@@ -1,5 +1,5 @@
 {
-  "name": "@org/nu-bash",
+"name": "@code-fixer-23/nu-bash",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
   "sourceRoot": "nu-bash/src",

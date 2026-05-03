@@ -85,15 +85,15 @@ importers:
 
   pi-agent-resource:
     dependencies:
+      '@code-fixer-23/pi-form-components':
+        specifier: workspace:*
+        version: link:../pi-form-components
       '@mariozechner/pi-coding-agent':
         specifier: ^0.67.2
         version: 0.67.68(ws@8.20.0)(zod@4.4.2)
       '@mariozechner/pi-tui':
         specifier: ^0.67.2
         version: 0.67.68
-      '@org/pi-form-components':
-        specifier: workspace:*
-        version: link:../pi-form-components
       memfs:
         specifier: ^4.57.2
         version: 4.57.2(tslib@2.8.1)

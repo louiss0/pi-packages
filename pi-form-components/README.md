@@ -1,6 +1,6 @@
-# @org/utils
+# @code-fixer-23/pi-form-components
 
-Shared utility functions used across all packages in the monorepo.
+Form component library for Pi extensions.
 
 ## 📦 Package Information
 

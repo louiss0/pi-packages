@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    name: '@org/pi-agent-resource',
+    name: '@code-fixer-23/pi-agent-resource',
     watch: false,
     globals: true,
     environment: 'node',
@@ -15,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@org/pi-form-components': path.resolve(__dirname, '../pi-form-components/src/index.ts'),
+      '@code-fixer-23/pi-form-components': path.resolve(__dirname, '../pi-form-components/src/index.ts'),
     },
   },
 });

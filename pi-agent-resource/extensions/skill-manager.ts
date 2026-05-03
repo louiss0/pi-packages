@@ -30,7 +30,7 @@ import {
   regex,
   string,
 } from "valibot";
-import { ConfirmationBox, Form, LabelledInput } from "@org/pi-form-components";
+import { ConfirmationBox, Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import { getResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";

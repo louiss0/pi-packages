@@ -56,8 +56,8 @@
   ],
   "release": {
     "projects": [
-      "!pi-form-components",
-      "!@org/source"
+      "!@code-fixer-23/pi-form-components",
+      "!@code-fixer-23/source"
     ],
     "version": {
       "preVersionCommand": "npx nx run-many -t build"

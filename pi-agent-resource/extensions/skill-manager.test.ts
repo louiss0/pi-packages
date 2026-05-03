@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { Key, type TUI } from "@mariozechner/pi-tui";
-import { Form } from "@org/pi-form-components";
+import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
   resetResourceFileSystem,

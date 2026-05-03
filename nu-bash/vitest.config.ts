@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    name: '@org/nu-bash',
+    name: '@code-fixer-23/nu-bash',
     watch: false,
     globals: true,
     environment: 'node',
