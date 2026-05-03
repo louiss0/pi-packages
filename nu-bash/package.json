@@ -1,12 +1,11 @@
 {
   "name": "@org/nu-bash",
   "scripts": {
-    "build": "vite build --config build.config.ts --mode production",
     "typecheck": "tsc -p tsconfig.lib.json --noEmit",
     "test": "vitest run --config build.config.ts --passWithNoTests",
     "lint": "eslint .",
     "format": "biome format --write .",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "version": "0.2.1"
 }

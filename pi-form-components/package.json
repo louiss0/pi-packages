@@ -16,7 +16,18 @@
     }
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@mariozechner/pi-coding-agent": "^0.67.2",
+    "@mariozechner/pi-tui": "^0.67.2"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4",
+    "vite": "^8.0.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit"
   },
   "nx": {
     "tags": [
