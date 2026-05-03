@@ -19,7 +19,7 @@ export class LabelledInput extends Container implements Component {
   #labelText: Text;
   #theme: Theme;
 
-  invalidate(): void {
+  override invalidate(): void {
     this.#labelText.invalidate();
     this.#input.invalidate();
     this.#errorText.invalidate();
@@ -135,7 +135,7 @@ export class ConfirmationBox extends Container implements Component {
     return [...lines, ...errorLines];
   }
 
-  invalidate(): void {
+  override invalidate(): void {
     this.#errorText.invalidate();
   }
 }
