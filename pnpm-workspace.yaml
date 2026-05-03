@@ -1,2 +1,4 @@
 packages:
-  - 'packages/*'
+  - 'pi-form-components'
+  - 'nu-bash'
+  - 'pi-agent-resource'

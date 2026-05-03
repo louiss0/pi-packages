@@ -4,16 +4,13 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/strings"
+      "path": "./pi-form-components"
     },
     {
-      "path": "./packages/colors"
+      "path": "./nu-bash"
     },
     {
-      "path": "./packages/async"
-    },
-    {
-      "path": "./packages/utils"
+      "path": "./pi-agent-resource"
     }
   ]
 }

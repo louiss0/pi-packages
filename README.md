@@ -12,12 +12,9 @@ This repository demonstrates a production-ready TypeScript monorepo with:
 
 - **3 Publishable Packages** - Ready for NPM publishing
 
-  - `@org/strings` - String manipulation utilities
-  - `@org/async` - Async utility functions with retry logic
-  - `@org/colors` - Color conversion and manipulation utilities
-
-- **1 Internal Library**
-  - `@org/utils` - Shared utilities (private, not published)
+  - `@org/pi-form-components` - Form component utilities
+  - `@org/nu-bash` - Nushell Pi extension
+  - `@org/pi-agent-resource` - Agent skills, prompts and subagents
 
 ## 🚀 Quick Start
 
@@ -118,26 +115,23 @@ npx nx release publish --projects=strings,colors
 ## 📁 Project Structure
 
 ```
-├── packages/
-│   ├── strings/     [scope:strings] - String utilities (publishable)
-│   ├── async/       [scope:async]   - Async utilities (publishable)
-│   ├── colors/      [scope:colors]  - Color utilities (publishable)
-│   └── utils/       [scope:shared]  - Shared utilities (private)
-├── nx.json          - Nx configuration
-├── tsconfig.json    - TypeScript configuration
-└── eslint.config.mjs - ESLint with module boundary rules
+├── pi-form-components/  - Form component utilities
+├── nu-bash/             - Nushell Pi extension
+├── pi-agent-resource/   - Agent skills, prompts and subagents
+├── nx.json              - Nx configuration
+├── tsconfig.json        - TypeScript configuration
+└── eslint.config.mjs    - ESLint with module boundary rules
 ```
 
 ## 🏷️ Understanding Tags
 
 This repository uses tags to enforce module boundaries:
 
-| Package        | Tag             | Can Import From        |
-| -------------- | --------------- | ---------------------- |
-| `@org/utils`   | `scope:shared`  | Nothing (base library) |
-| `@org/strings` | `scope:strings` | `scope:shared`         |
-| `@org/async`   | `scope:async`   | `scope:shared`         |
-| `@org/colors`  | `scope:colors`  | `scope:shared`         |
+| Package                   | Tag             | Can Import From        |
+| ------------------------- | --------------- | ---------------------- |
+| `@org/pi-form-components` | `scope:shared`  | Nothing (base library) |
+| `@org/nu-bash`            | `scope:nu-bash` | `scope:shared`         |
+| `@org/pi-agent-resource`  | `scope:resource`| `scope:shared`         |
 
 The ESLint configuration enforces these boundaries, preventing circular dependencies and maintaining clean architecture.
 
