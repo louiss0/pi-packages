@@ -2,7 +2,7 @@
   "name": "@org/nu-bash",
   "scripts": {
     "typecheck": "tsc -p tsconfig.lib.json --noEmit",
-    "test": "vitest run --config build.config.ts --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "lint": "eslint .",
     "format": "biome format --write .",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test"

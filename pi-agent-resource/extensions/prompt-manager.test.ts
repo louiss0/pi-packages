@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { Key, type TUI } from "@mariozechner/pi-tui";
-import { Form } from "../shared/components";
+import { Form } from "@org/pi-form-components";
 import {
   getResourceFileSystem,
   resetResourceFileSystem,

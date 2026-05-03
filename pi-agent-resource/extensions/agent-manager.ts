@@ -11,7 +11,7 @@ import {
   regex,
   string,
 } from "valibot";
-import { Form, LabelledInput } from "../shared/components";
+import { Form, LabelledInput } from "@org/pi-form-components";
 import { getResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
