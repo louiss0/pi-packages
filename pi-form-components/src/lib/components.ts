@@ -19,12 +19,6 @@ export class LabelledInput extends Container implements Component {
   #labelText: Text;
   #theme: Theme;
 
-  override invalidate(): void {
-    this.#labelText.invalidate();
-    this.#input.invalidate();
-    this.#errorText.invalidate();
-  }
-
   constructor(name: string, theme: Theme) {
     super();
     this.#name = name;
@@ -34,6 +28,12 @@ export class LabelledInput extends Container implements Component {
     this.addChild(this.#errorText);
     this.addChild(new Spacer(1));
     this.#theme = theme;
+  }
+
+  override invalidate(): void {
+    this.#labelText.invalidate();
+    this.#input.invalidate();
+    this.#errorText.invalidate();
   }
 
   setError(...messages: string[]) {
