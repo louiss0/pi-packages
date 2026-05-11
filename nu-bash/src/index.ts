@@ -279,16 +279,20 @@ async function executeNushellCommand(
 
       const fileName = timestampedFileName("nu-tool-output");
 
-      writeFileSync(fileName, output);
+      let outputBasedOnTruncation: string;
 
-      const tellAgentToReadFileWhenOutputIsTruncatedIfNotExposeContent = !truncation.truncated
-        ? truncation.content
-        : `File written to ${fileName} read that instead!
+      if (truncation.truncated) {
+        outputBasedOnTruncation = `File written to ${fileName} read that instead!
           Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}
           Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}
           `;
+        writeFileSync(fileName, output);
+      } else {
+        outputBasedOnTruncation = truncation.content;
+      }
+
       resolve({
-        output: tellAgentToReadFileWhenOutputIsTruncatedIfNotExposeContent,
+        output: outputBasedOnTruncation,
         exitCode,
         cancelled: Boolean(signal?.aborted),
         truncated: truncation.truncated,
