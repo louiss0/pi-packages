@@ -6,14 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": [
-      "dist",
-      "node_modules",
-      "coverage",
-      "tmp",
-      ".nx",
-      "pnpm-lock.yaml"
-    ]
+    "ignore": ["dist", "node_modules", "coverage", "tmp", ".nx", "pnpm-lock.yaml"]
   },
   "formatter": {
     "enabled": true,
@@ -29,7 +22,6 @@
   },
   "javascript": {
     "formatter": {
-      "quoteStyle": "single",
       "semicolons": "always",
       "trailingCommas": "all"
     }
