@@ -19,17 +19,8 @@ type BashParams = {
   timeout?: number;
 };
 
-const bashParameters = Type.Object({
-  command: Type.String({ description: 'Bash command to execute' }),
-  timeout: Type.Optional(
-    Type.Number({
-      description: 'Optional timeout in seconds before the command is aborted',
-    }),
-  ),
-}) as never;
-
-const NUSHELL_COMMAND = 'nu';
-const CANCEL_HINT = 'Press Escape to cancel.';
+const NUSHELL_COMMAND = "nu";
+const CANCEL_HINT = "Press Escape to cancel.";
 const ENV_VARIABLE_NAMES = Object.keys(process.env).sort();
 
 function getEnvSuggestions(prefix: string): AutocompleteItem[] {
@@ -307,7 +298,14 @@ export default function nuBashExtension(pi: ExtensionAPI) {
       'Use this tool for shell work. Commands execute through Nushell via `nu -c`, not bash.',
       `You are a Nushell user If you don't know something, resort to ${nuShellUrl}`,
     ],
-    parameters: bashParameters,
+    parameters: Type.Object({
+      command: Type.String({ description: "Bash command to execute" }),
+      timeout: Type.Optional(
+        Type.Number({
+          description: "Optional timeout in seconds before the command is aborted",
+        }),
+      ),
+    }),
     async execute(_toolCallId, params: BashParams, signal, onUpdate, ctx) {
       const timeoutSignal = params.timeout
         ? AbortSignal.timeout(params.timeout * 1000)
