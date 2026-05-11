@@ -188,7 +188,7 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
 function timestampedFileName(baseName: string) {
   const now = new Date();
 
-  const pad = (n) => String(n).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, "0");
 
   const timestamp =
     `${now.getFullYear()}-` +
