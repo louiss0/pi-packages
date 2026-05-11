@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import {
   BashOperations,
   CustomEditor,
@@ -14,12 +15,6 @@ import type {
   AutocompleteSuggestions,
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { writeFile, writeFileSync } from "node:fs";
-
-type BashParams = {
-  command: string;
-  timeout?: number;
-};
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
