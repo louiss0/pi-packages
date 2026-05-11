@@ -185,6 +185,22 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
   return `(command exited with code ${exitCode})`;
 }
 
+function timestampedFileName(baseName: string) {
+  const now = new Date();
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  const timestamp =
+    `${now.getFullYear()}-` +
+    `${pad(now.getMonth() + 1)}-` +
+    `${pad(now.getDate())}_` +
+    `${pad(now.getHours())}-` +
+    `${pad(now.getMinutes())}-` +
+    `${pad(now.getSeconds())}`;
+
+  return `${baseName}_${timestamp}.txt`;
+}
+
 async function executeNushellCommand(
   command: string,
   cwd: string,
@@ -261,8 +277,18 @@ async function executeNushellCommand(
 
       emitUpdate(exitCode);
 
+      const fileName = timestampedFileName("nu-tool-output");
+
+      writeFileSync(fileName, output);
+
+      const tellAgentToReadFileWhenOutputIsTruncatedIfNotExposeContent = !truncation.truncated
+        ? truncation.content
+        : `File written to ${fileName} read that instead!
+          Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}
+          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}
+          `;
       resolve({
-        output: truncation.content || formatToolOutput('', '', exitCode),
+        output: tellAgentToReadFileWhenOutputIsTruncatedIfNotExposeContent,
         exitCode,
         cancelled: Boolean(signal?.aborted),
         truncated: truncation.truncated,
