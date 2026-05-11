@@ -1,5 +1,12 @@
 {
-"name": "@code-fixer-23/nu-bash",
+  "type": "module",
+  "name": "@code-fixer-23/nu-bash",
+  "version": "0.2.1",
+  "description": "The extension created to run nu shell instead of bash as ",
+  "author": {
+    "name": "Shelton Louis",
+    "email": "louisshelton0@gmail.com"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.lib.json --noEmit",
     "test": "vitest run --passWithNoTests",
@@ -7,5 +14,7 @@
     "format": "biome format --write .",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
-  "version": "0.2.1"
+  "keywords": [
+    "pi-package"
+  ]
 }
