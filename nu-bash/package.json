@@ -2,7 +2,7 @@
   "type": "module",
   "name": "@code-fixer-23/nu-bash",
   "version": "0.2.1",
-  "description": "The extension created to run nu shell instead of bash as ",
+  "description": "The extension created to run nu shell instead of bash in the bash tool",
   "author": {
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
