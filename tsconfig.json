@@ -7,7 +7,7 @@
       "path": "./pi-form-components"
     },
     {
-      "path": "./nu-bash"
+      "path": "./bash-tooljack-nu"
     },
     {
       "path": "./pi-agent-resource"

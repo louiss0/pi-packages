@@ -1,8 +1,8 @@
 {
   "type": "module",
-  "name": "@code-fixer-23/nu-bash",
+  "name": "@code-fixer-23/bash-tooljack-nu",
   "version": "0.2.1",
-  "description": "The extension created to run nu shell instead of bash in the bash tool",
+  "description": "Pi extension that hijacks the bash tool and routes it through Nushell",
   "author": {
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
@@ -16,5 +16,8 @@
   },
   "keywords": [
     "pi-package"
-  ]
+  ],
+  "nx": {
+    "includedScripts": ["check"]
+  }
 }

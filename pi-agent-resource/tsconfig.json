@@ -6,5 +6,10 @@
     "types": ["vitest/globals"],
     "strict": true,
     "skipLibCheck": true
-  }
+  },
+  "references": [
+    {
+      "path": "../pi-form-components"
+    }
+  ]
 }

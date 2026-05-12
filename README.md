@@ -13,7 +13,7 @@ This repository demonstrates a production-ready TypeScript monorepo with:
 - **3 Publishable Packages** - Ready for NPM publishing
 
   - `@org/pi-form-components` - Form component utilities
-  - `@org/nu-bash` - Nushell Pi extension
+  - `@org/bash-tooljack-nu` - Nushell-backed bash tooljack extension
   - `@org/pi-agent-resource` - Agent skills, prompts and subagents
 
 ## 🚀 Quick Start
@@ -26,8 +26,8 @@ cd typescript-template
 # Install dependencies
 npm install
 
-# Build all packages
-npx nx run-many -t build
+# Run typechecks across packages
+npx nx run-many -t typecheck
 
 # Run tests
 npx nx run-many -t test
@@ -36,7 +36,7 @@ npx nx run-many -t test
 npx nx run-many -t lint
 
 # Run everything in parallel
-npx nx run-many -t lint test build --parallel=3
+npx nx run-many -t lint typecheck test --parallel=3
 
 # Visualize the project graph
 npx nx graph
@@ -116,7 +116,7 @@ npx nx release publish --projects=strings,colors
 
 ```
 ├── pi-form-components/  - Form component utilities
-├── nu-bash/             - Nushell Pi extension
+├── bash-tooljack-nu/    - Nushell-backed bash tooljack extension
 ├── pi-agent-resource/   - Agent skills, prompts and subagents
 ├── nx.json              - Nx configuration
 ├── tsconfig.json        - TypeScript configuration
@@ -130,7 +130,7 @@ This repository uses tags to enforce module boundaries:
 | Package                   | Tag             | Can Import From        |
 | ------------------------- | --------------- | ---------------------- |
 | `@org/pi-form-components` | `scope:shared`  | Nothing (base library) |
-| `@org/nu-bash`            | `scope:nu-bash` | `scope:shared`         |
+| `@org/bash-tooljack-nu`   | `scope:nu-bash` | `scope:shared`         |
 | `@org/pi-agent-resource`  | `scope:resource`| `scope:shared`         |
 
 The ESLint configuration enforces these boundaries, preventing circular dependencies and maintaining clean architecture.
@@ -152,17 +152,17 @@ npx nx list                                     # List installed plugins
 npx nx show project strings --web              # View project details
 
 # Development
-npx nx build strings                           # Build a specific package
+npx nx typecheck strings                       # Typecheck a specific package
 npx nx test async                              # Test a specific package
 npx nx lint colors                             # Lint a specific package
 
 # Running multiple tasks
-npx nx run-many -t build                       # Build all projects
+npx nx run-many -t typecheck                   # Typecheck all projects
 npx nx run-many -t test --parallel=3          # Test in parallel
-npx nx run-many -t lint test build            # Run multiple targets
+npx nx run-many -t lint typecheck test        # Run multiple targets
 
 # Affected commands (great for CI)
-npx nx affected -t build                       # Build only affected projects
+npx nx affected -t typecheck                   # Typecheck only affected projects
 npx nx affected -t test                        # Test only affected projects
 
 # Release management

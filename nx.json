@@ -19,12 +19,6 @@
       "options": {
         "typecheck": {
           "targetName": "typecheck"
-        },
-        "build": {
-          "targetName": "build",
-          "configName": "tsconfig.lib.json",
-          "buildDepsName": "build-deps",
-          "watchDepsName": "watch-deps"
         }
       }
     },
@@ -60,13 +54,13 @@
       "!@code-fixer-23/source"
     ],
     "version": {
-      "preVersionCommand": "npx nx run-many -t build"
+      "preVersionCommand": "npx nx run-many -t typecheck,test"
     }
   },
   "targetDefaults": {
     "test": {
       "dependsOn": [
-        "^build"
+        "^typecheck"
       ]
     }
   },

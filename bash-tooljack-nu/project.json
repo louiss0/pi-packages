@@ -1,0 +1,15 @@
+{
+"name": "@code-fixer-23/bash-tooljack-nu",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "bash-tooljack-nu/src",
+  "targets": {
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --dir bash-tooljack-nu run format"
+      }
+    }
+  },
+  "tags": []
+}
