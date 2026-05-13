@@ -186,7 +186,7 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
 
 async function getRecentHistoryCommands(cwd: string) {
   const historyResult = await executeNushellCommand(
-    `history | last ${HISTORY_LIMIT}  | get command | to json`,
+    `history | last ${HISTORY_LIMIT}| where command !~ '(?i)pi'  | get command | to json`,
     cwd,
   );
 
