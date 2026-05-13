@@ -11,15 +11,14 @@ import {
   truncateTail,
 } from "@mariozechner/pi-coding-agent";
 import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions } from "@mariozechner/pi-tui";
-import { Container, SelectList, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 import {
   buildHistoryItems,
   getHistoryQuery,
+  HistoryPicker,
   HISTORY_LIMIT,
   parseHistoryCommands,
-  updateHistoryFilter,
 } from "./history.js";
 
 const NUSHELL_COMMAND = "nu";
@@ -207,60 +206,8 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
 
   return ctx.ui.custom<string | null>(
     (tui, theme, _keybindings, done) => {
-      const container = new Container();
-      const filterLabel = new Text();
-      const selectList = new SelectList(items, Math.min(items.length, 12), {
-        selectedPrefix: (text) => theme.fg("accent", text),
-        selectedText: (text) => theme.fg("accent", text),
-        description: (text) => theme.fg("muted", text),
-        scrollInfo: (text) => theme.fg("dim", text),
-        noMatch: (text) => theme.fg("warning", text),
-      });
-      let filter = "";
-
-      const syncFilter = () => {
-        selectList.setFilter(filter);
-        filterLabel.setText(
-          theme.fg(
-            "muted",
-            `Filter: ${filter || `(type to narrow the last ${HISTORY_LIMIT} commands)`}`,
-          ),
-        );
-      };
-
-      container.addChild(new Text(theme.fg("accent", theme.bold("Recent Nushell History"))));
-      container.addChild(filterLabel);
-
-      selectList.onSelect = (item) => done(item.value);
-      selectList.onCancel = () => done(null);
-
-      container.addChild(selectList);
-      container.addChild(
-        new Text(theme.fg("dim", "type to filter • ↑↓ navigate • enter execute • esc cancel")),
-      );
-
-      syncFilter();
-
-      return {
-        render(width: number) {
-          return container.render(width);
-        },
-        invalidate() {
-          container.invalidate();
-        },
-        handleInput(data: string) {
-          const nextFilter = updateHistoryFilter(filter, data);
-          if (nextFilter !== filter) {
-            filter = nextFilter;
-            syncFilter();
-            tui.requestRender();
-            return;
-          }
-
-          selectList.handleInput(data);
-          tui.requestRender();
-        },
-      };
+      const historyPicker = new HistoryPicker(items, HISTORY_LIMIT);
+      return historyPicker.createComponent(tui, done, theme);
     },
     {
       overlay: true,

@@ -3,8 +3,9 @@ import {
   getHistoryQuery,
   HISTORY_LIMIT,
   parseHistoryCommands,
+  shouldIncludeHistoryCommand,
   updateHistoryFilter,
-} from "./history";
+} from "./history.js";
 
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
@@ -13,11 +14,16 @@ describe("history helpers", () => {
     );
   });
 
-  it("keeps only non-empty string commands", () => {
-    expect(parseHistoryCommands(JSON.stringify(["ls", "", 1, null, "pwd"]))).toEqual([
-      "ls",
-      "pwd",
-    ]);
+  it("keeps only non-empty non-pi string commands", () => {
+    expect(
+      parseHistoryCommands(JSON.stringify(["ls", "", 1, null, "pwd", "pi", "PI tools"])),
+    ).toEqual(["ls", "pwd"]);
+  });
+
+  it("never allows pi commands into the command list", () => {
+    expect(shouldIncludeHistoryCommand("pi")).toBe(false);
+    expect(shouldIncludeHistoryCommand("PI tools list")).toBe(false);
+    expect(shouldIncludeHistoryCommand("pnpm nx test")).toBe(true);
   });
 
   it("reverses history items so the newest command is first", () => {
