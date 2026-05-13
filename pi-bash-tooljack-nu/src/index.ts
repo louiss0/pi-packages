@@ -19,7 +19,7 @@ import {
   HistoryPicker,
   HISTORY_LIMIT,
   parseHistoryCommands,
-} from "./history.js";
+} from "./history";
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
@@ -205,10 +205,18 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
   const items = buildHistoryItems(commands);
 
   return ctx.ui.custom<string | null>(
-    (tui, theme, _keybindings, done) => {
-      const historyPicker = new HistoryPicker(items, HISTORY_LIMIT);
-      return historyPicker.createComponent(tui, done, theme);
-    },
+    (tui, theme, _keybindings, done) =>
+      new HistoryPicker(
+        {
+          items,
+          itemLimit: HISTORY_LIMIT,
+          theme,
+        },
+        {
+          tui,
+          done,
+        },
+      ),
     {
       overlay: true,
       overlayOptions: {

@@ -5,7 +5,7 @@ import {
   parseHistoryCommands,
   shouldIncludeHistoryCommand,
   updateHistoryFilter,
-} from "./history.js";
+} from "./history";
 
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
