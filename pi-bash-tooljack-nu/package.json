@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "@code-fixer-23/bash-tooljack-nu",
+  "name": "@code-fixer-23/pi-bash-tooljack-nu",
   "version": "0.2.1",
   "description": "Pi extension that hijacks the bash tool and routes it through Nushell",
   "author": {
