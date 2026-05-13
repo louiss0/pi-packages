@@ -600,14 +600,14 @@ export default function nuBashExtension(pi: ExtensionAPI) {
                     return;
                 }
 
-                if (ctx.isIdle()) {
-                    pi.sendUserMessage(`!${command}`);
-                    return;
-                }
+                const result = await pi.exec(NUSHELL_COMMAND, getNuArgs(command), {
+                    cwd: ctx.cwd,
+                });
+                const message = formatToolOutput(result.stdout, result.stderr, result.code);
 
-                pi.sendUserMessage(`!${command}`, { deliverAs: "followUp" });
+                ctx.ui.notify(`Executed: ${command}\n${message}`, result.code === 0 ? "info" : "error");
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Failed to open Nushell history.";
+                const message = error instanceof Error ? error.message : "Failed to execute Nushell history command.";
                 ctx.ui.notify(message, "error");
             }
         },
