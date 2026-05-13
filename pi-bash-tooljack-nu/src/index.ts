@@ -21,6 +21,7 @@ import { getHistoryQuery, HistoryPicker, HISTORY_LIMIT, parseHistoryCommands } f
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
+const COMMAND_COMPLETION_LIMIT = 50;
 const ENV_VARIABLE_NAMES = Object.keys(process.env).sort();
 
 function getEnvSuggestions(prefix: string): AutocompleteItem[] {
@@ -35,6 +36,71 @@ function getEnvSuggestions(prefix: string): AutocompleteItem[] {
   }));
 }
 
+interface CommandMetadata {
+  name?: string;
+  description?: string;
+  signatures?: Array<Record<string, unknown>>;
+  signature?: Record<string, unknown>;
+  type?: string;
+}
+
+interface CommandCompletionItem extends AutocompleteItem {
+  requiresClosure?: boolean;
+}
+
+function isClosureFirstCommand(command: CommandMetadata) {
+  const signatureTexts = [
+    command.signature,
+    ...(command.signatures ?? []),
+  ]
+    .map((signature) => JSON.stringify(signature).toLowerCase())
+    .join(" ");
+
+  return signatureTexts.includes("closure") || signatureTexts.includes("block");
+}
+
+function buildCommandCompletionItem(command: CommandMetadata): CommandCompletionItem {
+  const label = command.name ?? "";
+  return {
+    value: label,
+    label,
+    description: command.description,
+    requiresClosure: isClosureFirstCommand(command),
+  };
+}
+
+async function getCommandSuggestions(prefix: string, signal?: AbortSignal): Promise<AutocompleteSuggestions | null> {
+  const result = await executeNushellCommand(
+    `scope commands | get name description signature signatures type | to json`,
+    process.cwd(),
+    signal,
+  );
+
+  if (result.exitCode !== 0) {
+    return null;
+  }
+
+  const commands = JSON.parse(result.output) as CommandMetadata[];
+  const normalizedPrefix = prefix.toLowerCase();
+  const items = commands
+    .filter((command) => typeof command.name === "string" && command.name.length > 0)
+    .filter((command) => {
+      const name = command.name;
+      return prefix ? name?.toLowerCase().includes(normalizedPrefix) : true;
+    })
+    .slice(0, COMMAND_COMPLETION_LIMIT)
+    .map(buildCommandCompletionItem);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    items,
+    prefix,
+  };
+}
+
 class NuAutocompleteProvider implements AutocompleteProvider {
   constructor(private readonly baseProvider: AutocompleteProvider) {}
 
@@ -46,6 +112,11 @@ class NuAutocompleteProvider implements AutocompleteProvider {
   ): Promise<AutocompleteSuggestions | null> {
     const currentLine = lines[cursorLine] ?? "";
     const textBeforeCursor = currentLine.slice(0, cursorCol);
+    const commandPrefix = textBeforeCursor.match(/#([A-Za-z0-9_:-]*)$/);
+    if (commandPrefix) {
+      return getCommandSuggestions(commandPrefix[1] ?? "", options.signal);
+    }
+
     const envPrefix = textBeforeCursor.match(/\$env(?:\.([A-Za-z0-9_]*))?$/);
     if (envPrefix) {
       const propPrefix = envPrefix[1] ?? "";
@@ -82,6 +153,20 @@ class NuAutocompleteProvider implements AutocompleteProvider {
     item: AutocompleteItem,
     prefix: string,
   ) {
+    const completionItem = item as CommandCompletionItem;
+    if (completionItem.requiresClosure) {
+      const line = lines[cursorLine] ?? "";
+      const beforePrefix = line.slice(0, cursorCol - prefix.length);
+      const afterCursor = line.slice(cursorCol);
+      const newLines = [...lines];
+      newLines[cursorLine] = `${beforePrefix}#${item.value} {|$in| $in }${afterCursor}`;
+      return {
+        lines: newLines,
+        cursorLine,
+        cursorCol: beforePrefix.length + item.value.length + 14,
+      };
+    }
+
     return this.baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
   }
 }
