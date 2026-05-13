@@ -281,6 +281,25 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
   return `(command exited with code ${exitCode})`;
 }
 
+function truncateBashToolOutput(output: string) {
+  const truncation = truncateTail(output, {
+    maxBytes: DEFAULT_MAX_BYTES,
+    maxLines: DEFAULT_MAX_LINES,
+  });
+
+  if (!truncation.truncated) {
+    return { output: truncation.content, truncated: false };
+  }
+
+  const fileName = `nu-tool-output_${Date.now()}.txt`;
+  writeFileSync(fileName, output);
+
+  return {
+    output: `File written to ${fileName} read that instead!\n          Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}\n          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}\n          `,
+    truncated: true,
+  };
+}
+
 async function getRecentHistoryCommands(cwd: string) {
   const historyResult = await executeNushellCommand(getHistoryQuery(), cwd);
 
@@ -321,22 +340,6 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
   );
 }
 
-function timestampedFileName(baseName: string) {
-  const now = new Date();
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-
-  const timestamp =
-    `${now.getFullYear()}-` +
-    `${pad(now.getMonth() + 1)}-` +
-    `${pad(now.getDate())}_` +
-    `${pad(now.getHours())}-` +
-    `${pad(now.getMinutes())}-` +
-    `${pad(now.getSeconds())}`;
-
-  return `${baseName}_${timestamp}.txt`;
-}
-
 async function executeNushellCommand(
   command: string,
   cwd: string,
@@ -347,7 +350,6 @@ async function executeNushellCommand(
     output: string;
     exitCode: number;
     cancelled: boolean;
-    truncated: boolean;
   }>((resolve, reject) => {
     const child = spawn(NUSHELL_COMMAND, getNuArgs(command), {
       cwd,
@@ -406,32 +408,12 @@ async function executeNushellCommand(
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
       const stderr = Buffer.concat(stderrChunks).toString("utf-8");
       const output = [stdout, stderr].filter(Boolean).join("\n").trim();
-      const truncation = truncateTail(output, {
-        maxBytes: DEFAULT_MAX_BYTES,
-        maxLines: DEFAULT_MAX_LINES,
-      });
-
       emitUpdate(exitCode);
 
-      const fileName = timestampedFileName("nu-tool-output");
-
-      let outputBasedOnTruncation: string;
-
-      if (truncation.truncated) {
-        outputBasedOnTruncation = `File written to ${fileName} read that instead!
-          Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}
-          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}
-          `;
-        writeFileSync(fileName, output);
-      } else {
-        outputBasedOnTruncation = truncation.content;
-      }
-
       resolve({
-        output: outputBasedOnTruncation,
+        output,
         exitCode,
         cancelled: Boolean(signal?.aborted),
-        truncated: truncation.truncated,
       });
     });
   });
@@ -726,11 +708,13 @@ export default function nuBashExtension(pi: ExtensionAPI) {
         },
       );
 
+      const toolOutput = truncateBashToolOutput(result.output);
+
       return {
         content: [
           {
             type: "text",
-            text: result.output,
+            text: toolOutput.output,
           },
         ],
         details: {
@@ -738,9 +722,9 @@ export default function nuBashExtension(pi: ExtensionAPI) {
           backend: "nu",
           cwd: ctx.cwd,
           exitCode: result.exitCode,
-          output: result.output,
+          output: toolOutput.output,
           killed: result.cancelled,
-          truncated: result.truncated,
+          truncated: toolOutput.truncated,
         },
         isError: result.exitCode !== 0,
       };
