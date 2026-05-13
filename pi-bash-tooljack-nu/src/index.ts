@@ -49,10 +49,8 @@ interface CommandCompletionItem extends AutocompleteItem {
 }
 
 function isClosureFirstCommand(command: CommandMetadata) {
-  const signatureTexts = [
-    command.signature,
-    ...(command.signatures ?? []),
-  ]
+  const signatureTexts = [command.signature, ...(command.signatures ?? [])]
+    .filter((signature) => signature !== undefined && signature !== null)
     .map((signature) => JSON.stringify(signature).toLowerCase())
     .join(" ");
 
@@ -69,18 +67,10 @@ function buildCommandCompletionItem(command: CommandMetadata): CommandCompletion
   };
 }
 
-async function getCommandSuggestions(prefix: string, signal?: AbortSignal): Promise<AutocompleteSuggestions | null> {
-  const result = await executeNushellCommand(
-    `scope commands | get name description signature signatures type | to json`,
-    process.cwd(),
-    signal,
-  );
-
-  if (result.exitCode !== 0) {
-    return null;
-  }
-
-  const commands = JSON.parse(result.output) as CommandMetadata[];
+export function getCommandSuggestionsFromCommands(
+  commands: CommandMetadata[],
+  prefix: string,
+): AutocompleteSuggestions | null {
   const normalizedPrefix = prefix.toLowerCase();
   const items = commands
     .filter((command) => typeof command.name === "string" && command.name.length > 0)
@@ -99,6 +89,21 @@ async function getCommandSuggestions(prefix: string, signal?: AbortSignal): Prom
     items,
     prefix,
   };
+}
+
+async function getCommandSuggestions(prefix: string, signal?: AbortSignal): Promise<AutocompleteSuggestions | null> {
+  const result = await executeNushellCommand(
+    `scope commands | get name description signature signatures type | to json`,
+    process.cwd(),
+    signal,
+  );
+
+  if (result.exitCode !== 0) {
+    return null;
+  }
+
+  const commands = JSON.parse(result.output) as CommandMetadata[];
+  return getCommandSuggestionsFromCommands(commands, prefix);
 }
 
 class NuAutocompleteProvider implements AutocompleteProvider {

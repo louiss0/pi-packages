@@ -6,6 +6,8 @@ import {
   updateHistoryFilter,
 } from "./history";
 
+import { getCommandSuggestionsFromCommands } from "./index";
+
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
     expect(getHistoryQuery()).toBe(
@@ -32,5 +34,24 @@ describe("history helpers", () => {
     expect(updateHistoryFilter("git s", "\u007f")).toBe("git ");
     expect(updateHistoryFilter("git ", "\u0015")).toBe("");
     expect(updateHistoryFilter("git", "\u001b[A")).toBe("git");
+  });
+
+  it("shows command completion output for command metadata", () => {
+    expect(
+      getCommandSuggestionsFromCommands(
+        [
+          { name: "ls", description: "list files" },
+          { name: "do", description: "run closure", signature: { input: "closure" } },
+          { name: "", description: "ignored" },
+        ],
+        "",
+      ),
+    ).toEqual({
+      prefix: "",
+      items: [
+        { value: "ls", label: "ls", description: "list files", requiresClosure: false },
+        { value: "do", label: "do", description: "run closure", requiresClosure: true },
+      ],
+    });
   });
 });
