@@ -71,7 +71,7 @@ export class HistoryPicker implements Component {
   readonly #container = new Container();
   readonly #filterLabel = new Text();
   readonly #selectList: SelectList;
-  filter = "";
+  #filter = "";
 
   constructor(
     private readonly configOptions: HistoryPickerConfigOptions,
@@ -85,17 +85,13 @@ export class HistoryPicker implements Component {
       }))
       .reverse();
 
-    this.#selectList = new SelectList(
-      items,
-      Math.min(items.length, configOptions.itemLimit),
-      {
-        selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
-        selectedText: (text) => requirementOptions.theme.fg("accent", text),
-        description: (text) => requirementOptions.theme.fg("muted", text),
-        scrollInfo: (text) => requirementOptions.theme.fg("dim", text),
-        noMatch: (text) => requirementOptions.theme.fg("warning", text),
-      },
-    );
+    this.#selectList = new SelectList(items, Math.min(items.length, configOptions.itemLimit), {
+      selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
+      selectedText: (text) => requirementOptions.theme.fg("accent", text),
+      description: (text) => requirementOptions.theme.fg("muted", text),
+      scrollInfo: (text) => requirementOptions.theme.fg("dim", text),
+      noMatch: (text) => requirementOptions.theme.fg("warning", text),
+    });
 
     this.#container.addChild(
       new Text(
@@ -131,9 +127,9 @@ export class HistoryPicker implements Component {
   }
 
   handleInput(data: string) {
-    const nextFilter = updateHistoryFilter(this.filter, data);
-    if (nextFilter !== this.filter) {
-      this.filter = nextFilter;
+    const nextFilter = updateHistoryFilter(this.#filter, data);
+    if (nextFilter !== this.#filter) {
+      this.#filter = nextFilter;
       this.#syncFilter();
       this.requirementOptions.tui.requestRender();
       return;
@@ -144,11 +140,11 @@ export class HistoryPicker implements Component {
   }
 
   #syncFilter() {
-    this.#selectList.setFilter(this.filter);
+    this.#selectList.setFilter(this.#filter);
     this.#filterLabel.setText(
       this.requirementOptions.theme.fg(
         "muted",
-        `Filter: ${this.filter || `(type to narrow the last ${this.configOptions.itemLimit} commands)`}`,
+        `Filter: ${this.#filter || `(type to narrow the last ${this.configOptions.itemLimit} commands)`}`,
       ),
     );
   }
