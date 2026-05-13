@@ -10,7 +10,11 @@ import {
   formatSize,
   truncateTail,
 } from "@mariozechner/pi-coding-agent";
-import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions } from "@mariozechner/pi-tui";
+import type {
+  AutocompleteItem,
+  AutocompleteProvider,
+  AutocompleteSuggestions,
+} from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 import {
@@ -210,9 +214,9 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
         {
           items,
           itemLimit: HISTORY_LIMIT,
-          theme,
         },
         {
+          theme,
           tui,
           done,
         },

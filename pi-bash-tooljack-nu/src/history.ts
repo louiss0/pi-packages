@@ -14,10 +14,10 @@ interface HistoryPickerTheme {
 interface HistoryPickerConfigOptions {
   items: SelectItem[];
   itemLimit: number;
-  theme: HistoryPickerTheme;
 }
 
 interface HistoryPickerRequirementOptions {
+  theme: HistoryPickerTheme;
   tui: TUI;
   done: (value: string | null) => void;
 }
@@ -81,17 +81,20 @@ export class HistoryPicker implements Component {
       configOptions.items,
       Math.min(configOptions.items.length, configOptions.itemLimit),
       {
-        selectedPrefix: (text) => configOptions.theme.fg("accent", text),
-        selectedText: (text) => configOptions.theme.fg("accent", text),
-        description: (text) => configOptions.theme.fg("muted", text),
-        scrollInfo: (text) => configOptions.theme.fg("dim", text),
-        noMatch: (text) => configOptions.theme.fg("warning", text),
+        selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
+        selectedText: (text) => requirementOptions.theme.fg("accent", text),
+        description: (text) => requirementOptions.theme.fg("muted", text),
+        scrollInfo: (text) => requirementOptions.theme.fg("dim", text),
+        noMatch: (text) => requirementOptions.theme.fg("warning", text),
       },
     );
 
     this.#container.addChild(
       new Text(
-        configOptions.theme.fg("accent", configOptions.theme.bold("Recent Nushell History")),
+        requirementOptions.theme.fg(
+          "accent",
+          requirementOptions.theme.bold("Recent Nushell History"),
+        ),
       ),
     );
 
@@ -99,7 +102,7 @@ export class HistoryPicker implements Component {
     this.#container.addChild(this.#selectList);
     this.#container.addChild(
       new Text(
-        configOptions.theme.fg(
+        requirementOptions.theme.fg(
           "dim",
           "type to filter • ↑↓ navigate • enter execute • esc cancel",
         ),
@@ -135,7 +138,7 @@ export class HistoryPicker implements Component {
   #syncFilter() {
     this.#selectList.setFilter(this.filter);
     this.#filterLabel.setText(
-      this.configOptions.theme.fg(
+      this.requirementOptions.theme.fg(
         "muted",
         `Filter: ${this.filter || `(type to narrow the last ${this.configOptions.itemLimit} commands)`}`,
       ),
