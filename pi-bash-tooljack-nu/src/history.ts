@@ -12,7 +12,7 @@ interface HistoryPickerTheme {
 }
 
 interface HistoryPickerConfigOptions {
-  items: SelectItem[];
+  commands: string[];
   itemLimit: number;
 }
 
@@ -77,9 +77,17 @@ export class HistoryPicker implements Component {
     private readonly configOptions: HistoryPickerConfigOptions,
     private readonly requirementOptions: HistoryPickerRequirementOptions,
   ) {
+    const items = configOptions.commands
+      .map((command, index) => ({
+        value: command,
+        label: command,
+        description: `${index + 1}`,
+      }))
+      .reverse();
+
     this.#selectList = new SelectList(
-      configOptions.items,
-      Math.min(configOptions.items.length, configOptions.itemLimit),
+      items,
+      Math.min(items.length, configOptions.itemLimit),
       {
         selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
         selectedText: (text) => requirementOptions.theme.fg("accent", text),

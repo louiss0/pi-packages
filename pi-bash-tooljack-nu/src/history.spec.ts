@@ -1,5 +1,4 @@
 import {
-  buildHistoryItems,
   getHistoryQuery,
   HISTORY_LIMIT,
   parseHistoryCommands,
@@ -26,12 +25,6 @@ describe("history helpers", () => {
     expect(shouldIncludeHistoryCommand("pnpm nx test")).toBe(true);
   });
 
-  it("reverses history items so the newest command is first", () => {
-    expect(buildHistoryItems(["older", "newer"])).toEqual([
-      { value: "newer", label: "newer", description: "2" },
-      { value: "older", label: "older", description: "1" },
-    ]);
-  });
 
   it("updates the inline filter from typed input", () => {
     expect(updateHistoryFilter("git", " ")).toBe("git ");
