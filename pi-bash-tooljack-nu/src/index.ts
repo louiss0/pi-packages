@@ -10,18 +10,20 @@ import {
   formatSize,
   truncateTail,
 } from "@mariozechner/pi-coding-agent";
-import type {
-  AutocompleteItem,
-  AutocompleteProvider,
-  AutocompleteSuggestions,
-  SelectItem,
-} from "@mariozechner/pi-tui";
+import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions } from "@mariozechner/pi-tui";
 import { Container, SelectList, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
+import {
+  buildHistoryItems,
+  getHistoryQuery,
+  HISTORY_LIMIT,
+  parseHistoryCommands,
+  updateHistoryFilter,
+} from "./history.js";
+
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
-const HISTORY_LIMIT = 15;
 const ENV_VARIABLE_NAMES = Object.keys(process.env).sort();
 
 function getEnvSuggestions(prefix: string): AutocompleteItem[] {
@@ -185,23 +187,13 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
 }
 
 async function getRecentHistoryCommands(cwd: string) {
-  const historyResult = await executeNushellCommand(
-    `history | last ${HISTORY_LIMIT}| where command !~ '(?i)pi'  | get command | to json`,
-    cwd,
-  );
+  const historyResult = await executeNushellCommand(getHistoryQuery(), cwd);
 
   if (historyResult.exitCode !== 0) {
     throw new Error(historyResult.output || "Failed to read Nushell history.");
   }
 
-  const parsedOutput = JSON.parse(historyResult.output) as unknown;
-  if (!Array.isArray(parsedOutput)) {
-    return [];
-  }
-
-  return parsedOutput.filter(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
+  return parseHistoryCommands(historyResult.output);
 }
 
 async function selectHistoryCommand(ctx: ExtensionContext) {
@@ -211,32 +203,43 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
     return null;
   }
 
-  const items: SelectItem[] = commands
-    .map((command, index) => ({
-      value: command,
-      label: command,
-      description: `${index + 1}`,
-    }))
-    .reverse();
+  const items = buildHistoryItems(commands);
 
   return ctx.ui.custom<string | null>(
     (tui, theme, _keybindings, done) => {
       const container = new Container();
-      container.addChild(new Text(theme.fg("accent", theme.bold("Recent Nushell History"))));
-
-      const selectList = new SelectList(items, Math.min(items.length, HISTORY_LIMIT), {
+      const filterLabel = new Text();
+      const selectList = new SelectList(items, Math.min(items.length, 12), {
         selectedPrefix: (text) => theme.fg("accent", text),
         selectedText: (text) => theme.fg("accent", text),
         description: (text) => theme.fg("muted", text),
         scrollInfo: (text) => theme.fg("dim", text),
         noMatch: (text) => theme.fg("warning", text),
       });
+      let filter = "";
+
+      const syncFilter = () => {
+        selectList.setFilter(filter);
+        filterLabel.setText(
+          theme.fg(
+            "muted",
+            `Filter: ${filter || `(type to narrow the last ${HISTORY_LIMIT} commands)`}`,
+          ),
+        );
+      };
+
+      container.addChild(new Text(theme.fg("accent", theme.bold("Recent Nushell History"))));
+      container.addChild(filterLabel);
 
       selectList.onSelect = (item) => done(item.value);
       selectList.onCancel = () => done(null);
 
       container.addChild(selectList);
-      container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter execute • esc cancel")));
+      container.addChild(
+        new Text(theme.fg("dim", "type to filter • ↑↓ navigate • enter execute • esc cancel")),
+      );
+
+      syncFilter();
 
       return {
         render(width: number) {
@@ -246,6 +249,14 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
           container.invalidate();
         },
         handleInput(data: string) {
+          const nextFilter = updateHistoryFilter(filter, data);
+          if (nextFilter !== filter) {
+            filter = nextFilter;
+            syncFilter();
+            tui.requestRender();
+            return;
+          }
+
           selectList.handleInput(data);
           tui.requestRender();
         },
