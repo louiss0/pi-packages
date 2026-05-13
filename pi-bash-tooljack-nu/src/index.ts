@@ -39,6 +39,7 @@ function getEnvSuggestions(prefix: string): AutocompleteItem[] {
 interface CommandMetadata {
   name?: string;
   description?: string;
+  search_terms?: string;
   signatures?: Array<Record<string, unknown>>;
   signature?: Record<string, unknown>;
   type?: string;
@@ -75,8 +76,15 @@ export function getCommandSuggestionsFromCommands(
   const items = commands
     .filter((command) => typeof command.name === "string" && command.name.length > 0)
     .filter((command) => {
-      const name = command.name;
-      return prefix ? name?.toLowerCase().includes(normalizedPrefix) : true;
+      if (!prefix) {
+        return true;
+      }
+
+      const haystacks = [command.name, command.description, command.search_terms]
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+        .map((value) => value.toLowerCase());
+
+      return haystacks.some((value) => value.includes(normalizedPrefix));
     })
     .slice(0, COMMAND_COMPLETION_LIMIT)
     .map(buildCommandCompletionItem);

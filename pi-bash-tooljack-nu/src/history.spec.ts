@@ -42,16 +42,14 @@ describe("history helpers", () => {
         [
           { name: "ls", description: "list files" },
           { name: "do", description: "run closure", signature: { input: "closure" } },
+          { name: "str join", description: "join strings" },
           { name: "", description: "ignored" },
         ],
-        "",
+        "str",
       ),
     ).toEqual({
-      prefix: "",
-      items: [
-        { value: "ls", label: "ls", description: "list files", requiresClosure: false },
-        { value: "do", label: "do", description: "run closure", requiresClosure: true },
-      ],
+      prefix: "str",
+      items: [{ value: "str join", label: "str join", description: "join strings", requiresClosure: false }],
     });
   });
 });
