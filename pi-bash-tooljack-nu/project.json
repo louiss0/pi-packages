@@ -1,13 +1,40 @@
 {
-"name": "@code-fixer-23/bash-tooljack-nu",
+  "name": "@code-fixer-23/pi-bash-tooljack-nu",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
-  "sourceRoot": "bash-tooljack-nu/src",
+  "sourceRoot": "pi-bash-tooljack-nu/src",
   "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.lib.json --noEmit",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "configFile": "{projectRoot}/vitest.config.ts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["{projectRoot}/**/*.ts", "{projectRoot}/**/*.js"]
+      }
+    },
     "format": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm --dir bash-tooljack-nu run format"
+        "command": "biome format --write .",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "check": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["typecheck", "lint", "test"],
+      "options": {
+        "command": "echo 'All checks passed'"
       }
     }
   },
