@@ -68,16 +68,16 @@ export function updateHistoryFilter(currentFilter: string, input: string) {
 }
 
 export class HistoryPicker implements Component {
-  private readonly container = new Container();
-  private readonly filterLabel = new Text();
-  private readonly selectList: SelectList;
-  private filter = "";
+  readonly #container = new Container();
+  readonly #filterLabel = new Text();
+  readonly #selectList: SelectList;
+  filter = "";
 
   constructor(
     private readonly configOptions: HistoryPickerConfigOptions,
     private readonly requirementOptions: HistoryPickerRequirementOptions,
   ) {
-    this.selectList = new SelectList(
+    this.#selectList = new SelectList(
       configOptions.items,
       Math.min(configOptions.items.length, configOptions.itemLimit),
       {
@@ -89,46 +89,52 @@ export class HistoryPicker implements Component {
       },
     );
 
-    this.container.addChild(
-      new Text(configOptions.theme.fg("accent", configOptions.theme.bold("Recent Nushell History"))),
-    );
-    this.container.addChild(this.filterLabel);
-    this.container.addChild(this.selectList);
-    this.container.addChild(
+    this.#container.addChild(
       new Text(
-        configOptions.theme.fg("dim", "type to filter • ↑↓ navigate • enter execute • esc cancel"),
+        configOptions.theme.fg("accent", configOptions.theme.bold("Recent Nushell History")),
       ),
     );
 
-    this.selectList.onSelect = (item) => requirementOptions.done(item.value);
-    this.selectList.onCancel = () => requirementOptions.done(null);
-    this.syncFilter();
+    this.#container.addChild(this.#filterLabel);
+    this.#container.addChild(this.#selectList);
+    this.#container.addChild(
+      new Text(
+        configOptions.theme.fg(
+          "dim",
+          "type to filter • ↑↓ navigate • enter execute • esc cancel",
+        ),
+      ),
+    );
+
+    this.#selectList.onSelect = (item) => requirementOptions.done(item.value);
+    this.#selectList.onCancel = () => requirementOptions.done(null);
+    this.#syncFilter();
   }
 
   render(width: number) {
-    return this.container.render(width);
+    return this.#container.render(width);
   }
 
   invalidate() {
-    this.container.invalidate();
+    this.#container.invalidate();
   }
 
   handleInput(data: string) {
     const nextFilter = updateHistoryFilter(this.filter, data);
     if (nextFilter !== this.filter) {
       this.filter = nextFilter;
-      this.syncFilter();
+      this.#syncFilter();
       this.requirementOptions.tui.requestRender();
       return;
     }
 
-    this.selectList.handleInput(data);
+    this.#selectList.handleInput(data);
     this.requirementOptions.tui.requestRender();
   }
 
-  private syncFilter() {
-    this.selectList.setFilter(this.filter);
-    this.filterLabel.setText(
+  #syncFilter() {
+    this.#selectList.setFilter(this.filter);
+    this.#filterLabel.setText(
       this.configOptions.theme.fg(
         "muted",
         `Filter: ${this.filter || `(type to narrow the last ${this.configOptions.itemLimit} commands)`}`,
