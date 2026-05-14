@@ -22,7 +22,7 @@ describe("getCommandSuggestions", () => {
         const suggestions = await getCommandSuggestions(prefix);
 
         expect(suggestions?.items.length).toBeGreaterThan(0);
-        expect(suggestions?.items.every((item) => item.value.startsWith(prefix))).toBe(true);
+        expect(suggestions?.items.some((item) => item.value.startsWith(prefix))).toBe(true);
       },
     );
   });
@@ -32,11 +32,10 @@ describe("getCommandSuggestions", () => {
       "returns suggestions based on prefix %s",
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
+        const prefixItems = suggestions?.items.filter((item) => item.value.startsWith(prefix));
 
-        expect(suggestions?.items.length).toBeGreaterThan(0);
-        expect(suggestions?.items.every((item) => item.value.startsWith(prefix))).toBe(true);
-
-        expect(suggestions?.items.every((item) => item.requiresClosure)).toBe(true);
+        expect(prefixItems?.length).toBeGreaterThan(0);
+        expect(prefixItems?.every((item) => item.requiresClosure)).toBe(true);
       },
     );
   });
@@ -44,10 +43,10 @@ describe("getCommandSuggestions", () => {
   it("returns null when are no commands available", async () => {
     const result = await getCommandSuggestions("bobobobobo");
 
-    expect(result).toBeInstanceOf(Error);
+    expect(result).toBeNull();
   }, 30_000);
 
-  describe.only("How it returns results based on category", () => {
+  describe("How it returns results based on category", () => {
     it.for(["strings", "math", "filesystem", "random", "formats"])(
       "returns suggestions based on category %s",
       async (prefix) => {
@@ -56,5 +55,24 @@ describe("getCommandSuggestions", () => {
         expect(result?.items.length).toBeGreaterThan(0);
       },
     );
+  });
+
+  describe("How it returns results based on search terms", () => {
+    it.for([
+      "aka",
+      "every",
+      "colors",
+      "some",
+      "concatenate",
+      "slice",
+      "search",
+      "parse",
+      "convert",
+      "regex",
+    ])("returns suggestions based on search_terms %s", async (prefix) => {
+      const result = await getCommandSuggestions(prefix);
+
+      expect(result?.items.length).toBeGreaterThan(0);
+    });
   });
 });
