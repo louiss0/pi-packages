@@ -45,7 +45,6 @@ class CommandEmptyError extends Error {
 
 export async function getCommandSuggestions(
   prefix: string,
-  signal?: AbortSignal,
 ): Promise<
   | (Pick<AutocompleteSuggestions, "prefix"> & { items: Array<CommandCompletionItem> })
   | CommandEmptyError
@@ -59,7 +58,7 @@ export async function getCommandSuggestions(
     | str starts-with '${safePrefix}') or ($it.category == '${safePrefix}') | to json`
     : `scope commands | select name description signatures type | to json`;
 
-  const result = await new Promise<{ output: string; exitCode: number }>((resolve, reject) => {
+  const result = await new Promise<string>((resolve, reject) => {
     const child = spawn("nu", ["-c", command], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -69,16 +68,15 @@ export async function getCommandSuggestions(
     const stdout: Buffer[] = [];
 
     child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-    child.on("error", reject);
-    signal?.addEventListener("abort", () => child.kill(), { once: true });
-    child.on("close", (exitCode) => {
-      resolve({ output: Buffer.concat(stdout).toString("utf-8"), exitCode: exitCode ?? 1 });
+    child.on("close", () => {
+      resolve(Buffer.concat(stdout).toString("utf-8"));
     });
+    child.on("error", reject);
   });
 
-  if (!result.output) return new CommandEmptyError();
+  if (!result) return new CommandEmptyError();
 
-  const commands = JSON.parse(result.output) as CommandMetadata[];
+  const commands = JSON.parse(result) as CommandMetadata[];
   return commands.length > 0
     ? { prefix, items: commands.map(buildCommandCompletionItem) }
     : new CommandEmptyError();
