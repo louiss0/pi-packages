@@ -57,7 +57,7 @@ export async function getCommandSuggestions(
     | select name description signatures type
     | where (($it.name | default "")
     | str starts-with '${safePrefix}') or (($it.description | default "")
-    | str starts-with '${safePrefix}') | to json`
+    | str starts-with '${safePrefix}' or ($it.category == '${safePrefix}')) | to json`
     : `scope commands | select name description signatures type | to json`;
 
   const result = await new Promise<{ output: string; exitCode: number }>((resolve, reject) => {
