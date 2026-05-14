@@ -17,7 +17,7 @@ export interface CommandCompletionItem extends AutocompleteItem {
 
 function isClosureFirstCommand(command: CommandMetadata) {
   const signatures = Array.isArray(command.signatures) ? command.signatures : [];
-  const signatureTexts = [command.signature, ...signatures]
+  const signatureTexts = signatures
     .filter((signature) => signature !== undefined && signature !== null)
     .map((signature) => JSON.stringify(signature).toLowerCase())
     .join(" ");
