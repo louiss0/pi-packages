@@ -76,10 +76,6 @@ export async function getCommandSuggestions(
     });
   });
 
-  if (result.exitCode !== 0) {
-    return null;
-  }
-
   const commands = JSON.parse(result.output) as CommandMetadata[];
   return commands.length > 0
     ? { prefix, items: commands.map(buildCommandCompletionItem) }
