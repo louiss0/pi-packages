@@ -1,15 +1,18 @@
 import { spawn } from "node:child_process";
+import { object, string, array, record, InferOutput, parse, optional } from "valibot";
 
 import type { AutocompleteItem, AutocompleteSuggestions } from "@mariozechner/pi-tui";
 
-export interface CommandMetadata {
-  name?: string;
-  description?: string;
-  search_terms?: string;
-  signatures?: Array<Record<string, unknown>>;
-  type?: string;
-}
+const CommandMetadataSchema = object({
+  name: string(),
+  description: string(),
+  search_terms: string(),
+  category: string(),
+  signatures: optional(array(record(string(), string()))),
+  type: string(),
+});
 
+export type CommandMetadata = InferOutput<typeof CommandMetadataSchema>;
 export interface CommandCompletionItem extends AutocompleteItem {
   requiresClosure: boolean;
 }
@@ -66,7 +69,7 @@ export async function getCommandSuggestions(
 
   if (!result) return null;
 
-  const commands = JSON.parse(result) as CommandMetadata[];
+  const commands = parse(array(CommandMetadataSchema), JSON.parse(result));
   return commands.length > 0
     ? { prefix, items: commands.map(buildCommandCompletionItem) }
     : null;
