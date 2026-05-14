@@ -55,7 +55,7 @@ describe("getCommandSuggestions", () => {
   }, 30_000);
 
   describe.only("How it returns results based on category", () => {
-    it.for(["string", "math", "filesystem", "random", "formats"])(
+    it.for(["strings", "math", "filesystem", "random", "formats"])(
       "returns suggestions based on category %s",
       async (prefix) => {
         const result = await getCommandSuggestions(prefix);
