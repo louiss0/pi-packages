@@ -1,5 +1,6 @@
 import type { Component, SelectItem, TUI } from "@mariozechner/pi-tui";
 import { Container, SelectList, Text } from "@mariozechner/pi-tui";
+import { DynamicBorder, ThemeColor } from "@mariozechner/pi-coding-agent";
 
 export const HISTORY_LIMIT = 100;
 const HISTORY_EXCLUSION_PATTERN = "(?i)pi";
@@ -7,7 +8,7 @@ const HIDDEN_INPUT_PATTERN = /\p{C}/u;
 const PI_COMMAND_PATTERN = /\bpi\b/i;
 
 interface HistoryPickerTheme {
-  fg(color: string, text: string): string;
+  fg(color: ThemeColor, text: string): string;
   bold(text: string): string;
 }
 
@@ -73,6 +74,8 @@ export class HistoryPicker implements Component {
   readonly #selectList: SelectList;
   #filter = "";
 
+  #borderColorTheme: Extract<ThemeColor, `border${string}`> = "borderAccent";
+
   constructor(
     private readonly configOptions: HistoryPickerConfigOptions,
     private readonly requirementOptions: HistoryPickerRequirementOptions,
@@ -94,6 +97,10 @@ export class HistoryPicker implements Component {
     });
 
     this.#container.addChild(
+      new DynamicBorder((text) => requirementOptions.theme.fg(this.#borderColorTheme, text)),
+    );
+
+    this.#container.addChild(
       new Text(
         requirementOptions.theme.fg(
           "accent",
@@ -111,6 +118,10 @@ export class HistoryPicker implements Component {
           "type to filter • ↑↓ navigate • enter execute • esc cancel",
         ),
       ),
+    );
+
+    this.#container.addChild(
+      new DynamicBorder((text) => requirementOptions.theme.fg(this.#borderColorTheme, text)),
     );
 
     this.#selectList.onSelect = (item) => requirementOptions.done(item.value);
