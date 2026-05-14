@@ -47,4 +47,23 @@ describe("getCommandSuggestions", () => {
       },
     );
   });
+
+  it("returns an error when are no commands available", async () => {
+    const result = await getCommandSuggestions("bobobobobo");
+
+    expect(result).toBeInstanceOf(Error);
+  }, 30_000);
+
+  describe.only("How it returns results based on category", () => {
+    it.for(["string", "math", "filesystem", "random", "formats"])(
+      "returns suggestions based on category %s",
+      async (prefix) => {
+        const result = await getCommandSuggestions(prefix);
+        console.log(result);
+
+        assertNotError(result);
+        expect(result?.items.length).toBeGreaterThan(0);
+      },
+    );
+  });
 });
