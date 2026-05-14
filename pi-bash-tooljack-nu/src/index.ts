@@ -17,11 +17,11 @@ import type {
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
+import { getCommandSuggestions, type CommandCompletionItem } from "./command";
 import { getHistoryQuery, HistoryPicker, HISTORY_LIMIT, parseHistoryCommands } from "./history";
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
-const COMMAND_COMPLETION_LIMIT = 50;
 const ENV_VARIABLE_NAMES = Object.keys(process.env).sort();
 
 function getEnvSuggestions(prefix: string): AutocompleteItem[] {
@@ -34,84 +34,6 @@ function getEnvSuggestions(prefix: string): AutocompleteItem[] {
     label: name,
     description: "Environment variable",
   }));
-}
-
-interface CommandMetadata {
-  name?: string;
-  description?: string;
-  search_terms?: string;
-  signatures?: Array<Record<string, unknown>>;
-  signature?: Record<string, unknown>;
-  type?: string;
-}
-
-interface CommandCompletionItem extends AutocompleteItem {
-  requiresClosure?: boolean;
-}
-
-function isClosureFirstCommand(command: CommandMetadata) {
-  const signatureTexts = [command.signature, ...(command.signatures ?? [])]
-    .filter((signature) => signature !== undefined && signature !== null)
-    .map((signature) => JSON.stringify(signature).toLowerCase())
-    .join(" ");
-
-  return signatureTexts.includes("closure") || signatureTexts.includes("block");
-}
-
-function buildCommandCompletionItem(command: CommandMetadata): CommandCompletionItem {
-  const label = command.name ?? "";
-  return {
-    value: label,
-    label,
-    description: command.description,
-    requiresClosure: isClosureFirstCommand(command),
-  };
-}
-
-export function getCommandSuggestionsFromCommands(
-  commands: CommandMetadata[],
-  prefix: string,
-): AutocompleteSuggestions | null {
-  const normalizedPrefix = prefix.toLowerCase();
-  const items = commands
-    .filter((command) => typeof command.name === "string" && command.name.length > 0)
-    .filter((command) => {
-      if (!prefix) {
-        return true;
-      }
-
-      const haystacks = [command.name, command.description, command.search_terms]
-        .filter((value): value is string => typeof value === "string" && value.length > 0)
-        .map((value) => value.toLowerCase());
-
-      return haystacks.some((value) => value.includes(normalizedPrefix));
-    })
-    .slice(0, COMMAND_COMPLETION_LIMIT)
-    .map(buildCommandCompletionItem);
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
-    items,
-    prefix,
-  };
-}
-
-async function getCommandSuggestions(prefix: string, signal?: AbortSignal): Promise<AutocompleteSuggestions | null> {
-  const result = await executeNushellCommand(
-    `scope commands | get name description signature signatures type | to json`,
-    process.cwd(),
-    signal,
-  );
-
-  if (result.exitCode !== 0) {
-    return null;
-  }
-
-  const commands = JSON.parse(result.output) as CommandMetadata[];
-  return getCommandSuggestionsFromCommands(commands, prefix);
 }
 
 class NuAutocompleteProvider implements AutocompleteProvider {
@@ -166,21 +88,34 @@ class NuAutocompleteProvider implements AutocompleteProvider {
     item: AutocompleteItem,
     prefix: string,
   ) {
+    const line = lines[cursorLine] ?? "";
+    const textBeforeCursor = line.slice(0, cursorCol);
+    const commandPrefix = textBeforeCursor.match(/#([A-Za-z0-9_:-]*)$/);
     const completionItem = item as CommandCompletionItem;
+
+    if (!commandPrefix) {
+      return this.baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+    }
+
+    const beforeCommandTrigger = line.slice(0, cursorCol - commandPrefix[0].length);
+    const afterCursor = line.slice(cursorCol);
+    const newLines = [...lines];
+
     if (completionItem.requiresClosure) {
-      const line = lines[cursorLine] ?? "";
-      const beforePrefix = line.slice(0, cursorCol - prefix.length);
-      const afterCursor = line.slice(cursorCol);
-      const newLines = [...lines];
-      newLines[cursorLine] = `${beforePrefix}#${item.value} {|$in| $in }${afterCursor}`;
+      newLines[cursorLine] = `${beforeCommandTrigger}${item.value} {|$in| $in }${afterCursor}`;
       return {
         lines: newLines,
         cursorLine,
-        cursorCol: beforePrefix.length + item.value.length + 14,
+        cursorCol: beforeCommandTrigger.length + item.value.length + 12,
       };
     }
 
-    return this.baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+    newLines[cursorLine] = `${beforeCommandTrigger}${item.value}${afterCursor}`;
+    return {
+      lines: newLines,
+      cursorLine,
+      cursorCol: beforeCommandTrigger.length + item.value.length,
+    };
   }
 }
 
@@ -295,7 +230,7 @@ function truncateBashToolOutput(output: string) {
   writeFileSync(fileName, output);
 
   return {
-    output: `File written to ${fileName} read that instead!\n          Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}\n          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}\n          `,
+    output: `File written to ${fileName} read that instead!\n Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}\n          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}\n          `,
     truncated: true,
   };
 }
