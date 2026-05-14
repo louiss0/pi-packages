@@ -59,7 +59,6 @@ describe("getCommandSuggestions", () => {
       "returns suggestions based on category %s",
       async (prefix) => {
         const result = await getCommandSuggestions(prefix);
-        console.log(result);
 
         assertNotError(result);
         expect(result?.items.length).toBeGreaterThan(0);
