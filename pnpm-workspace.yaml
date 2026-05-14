@@ -2,3 +2,9 @@ packages:
   - "pi-form-components"
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
+allowBuilds:
+  '@biomejs/biome': true
+  '@google/genai': true
+  koffi: true
+  nx: true
+  protobufjs: true
