@@ -53,10 +53,10 @@ export async function getCommandSuggestions(
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
     ? `scope commands
-    | select name description signatures type
+    | select name description signatures type category
     | where (($it.name | default "")
     | str starts-with '${safePrefix}') or (($it.description | default "")
-    | str starts-with '${safePrefix}' or ($it.category == '${safePrefix}')) | to json`
+    | str starts-with '${safePrefix}') or ($it.category == '${safePrefix}') | to json`
     : `scope commands | select name description signatures type | to json`;
 
   const result = await new Promise<{ output: string; exitCode: number }>((resolve, reject) => {
@@ -75,6 +75,8 @@ export async function getCommandSuggestions(
       resolve({ output: Buffer.concat(stdout).toString("utf-8"), exitCode: exitCode ?? 1 });
     });
   });
+
+  if (!result.output) return new CommandEmptyError();
 
   const commands = JSON.parse(result.output) as CommandMetadata[];
   return commands.length > 0
