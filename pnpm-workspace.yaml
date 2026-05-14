@@ -1,4 +1,4 @@
 packages:
-  - 'pi-form-components'
-  - 'bash-tooljack-nu'
-  - 'pi-agent-resource'
+  - "pi-form-components"
+  - "pi-bash-tooljack-nu"
+  - "pi-agent-resource"
