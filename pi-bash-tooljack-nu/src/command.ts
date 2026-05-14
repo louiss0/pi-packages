@@ -1,14 +1,42 @@
 import { spawn } from "node:child_process";
-import { object, string, array, record, InferOutput, parse, optional } from "valibot";
+import type { InferOutput } from "valibot";
+import {
+  array,
+  boolean,
+  nullable,
+  number,
+  object,
+  optional,
+  record,
+  safeParse,
+  string,
+  union,
+} from "valibot";
 
 import type { AutocompleteItem, AutocompleteSuggestions } from "@mariozechner/pi-tui";
+
+const signatureDefaultSchema = union([string(), number(), boolean()]);
+const signatureParameterSchema = object({
+  parameter_name: nullable(string()),
+  parameter_type: string(),
+  syntax_shape: nullable(string()),
+  is_optional: boolean(),
+  short_flag: nullable(string()),
+  description: nullable(string()),
+  completion: nullable(array(string())),
+  parameter_default: nullable(signatureDefaultSchema),
+});
+const commandSignaturesSchema = union([
+  array(signatureParameterSchema),
+  record(string(), array(signatureParameterSchema)),
+]);
 
 const CommandMetadataSchema = object({
   name: string(),
   description: string(),
   search_terms: string(),
   category: string(),
-  signatures: optional(array(record(string(), string()))),
+  signatures: optional(commandSignaturesSchema),
   type: string(),
 });
 
@@ -18,11 +46,7 @@ export interface CommandCompletionItem extends AutocompleteItem {
 }
 
 function isClosureFirstCommand(command: CommandMetadata) {
-  const signatures = Array.isArray(command.signatures) ? command.signatures : [];
-  const signatureTexts = signatures
-    .filter((signature) => signature !== undefined && signature !== null)
-    .map((signature) => JSON.stringify(signature).toLowerCase())
-    .join(" ");
+  const signatureTexts = JSON.stringify(command.signatures ?? "").toLowerCase();
 
   return signatureTexts.includes("closure") || signatureTexts.includes("block");
 }
@@ -45,11 +69,12 @@ export async function getCommandSuggestions(
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
     ? `scope commands
-    | select name description signatures type category
+    | select name description signatures type category search_terms
     | where (($it.name | default "")
     | str starts-with '${safePrefix}') or (($it.description | default "")
-    | str starts-with '${safePrefix}') or ($it.category == '${safePrefix}') or ($it.search_terms == '${safePrefix}') | to json`
-    : `scope commands | select name description signatures type | to json`;
+    | str starts-with '${safePrefix}') or ($it.category == '${safePrefix}') or ($it.search_terms | str contains '${safePrefix}')
+    | to json`
+    : `scope commands | select name description signatures type category search_terms | to json`;
 
   const result = await new Promise<string>((resolve, reject) => {
     const child = spawn("nu", ["-c", command], {
@@ -68,8 +93,15 @@ export async function getCommandSuggestions(
   });
 
   if (!result) return null;
+  const safeParseResult = safeParse(array(CommandMetadataSchema), JSON.parse(result));
 
-  const commands = parse(array(CommandMetadataSchema), JSON.parse(result));
+  if (!safeParseResult.success) {
+    safeParseResult.issues.forEach((item) => {
+      console.dir(item, { depth: 3 });
+    });
+    return null;
+  }
+  const commands = safeParseResult.output;
   return commands.length > 0
     ? { prefix, items: commands.map(buildCommandCompletionItem) }
     : null;
