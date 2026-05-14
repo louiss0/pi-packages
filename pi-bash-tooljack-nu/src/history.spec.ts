@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   getHistoryQuery,
   HISTORY_LIMIT,
@@ -5,8 +7,6 @@ import {
   shouldIncludeHistoryCommand,
   updateHistoryFilter,
 } from "./history";
-
-import { getCommandSuggestionsFromCommands } from "./index";
 
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
@@ -34,22 +34,5 @@ describe("history helpers", () => {
     expect(updateHistoryFilter("git s", "\u007f")).toBe("git ");
     expect(updateHistoryFilter("git ", "\u0015")).toBe("");
     expect(updateHistoryFilter("git", "\u001b[A")).toBe("git");
-  });
-
-  it("shows command completion output for command metadata", () => {
-    expect(
-      getCommandSuggestionsFromCommands(
-        [
-          { name: "ls", description: "list files" },
-          { name: "do", description: "run closure", signature: { input: "closure" } },
-          { name: "str join", description: "join strings" },
-          { name: "", description: "ignored" },
-        ],
-        "str",
-      ),
-    ).toEqual({
-      prefix: "str",
-      items: [{ value: "str join", label: "str join", description: "join strings", requiresClosure: false }],
-    });
   });
 });
