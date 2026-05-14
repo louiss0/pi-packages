@@ -34,20 +34,10 @@ function buildCommandCompletionItem(command: CommandMetadata): CommandCompletion
   };
 }
 
-class CommandEmptyError extends Error {
-  constructor() {
-    super(
-      "There are no commands available. You can search based on name, description, or signature, even category",
-    );
-    this.name = "CommandEmptyError";
-  }
-}
-
 export async function getCommandSuggestions(
   prefix: string,
 ): Promise<
-  | (Pick<AutocompleteSuggestions, "prefix"> & { items: Array<CommandCompletionItem> })
-  | CommandEmptyError
+  (Pick<AutocompleteSuggestions, "prefix"> & { items: Array<CommandCompletionItem> }) | null
 > {
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
@@ -74,10 +64,10 @@ export async function getCommandSuggestions(
     child.on("error", reject);
   });
 
-  if (!result) return new CommandEmptyError();
+  if (!result) return null;
 
   const commands = JSON.parse(result) as CommandMetadata[];
   return commands.length > 0
     ? { prefix, items: commands.map(buildCommandCompletionItem) }
-    : new CommandEmptyError();
+    : null;
 }

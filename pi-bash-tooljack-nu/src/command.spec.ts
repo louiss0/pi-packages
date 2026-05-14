@@ -2,21 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { getCommandSuggestions } from "./command";
 
-function assertNotError<T>(value: T): asserts value is Exclude<T, Error> {
-  expect(value instanceof Error).toBe(false);
-}
 describe("getCommandSuggestions", () => {
   it("returns real suggestions from NuShell", async () => {
     const suggestions = await getCommandSuggestions("");
 
-    assertNotError(suggestions);
     expect(suggestions?.items.length).toBeGreaterThan(0);
   }, 30_000);
 
   it("returns real suggestions from NuShell based on ", async () => {
     const suggestions = await getCommandSuggestions("each");
 
-    assertNotError(suggestions);
     expect(suggestions?.items.length).toBeGreaterThan(0);
   }, 30_000);
 
@@ -26,7 +21,6 @@ describe("getCommandSuggestions", () => {
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
 
-        assertNotError(suggestions);
         expect(suggestions?.items.length).toBeGreaterThan(0);
         expect(suggestions?.items.every((item) => item.value.startsWith(prefix))).toBe(true);
       },
@@ -39,7 +33,6 @@ describe("getCommandSuggestions", () => {
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
 
-        assertNotError(suggestions);
         expect(suggestions?.items.length).toBeGreaterThan(0);
         expect(suggestions?.items.every((item) => item.value.startsWith(prefix))).toBe(true);
 
@@ -48,7 +41,7 @@ describe("getCommandSuggestions", () => {
     );
   });
 
-  it("returns an error when are no commands available", async () => {
+  it("returns null when are no commands available", async () => {
     const result = await getCommandSuggestions("bobobobobo");
 
     expect(result).toBeInstanceOf(Error);
@@ -60,7 +53,6 @@ describe("getCommandSuggestions", () => {
       async (prefix) => {
         const result = await getCommandSuggestions(prefix);
 
-        assertNotError(result);
         expect(result?.items.length).toBeGreaterThan(0);
       },
     );
