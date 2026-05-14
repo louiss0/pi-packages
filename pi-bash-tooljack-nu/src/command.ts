@@ -16,11 +16,7 @@ export interface CommandCompletionItem extends AutocompleteItem {
 }
 
 function isClosureFirstCommand(command: CommandMetadata) {
-  const signatures = Array.isArray(command.signatures)
-    ? command.signatures
-    : command.signatures
-      ? [command.signatures]
-      : [];
+  const signatures = Array.isArray(command.signatures) ? command.signatures : [];
   const signatureTexts = [command.signature, ...signatures]
     .filter((signature) => signature !== undefined && signature !== null)
     .map((signature) => JSON.stringify(signature).toLowerCase())
@@ -47,8 +43,13 @@ export async function getCommandSuggestions(
 > {
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
-    ? `scope commands | select name description signatures type | where (($it.name | default "") | str starts-with '${safePrefix}') or (($it.description | default "") | str starts-with '${safePrefix}') | to json`
+    ? `scope commands
+    | select name description signatures type
+    | where (($it.name | default "")
+    | str starts-with '${safePrefix}') or (($it.description | default "")
+    | str starts-with '${safePrefix}') | to json`
     : `scope commands | select name description signatures type | to json`;
+
   const result = await new Promise<{ output: string; exitCode: number }>((resolve, reject) => {
     const child = spawn("nu", ["-c", command], {
       cwd: process.cwd(),
