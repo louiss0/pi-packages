@@ -49,7 +49,7 @@ class NuAutocompleteProvider implements AutocompleteProvider {
     const textBeforeCursor = currentLine.slice(0, cursorCol);
     const commandPrefix = textBeforeCursor.match(/#([A-Za-z0-9_:-]*)$/);
     if (commandPrefix) {
-      return getCommandSuggestions(commandPrefix[1] ?? "", options.signal);
+      return getCommandSuggestions(commandPrefix[1] ?? "");
     }
 
     const envPrefix = textBeforeCursor.match(/\$env(?:\.([A-Za-z0-9_]*))?$/);
