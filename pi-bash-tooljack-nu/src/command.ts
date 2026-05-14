@@ -7,7 +7,6 @@ export interface CommandMetadata {
   description?: string;
   search_terms?: string;
   signatures?: Array<Record<string, unknown>>;
-  signature?: Record<string, unknown>;
   type?: string;
 }
 
