@@ -3,9 +3,9 @@ import { Container, SelectList, Text } from "@mariozechner/pi-tui";
 import { DynamicBorder, ThemeColor } from "@mariozechner/pi-coding-agent";
 
 export const HISTORY_LIMIT = 100;
-const HISTORY_EXCLUSION_PATTERN = "(?i)pi";
+const HISTORY_EXCLUSION_PATTERN = "(?i)^\\s*pi\\b";
 const HIDDEN_INPUT_PATTERN = /\p{C}/u;
-const PI_COMMAND_PATTERN = /\bpi\b/i;
+const PI_COMMAND_PATTERN = /^\s*pi\b/i;
 
 interface HistoryPickerTheme {
   fg(color: ThemeColor, text: string): string;
