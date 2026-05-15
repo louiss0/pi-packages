@@ -53,6 +53,7 @@
       "!@code-fixer-23/pi-form-components",
       "!@code-fixer-23/source"
     ],
+    "projectsRelationship": "independent",
     "version": {
       "preVersionCommand": "npx nx run-many -t typecheck,test"
     }
