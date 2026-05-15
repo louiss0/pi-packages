@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   BashOperations,
   CustomEditor,
@@ -216,7 +217,7 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
   return `(command exited with code ${exitCode})`;
 }
 
-function truncateBashToolOutput(output: string) {
+export async function truncateBashToolOutput(output: string, cwd: string) {
   const truncation = truncateTail(output, {
     maxBytes: DEFAULT_MAX_BYTES,
     maxLines: DEFAULT_MAX_LINES,
@@ -226,11 +227,11 @@ function truncateBashToolOutput(output: string) {
     return { output: truncation.content, truncated: false };
   }
 
-  const fileName = `nu-tool-output_${Date.now()}.txt`;
-  writeFileSync(fileName, output);
+  const outputPath = join(cwd, `nu-tool-output_${Date.now()}.txt`);
+  await writeFile(outputPath, output);
 
   return {
-    output: `File written to ${fileName} read that instead!\n Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}\n          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}\n          `,
+    output: `File written to ${outputPath} read that instead!\n Output Lines/Total Lines: ${truncation.outputLines}/${truncation.totalLines}\n          Output Bytes/Total Bytes: ${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}\n          `,
     truncated: true,
   };
 }
@@ -643,7 +644,7 @@ export default function nuBashExtension(pi: ExtensionAPI) {
         },
       );
 
-      const toolOutput = truncateBashToolOutput(result.output);
+      const toolOutput = await truncateBashToolOutput(result.output, ctx.cwd);
 
       return {
         content: [
