@@ -1,9 +1,11 @@
 name: Release
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed
   workflow_dispatch:
     inputs:
       dry-run:
@@ -19,12 +21,14 @@ permissions:
 jobs:
   release:
     name: Nx Release
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Git author
