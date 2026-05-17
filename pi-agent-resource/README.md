@@ -5,7 +5,7 @@ A PI package that installs an extension for creating, editing, deleting, and lis
 - Global agents in `~/.pi/agent/agents/<name>.md`
 - Project agents in `.pi/agents/<name>.md` when the `local-agent` flag is enabled
 - Skills in `~/.pi/agent/skills/<name>/SKILL.md`
-- Local skills in `.pi/skills/<name>/SKILL.md` when the `local-skill` flag is enabled
+- Local skills in `.pi/skills/<name>/SKILL.md` through `resource:local-skill`
 - Global prompts in `~/.pi/agent/prompts/*.md`
 - Project prompts in `.pi/prompts/*.md` or grouped prompt directories when the `local-prompt` flag is enabled
 
@@ -34,14 +34,15 @@ The package exposes the extension from `@extensions/resource-studio/index.ts`.
 
 ## Scope flags
 
-The extension now uses registered pi flags instead of inline command flags.
+The extension uses registered pi flags for agents, prompts, and the external skill editor.
+Local skills now use a dedicated command instead of a scope flag.
 
 - `local-agent` → use project agents from `.pi/agents`
-- `local-skill` → use project skills from `.pi/skills`
 - `local-prompt` → use project prompts from `.pi/prompts`
 - `external-skill-editor` → use the external editor for skill edits
+- `resource:local-skill` → create, edit, or delete project skills in `.pi/skills`
 
-When a local scope flag is enabled, the command shows a notice before it creates,
+When a local scope flag or the local skill command is used, the command shows a notice before it creates,
 edits, or deletes the local resource.
 
 ## Prompt behavior

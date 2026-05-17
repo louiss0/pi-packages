@@ -138,30 +138,36 @@ describe("skill manager handlers", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local skill command is about to run", async () => {
+    it("registers a dedicated command for local skills", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn((name: string) => name === "local-skill");
+      const getFlag = vi.fn(() => false);
       const notify = vi.fn();
       const custom = vi.fn().mockResolvedValueOnce(null);
 
       registerSkillManager({ registerCommand, registerFlag, getFlag } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-skill", {
-        description: "Use project skills from .pi/skills for skill commands",
-        type: "boolean",
-        default: false,
-      });
       expect(registerFlag).toHaveBeenCalledWith("external-skill-editor", {
         description: "Use the external editor for skill edit commands",
         type: "boolean",
         default: false,
       });
+      expect(registerFlag).toHaveBeenCalledTimes(1);
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:skill",
+        expect.objectContaining({ description: "This is for managing global skills" }),
+      );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-skill",
+        expect.objectContaining({ description: "This is for managing project skills" }),
+      );
 
-      const command = registerCommand.mock.calls[0]?.[1] as {
+      const localCommand = registerCommand.mock.calls[1]?.[1] as {
         handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify; custom: typeof custom } }) => Promise<void>;
       };
-      await command.handler("create", { cwd: localCwd, ui: { notify, custom } });
+      await localCommand.handler("create", { cwd: localCwd, ui: { notify, custom } });
 
       expect(notify).toHaveBeenNthCalledWith(
         1,

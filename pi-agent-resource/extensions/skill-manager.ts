@@ -46,8 +46,8 @@ const PI_DIRECTORY_NAME = ".pi";
 const AGENT_DIRECTORY_NAME = "agent";
 const SKILLS_DIRECTORY_NAME = "skills";
 const SKILL_FILE_NAME = "SKILL.md";
-const LOCAL_SKILL_FLAG = "local-skill";
 const EXTERNAL_EDITOR_FLAG = "external-skill-editor";
+const LOCAL_SKILL_COMMAND_NAME = "resource:local-skill";
 
 export const GLOBAL_SKILLS_DIRECTORY = join(
   homedir(),
@@ -96,9 +96,7 @@ type RequiredAgentSkillFields = InferOutput<typeof RequiredAgentSkillFieldsSchem
 type OptionalAgentSkillFormFields = InferOutput<typeof OptionalAgentSkillFormFieldsSchema>;
 type SkillFrontmatterFields = RequiredAgentSkillFields & OptionalAgentSkillFormFields;
 type SkillEditorMode = "external";
-type SkillSubcommand = "create" | "edit" | "delete";
 type SkillScope = "global" | "local";
-type ParsedSkillCommandArgument = SkillSubcommand;
 
 class SkillEditorOverlay extends Container implements Focusable {
   #editor: Editor;
@@ -604,12 +602,48 @@ async function readSkillFile(filePath: string) {
   return getResourceFileSystem().readFile(filePath, "utf8");
 }
 
+async function handleSkillCommand(
+  pi: ExtensionAPI,
+  arg: string,
+  ctx: ExtensionCommandContext,
+  scope: SkillScope,
+) {
+  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+  const result = parseSkillCommandArgument(arg);
+
+  if (!result.success) {
+    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
+    return;
+  }
+
+  const editMode = pi.getFlag(EXTERNAL_EDITOR_FLAG) === true ? "external" : undefined;
+
+  if (editMode === "external" && result.output !== "edit") {
+    ctx.ui.notify(`Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`, "error");
+    return;
+  }
+
+  if (scope === "local") {
+    ctx.ui.notify(
+      `Using local skills from ${getSkillsDirectory("local", ctx.cwd || process.cwd())}`,
+      "info",
+    );
+  }
+
+  switch (result.output) {
+    case "create":
+      await handleCreate(ctx, scope);
+      break;
+    case "edit":
+      await handleEdit(ctx, editMode, scope);
+      break;
+    case "delete":
+      await handleDelete(ctx, scope);
+      break;
+  }
+}
+
 export default (pi: ExtensionAPI) => {
-  pi.registerFlag(LOCAL_SKILL_FLAG, {
-    description: "Use project skills from .pi/skills for skill commands",
-    type: "boolean",
-    default: false,
-  });
   pi.registerFlag(EXTERNAL_EDITOR_FLAG, {
     description: "Use the external editor for skill edit commands",
     type: "boolean",
@@ -617,44 +651,16 @@ export default (pi: ExtensionAPI) => {
   });
 
   pi.registerCommand("resource:skill", {
-    description: "This is for managing skills",
+    description: "This is for managing global skills",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("skill"),
-    handler: async (arg, ctx) => {
-      notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-      const result = parseSkillCommandArgument(arg);
+    handler: async (arg, ctx) => handleSkillCommand(pi, arg, ctx, "global"),
+  });
 
-      if (!result.success) {
-        ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-        return;
-      }
-
-      const scope = pi.getFlag(LOCAL_SKILL_FLAG) === true ? "local" : "global";
-      const editMode = pi.getFlag(EXTERNAL_EDITOR_FLAG) === true ? "external" : undefined;
-
-      if (editMode === "external" && result.output !== "edit") {
-        ctx.ui.notify(`Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`, "error");
-        return;
-      }
-
-      if (scope === "local") {
-        ctx.ui.notify(
-          `Using local skills from ${getSkillsDirectory("local", ctx.cwd || process.cwd())}`,
-          "info",
-        );
-      }
-
-      switch (result.output) {
-        case "create":
-          await handleCreate(ctx, scope);
-          break;
-        case "edit":
-          await handleEdit(ctx, editMode, scope);
-          break;
-        case "delete":
-          await handleDelete(ctx, scope);
-          break;
-      }
-    },
+  pi.registerCommand(LOCAL_SKILL_COMMAND_NAME, {
+    description: "This is for managing project skills",
+    getArgumentCompletions:
+      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("skill"),
+    handler: async (arg, ctx) => handleSkillCommand(pi, arg, ctx, "local"),
   });
 };
