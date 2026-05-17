@@ -7,7 +7,7 @@ A PI package that installs an extension for creating, editing, deleting, and lis
 - Skills in `~/.pi/agent/skills/<name>/SKILL.md`
 - Local skills in `.pi/skills/<name>/SKILL.md` through `resource:local-skill`
 - Global prompts in `~/.pi/agent/prompts/*.md`
-- Project prompts in `.pi/prompts/*.md` or grouped prompt directories
+- Project prompts in `.pi/prompts/*.md` or grouped prompt directories through `resource:local-prompt`
 
 ## What it does
 
@@ -40,6 +40,7 @@ Project-local resources now use dedicated commands instead of scope flags.
 - `external-skill-editor` → use the external editor for skill edits
 - `resource:local-agent` → create, edit, or delete project agents in `.pi/agents`
 - `resource:local-skill` → create, edit, or delete project skills in `.pi/skills`
+- `resource:local-prompt` → create, edit, or delete project prompts in `.pi/prompts`
 
 When a local resource command is used, the command shows a notice before it creates,
 edits, or deletes the local resource.

@@ -89,21 +89,27 @@ describe("extensions/prompt-manager", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local prompt command is about to run", async () => {
+    it("registers a dedicated command for local prompts", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn().mockReturnValue(true);
+      const getFlag = vi.fn();
       const notify = vi.fn();
 
       registerPromptManager({ registerCommand, registerFlag, getFlag } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-prompt", {
-        description: "Use project prompts from .pi/prompts for prompt commands",
-        type: "boolean",
-        default: false,
-      });
+      expect(registerFlag).not.toHaveBeenCalled();
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:prompts",
+        expect.objectContaining({ description: "This is for managing global prompts" }),
+      );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-prompt",
+        expect.objectContaining({ description: "This is for managing project prompts" }),
+      );
 
-      const command = registerCommand.mock.calls[0]?.[1] as {
+      const command = registerCommand.mock.calls[1]?.[1] as {
         handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
       };
       await command.handler(
