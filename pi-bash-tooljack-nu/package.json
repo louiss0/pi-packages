@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@code-fixer-23/pi-bash-tooljack-nu",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Pi extension that hijacks the bash tool and routes it through Nushell",
   "author": {
     "name": "Shelton Louis",
@@ -17,6 +17,9 @@
   "keywords": [
     "pi-package"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "nx": {
     "includedScripts": [
       "check"
