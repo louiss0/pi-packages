@@ -78,21 +78,27 @@ describe("extensions/agent-manager", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local agent command is about to run", async () => {
+    it("registers a dedicated command for local agents", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn().mockReturnValue(true);
+      const getFlag = vi.fn();
       const notify = vi.fn();
 
       registerAgentManager({ registerCommand, registerFlag, getFlag } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-agent", {
-        description: "Use project agents from .pi/agents for agent commands",
-        type: "boolean",
-        default: false,
-      });
+      expect(registerFlag).not.toHaveBeenCalled();
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:agent",
+        expect.objectContaining({ description: "This is for managing global agents" }),
+      );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-agent",
+        expect.objectContaining({ description: "This is for managing project agents" }),
+      );
 
-      const command = registerCommand.mock.calls[0]?.[1] as {
+      const command = registerCommand.mock.calls[1]?.[1] as {
         handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
       };
       await command.handler(

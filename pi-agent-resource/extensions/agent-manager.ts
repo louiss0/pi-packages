@@ -25,7 +25,7 @@ const extensionName = "agent-manager";
 const PI_DIRECTORY_NAME = ".pi";
 const AGENT_DIRECTORY_NAME = "agent";
 const AGENTS_DIRECTORY_NAME = "agents";
-const LOCAL_AGENT_FLAG = "local-agent";
+const LOCAL_AGENT_COMMAND_NAME = "resource:local-agent";
 
 export const GLOBAL_AGENT_DIRECTORY = join(
   homedir(),
@@ -105,46 +105,51 @@ export function createAgentForm(tui: TUI, theme: Theme, done: (value: AgentField
   });
 }
 
-export default (pi: ExtensionAPI) => {
-  pi.registerFlag(LOCAL_AGENT_FLAG, {
-    description: "Use project agents from .pi/agents for agent commands",
-    type: "boolean",
-    default: false,
-  });
+async function handleAgentCommand(
+  arg: string,
+  ctx: ExtensionContext,
+  scope: AgentScope,
+) {
+  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+  const result = parseAgentCommandArgument(arg);
+  if (!result.success) {
+    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
+    return;
+  }
 
+  if (scope === "local") {
+    ctx.ui.notify(
+      `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
+      "info",
+    );
+  }
+
+  switch (result.output) {
+    case "create":
+      await handleCreate(ctx, scope);
+      break;
+    case "edit":
+      await handleEdit(ctx, scope);
+      break;
+    case "delete":
+      await handleDelete(ctx, scope);
+      break;
+  }
+}
+
+export default (pi: ExtensionAPI) => {
   pi.registerCommand("resource:agent", {
-    description: "This is for managing agents",
+    description: "This is for managing global agents",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
-    handler: async (arg, ctx) => {
-      notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-      const result = parseAgentCommandArgument(arg);
-      if (!result.success) {
-        ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-        return;
-      }
+    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "global"),
+  });
 
-      const scope = pi.getFlag(LOCAL_AGENT_FLAG) === true ? "local" : "global";
-
-      if (scope === "local") {
-        ctx.ui.notify(
-          `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
-          "info",
-        );
-      }
-
-      switch (result.output) {
-        case "create":
-          await handleCreate(ctx, scope);
-          break;
-        case "edit":
-          await handleEdit(ctx, scope);
-          break;
-        case "delete":
-          await handleDelete(ctx, scope);
-          break;
-      }
-    },
+  pi.registerCommand(LOCAL_AGENT_COMMAND_NAME, {
+    description: "This is for managing project agents",
+    getArgumentCompletions:
+      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
+    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "local"),
   });
 };
 
