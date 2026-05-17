@@ -5,7 +5,7 @@ export default defineConfig(() => ({
   cacheDir: '../node_modules/.vite/packages/pi-form-components',
   plugins: [],
   test: {
-    name: '@code-fixer-23/pi-form-components',
+    name: 'pi-form-components',
     watch: false,
     globals: true,
     environment: 'node',

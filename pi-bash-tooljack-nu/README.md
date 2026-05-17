@@ -48,15 +48,15 @@ pnpm install
 Run the package checks through Nx from the workspace root:
 
 ```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:check
+pnpm nx run pi-bash-tooljack-nu:check
 ```
 
 You can also run individual tasks:
 
 ```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:typecheck
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:lint
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:test
+pnpm nx run pi-bash-tooljack-nu:typecheck
+pnpm nx run pi-bash-tooljack-nu:lint
+pnpm nx run pi-bash-tooljack-nu:test
 ```
 
 If you want to work from the package directory instead:
@@ -99,6 +99,6 @@ When editing this project, verify the parts affected by your change:
 Before publishing, run:
 
 ```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:check
+pnpm nx run pi-bash-tooljack-nu:check
 pnpm --dir pi-bash-tooljack-nu pack --dry-run
 ```

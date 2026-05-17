@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    name: '@code-fixer-23/pi-bash-tooljack-nu',
+    name: 'pi-bash-tooljack-nu',
     watch: false,
     globals: true,
     environment: 'node',

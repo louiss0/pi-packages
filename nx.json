@@ -50,10 +50,13 @@
   ],
   "release": {
     "projects": [
-      "!@code-fixer-23/pi-form-components",
-      "!@code-fixer-23/source"
+      "!pi-form-components",
+      "!source"
     ],
     "projectsRelationship": "independent",
+    "releaseTag": {
+      "pattern": "{projectName}@{version}"
+    },
     "version": {
       "preVersionCommand": "npx nx run-many -t typecheck,test"
     }

@@ -1,0 +1,7 @@
+{
+  "name": "pi-agent-resource",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "root": "pi-agent-resource",
+  "tags": ["npm:public", "npm:pi-package"]
+}

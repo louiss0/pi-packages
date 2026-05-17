@@ -1,5 +1,5 @@
 {
-  "name": "@code-fixer-23/pi-bash-tooljack-nu",
+  "name": "pi-bash-tooljack-nu",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
   "sourceRoot": "pi-bash-tooljack-nu/src",
@@ -38,5 +38,5 @@
       }
     }
   },
-  "tags": []
+  "tags": ["npm:public", "npm:pi-package"]
 }

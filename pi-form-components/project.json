@@ -1,0 +1,7 @@
+{
+  "name": "pi-form-components",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "root": "pi-form-components",
+  "tags": ["npm:public", "scope:shared"]
+}

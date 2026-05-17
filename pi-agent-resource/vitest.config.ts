@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    name: '@code-fixer-23/pi-agent-resource',
+    name: 'pi-agent-resource',
     watch: false,
     globals: true,
     environment: 'node',
