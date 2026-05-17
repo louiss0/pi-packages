@@ -50,7 +50,6 @@
   ],
   "release": {
     "projects": [
-      "!pi-form-components",
       "!source"
     ],
     "projectsRelationship": "independent",
