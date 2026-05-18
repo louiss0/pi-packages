@@ -7,12 +7,6 @@ on:
     types:
       - closed
   workflow_dispatch:
-    inputs:
-      dry-run:
-        description: Run Nx Release without publishing changes
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -63,8 +57,4 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry-run }}" == "true" ]]; then
-            pnpm exec nx release --dry-run
-          else
-            pnpm exec nx release --yes
-          fi
+          pnpm exec nx release --yes
