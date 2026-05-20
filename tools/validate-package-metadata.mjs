@@ -21,9 +21,9 @@ const projectJson = JSON.parse(projectJsonText);
 const tags = new Set(projectJson.tags ?? []);
 const keywords = new Set(packageJson.keywords ?? []);
 
-if (tags.has('project:unbundled') && keywords.has('pi-package')) {
+if (tags.has('project:unbundled') && !keywords.has('pi-package')) {
   console.error(
-    `${projectRoot}/package.json must not include the \"pi-package\" keyword when the project is tagged project:unbundled.`,
+    `${projectRoot}/package.json must include the \"pi-package\" keyword when the project is tagged project:unbundled.`,
   );
   process.exit(1);
 }

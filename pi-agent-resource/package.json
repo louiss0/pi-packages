@@ -2,6 +2,9 @@
 "name": "@code-fixer-23/pi-agent-resource",
 	"version": "1.0.0",
 	"description": "This extension is useful for making agent skills, propmts and subagents",
+	"keywords": [
+		"pi-package"
+	],
 	"files": [
 		"extensions",
 		"shared",

@@ -7,6 +7,9 @@
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
   },
+  "keywords": [
+    "pi-package"
+  ],
   "publishConfig": {
     "access": "public"
   },
