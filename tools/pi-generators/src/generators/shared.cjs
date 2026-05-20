@@ -1,25 +1,25 @@
-const { spawnSync } = require('node:child_process');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-const { formatFiles, readJson, writeJson } = require('@nx/devkit');
+const { formatFiles, readJson, writeJson } = require("@nx/devkit");
 
-const packageScope = '@code-fixer-23';
-const piAgentVersion = '^0.67.2';
-const bundledTags = ['npm:public', 'project:bundled', 'status:supported'];
-const unbundledTags = ['npm:public', 'project:unbundled', 'status:supported'];
+const packageScope = "@code-fixer-23";
+const piAgentVersion = "^0.67.2";
+const bundledTags = ["npm:public", "project:bundled", "status:supported"];
+const unbundledTags = ["npm:public", "project:unbundled", "status:supported"];
 
 function normalizeProjectFolders(projectFolders = []) {
   const entries = Array.isArray(projectFolders) ? projectFolders : [projectFolders];
-  const extras = new Set(['extensions']);
+  const extras = new Set(["extensions"]);
 
   for (const entry of entries) {
     if (!entry) {
       continue;
     }
 
-    if (!['extensions', 'prompts', 'skills'].includes(entry)) {
+    if (!["extensions", "prompts", "skills"].includes(entry)) {
       throw new Error(
         `Unsupported project folder \"${entry}\". Use extensions, prompts, or skills.`,
       );
@@ -32,37 +32,37 @@ function normalizeProjectFolders(projectFolders = []) {
 }
 
 function getCreatePiPackageBin() {
-  const packageJsonPath = require.resolve('@code-fixer-23/create-pi-package/package.json');
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const packageJsonPath = require.resolve("@code-fixer-23/create-pi-package/package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   const packageRoot = path.dirname(packageJsonPath);
 
-  return path.resolve(packageRoot, packageJson.bin['create-pi-package']);
+  return path.resolve(packageRoot, packageJson.bin["create-pi-package"]);
 }
 
 function runCreatePiPackage(options) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-generators-'));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pi-generators-"));
   const createPiPackageBin = getCreatePiPackageBin();
   const args = [
     createPiPackageBin,
     options.name,
-    '--project-folders',
+    "--project-folders",
     ...options.projectFolders,
-    '--runner',
+    "--runner",
     options.runner,
-    '--no-install',
+    "--no-install",
   ];
 
   if (options.instructions) {
-    args.push('--instructions');
+    args.push("--instructions");
   }
 
   const result = spawnSync(process.execPath, args, {
     cwd: tempRoot,
-    encoding: 'utf8',
+    encoding: "utf8",
   });
 
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || 'create-pi-package failed');
+    throw new Error(result.stderr || result.stdout || "create-pi-package failed");
   }
 
   return path.join(tempRoot, options.name);
@@ -78,7 +78,7 @@ function copyDirectoryToTree(tree, sourceRoot, targetRoot) {
       continue;
     }
 
-    tree.write(targetPath, fs.readFileSync(sourcePath, 'utf8'));
+    tree.write(targetPath, fs.readFileSync(sourcePath, "utf8"));
   }
 }
 
@@ -87,19 +87,19 @@ function updatePackageJson(tree, projectRoot, kind) {
   const packageJson = readJson(tree, packageJsonPath);
 
   packageJson.name = `${packageScope}/${projectRoot}`;
-  packageJson.version ??= '0.0.1';
+  packageJson.version ??= "0.0.1";
   packageJson.private = false;
-  packageJson.publishConfig = { access: 'public' };
+  packageJson.publishConfig = { access: "public" };
   packageJson.description ??= `Pi package scaffold for ${projectRoot}`;
 
   delete packageJson.scripts;
 
-  if (packageJson.dependencies?.['@earendil-works/pi-coding-agent']) {
-    delete packageJson.dependencies['@earendil-works/pi-coding-agent'];
+  if (packageJson.dependencies?.["@earendil-works/pi-coding-agent"]) {
+    delete packageJson.dependencies["@earendil-works/pi-coding-agent"];
   }
 
   packageJson.dependencies = {
-    '@mariozechner/pi-coding-agent': piAgentVersion,
+    "@earendil-works/pi-coding-agent": piAgentVersion,
     ...packageJson.dependencies,
   };
 
@@ -107,8 +107,8 @@ function updatePackageJson(tree, projectRoot, kind) {
     delete packageJson.devDependencies.tsx;
   }
 
-  if (kind === 'unbundled') {
-    packageJson.keywords = ['pi-package'];
+  if (kind === "unbundled") {
+    packageJson.keywords = ["pi-package"];
   } else {
     delete packageJson.keywords;
   }
@@ -123,89 +123,92 @@ function updateExtensionEntrypoint(tree, projectRoot) {
     return;
   }
 
-  const currentContent = tree.read(extensionPath, 'utf8');
+  const currentContent = tree.read(extensionPath, "utf8");
 
   if (!currentContent) {
     return;
   }
 
   const updatedContent = currentContent
-    .replaceAll('@earendil-works/pi-coding-agent', '@mariozechner/pi-coding-agent')
-    .replace('type ExtensionAPI  ', 'type ExtensionAPI ')
-    .replace('  import', 'import')
-    .replace('  export default function (pi:ExtensionAPI) {', 'export default function (pi: ExtensionAPI) {')
-    .replace('      }', '}');
+    .replaceAll("@earendil-works/pi-coding-agent", "@earendil-works/pi-coding-agent")
+    .replace("type ExtensionAPI  ", "type ExtensionAPI ")
+    .replace("  import", "import")
+    .replace(
+      "  export default function (pi:ExtensionAPI) {",
+      "export default function (pi: ExtensionAPI) {",
+    )
+    .replace("      }", "}");
 
   tree.write(extensionPath, `${updatedContent.trim()}\n`);
 }
 
 function getTestTarget(runner) {
-  if (runner === 'jest') {
+  if (runner === "jest") {
     return {
-      executor: 'nx:run-commands',
+      executor: "nx:run-commands",
       options: {
-        command: 'pnpm exec jest --config jest.config.cjs --passWithNoTests',
-        cwd: '{projectRoot}',
+        command: "pnpm exec jest --config jest.config.cjs --passWithNoTests",
+        cwd: "{projectRoot}",
       },
     };
   }
 
   return {
-    executor: 'nx:run-commands',
+    executor: "nx:run-commands",
     options: {
-      command: 'pnpm exec vitest run --config vitest.config.ts --passWithNoTests',
-      cwd: '{projectRoot}',
+      command: "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
+      cwd: "{projectRoot}",
     },
   };
 }
 
 function writeProjectJson(tree, projectRoot, kind, runner) {
-  const tags = kind === 'bundled' ? bundledTags : unbundledTags;
+  const tags = kind === "bundled" ? bundledTags : unbundledTags;
   const projectJsonPath = `${projectRoot}/project.json`;
   const projectJson = {
     name: projectRoot,
-    $schema: '../node_modules/nx/schemas/project-schema.json',
-    projectType: 'library',
+    $schema: "../node_modules/nx/schemas/project-schema.json",
+    projectType: "library",
     root: projectRoot,
     sourceRoot: `${projectRoot}/extensions`,
     targets: {
       typecheck: {
-        executor: 'nx:run-commands',
+        executor: "nx:run-commands",
         options: {
-          command: 'tsc -p tsconfig.json --noEmit',
-          cwd: '{projectRoot}',
+          command: "tsc -p tsconfig.json --noEmit",
+          cwd: "{projectRoot}",
         },
       },
       test: getTestTarget(runner),
       lint: {
-        executor: '@nx/eslint:lint',
+        executor: "@nx/eslint:lint",
         options: {
           lintFilePatterns: [
-            '{projectRoot}/**/*.ts',
-            '{projectRoot}/**/*.js',
-            '{projectRoot}/**/*.mts',
-            '{projectRoot}/**/*.mjs',
-            '{projectRoot}/**/*.cts',
-            '{projectRoot}/**/*.cjs',
+            "{projectRoot}/**/*.ts",
+            "{projectRoot}/**/*.js",
+            "{projectRoot}/**/*.mts",
+            "{projectRoot}/**/*.mjs",
+            "{projectRoot}/**/*.cts",
+            "{projectRoot}/**/*.cjs",
           ],
         },
       },
       format: {
-        executor: 'nx:run-commands',
+        executor: "nx:run-commands",
         options: {
-          command: 'biome format --write .',
-          cwd: '{projectRoot}',
+          command: "biome format --write .",
+          cwd: "{projectRoot}",
         },
       },
       metadata: {
-        executor: 'nx:run-commands',
+        executor: "nx:run-commands",
         options: {
-          command: 'node tools/validate-package-metadata.mjs {projectRoot}',
+          command: "node tools/validate-package-metadata.mjs {projectRoot}",
         },
       },
       check: {
-        executor: 'nx:run-commands',
-        dependsOn: ['typecheck', 'lint', 'test', 'metadata'],
+        executor: "nx:run-commands",
+        dependsOn: ["typecheck", "lint", "test", "metadata"],
         options: {
           command: "echo 'All checks passed'",
         },
@@ -218,10 +221,10 @@ function writeProjectJson(tree, projectRoot, kind, runner) {
 }
 
 function updatePnpmWorkspace(tree, projectRoot) {
-  const workspacePath = 'pnpm-workspace.yaml';
-  const currentContent = tree.read(workspacePath, 'utf8');
+  const workspacePath = "pnpm-workspace.yaml";
+  const currentContent = tree.read(workspacePath, "utf8");
 
-  if (!currentContent || currentContent.includes(`  - \"${projectRoot}\"`)) {
+  if (!currentContent || currentContent.includes(`  - "${projectRoot}"`)) {
     return;
   }
 
@@ -234,7 +237,7 @@ function updatePnpmWorkspace(tree, projectRoot) {
 }
 
 function updateTsConfigReferences(tree, projectRoot) {
-  const tsconfigPath = 'tsconfig.json';
+  const tsconfigPath = "tsconfig.json";
   const tsconfig = readJson(tree, tsconfigPath);
   const references = tsconfig.references ?? [];
 
@@ -250,7 +253,7 @@ function updateTsConfigReferences(tree, projectRoot) {
 
 async function createPiPackageGenerator(tree, options, kind) {
   if (!options.name) {
-    throw new Error('A package name is required.');
+    throw new Error("A package name is required.");
   }
 
   if (tree.exists(options.name)) {
@@ -262,13 +265,13 @@ async function createPiPackageGenerator(tree, options, kind) {
     instructions: options.instructions === true,
     name: options.name,
     projectFolders,
-    runner: options.runner ?? 'vitest',
+    runner: options.runner ?? "vitest",
   });
 
   copyDirectoryToTree(tree, generatedRoot, options.name);
   updatePackageJson(tree, options.name, kind);
   updateExtensionEntrypoint(tree, options.name);
-  writeProjectJson(tree, options.name, kind, options.runner ?? 'vitest');
+  writeProjectJson(tree, options.name, kind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);
 

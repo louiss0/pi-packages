@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Key, type TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -10,10 +10,9 @@ import {
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
-  );
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module =
+    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
 
   return {
     ...module,
@@ -99,12 +98,15 @@ describe("extensions/agent-manager", () => {
       );
 
       const command = registerCommand.mock.calls[1]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
+        handler: (
+          arg: string,
+          ctx: { cwd: string; ui: { notify: typeof notify } },
+        ) => Promise<void>;
       };
-      await command.handler(
-        "create",
-        { cwd: localCwd, ui: { notify, custom: vi.fn() } } as never,
-      );
+      await command.handler("create", {
+        cwd: localCwd,
+        ui: { notify, custom: vi.fn() },
+      } as never);
 
       expect(notify).toHaveBeenNthCalledWith(
         1,
@@ -244,9 +246,13 @@ describe("extensions/agent-manager", () => {
     it("reports cancellation when agent creation is dismissed", async () => {
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom: vi.fn().mockResolvedValueOnce(null), notify } } as never);
+      await handleCreate({
+        ui: { custom: vi.fn().mockResolvedValueOnce(null), notify },
+      } as never);
 
-      await expect(getResourceFileSystem().readFile(expectedAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(notify).toHaveBeenCalledWith("Agent creation cancelled", "info");
     });
   });
@@ -298,7 +304,9 @@ describe("extensions/agent-manager", () => {
 
       await handleDelete({ ui: { notify, select } } as never);
 
-      await expect(getResourceFileSystem().readFile(expectedAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(select).toHaveBeenCalledWith("Delete Agent", ["global: oracle"]);
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
@@ -312,7 +320,9 @@ describe("extensions/agent-manager", () => {
 
       await handleDelete({ cwd: localCwd, ui: { notify, select } } as never, "local");
 
-      await expect(getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(select).toHaveBeenCalledWith("Delete Agent", ["local: oracle"]);
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });

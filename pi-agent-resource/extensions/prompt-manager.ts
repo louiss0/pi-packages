@@ -1,10 +1,6 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Editor,
@@ -13,7 +9,7 @@ import {
   Spacer,
   Text,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import {
   InferOutput,
   maxLength,
@@ -55,10 +51,7 @@ const PromptFieldsSchema = object({
     string(),
     minLength(3, "Name must be at least 3 characters"),
     maxLength(48, "Name must be 48 characters or fewer"),
-    regex(
-      promptNamePattern,
-      "Name must be lowercase letters, numbers, and dashes only",
-    ),
+    regex(promptNamePattern, "Name must be lowercase letters, numbers, and dashes only"),
   ),
   description: pipe(
     string(),
@@ -66,10 +59,7 @@ const PromptFieldsSchema = object({
     maxLength(1024, "Description must be 1024 characters or fewer"),
   ),
   "argument-hint": optional(
-    pipe(
-      string(),
-      regex(argumentHintPattern, "Argument hint must use [] or <> tokens"),
-    ),
+    pipe(string(), regex(argumentHintPattern, "Argument hint must use [] or <> tokens")),
     "",
   ),
 });
@@ -125,11 +115,7 @@ class PromptTemplateOverlay extends Container {
   #editor: Editor;
   #done: (value: string | undefined) => void;
 
-  constructor(
-    tui: TUI,
-    theme: Theme,
-    done: (value: string | undefined) => void,
-  ) {
+  constructor(tui: TUI, theme: Theme, done: (value: string | undefined) => void) {
     super();
     this.#done = done;
     this.#editor = new Editor(tui, {
@@ -169,11 +155,7 @@ class PromptTemplateOverlay extends Container {
   }
 }
 
-async function handlePromptCommand(
-  arg: string,
-  ctx: ExtensionContext,
-  scope: PromptScope,
-) {
+async function handlePromptCommand(arg: string, ctx: ExtensionContext, scope: PromptScope) {
   notifyWhenUsingDevelopmentExtension(extensionName, ctx);
   const result = parsePromptCommandArgument(arg);
   if (!result.success) {
@@ -233,8 +215,7 @@ export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "
   }
 
   const template = await ctx.ui.custom<string | undefined>(
-    (tui, theme, _keyboard, done) =>
-      new PromptTemplateOverlay(tui, theme, done),
+    (tui, theme, _keyboard, done) => new PromptTemplateOverlay(tui, theme, done),
     modalEditorOverlayOptions,
   );
 
@@ -333,9 +314,7 @@ async function listPromptChoices(scope: PromptScope, cwd: string) {
     choices.push(
       ...entries.map((entry) => {
         const entryPath = join(directory, entry.name);
-        const promptPath = entry.isDirectory()
-          ? join(entryPath, "_index.md")
-          : entryPath;
+        const promptPath = entry.isDirectory() ? join(entryPath, "_index.md") : entryPath;
 
         return {
           path: promptPath,

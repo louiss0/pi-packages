@@ -10,12 +10,12 @@ import {
   type ExtensionContext,
   formatSize,
   truncateTail,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type {
   AutocompleteItem,
   AutocompleteProvider,
   AutocompleteSuggestions,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 import { getCommandSuggestions, type CommandCompletionItem } from "./command";

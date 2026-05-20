@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Key, type TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -11,10 +11,9 @@ import {
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
-  );
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module =
+    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
 
   return {
     ...module,
@@ -53,13 +52,7 @@ describe("skill manager handlers", () => {
     "test-skill",
     "SKILL.md",
   );
-  const expectedLocalSkillPath = join(
-    localCwd,
-    ".pi",
-    "skills",
-    "test-skill",
-    "SKILL.md",
-  );
+  const expectedLocalSkillPath = join(localCwd, ".pi", "skills", "test-skill", "SKILL.md");
   const expectedSkillDirectory = dirname(expectedSkillPath);
   const expectedLocalSkillDirectory = dirname(expectedLocalSkillPath);
 
@@ -165,7 +158,10 @@ describe("skill manager handlers", () => {
       );
 
       const localCommand = registerCommand.mock.calls[1]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify; custom: typeof custom } }) => Promise<void>;
+        handler: (
+          arg: string,
+          ctx: { cwd: string; ui: { notify: typeof notify; custom: typeof custom } },
+        ) => Promise<void>;
       };
       await localCommand.handler("create", { cwd: localCwd, ui: { notify, custom } });
 

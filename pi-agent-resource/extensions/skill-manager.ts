@@ -3,7 +3,7 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
   Theme,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -16,7 +16,7 @@ import {
   Text,
   type SelectItem,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -306,10 +306,7 @@ export async function handleEdit(
   await ctx.reload();
 }
 
-export async function handleDelete(
-  ctx: ExtensionCommandContext,
-  scope: SkillScope = "global",
-) {
+export async function handleDelete(ctx: ExtensionCommandContext, scope: SkillScope = "global") {
   const skillPath = await pickSkillPath(ctx, "Delete Skill", scope);
 
   if (!skillPath) {
@@ -453,48 +450,47 @@ async function pickSkillPath(ctx: ExtensionContext, title: string, scope: SkillS
     return null;
   }
 
-  return ctx.ui.custom<string | null>(
-    (tui, theme, _kb, done) => {
-      const items: SelectItem[] = skillNames.map((skillName) => ({
-        value: skillName,
-        label: skillName,
-      }));
+  return ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
+    const items: SelectItem[] = skillNames.map((skillName) => ({
+      value: skillName,
+      label: skillName,
+    }));
 
-      const selectList = new SelectList(items, Math.min(items.length, 8), {
-        selectedPrefix: (text) => theme.fg("accent", text),
-        selectedText: (text) => theme.fg("accent", text),
-        description: (text) => theme.fg("muted", text),
-        scrollInfo: (text) => theme.fg("dim", text),
-        noMatch: (text) => theme.fg("warning", text),
-      });
+    const selectList = new SelectList(items, Math.min(items.length, 8), {
+      selectedPrefix: (text) => theme.fg("accent", text),
+      selectedText: (text) => theme.fg("accent", text),
+      description: (text) => theme.fg("muted", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    });
 
-      selectList.onSelect = (item) =>
-        done(join(getSkillsDirectory(scope, cwd), item.value, SKILL_FILE_NAME));
-      selectList.onCancel = () => done(null);
+    selectList.onSelect = (item) =>
+      done(join(getSkillsDirectory(scope, cwd), item.value, SKILL_FILE_NAME));
+    selectList.onCancel = () => done(null);
 
-      const container = new Container();
-      container.addChild(new Text(theme.fg("accent", title)));
-      container.addChild(new Spacer(1));
-      container.addChild(selectList);
-      container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("dim", "^v navigate | enter select | esc cancel")));
+    const container = new Container();
+    container.addChild(new Text(theme.fg("accent", title)));
+    container.addChild(new Spacer(1));
+    container.addChild(selectList);
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("dim", "^v navigate | enter select | esc cancel")));
 
-      return {
-        render: (width) => container.render(width),
-        invalidate: () => container.invalidate(),
-        handleInput: (data) => {
-          selectList.handleInput(data);
-          tui.requestRender();
-        },
-      } satisfies Component;
-    },
-    formOverlayOptions,
-  );
+    return {
+      render: (width) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data) => {
+        selectList.handleInput(data);
+        tui.requestRender();
+      },
+    } satisfies Component;
+  }, formOverlayOptions);
 }
 
 async function listSkillNames(scope: SkillScope, cwd: string) {
   try {
-    const entries = await getResourceFileSystem().readDirectoryEntries(getSkillsDirectory(scope, cwd));
+    const entries = await getResourceFileSystem().readDirectoryEntries(
+      getSkillsDirectory(scope, cwd),
+    );
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   } catch {
     return [];
@@ -619,7 +615,10 @@ async function handleSkillCommand(
   const editMode = pi.getFlag(EXTERNAL_EDITOR_FLAG) === true ? "external" : undefined;
 
   if (editMode === "external" && result.output !== "edit") {
-    ctx.ui.notify(`Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`, "error");
+    ctx.ui.notify(
+      `Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`,
+      "error",
+    );
     return;
   }
 

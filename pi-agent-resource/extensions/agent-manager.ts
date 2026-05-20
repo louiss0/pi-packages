@@ -1,16 +1,8 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
-import type { TUI } from "@mariozechner/pi-tui";
-import {
-  InferOutput,
-  maxLength,
-  minLength,
-  object,
-  pipe,
-  regex,
-  string,
-} from "valibot";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
+import { InferOutput, maxLength, minLength, object, pipe, regex, string } from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import { getResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
@@ -89,7 +81,11 @@ export function parseAgentCommandArgument(argument: string) {
   };
 }
 
-export function createAgentForm(tui: TUI, theme: Theme, done: (value: AgentFields | null) => void) {
+export function createAgentForm(
+  tui: TUI,
+  theme: Theme,
+  done: (value: AgentFields | null) => void,
+) {
   return new Form<AgentFields>(tui, done, {
     title: "Create Agent",
     fields: [
@@ -105,11 +101,7 @@ export function createAgentForm(tui: TUI, theme: Theme, done: (value: AgentField
   });
 }
 
-async function handleAgentCommand(
-  arg: string,
-  ctx: ExtensionContext,
-  scope: AgentScope,
-) {
+async function handleAgentCommand(arg: string, ctx: ExtensionContext, scope: AgentScope) {
   notifyWhenUsingDevelopmentExtension(extensionName, ctx);
   const result = parseAgentCommandArgument(arg);
   if (!result.success) {
@@ -210,8 +202,12 @@ export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "g
 }
 
 function renderFrontmatter(values: AgentFields) {
-  return ["---", ...Object.entries(values).map(([key, value]) => `${key}: ${value}`), "---", ""]
-    .join("\n");
+  return [
+    "---",
+    ...Object.entries(values).map(([key, value]) => `${key}: ${value}`),
+    "---",
+    "",
+  ].join("\n");
 }
 
 async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope) {

@@ -1,6 +1,6 @@
-import type { Component, SelectItem, TUI } from "@mariozechner/pi-tui";
-import { Container, SelectList, Text } from "@mariozechner/pi-tui";
-import { DynamicBorder, ThemeColor } from "@mariozechner/pi-coding-agent";
+import type { Component, SelectItem, TUI } from "@earendil-works/pi-tui";
+import { Container, SelectList, Text } from "@earendil-works/pi-tui";
+import { DynamicBorder, ThemeColor } from "@earendil-works/pi-coding-agent";
 
 export const HISTORY_LIMIT = 100;
 const HISTORY_EXCLUSION_PATTERN = "(?i)^\\s*pi\\b";

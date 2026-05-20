@@ -1,9 +1,9 @@
-import { Theme } from "@mariozechner/pi-coding-agent";
-import { Container, Input, Key, matchesKey, Text, type TUI } from "@mariozechner/pi-tui";
+import { Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Input, Key, matchesKey, Text, type TUI } from "@earendil-works/pi-tui";
 
-vi.mock("@mariozechner/pi-tui", async () => {
+vi.mock("@earendil-works/pi-tui", async () => {
   const module =
-    await vi.importActual<typeof import("@mariozechner/pi-tui")>("@mariozechner/pi-tui");
+    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
 
   return {
     ...module,

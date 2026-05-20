@@ -13,7 +13,7 @@ import {
   union,
 } from "valibot";
 
-import type { AutocompleteItem, AutocompleteSuggestions } from "@mariozechner/pi-tui";
+import type { AutocompleteItem, AutocompleteSuggestions } from "@earendil-works/pi-tui";
 
 const signatureDefaultSchema = union([string(), number(), boolean()]);
 const signatureParameterSchema = object({

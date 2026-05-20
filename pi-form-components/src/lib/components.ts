@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -10,7 +10,7 @@ import {
   Text,
   type TUI,
   truncateToWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 export class LabelledInput extends Container implements Component {
   #name: string;
@@ -351,8 +351,6 @@ export class Form<T extends Record<string, string | number | boolean>>
       return [];
     }
 
-    return this.#footer
-      .split(/\r?\n/)
-      .map((line) => truncateToWidth(line, width));
+    return this.#footer.split(/\r?\n/).map((line) => truncateToWidth(line, width));
   }
 }

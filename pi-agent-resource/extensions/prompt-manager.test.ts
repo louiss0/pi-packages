@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Key, type TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -10,10 +10,9 @@ import {
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
-  );
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module =
+    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
 
   return {
     ...module,
@@ -45,12 +44,7 @@ describe("extensions/prompt-manager", () => {
     "prompts",
     "create-react-component.md",
   );
-  const expectedLocalPromptPath = join(
-    localCwd,
-    ".pi",
-    "prompts",
-    "create-react-component.md",
-  );
+  const expectedLocalPromptPath = join(localCwd, ".pi", "prompts", "create-react-component.md");
 
   function createTheme() {
     return {
@@ -110,12 +104,15 @@ describe("extensions/prompt-manager", () => {
       );
 
       const command = registerCommand.mock.calls[1]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
+        handler: (
+          arg: string,
+          ctx: { cwd: string; ui: { notify: typeof notify } },
+        ) => Promise<void>;
       };
-      await command.handler(
-        "create",
-        { cwd: localCwd, ui: { notify, custom: vi.fn() } } as never,
-      );
+      await command.handler("create", {
+        cwd: localCwd,
+        ui: { notify, custom: vi.fn() },
+      } as never);
 
       expect(notify).toHaveBeenNthCalledWith(
         1,
@@ -159,8 +156,7 @@ describe("extensions/prompt-manager", () => {
         .fn()
         .mockResolvedValueOnce({
           name: "create-react-component",
-          description:
-            "This prompt creates a React component with full file output",
+          description: "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
         .mockResolvedValueOnce("Write the component template here");
@@ -168,10 +164,7 @@ describe("extensions/prompt-manager", () => {
 
       await handleCreate({ ui: { custom, notify } } as never);
 
-      const content = await getResourceFileSystem().readFile(
-        expectedPromptPath,
-        "utf8",
-      );
+      const content = await getResourceFileSystem().readFile(expectedPromptPath, "utf8");
 
       expect(content).toContain("argument-hint: <name> [directory]");
       expect(content).toContain("Write the component template here");
@@ -183,8 +176,7 @@ describe("extensions/prompt-manager", () => {
         .fn()
         .mockResolvedValueOnce({
           name: "create-react-component",
-          description:
-            "This prompt creates a React component with full file output",
+          description: "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
         .mockResolvedValueOnce("Write the component template here");
@@ -192,10 +184,7 @@ describe("extensions/prompt-manager", () => {
 
       await handleCreate({ cwd: localCwd, ui: { custom, notify } } as never, "local");
 
-      const content = await getResourceFileSystem().readFile(
-        expectedLocalPromptPath,
-        "utf8",
-      );
+      const content = await getResourceFileSystem().readFile(expectedLocalPromptPath, "utf8");
 
       expect(content).toContain("Write the component template here");
       expect(notify).toHaveBeenCalledWith("Prompt created");
@@ -207,22 +196,15 @@ describe("extensions/prompt-manager", () => {
       seedMemoryResourceFileSystem({
         [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi
-        .fn()
-        .mockResolvedValueOnce("global: create-react-component");
+      const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
       const notify = vi.fn();
 
       await handleEdit({ ui: { notify, select, editor } } as never);
 
-      const content = await getResourceFileSystem().readFile(
-        expectedPromptPath,
-        "utf8",
-      );
+      const content = await getResourceFileSystem().readFile(expectedPromptPath, "utf8");
 
-      expect(select).toHaveBeenCalledWith("Edit Prompt", [
-        "global: create-react-component",
-      ]);
+      expect(select).toHaveBeenCalledWith("Edit Prompt", ["global: create-react-component"]);
       expect(content).toBe("updated prompt content");
       expect(notify).toHaveBeenCalledWith("Prompt edited");
     });
@@ -231,22 +213,15 @@ describe("extensions/prompt-manager", () => {
       seedMemoryResourceFileSystem({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi
-        .fn()
-        .mockResolvedValueOnce("local: create-react-component");
+      const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated local prompt content");
       const notify = vi.fn();
 
       await handleEdit({ cwd: localCwd, ui: { notify, select, editor } } as never, "local");
 
-      const content = await getResourceFileSystem().readFile(
-        expectedLocalPromptPath,
-        "utf8",
-      );
+      const content = await getResourceFileSystem().readFile(expectedLocalPromptPath, "utf8");
 
-      expect(select).toHaveBeenCalledWith("Edit Prompt", [
-        "local: create-react-component",
-      ]);
+      expect(select).toHaveBeenCalledWith("Edit Prompt", ["local: create-react-component"]);
       expect(content).toBe("updated local prompt content");
       expect(notify).toHaveBeenCalledWith("Prompt edited");
     });
