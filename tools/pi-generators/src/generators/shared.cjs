@@ -21,7 +21,7 @@ function normalizeProjectFolders(projectFolders = []) {
 
     if (!["extensions", "prompts", "skills"].includes(entry)) {
       throw new Error(
-        `Unsupported project folder \"${entry}\". Use extensions, prompts, or skills.`,
+        `Unsupported project folder "${entry}". Use extensions, prompts, or skills.`,
       );
     }
 
@@ -108,32 +108,6 @@ function updatePackageJson(tree, projectRoot, kind) {
   }
 
   writeJson(tree, packageJsonPath, packageJson);
-}
-
-function updateExtensionEntrypoint(tree, projectRoot) {
-  const extensionPath = `${projectRoot}/extensions/index.ts`;
-
-  if (!tree.exists(extensionPath)) {
-    return;
-  }
-
-  const currentContent = tree.read(extensionPath, "utf8");
-
-  if (!currentContent) {
-    return;
-  }
-
-  const updatedContent = currentContent
-    .replaceAll("@earendil-works/pi-coding-agent", "@earendil-works/pi-coding-agent")
-    .replace("type ExtensionAPI  ", "type ExtensionAPI ")
-    .replace("  import", "import")
-    .replace(
-      "  export default function (pi:ExtensionAPI) {",
-      "export default function (pi: ExtensionAPI) {",
-    )
-    .replace("      }", "}");
-
-  tree.write(extensionPath, `${updatedContent.trim()}\n`);
 }
 
 function getTestTarget(runner) {
@@ -264,7 +238,6 @@ async function createPiPackageGenerator(tree, options, kind) {
 
   copyDirectoryToTree(tree, generatedRoot, options.name);
   updatePackageJson(tree, options.name, kind);
-  updateExtensionEntrypoint(tree, options.name);
   writeProjectJson(tree, options.name, kind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);
