@@ -94,10 +94,6 @@ function updatePackageJson(tree, projectRoot, kind) {
 
   delete packageJson.scripts;
 
-  if (packageJson.dependencies?.["@earendil-works/pi-coding-agent"]) {
-    delete packageJson.dependencies["@earendil-works/pi-coding-agent"];
-  }
-
   packageJson.dependencies = {
     "@earendil-works/pi-coding-agent": piAgentVersion,
     ...packageJson.dependencies,
@@ -107,9 +103,7 @@ function updatePackageJson(tree, projectRoot, kind) {
     delete packageJson.devDependencies.tsx;
   }
 
-  if (kind === "unbundled") {
-    packageJson.keywords = ["pi-package"];
-  } else {
+  if (kind !== "unbundled") {
     delete packageJson.keywords;
   }
 
