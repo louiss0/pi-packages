@@ -59,11 +59,10 @@ pnpm nx run pi-bash-tooljack-nu:lint
 pnpm nx run pi-bash-tooljack-nu:test
 ```
 
-If you want to work from the package directory instead:
+Run tasks through Nx from the workspace root:
 
 ```sh
-cd pi-bash-tooljack-nu
-pnpm check
+pnpm nx run pi-bash-tooljack-nu:check
 ```
 
 ## Run the extension in Pi

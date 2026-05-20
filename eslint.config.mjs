@@ -22,6 +22,22 @@ export default [
           allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
           depConstraints: [
             {
+              sourceTag: 'project:bundled',
+              onlyDependOnLibsWithTags: ['project:bundled'],
+            },
+            {
+              sourceTag: 'project:unbundled',
+              onlyDependOnLibsWithTags: ['project:bundled'],
+            },
+            {
+              sourceTag: 'status:supported',
+              onlyDependOnLibsWithTags: ['status:supported'],
+            },
+            {
+              sourceTag: 'status:deprecated',
+              onlyDependOnLibsWithTags: ['status:supported', 'status:deprecated'],
+            },
+            {
               sourceTag: 'scope:shared',
               onlyDependOnLibsWithTags: ['scope:shared'],
             },

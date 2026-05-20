@@ -25,18 +25,9 @@
     "@mariozechner/pi-tui": "^0.67.2",
     "tslib": "^2.3.0"
   },
-  "scripts": {
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.lib.json --noEmit"
-  },
   "devDependencies": {
     "vite": "^8.0.0",
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^4.1.4"
-  },
-  "nx": {
-    "tags": [
-      "scope:shared"
-    ]
   }
 }

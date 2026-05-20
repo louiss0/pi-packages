@@ -32,11 +32,17 @@
     },
     "check": {
       "executor": "nx:run-commands",
-      "dependsOn": ["typecheck", "lint", "test"],
+      "dependsOn": ["typecheck", "lint", "test", "metadata"],
       "options": {
         "command": "echo 'All checks passed'"
       }
+    },
+    "metadata": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/validate-package-metadata.mjs {projectRoot}"
+      }
     }
   },
-  "tags": ["npm:public", "npm:pi-package"]
+  "tags": ["npm:public", "project:unbundled", "status:supported"]
 }
