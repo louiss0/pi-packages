@@ -2,9 +2,12 @@ packages:
   - "pi-form-components"
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
+  - "tools/pi-generators"
 allowBuilds:
   '@biomejs/biome': true
   '@google/genai': true
+  '@swc/core': set this to true or false
+  esbuild: set this to true or false
   koffi: true
   nx: true
   protobufjs: true

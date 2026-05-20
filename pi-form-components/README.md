@@ -1,76 +1,29 @@
 # @code-fixer-23/pi-form-components
 
-Form component library for Pi extensions.
+Shared bundled package for Pi workspace UI pieces.
 
-## 📦 Package Information
+## Role
 
-- **Version**: 0.0.1
-- **Publishable**: ❌ No (Private Package)
-- **Tag**: `scope:shared`
-- **Module Boundaries**: Base library - no external dependencies allowed
+`pi-form-components` is tagged:
 
-## 🔒 Private Package
+- `project:bundled`
+- `status:supported`
+- `scope:shared`
 
-This is an **internal library** that:
-- Will NOT be published to NPM
-- Provides shared utilities for other packages
-- Serves as the foundation layer for the monorepo
+That means other workspace packages may depend on it, and it forms part of the allowed dependency layer for unbundled Pi packages.
 
-## 🚀 Features
+## Development
 
-This package provides core utilities that are shared across all other packages:
+Run tasks through Nx from the workspace root:
 
-- Common helper functions
-- Shared types and interfaces
-- Base utilities used by `@org/strings`, `@org/async`, and `@org/colors`
-
-## 📝 Usage
-
-This package is automatically available to all other packages in the monorepo:
-
-```typescript
-// In any other package (strings, async, colors)
-import { someUtility } from '@org/utils';
-
-// Use the shared functionality
-const result = someUtility(input);
+```sh
+pnpm nx run pi-form-components:lint
+pnpm nx run pi-form-components:typecheck
+pnpm nx run pi-form-components:test
+pnpm nx run pi-form-components:metadata
 ```
 
-## 🏗️ Building
+## Notes
 
-```bash
-# Build the package
-nx build utils
-
-# The build output will be in dist/packages/utils
-```
-
-## 📋 Available Commands
-
-```bash
-nx build utils    # Build the package
-nx lint utils     # Lint the package
-```
-
-## 🔒 Module Boundaries
-
-This package has the tag `scope:shared` which means:
-- **Can be imported by**: All packages (`scope:strings`, `scope:async`, `scope:colors`)
-- **Can import from**: Nothing (it's the base layer)
-
-This ensures a clean dependency hierarchy where `utils` serves as the foundation without creating circular dependencies.
-
-## 🏛️ Architecture Role
-
-As the shared foundation of the monorepo:
-1. Contains no business logic specific to strings, async, or colors
-2. Provides only generic, reusable utilities
-3. Has no external dependencies beyond TypeScript's standard library
-4. Ensures consistency across all packages
-
-## ⚠️ Important Notes
-
-- This package is marked as `"private": true` in package.json
-- It will be excluded from NPM publishing when running `nx release`
-- Changes to this package may affect all other packages in the monorepo
-- Keep utilities generic and well-tested as they form the foundation
+- package-level `scripts` are intentionally avoided in this workspace
+- metadata policy is enforced by `tools/validate-package-metadata.mjs`

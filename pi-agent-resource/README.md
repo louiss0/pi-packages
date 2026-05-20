@@ -64,8 +64,17 @@ PI_RESOURCE_DEV=1
 
 When that variable is set, the extension shows its development notice and uses the in-memory filesystem.
 
-## Tests
+## Development
+
+Run tasks through Nx from the workspace root:
 
 ```bash
-npm test
+pnpm nx run pi-agent-resource:lint
+pnpm nx run pi-agent-resource:typecheck
+pnpm nx run pi-agent-resource:test
+pnpm nx run pi-agent-resource:metadata
 ```
+
+## Package policy
+
+`pi-agent-resource` is an unbundled package, so it keeps the `pi-package` keyword and may only depend on bundled workspace packages.

@@ -22,6 +22,7 @@
     "jsonc-eslint-parser": "^2.1.0",
     "nx": "22.7.0",
     "@biomejs/biome": "^1.9.4",
+    "@code-fixer-23/pi-generators": "workspace:*",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.40.0",
