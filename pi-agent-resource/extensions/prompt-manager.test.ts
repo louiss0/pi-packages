@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Key, type TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -26,7 +26,6 @@ vi.mock("node:os", () => ({
 
 import registerPromptManager, {
   createPromptForm,
-  GLOBAL_PROMPT_DIRECTORY,
   handleCreate,
   handleDelete,
   handleEdit,

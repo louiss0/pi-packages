@@ -1,16 +1,16 @@
 # @code-fixer-23/pi-form-components
 
-Shared bundled package for Pi workspace UI pieces.
+Shared package for Pi workspace UI pieces.
 
 ## Role
 
 `pi-form-components` is tagged:
 
-- `project:bundled`
+- `project:package`
 - `status:supported`
 - `scope:shared`
 
-That means other workspace packages may depend on it, and it forms part of the allowed dependency layer for unbundled Pi packages.
+That means other workspace projects may depend on it, and it forms part of the allowed dependency layer for Pi extension packages.
 
 ## Development
 

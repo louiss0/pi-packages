@@ -26,7 +26,6 @@ vi.mock("node:os", () => ({
 
 import registerAgentManager, {
   createAgentForm,
-  GLOBAL_AGENT_DIRECTORY,
   handleCreate,
   handleDelete,
   handleEdit,

@@ -7,6 +7,11 @@
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
   },
+  "repository": "https://github.com/louiss0/pi-packages",
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
   "keywords": [
     "pi-package"
   ],

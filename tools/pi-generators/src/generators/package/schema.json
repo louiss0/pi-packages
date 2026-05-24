@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/schema",
   "cli": "nx",
-  "$id": "unbundled-package",
-  "title": "Unbundled Pi Package",
+  "$id": "package",
+  "title": "Pi Package",
   "type": "object",
   "properties": {
     "name": {
@@ -24,7 +24,7 @@
     },
     "runner": {
       "type": "string",
-      "description": "Test runner for the generated extension scaffold.",
+      "description": "Test runner for the generated Pi scaffold.",
       "enum": ["vitest", "jest"],
       "default": "vitest"
     },

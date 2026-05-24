@@ -11,5 +11,5 @@
       }
     }
   },
-  "tags": ["npm:public", "scope:shared", "project:bundled", "status:supported"]
+  "tags": ["npm:public", "scope:shared", "project:package", "status:supported"]
 }

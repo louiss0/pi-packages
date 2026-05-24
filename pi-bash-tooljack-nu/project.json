@@ -44,5 +44,5 @@
       }
     }
   },
-  "tags": ["npm:public", "project:unbundled", "status:supported"]
+  "tags": ["npm:public", "project:extension", "status:supported"]
 }
