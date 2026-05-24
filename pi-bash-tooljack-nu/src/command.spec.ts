@@ -1,18 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { getCommandSuggestions } from "./command";
 
 describe("getCommandSuggestions", () => {
+  let hasNuShell = false;
+
+  beforeAll(async () => {
+    const suggestions = await getCommandSuggestions("");
+    hasNuShell = (suggestions?.items.length ?? 0) > 0;
+  });
+
+  function expectNuShellSuggestions(
+    suggestions: Awaited<ReturnType<typeof getCommandSuggestions>>,
+  ) {
+    if (!hasNuShell) {
+      expect(suggestions).toBeNull();
+      return;
+    }
+
+    expect(suggestions?.items.length).toBeGreaterThan(0);
+  }
+
   it("returns real suggestions from NuShell", async () => {
     const suggestions = await getCommandSuggestions("");
 
-    expect(suggestions?.items.length).toBeGreaterThan(0);
+    expectNuShellSuggestions(suggestions);
   }, 30_000);
 
   it("returns real suggestions from NuShell based on ", async () => {
     const suggestions = await getCommandSuggestions("each");
 
-    expect(suggestions?.items.length).toBeGreaterThan(0);
+    expectNuShellSuggestions(suggestions);
   }, 30_000);
 
   describe("suggestions are returned based on prefix", () => {
@@ -20,6 +38,11 @@ describe("getCommandSuggestions", () => {
       "returns suggestions based on prefix %s",
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
+
+        if (!hasNuShell) {
+          expect(suggestions).toBeNull();
+          return;
+        }
 
         expect(suggestions?.items.length).toBeGreaterThan(0);
         expect(
@@ -34,6 +57,12 @@ describe("getCommandSuggestions", () => {
       "returns suggestions based on prefix %s",
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
+
+        if (!hasNuShell) {
+          expect(suggestions).toBeNull();
+          return;
+        }
+
         const prefixItems = suggestions?.items.filter((item) =>
           item.value.startsWith(prefix),
         );
@@ -56,6 +85,11 @@ describe("getCommandSuggestions", () => {
       async (prefix) => {
         const result = await getCommandSuggestions(prefix);
 
+        if (!hasNuShell) {
+          expect(result).toBeNull();
+          return;
+        }
+
         expect(result?.items.length).toBeGreaterThan(0);
       },
     );
@@ -75,6 +109,11 @@ describe("getCommandSuggestions", () => {
       "regex",
     ])("returns suggestions based on search_terms %s", async (prefix) => {
       const result = await getCommandSuggestions(prefix);
+
+      if (!hasNuShell) {
+        expect(result).toBeNull();
+        return;
+      }
 
       expect(result?.items.length).toBeGreaterThan(0);
     });

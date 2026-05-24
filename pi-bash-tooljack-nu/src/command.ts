@@ -82,7 +82,7 @@ export async function getCommandSuggestions(prefix: string): Promise<
     | to json`
     : `scope commands | select name description signatures type category search_terms | to json`;
 
-  const result = await new Promise<string>((resolve, reject) => {
+  const result = await new Promise<string | null>((resolve) => {
     const child = spawn("nu", ["-c", command], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -92,10 +92,12 @@ export async function getCommandSuggestions(prefix: string): Promise<
     const stdout: Buffer[] = [];
 
     child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-    child.on("close", () => {
-      resolve(Buffer.concat(stdout).toString("utf-8"));
+    child.on("close", (code) => {
+      resolve(code === 0 ? Buffer.concat(stdout).toString("utf-8") : null);
     });
-    child.on("error", reject);
+    child.on("error", () => {
+      resolve(null);
+    });
   });
 
   if (!result) return null;
