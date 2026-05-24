@@ -1,5 +1,5 @@
 {
-	"linter": {
-		"enabled": false
-	}
+  "linter": {
+    "enabled": false
+  }
 }

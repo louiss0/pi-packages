@@ -175,15 +175,17 @@ function writeProjectJson(tree, projectRoot, projectKind, runner) {
       biome: {
         executor: "nx:run-commands",
         options: {
-          command: "pnpm exec biome format .",
-          cwd: "{projectRoot}",
+          command:
+            "pnpm exec biome format --config-path biome.json {projectRoot}",
+          cwd: "{workspaceRoot}",
         },
       },
       format: {
         executor: "nx:run-commands",
         options: {
-          command: "pnpm exec biome format --write .",
-          cwd: "{projectRoot}",
+          command:
+            "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+          cwd: "{workspaceRoot}",
         },
       },
       metadata: {

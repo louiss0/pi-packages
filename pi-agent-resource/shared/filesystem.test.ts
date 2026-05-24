@@ -1,97 +1,97 @@
 import {
-	getResourceFileSystem,
-	resetResourceFileSystem,
-	seedMemoryResourceFileSystem,
-	useMemoryResourceFileSystem,
+  getResourceFileSystem,
+  resetResourceFileSystem,
+  seedMemoryResourceFileSystem,
+  useMemoryResourceFileSystem,
 } from "./filesystem";
 import { resetDevelopmentExtensionNotice } from "./runtime";
 
 describe("shared/filesystem", () => {
-	beforeEach(() => {
-		vi.unstubAllEnvs();
-		resetDevelopmentExtensionNotice();
-		resetResourceFileSystem();
-	});
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+    resetDevelopmentExtensionNotice();
+    resetResourceFileSystem();
+  });
 
-	afterEach(() => {
-		resetResourceFileSystem();
-	});
+  afterEach(() => {
+    resetResourceFileSystem();
+  });
 
-	it("uses memfs when development mode is enabled", async () => {
-		vi.stubEnv("PI_RESOURCE_DEV", "1");
-		const fileSystem = getResourceFileSystem();
+  it("uses memfs when development mode is enabled", async () => {
+    vi.stubEnv("PI_RESOURCE_DEV", "1");
+    const fileSystem = getResourceFileSystem();
 
-		await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });
-		await fileSystem.writeFile(
-			"/workspace/.pi/agents/test.md",
-			"hello",
-			"utf8",
-		);
+    await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });
+    await fileSystem.writeFile(
+      "/workspace/.pi/agents/test.md",
+      "hello",
+      "utf8",
+    );
 
-		await expect(
-			fileSystem.readFile("/workspace/.pi/agents/test.md", "utf8"),
-		).resolves.toBe("hello");
-	});
+    await expect(
+      fileSystem.readFile("/workspace/.pi/agents/test.md", "utf8"),
+    ).resolves.toBe("hello");
+  });
 
-	it("can seed and clear the memory filesystem explicitly in tests", async () => {
-		useMemoryResourceFileSystem();
-		seedMemoryResourceFileSystem({
-			"/workspace/.pi/prompts/test.md": "prompt",
-		});
+  it("can seed and clear the memory filesystem explicitly in tests", async () => {
+    useMemoryResourceFileSystem();
+    seedMemoryResourceFileSystem({
+      "/workspace/.pi/prompts/test.md": "prompt",
+    });
 
-		await expect(
-			getResourceFileSystem().readFile(
-				"/workspace/.pi/prompts/test.md",
-				"utf8",
-			),
-		).resolves.toBe("prompt");
+    await expect(
+      getResourceFileSystem().readFile(
+        "/workspace/.pi/prompts/test.md",
+        "utf8",
+      ),
+    ).resolves.toBe("prompt");
 
-		resetResourceFileSystem();
-		useMemoryResourceFileSystem();
+    resetResourceFileSystem();
+    useMemoryResourceFileSystem();
 
-		await expect(
-			getResourceFileSystem().readFile(
-				"/workspace/.pi/prompts/test.md",
-				"utf8",
-			),
-		).rejects.toThrow();
-	});
+    await expect(
+      getResourceFileSystem().readFile(
+        "/workspace/.pi/prompts/test.md",
+        "utf8",
+      ),
+    ).rejects.toThrow();
+  });
 
-	it("removes files and directories with explicit methods", async () => {
-		useMemoryResourceFileSystem();
-		const fileSystem = getResourceFileSystem();
+  it("removes files and directories with explicit methods", async () => {
+    useMemoryResourceFileSystem();
+    const fileSystem = getResourceFileSystem();
 
-		await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {
-			recursive: true,
-		});
-		await fileSystem.writeFile(
-			"/workspace/.pi/agent/skills/test-skill/SKILL.md",
-			"skill",
-			"utf8",
-		);
-		await fileSystem.removeFile(
-			"/workspace/.pi/agent/skills/test-skill/SKILL.md",
-		);
+    await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {
+      recursive: true,
+    });
+    await fileSystem.writeFile(
+      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+      "skill",
+      "utf8",
+    );
+    await fileSystem.removeFile(
+      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+    );
 
-		await expect(
-			fileSystem.readFile(
-				"/workspace/.pi/agent/skills/test-skill/SKILL.md",
-				"utf8",
-			),
-		).rejects.toThrow();
+    await expect(
+      fileSystem.readFile(
+        "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+        "utf8",
+      ),
+    ).rejects.toThrow();
 
-		await fileSystem.writeFile(
-			"/workspace/.pi/agent/skills/test-skill/SKILL.md",
-			"skill",
-			"utf8",
-		);
-		await fileSystem.removeDirectory("/workspace/.pi/agent/skills/test-skill");
+    await fileSystem.writeFile(
+      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+      "skill",
+      "utf8",
+    );
+    await fileSystem.removeDirectory("/workspace/.pi/agent/skills/test-skill");
 
-		await expect(
-			fileSystem.readFile(
-				"/workspace/.pi/agent/skills/test-skill/SKILL.md",
-				"utf8",
-			),
-		).rejects.toThrow();
-	});
+    await expect(
+      fileSystem.readFile(
+        "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+        "utf8",
+      ),
+    ).rejects.toThrow();
+  });
 });
