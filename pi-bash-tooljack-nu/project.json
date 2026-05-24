@@ -23,10 +23,17 @@
         "lintFilePatterns": ["{projectRoot}/**/*.ts", "{projectRoot}/**/*.js"]
       }
     },
+    "biome": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format .",
+        "cwd": "{projectRoot}"
+      }
+    },
     "format": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "biome format --write .",
+        "command": "pnpm exec biome format --write .",
         "cwd": "{projectRoot}"
       }
     },

@@ -13,7 +13,10 @@ import {
   union,
 } from "valibot";
 
-import type { AutocompleteItem, AutocompleteSuggestions } from "@earendil-works/pi-tui";
+import type {
+  AutocompleteItem,
+  AutocompleteSuggestions,
+} from "@earendil-works/pi-tui";
 
 const signatureDefaultSchema = union([string(), number(), boolean()]);
 const signatureParameterSchema = object({
@@ -51,7 +54,9 @@ function isClosureFirstCommand(command: CommandMetadata) {
   return signatureTexts.includes("closure") || signatureTexts.includes("block");
 }
 
-function buildCommandCompletionItem(command: CommandMetadata): CommandCompletionItem {
+function buildCommandCompletionItem(
+  command: CommandMetadata,
+): CommandCompletionItem {
   const label = command.name ?? "";
   return {
     value: label,
@@ -61,10 +66,11 @@ function buildCommandCompletionItem(command: CommandMetadata): CommandCompletion
   };
 }
 
-export async function getCommandSuggestions(
-  prefix: string,
-): Promise<
-  (Pick<AutocompleteSuggestions, "prefix"> & { items: Array<CommandCompletionItem> }) | null
+export async function getCommandSuggestions(prefix: string): Promise<
+  | (Pick<AutocompleteSuggestions, "prefix"> & {
+      items: Array<CommandCompletionItem>;
+    })
+  | null
 > {
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
@@ -93,7 +99,10 @@ export async function getCommandSuggestions(
   });
 
   if (!result) return null;
-  const safeParseResult = safeParse(array(CommandMetadataSchema), JSON.parse(result));
+  const safeParseResult = safeParse(
+    array(CommandMetadataSchema),
+    JSON.parse(result),
+  );
 
   if (!safeParseResult.success) {
     safeParseResult.issues.forEach((item) => {

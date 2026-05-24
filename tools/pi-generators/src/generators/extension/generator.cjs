@@ -1,7 +1,7 @@
-const { createPiPackageGenerator } = require('../shared.cjs');
+const { createPiPackageGenerator } = require("../shared.cjs");
 
 async function extensionGenerator(tree, options) {
-  await createPiPackageGenerator(tree, options, 'extension');
+  await createPiPackageGenerator(tree, options, "extension");
 }
 
 module.exports = extensionGenerator;

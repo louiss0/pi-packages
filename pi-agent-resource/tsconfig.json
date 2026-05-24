@@ -1,23 +1,23 @@
 {
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["vitest/globals"],
-    "strict": true,
-    "skipLibCheck": true,
-    "composite": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
-  },
-  "include": ["extensions/**/*.ts", "shared/**/*.ts"],
-  "exclude": ["**/*.test.ts"],
-  "references": [
-    {
-      "path": "../pi-form-components"
-    }
-  ]
+	"extends": "../tsconfig.base.json",
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"types": ["vitest/globals"],
+		"strict": true,
+		"skipLibCheck": true,
+		"composite": true,
+		"declaration": true,
+		"emitDeclarationOnly": true,
+		"outDir": "dist",
+		"tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+	},
+	"include": ["extensions/**/*.ts", "shared/**/*.ts"],
+	"exclude": ["**/*.test.ts"],
+	"references": [
+		{
+			"path": "../pi-form-components"
+		}
+	]
 }

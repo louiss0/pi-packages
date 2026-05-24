@@ -36,15 +36,8 @@ jobs:
       - name: Derive Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Start Nx Cloud CI run
-        run: pnpm exec nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="metadata"
-
-      - name: Check formatting
-        run: pnpm exec nx record -- pnpm exec nx format:check --base="$NX_BASE" --head="$NX_HEAD"
+      - name: Run affected Biome checks
+        run: pnpm exec nx affected -t biome
 
       - name: Run affected checks
         run: pnpm exec nx affected -t lint test build typecheck metadata
-
-      - name: Run Nx self-healing fixes
-        run: pnpm exec nx fix-ci
-        if: always()

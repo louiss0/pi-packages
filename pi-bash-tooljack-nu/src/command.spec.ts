@@ -22,7 +22,9 @@ describe("getCommandSuggestions", () => {
         const suggestions = await getCommandSuggestions(prefix);
 
         expect(suggestions?.items.length).toBeGreaterThan(0);
-        expect(suggestions?.items.some((item) => item.value.startsWith(prefix))).toBe(true);
+        expect(
+          suggestions?.items.some((item) => item.value.startsWith(prefix)),
+        ).toBe(true);
       },
     );
   });
@@ -32,7 +34,9 @@ describe("getCommandSuggestions", () => {
       "returns suggestions based on prefix %s",
       async (prefix) => {
         const suggestions = await getCommandSuggestions(prefix);
-        const prefixItems = suggestions?.items.filter((item) => item.value.startsWith(prefix));
+        const prefixItems = suggestions?.items.filter((item) =>
+          item.value.startsWith(prefix),
+        );
 
         expect(prefixItems?.length).toBeGreaterThan(0);
         expect(prefixItems?.every((item) => item.requiresClosure)).toBe(true);

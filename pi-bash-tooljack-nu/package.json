@@ -12,16 +12,12 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
-  "keywords": [
-    "pi-package"
-  ],
+  "keywords": ["pi-package"],
   "publishConfig": {
     "access": "public"
   },
   "pi": {
-    "extensions": [
-      "src/index.ts"
-    ]
+    "extensions": ["src/index.ts"]
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.75.3",

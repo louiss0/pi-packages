@@ -19,7 +19,10 @@ export function notifyWhenUsingDevelopmentExtension(
 		};
 	},
 ) {
-	if (!isDevelopmentExtensionRuntime() || shownDevelopmentNotices.has(extensionName)) {
+	if (
+		!isDevelopmentExtensionRuntime() ||
+		shownDevelopmentNotices.has(extensionName)
+	) {
 		return;
 	}
 
