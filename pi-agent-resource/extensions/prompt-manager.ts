@@ -51,7 +51,8 @@ export const LOCAL_PROMPT_DIRECTORY = join(
   PROMPTS_DIRECTORY_NAME,
 );
 const promptNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const argumentHintPattern = /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
+const argumentHintPattern =
+  /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
 
 const PromptFieldsSchema = object({
   name: pipe(
