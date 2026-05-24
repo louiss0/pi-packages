@@ -7,7 +7,9 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

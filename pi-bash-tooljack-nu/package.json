@@ -12,7 +12,9 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "publishConfig": {
     "access": "public"
   },
