@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Derive Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
       - name: Load npm token from 1Password
         uses: 1password/load-secrets-action@v3
         env:
@@ -56,5 +59,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          export NODE_AUTH_TOKEN="$NPM_TOKEN"
           pnpm exec nx release --yes

@@ -33,14 +33,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Derive Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
       - name: Start Nx Cloud CI run
-        run: pnpm exec nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="typecheck"
+        run: pnpm exec nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="metadata"
 
       - name: Check formatting
-        run: pnpm exec nx record -- pnpm exec nx format:check --base="remotes/origin/main"
+        run: pnpm exec nx record -- pnpm exec nx format:check --base="$NX_BASE" --head="$NX_HEAD"
 
-      - name: Run lint, test, build, and typecheck
-        run: pnpm exec nx run-many -t lint test build typecheck
+      - name: Run affected checks
+        run: pnpm exec nx affected -t lint test build typecheck metadata
 
       - name: Run Nx self-healing fixes
         run: pnpm exec nx fix-ci
