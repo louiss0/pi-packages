@@ -23,11 +23,18 @@
         "lintFilePatterns": ["{projectRoot}/**/*.ts", "{projectRoot}/**/*.js"]
       }
     },
+    "biome": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "format": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "biome format --write .",
-        "cwd": "{projectRoot}"
+        "command": "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
       }
     },
     "check": {
@@ -44,5 +51,5 @@
       }
     }
   },
-  "tags": ["npm:public", "project:unbundled", "status:supported"]
+  "tags": ["npm:public", "project:extension", "status:supported"]
 }

@@ -130,7 +130,9 @@ export class ConfirmationBox extends Container implements Component {
     const prefix = this.#focused ? "> " : "  ";
     const box = this.#theme.fg("accent", ` ${this.#value ? "[x]" : "[ ]"}`);
     const lines = [truncateToWidth(`${prefix}${box} ${this.#message}`, width)];
-    const errorLines = this.#errorText.render(width).filter((line) => line.length > 0);
+    const errorLines = this.#errorText
+      .render(width)
+      .filter((line) => line.length > 0);
 
     return [...lines, ...errorLines];
   }
@@ -150,7 +152,9 @@ export type FormField = Component & {
   value: string | number | boolean;
 };
 
-export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
+export type Parse<T extends Record<string, string | number | boolean>> = (
+  value: T,
+) =>
   | {
       [key in keyof T]?: string;
     }
@@ -244,7 +248,10 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     if (matchesKey(data, Key.enter)) {
-      if (this.#fields.length === 0 || this.#activeFieldIndex === this.#fields.length - 1) {
+      if (
+        this.#fields.length === 0 ||
+        this.#activeFieldIndex === this.#fields.length - 1
+      ) {
         this.#submit();
         return;
       }
@@ -265,7 +272,8 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     this.#activeFieldIndex =
-      (this.#activeFieldIndex + direction + this.#fields.length) % this.#fields.length;
+      (this.#activeFieldIndex + direction + this.#fields.length) %
+      this.#fields.length;
     this.#syncFieldFocus();
     this.tui.requestRender();
   }
@@ -351,6 +359,8 @@ export class Form<T extends Record<string, string | number | boolean>>
       return [];
     }
 
-    return this.#footer.split(/\r?\n/).map((line) => truncateToWidth(line, width));
+    return this.#footer
+      .split(/\r?\n/)
+      .map((line) => truncateToWidth(line, width));
   }
 }

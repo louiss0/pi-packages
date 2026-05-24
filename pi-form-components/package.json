@@ -2,9 +2,12 @@
   "name": "@code-fixer-23/pi-form-components",
   "version": "0.0.1",
   "private": false,
-  "files": [
-    "dist"
-  ],
+  "repository": "https://github.com/louiss0/pi-packages",
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "files": ["dist"],
   "publishConfig": {
     "access": "public"
   },

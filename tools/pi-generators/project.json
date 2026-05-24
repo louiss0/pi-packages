@@ -1,8 +1,8 @@
 {
-  "name": "pi-form-components",
-  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "name": "@code-fixer-23/pi-generators",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
-  "root": "pi-form-components",
+  "root": "tools/pi-generators",
   "targets": {
     "biome": {
       "executor": "nx:run-commands",
@@ -17,13 +17,7 @@
         "command": "pnpm exec biome format --write --config-path biome.json {projectRoot}",
         "cwd": "{workspaceRoot}"
       }
-    },
-    "metadata": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "node tools/validate-package-metadata.mjs {projectRoot}"
-      }
     }
   },
-  "tags": ["npm:public", "scope:shared", "project:package", "status:supported"]
+  "tags": ["npm:private"]
 }

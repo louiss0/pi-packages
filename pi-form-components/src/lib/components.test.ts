@@ -1,9 +1,17 @@
 import { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Input, Key, matchesKey, Text, type TUI } from "@earendil-works/pi-tui";
+import {
+  Container,
+  Input,
+  Key,
+  matchesKey,
+  Text,
+  type TUI,
+} from "@earendil-works/pi-tui";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  const module =
-    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
+  );
 
   return {
     ...module,
@@ -11,7 +19,13 @@ vi.mock("@earendil-works/pi-tui", async () => {
   };
 });
 
-import { ConfirmationBox, Form, type FormField, LabelledInput, Parse } from "./components";
+import {
+  ConfirmationBox,
+  Form,
+  type FormField,
+  LabelledInput,
+  Parse,
+} from "./components";
 
 describe("shared/components", () => {
   function createTheme() {
@@ -59,14 +73,19 @@ describe("shared/components", () => {
       input.setError("Description is required");
       input.clearError();
 
-      expect(input.render(45).join("\n")).not.toContain("Description is required");
+      expect(input.render(45).join("\n")).not.toContain(
+        "Description is required",
+      );
     });
   });
 
   describe("ConfirmationBox", () => {
     it("renders unchecked by default", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
       const lines = checkbox.render(80).join("\n");
 
       expect(lines).toContain(`  ${theme.getFgAnsi("accent")} [ ]`);
@@ -84,7 +103,10 @@ describe("shared/components", () => {
 
     it("renders the focused prefix when focused", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.setFocused(true);
 
@@ -96,7 +118,10 @@ describe("shared/components", () => {
 
     it("toggles to confirmed when space is pressed", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.setFocused(true);
       checkbox.handleInput(Key.space);
@@ -109,7 +134,10 @@ describe("shared/components", () => {
 
     it("toggles back to unchecked when space is pressed twice", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.handleInput(Key.space);
       checkbox.handleInput(Key.space);
@@ -122,7 +150,10 @@ describe("shared/components", () => {
 
     it("confirms the box without toggling it back off", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.confirm();
       checkbox.confirm();
@@ -135,7 +166,10 @@ describe("shared/components", () => {
 
     it("the checkbox is colored", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
       const lines = checkbox.render(45).join("\n");
 
       expect(lines).toContain(`${theme.getFgAnsi("accent")} [ ]`);
@@ -260,9 +294,13 @@ describe("shared/components", () => {
 
     it("renders the form with errors when submitted with invalid input", () => {
       const errorFields = { "field-1": "Name is required" };
-      const { form, done, parse } = createForm("Title", [new TestField("field-1")], {
-        parse: () => errorFields,
-      });
+      const { form, done, parse } = createForm(
+        "Title",
+        [new TestField("field-1")],
+        {
+          parse: () => errorFields,
+        },
+      );
 
       form.handleInput(Key.enter);
 
@@ -302,7 +340,11 @@ describe("shared/components", () => {
       form.handleInput(Key.enter);
       form.handleInput(Key.enter);
 
-      expect(done).toHaveBeenCalledWith({ "field-1": "a", "field-2": "b", "field-3": false });
+      expect(done).toHaveBeenCalledWith({
+        "field-1": "a",
+        "field-2": "b",
+        "field-3": false,
+      });
     });
 
     it("submits a object with the correct values based on names with that have changed", () => {
@@ -319,7 +361,11 @@ describe("shared/components", () => {
       form.handleInput(Key.space);
       form.handleInput(Key.enter);
 
-      expect(done).toHaveBeenCalledWith({ "field-1": "a", "field-2": "b", "field-3": true });
+      expect(done).toHaveBeenCalledWith({
+        "field-1": "a",
+        "field-2": "b",
+        "field-3": true,
+      });
     });
 
     it("revalidates field errors while editing after an invalid submit", () => {
@@ -376,7 +422,9 @@ describe("shared/components", () => {
     });
 
     it("renders multiline footers as separate lines", () => {
-      const { form } = createForm("Title", [], { footer: "Footer line 1\nFooter line 2" });
+      const { form } = createForm("Title", [], {
+        footer: "Footer line 1\nFooter line 2",
+      });
 
       const lines = form.render(45);
 

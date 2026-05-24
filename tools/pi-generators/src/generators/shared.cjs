@@ -7,11 +7,14 @@ const { formatFiles, readJson, writeJson } = require("@nx/devkit");
 
 const packageScope = "@code-fixer-23";
 const piAgentVersion = "^0.67.2";
-const bundledTags = ["npm:public", "project:bundled", "status:supported"];
-const unbundledTags = ["npm:public", "project:unbundled", "status:supported"];
+const repositoryUrl = "https://github.com/louiss0/pi-packages";
+const packageTags = ["npm:public", "project:package", "status:supported"];
+const extensionTags = ["npm:public", "project:extension", "status:supported"];
 
 function normalizeProjectFolders(projectFolders = []) {
-  const entries = Array.isArray(projectFolders) ? projectFolders : [projectFolders];
+  const entries = Array.isArray(projectFolders)
+    ? projectFolders
+    : [projectFolders];
   const extras = new Set(["extensions"]);
 
   for (const entry of entries) {
@@ -32,7 +35,9 @@ function normalizeProjectFolders(projectFolders = []) {
 }
 
 function getCreatePiPackageBin() {
-  const packageJsonPath = require.resolve("@code-fixer-23/create-pi-package/package.json");
+  const packageJsonPath = require.resolve(
+    "@code-fixer-23/create-pi-package/package.json",
+  );
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   const packageRoot = path.dirname(packageJsonPath);
 
@@ -62,7 +67,9 @@ function runCreatePiPackage(options) {
   });
 
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || "create-pi-package failed");
+    throw new Error(
+      result.stderr || result.stdout || "create-pi-package failed",
+    );
   }
 
   return path.join(tempRoot, options.name);
@@ -82,7 +89,7 @@ function copyDirectoryToTree(tree, sourceRoot, targetRoot) {
   }
 }
 
-function updatePackageJson(tree, projectRoot, kind) {
+function updatePackageJson(tree, projectRoot, projectKind) {
   const packageJsonPath = `${projectRoot}/package.json`;
   const packageJson = readJson(tree, packageJsonPath);
 
@@ -91,6 +98,9 @@ function updatePackageJson(tree, projectRoot, kind) {
   packageJson.private = false;
   packageJson.publishConfig = { access: "public" };
   packageJson.description ??= `Pi package scaffold for ${projectRoot}`;
+  packageJson.repository = repositoryUrl;
+  packageJson.homepage = repositoryUrl;
+  packageJson.bugs = { url: `${repositoryUrl}/issues` };
 
   delete packageJson.scripts;
 
@@ -103,7 +113,7 @@ function updatePackageJson(tree, projectRoot, kind) {
     delete packageJson.devDependencies.tsx;
   }
 
-  if (kind !== "unbundled") {
+  if (projectKind !== "extension") {
     delete packageJson.keywords;
   }
 
@@ -124,14 +134,15 @@ function getTestTarget(runner) {
   return {
     executor: "nx:run-commands",
     options: {
-      command: "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
+      command:
+        "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
       cwd: "{projectRoot}",
     },
   };
 }
 
-function writeProjectJson(tree, projectRoot, kind, runner) {
-  const tags = kind === "bundled" ? bundledTags : unbundledTags;
+function writeProjectJson(tree, projectRoot, projectKind, runner) {
+  const tags = projectKind === "package" ? packageTags : extensionTags;
   const projectJsonPath = `${projectRoot}/project.json`;
   const projectJson = {
     name: projectRoot,
@@ -161,11 +172,20 @@ function writeProjectJson(tree, projectRoot, kind, runner) {
           ],
         },
       },
+      biome: {
+        executor: "nx:run-commands",
+        options: {
+          command:
+            "pnpm exec biome format --config-path biome.json {projectRoot}",
+          cwd: "{workspaceRoot}",
+        },
+      },
       format: {
         executor: "nx:run-commands",
         options: {
-          command: "biome format --write .",
-          cwd: "{projectRoot}",
+          command:
+            "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+          cwd: "{workspaceRoot}",
         },
       },
       metadata: {
@@ -219,7 +239,7 @@ function updateTsConfigReferences(tree, projectRoot) {
   writeJson(tree, tsconfigPath, tsconfig);
 }
 
-async function createPiPackageGenerator(tree, options, kind) {
+async function createPiPackageGenerator(tree, options, projectKind) {
   if (!options.name) {
     throw new Error("A package name is required.");
   }
@@ -237,8 +257,8 @@ async function createPiPackageGenerator(tree, options, kind) {
   });
 
   copyDirectoryToTree(tree, generatedRoot, options.name);
-  updatePackageJson(tree, options.name, kind);
-  writeProjectJson(tree, options.name, kind, options.runner ?? "vitest");
+  updatePackageJson(tree, options.name, projectKind);
+  writeProjectJson(tree, options.name, projectKind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);
 

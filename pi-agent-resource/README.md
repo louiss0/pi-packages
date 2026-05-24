@@ -77,4 +77,4 @@ pnpm nx run pi-agent-resource:metadata
 
 ## Package policy
 
-`pi-agent-resource` is an unbundled package, so it keeps the `pi-package` keyword and may only depend on bundled workspace packages.
+`pi-agent-resource` is an extension package, so it keeps the `pi-package` keyword and may only depend on package-layer workspace projects.

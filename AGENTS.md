@@ -26,11 +26,11 @@
 
 - Stay on `main` in this repository unless the user explicitly asks otherwise
 - New Pi packages should be scaffolded with the local generators instead of by hand:
-  - `pnpm nx g @code-fixer-23/pi-generators:bundled-package <name> --no-interactive`
-  - `pnpm nx g @code-fixer-23/pi-generators:unbundled-package <name> --no-interactive`
+  - `pnpm nx g @code-fixer-23/pi-generators:package <name> --no-interactive`
+  - `pnpm nx g @code-fixer-23/pi-generators:extension <name> --no-interactive`
 - Both generators are built on `@code-fixer-23/create-pi-package`
 - Generated packages always include `extensions` and may add `prompts` and `skills`
-- Use `project:bundled` for packages that other workspace packages may depend on
-- Use `project:unbundled` for standalone Pi packages that must not depend on unbundled packages
-- Unbundled packages must include the `pi-package` keyword in `package.json`
+- Use `project:package` for packages that other workspace packages may depend on
+- Use `project:extension` for standalone Pi extension packages that must not depend on other extension packages
+- Extension packages must include the `pi-package` keyword in `package.json`
 - Do not add package-level `scripts`; define runnable work through Nx targets in `project.json`

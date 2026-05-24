@@ -7,16 +7,17 @@
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
   },
-  "keywords": [
-    "pi-package"
-  ],
+  "repository": "https://github.com/louiss0/pi-packages",
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "keywords": ["pi-package"],
   "publishConfig": {
     "access": "public"
   },
   "pi": {
-    "extensions": [
-      "src/index.ts"
-    ]
+    "extensions": ["src/index.ts"]
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.75.3",

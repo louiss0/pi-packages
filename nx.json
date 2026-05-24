@@ -51,7 +51,7 @@
       "pattern": "{projectName}@{version}"
     },
     "version": {
-      "preVersionCommand": "pnpm nx run-many -t typecheck,test,metadata"
+      "preVersionCommand": "pnpm nx affected -t typecheck test metadata"
     }
   },
   "targetDefaults": {

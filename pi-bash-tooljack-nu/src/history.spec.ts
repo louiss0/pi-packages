@@ -18,7 +18,17 @@ describe("history helpers", () => {
   it("keeps only non-empty commands that are not pi invocations", () => {
     expect(
       parseHistoryCommands(
-        JSON.stringify(["ls", "", 1, null, "pwd", "pi", "PI tools", "pip install", "echo pi"]),
+        JSON.stringify([
+          "ls",
+          "",
+          1,
+          null,
+          "pwd",
+          "pi",
+          "PI tools",
+          "pip install",
+          "echo pi",
+        ]),
       ),
     ).toEqual(["ls", "pwd", "pip install", "echo pi"]);
   });

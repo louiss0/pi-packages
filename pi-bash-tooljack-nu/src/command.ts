@@ -13,7 +13,10 @@ import {
   union,
 } from "valibot";
 
-import type { AutocompleteItem, AutocompleteSuggestions } from "@earendil-works/pi-tui";
+import type {
+  AutocompleteItem,
+  AutocompleteSuggestions,
+} from "@earendil-works/pi-tui";
 
 const signatureDefaultSchema = union([string(), number(), boolean()]);
 const signatureParameterSchema = object({
@@ -51,7 +54,9 @@ function isClosureFirstCommand(command: CommandMetadata) {
   return signatureTexts.includes("closure") || signatureTexts.includes("block");
 }
 
-function buildCommandCompletionItem(command: CommandMetadata): CommandCompletionItem {
+function buildCommandCompletionItem(
+  command: CommandMetadata,
+): CommandCompletionItem {
   const label = command.name ?? "";
   return {
     value: label,
@@ -61,10 +66,11 @@ function buildCommandCompletionItem(command: CommandMetadata): CommandCompletion
   };
 }
 
-export async function getCommandSuggestions(
-  prefix: string,
-): Promise<
-  (Pick<AutocompleteSuggestions, "prefix"> & { items: Array<CommandCompletionItem> }) | null
+export async function getCommandSuggestions(prefix: string): Promise<
+  | (Pick<AutocompleteSuggestions, "prefix"> & {
+      items: Array<CommandCompletionItem>;
+    })
+  | null
 > {
   const safePrefix = prefix.replace(/'/g, "''");
   const command = prefix
@@ -76,7 +82,7 @@ export async function getCommandSuggestions(
     | to json`
     : `scope commands | select name description signatures type category search_terms | to json`;
 
-  const result = await new Promise<string>((resolve, reject) => {
+  const result = await new Promise<string | null>((resolve) => {
     const child = spawn("nu", ["-c", command], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
@@ -86,14 +92,19 @@ export async function getCommandSuggestions(
     const stdout: Buffer[] = [];
 
     child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-    child.on("close", () => {
-      resolve(Buffer.concat(stdout).toString("utf-8"));
+    child.on("close", (code) => {
+      resolve(code === 0 ? Buffer.concat(stdout).toString("utf-8") : null);
     });
-    child.on("error", reject);
+    child.on("error", () => {
+      resolve(null);
+    });
   });
 
   if (!result) return null;
-  const safeParseResult = safeParse(array(CommandMetadataSchema), JSON.parse(result));
+  const safeParseResult = safeParse(
+    array(CommandMetadataSchema),
+    JSON.parse(result),
+  );
 
   if (!safeParseResult.success) {
     safeParseResult.issues.forEach((item) => {

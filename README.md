@@ -4,17 +4,17 @@ Nx workspace for Pi packages published under `@code-fixer-23`.
 
 ## Projects
 
-- `pi-form-components` — shared bundled dependency layer
-- `pi-bash-tooljack-nu` — unbundled Pi extension package
-- `pi-agent-resource` — unbundled Pi extension package
+- `pi-form-components` — shared package dependency layer
+- `pi-bash-tooljack-nu` — Pi extension package
+- `pi-agent-resource` — Pi extension package
 - `tools/pi-generators` — local Nx generators for new packages
 
 ## Package policy
 
 This workspace uses two architectural tags:
 
-- `project:bundled` — packages other projects may depend on
-- `project:unbundled` — standalone Pi packages that may only depend on bundled packages
+- `project:package` — packages other workspace projects may depend on
+- `project:extension` — standalone Pi extension packages that may only depend on package-layer projects
 
 And one lifecycle tag set:
 
@@ -25,7 +25,7 @@ Current rule enforcement lives in `eslint.config.mjs` and `tools/validate-packag
 
 ### Metadata rules
 
-- unbundled packages must include the `pi-package` keyword
+- extension packages must include the `pi-package` keyword
 - package-level `scripts` are not allowed
 - runnable tasks belong in `project.json`
 
@@ -33,16 +33,16 @@ Current rule enforcement lives in `eslint.config.mjs` and `tools/validate-packag
 
 Use the local generators instead of scaffolding by hand.
 
-### Unbundled package
+### Extension package
 
 ```sh
-pnpm nx g @code-fixer-23/pi-generators:unbundled-package my-package --no-interactive
+pnpm nx g @code-fixer-23/pi-generators:extension my-package --no-interactive
 ```
 
-### Bundled package
+### Shared package
 
 ```sh
-pnpm nx g @code-fixer-23/pi-generators:bundled-package my-package --no-interactive
+pnpm nx g @code-fixer-23/pi-generators:package my-package --no-interactive
 ```
 
 ### Add prompts or skills too
@@ -50,7 +50,7 @@ pnpm nx g @code-fixer-23/pi-generators:bundled-package my-package --no-interacti
 Both generators always include `extensions` and can also add `prompts` or `skills`.
 
 ```sh
-pnpm nx g @code-fixer-23/pi-generators:unbundled-package my-package \
+pnpm nx g @code-fixer-23/pi-generators:extension my-package \
   --projectFolders prompts skills \
   --runner vitest \
   --no-interactive
@@ -62,7 +62,7 @@ The generators are built on `@code-fixer-23/create-pi-package` and then normaliz
 
 ```sh
 pnpm nx show projects
-pnpm nx run-many -t lint,typecheck,test,metadata
+pnpm nx affected -t lint,typecheck,test,metadata
 pnpm nx graph
 pnpm nx release --dry-run
 ```

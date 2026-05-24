@@ -1,8 +1,20 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { InferOutput, maxLength, minLength, object, pipe, regex, string } from "valibot";
+import {
+  InferOutput,
+  maxLength,
+  minLength,
+  object,
+  pipe,
+  regex,
+  string,
+} from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import { getResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
@@ -25,7 +37,10 @@ export const GLOBAL_AGENT_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   AGENTS_DIRECTORY_NAME,
 );
-export const LOCAL_AGENT_DIRECTORY = join(PI_DIRECTORY_NAME, AGENTS_DIRECTORY_NAME);
+export const LOCAL_AGENT_DIRECTORY = join(
+  PI_DIRECTORY_NAME,
+  AGENTS_DIRECTORY_NAME,
+);
 const agentNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const lowerCommaSeparatedToolsPattern = /^[a-z0-9:-]+(?:\s*,\s*[a-z0-9:-]+)*$/;
 
@@ -34,7 +49,10 @@ const AgentFieldsSchema = object({
     string(),
     minLength(1, "Name is required"),
     maxLength(48, "Name must be 48 characters or fewer"),
-    regex(agentNamePattern, "Name must be lowercase letters, numbers, and dashes only"),
+    regex(
+      agentNamePattern,
+      "Name must be lowercase letters, numbers, and dashes only",
+    ),
   ),
   description: pipe(
     string(),
@@ -44,7 +62,10 @@ const AgentFieldsSchema = object({
   tools: pipe(
     string(),
     minLength(1, "Tools are required"),
-    regex(lowerCommaSeparatedToolsPattern, "Tools must be a lowercase comma-separated list"),
+    regex(
+      lowerCommaSeparatedToolsPattern,
+      "Tools must be a lowercase comma-separated list",
+    ),
   ),
   model: pipe(
     string(),
@@ -101,7 +122,11 @@ export function createAgentForm(
   });
 }
 
-async function handleAgentCommand(arg: string, ctx: ExtensionContext, scope: AgentScope) {
+async function handleAgentCommand(
+  arg: string,
+  ctx: ExtensionContext,
+  scope: AgentScope,
+) {
   notifyWhenUsingDevelopmentExtension(extensionName, ctx);
   const result = parseAgentCommandArgument(arg);
   if (!result.success) {
@@ -146,10 +171,15 @@ export default (pi: ExtensionAPI) => {
 };
 
 function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY;
+  return scope === "local"
+    ? join(cwd, LOCAL_AGENT_DIRECTORY)
+    : GLOBAL_AGENT_DIRECTORY;
 }
 
-export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -168,7 +198,10 @@ export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "g
   ctx.ui.notify("Agent created");
 }
 
-export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleEdit(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const agent = await pickAgent(ctx, "Edit Agent", scope);
 
   if (!agent) {
@@ -189,7 +222,10 @@ export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "glo
   ctx.ui.notify("Agent edited");
 }
 
-export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleDelete(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const agent = await pickAgent(ctx, "Delete Agent", scope);
 
   if (!agent) {
@@ -210,7 +246,11 @@ function renderFrontmatter(values: AgentFields) {
   ].join("\n");
 }
 
-async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope) {
+async function pickAgent(
+  ctx: ExtensionContext,
+  title: string,
+  scope: AgentScope,
+) {
   const choices = await listAgentChoices(scope, ctx.cwd || process.cwd());
 
   if (choices.length === 0) {

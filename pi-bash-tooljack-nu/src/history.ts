@@ -38,7 +38,8 @@ export function parseHistoryCommands(output: string) {
   }
 
   return parsedOutput.filter(
-    (value): value is string => typeof value === "string" && shouldIncludeHistoryCommand(value),
+    (value): value is string =>
+      typeof value === "string" && shouldIncludeHistoryCommand(value),
   );
 }
 
@@ -88,16 +89,22 @@ export class HistoryPicker implements Component {
       }))
       .reverse();
 
-    this.#selectList = new SelectList(items, Math.min(items.length, configOptions.itemLimit), {
-      selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
-      selectedText: (text) => requirementOptions.theme.fg("accent", text),
-      description: (text) => requirementOptions.theme.fg("muted", text),
-      scrollInfo: (text) => requirementOptions.theme.fg("dim", text),
-      noMatch: (text) => requirementOptions.theme.fg("warning", text),
-    });
+    this.#selectList = new SelectList(
+      items,
+      Math.min(items.length, configOptions.itemLimit),
+      {
+        selectedPrefix: (text) => requirementOptions.theme.fg("accent", text),
+        selectedText: (text) => requirementOptions.theme.fg("accent", text),
+        description: (text) => requirementOptions.theme.fg("muted", text),
+        scrollInfo: (text) => requirementOptions.theme.fg("dim", text),
+        noMatch: (text) => requirementOptions.theme.fg("warning", text),
+      },
+    );
 
     this.#container.addChild(
-      new DynamicBorder((text) => requirementOptions.theme.fg(this.#borderColorTheme, text)),
+      new DynamicBorder((text) =>
+        requirementOptions.theme.fg(this.#borderColorTheme, text),
+      ),
     );
 
     this.#container.addChild(
@@ -121,7 +128,9 @@ export class HistoryPicker implements Component {
     );
 
     this.#container.addChild(
-      new DynamicBorder((text) => requirementOptions.theme.fg(this.#borderColorTheme, text)),
+      new DynamicBorder((text) =>
+        requirementOptions.theme.fg(this.#borderColorTheme, text),
+      ),
     );
 
     this.#selectList.onSelect = (item) => requirementOptions.done(item.value);

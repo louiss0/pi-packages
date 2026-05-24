@@ -1,6 +1,10 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Editor,
@@ -42,16 +46,23 @@ export const GLOBAL_PROMPT_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   PROMPTS_DIRECTORY_NAME,
 );
-export const LOCAL_PROMPT_DIRECTORY = join(PI_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME);
+export const LOCAL_PROMPT_DIRECTORY = join(
+  PI_DIRECTORY_NAME,
+  PROMPTS_DIRECTORY_NAME,
+);
 const promptNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const argumentHintPattern = /^(?:\s*(?:<[^<>\s]+>|\[[^\[\]\s]+\])\s*)*$/;
+const argumentHintPattern =
+  /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
 
 const PromptFieldsSchema = object({
   name: pipe(
     string(),
     minLength(3, "Name must be at least 3 characters"),
     maxLength(48, "Name must be 48 characters or fewer"),
-    regex(promptNamePattern, "Name must be lowercase letters, numbers, and dashes only"),
+    regex(
+      promptNamePattern,
+      "Name must be lowercase letters, numbers, and dashes only",
+    ),
   ),
   description: pipe(
     string(),
@@ -59,7 +70,10 @@ const PromptFieldsSchema = object({
     maxLength(1024, "Description must be 1024 characters or fewer"),
   ),
   "argument-hint": optional(
-    pipe(string(), regex(argumentHintPattern, "Argument hint must use [] or <> tokens")),
+    pipe(
+      string(),
+      regex(argumentHintPattern, "Argument hint must use [] or <> tokens"),
+    ),
     "",
   ),
 });
@@ -115,7 +129,11 @@ class PromptTemplateOverlay extends Container {
   #editor: Editor;
   #done: (value: string | undefined) => void;
 
-  constructor(tui: TUI, theme: Theme, done: (value: string | undefined) => void) {
+  constructor(
+    tui: TUI,
+    theme: Theme,
+    done: (value: string | undefined) => void,
+  ) {
     super();
     this.#done = done;
     this.#editor = new Editor(tui, {
@@ -155,7 +173,11 @@ class PromptTemplateOverlay extends Container {
   }
 }
 
-async function handlePromptCommand(arg: string, ctx: ExtensionContext, scope: PromptScope) {
+async function handlePromptCommand(
+  arg: string,
+  ctx: ExtensionContext,
+  scope: PromptScope,
+) {
   notifyWhenUsingDevelopmentExtension(extensionName, ctx);
   const result = parsePromptCommandArgument(arg);
   if (!result.success) {
@@ -200,10 +222,15 @@ export default (pi: ExtensionAPI) => {
 };
 
 function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_PROMPT_DIRECTORY) : GLOBAL_PROMPT_DIRECTORY;
+  return scope === "local"
+    ? join(cwd, LOCAL_PROMPT_DIRECTORY)
+    : GLOBAL_PROMPT_DIRECTORY;
 }
 
-export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const values = await ctx.ui.custom<PromptFields | null>(
     (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
     formOverlayOptions,
@@ -215,7 +242,8 @@ export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "
   }
 
   const template = await ctx.ui.custom<string | undefined>(
-    (tui, theme, _keyboard, done) => new PromptTemplateOverlay(tui, theme, done),
+    (tui, theme, _keyboard, done) =>
+      new PromptTemplateOverlay(tui, theme, done),
     modalEditorOverlayOptions,
   );
 
@@ -236,7 +264,10 @@ export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "
   ctx.ui.notify("Prompt created");
 }
 
-export async function handleEdit(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleEdit(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const prompt = await pickPrompt(ctx, "Edit Prompt", scope);
 
   if (!prompt) {
@@ -257,7 +288,10 @@ export async function handleEdit(ctx: ExtensionContext, scope: PromptScope = "gl
   ctx.ui.notify("Prompt edited");
 }
 
-export async function handleDelete(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleDelete(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const prompt = await pickPrompt(ctx, "Delete Prompt", scope);
 
   if (!prompt) {
@@ -285,7 +319,11 @@ function renderFrontmatter(values: PromptFields) {
   ].join("\n");
 }
 
-async function pickPrompt(ctx: ExtensionContext, title: string, scope: PromptScope) {
+async function pickPrompt(
+  ctx: ExtensionContext,
+  title: string,
+  scope: PromptScope,
+) {
   const choices = await listPromptChoices(scope, ctx.cwd || process.cwd());
 
   if (choices.length === 0) {
@@ -310,11 +348,14 @@ async function listPromptChoices(scope: PromptScope, cwd: string) {
   const choices: PromptChoice[] = [];
 
   try {
-    const entries = await getResourceFileSystem().readDirectoryEntries(directory);
+    const entries =
+      await getResourceFileSystem().readDirectoryEntries(directory);
     choices.push(
       ...entries.map((entry) => {
         const entryPath = join(directory, entry.name);
-        const promptPath = entry.isDirectory() ? join(entryPath, "_index.md") : entryPath;
+        const promptPath = entry.isDirectory()
+          ? join(entryPath, "_index.md")
+          : entryPath;
 
         return {
           path: promptPath,

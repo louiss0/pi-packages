@@ -22,12 +22,12 @@ export default [
           allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
           depConstraints: [
             {
-              sourceTag: 'project:bundled',
-              onlyDependOnLibsWithTags: ['project:bundled'],
+              sourceTag: 'project:package',
+              onlyDependOnLibsWithTags: ['project:package'],
             },
             {
-              sourceTag: 'project:unbundled',
-              onlyDependOnLibsWithTags: ['project:bundled'],
+              sourceTag: 'project:extension',
+              onlyDependOnLibsWithTags: ['project:package'],
             },
             {
               sourceTag: 'status:supported',
@@ -67,7 +67,6 @@ export default [
       '**/*.cjs',
       '**/*.mjs',
     ],
-    // Override or add rules here
     rules: {},
   },
 ];
