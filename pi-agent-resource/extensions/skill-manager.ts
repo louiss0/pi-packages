@@ -194,21 +194,25 @@ export function createRequiredSkillForm(
     value: (RequiredAgentSkillFields & { confirm: boolean }) | null,
   ) => void,
 ) {
-  return new Form<RequiredAgentSkillFields & { confirm: boolean }>(tui, done, {
-    title: "Create Skill",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new ConfirmationBox(theme, "Do you want to fill in the next fields?"),
-    ],
-    parse: (values) =>
-      parseRequiredSkillFormValues({
-        name: values.name,
-        description: values.description,
-      }),
-    footer: "Enter next/submit | Tab switch field | Esc cancel",
-    spacing: 1,
-  });
+  return new Form<RequiredAgentSkillFields & { confirm: boolean }>(
+    {
+      title: "Create Skill",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new ConfirmationBox(theme, "Do you want to fill in the next fields?"),
+      ],
+      parse: (values) =>
+        parseRequiredSkillFormValues({
+          name: values.name,
+          description: values.description,
+        }),
+      footer: "Enter next/submit | Tab switch field | Esc cancel",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 export function createOptionalSkillForm(
@@ -216,17 +220,21 @@ export function createOptionalSkillForm(
   theme: Theme,
   done: (value: OptionalAgentSkillFormFields | null) => void,
 ) {
-  return new Form<OptionalAgentSkillFormFields>(tui, done, {
-    title: "Skill Details",
-    fields: [
-      new LabelledInput("license", theme),
-      new LabelledInput("compatibility", theme),
-      new LabelledInput("allowedTools", theme),
-    ],
-    parse: (values) => parseOptionalSkillFormValues(values),
-    footer: "Enter next/submit | Tab switch field | Esc cancel",
-    spacing: 1,
-  });
+  return new Form<OptionalAgentSkillFormFields>(
+    {
+      title: "Skill Details",
+      fields: [
+        new LabelledInput("license", theme),
+        new LabelledInput("compatibility", theme),
+        new LabelledInput("allowedTools", theme),
+      ],
+      parse: (values) => parseOptionalSkillFormValues(values),
+      footer: "Enter next/submit | Tab switch field | Esc cancel",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 export function parseSkillCommandArgument(argument: string) {

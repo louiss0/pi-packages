@@ -160,13 +160,15 @@ export type Parse<T extends Record<string, string | number | boolean>> = (
     }
   | undefined;
 
-type FormOptions<T extends Record<string, string | number | boolean>> = {
+export interface FormOptions<
+  T extends Record<string, string | number | boolean>,
+> {
   title: string;
   fields: FormField[];
   parse: Parse<T>;
   footer?: string;
   spacing?: number;
-};
+}
 
 export class Form<T extends Record<string, string | number | boolean>>
   extends Container
@@ -182,9 +184,9 @@ export class Form<T extends Record<string, string | number | boolean>>
   #parse: Parse<T>;
 
   constructor(
+    options: FormOptions<T>,
     private tui: TUI,
     private done: (value: T | null) => void,
-    options: FormOptions<T>,
   ) {
     super();
 

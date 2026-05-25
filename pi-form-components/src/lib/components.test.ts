@@ -279,13 +279,17 @@ describe("shared/components", () => {
       const tui = createTui();
       const done = vi.fn();
       const parse = vi.fn(options.parse);
-      const form = new Form(tui, done, {
-        title,
-        fields,
-        footer: options.footer,
-        parse,
-        spacing: options.spacing,
-      });
+      const form = new Form(
+        {
+          title,
+          fields,
+          footer: options.footer,
+          parse,
+          spacing: options.spacing,
+        },
+        tui,
+        done,
+      );
 
       form.focused = true;
 

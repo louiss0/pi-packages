@@ -107,19 +107,23 @@ export function createAgentForm(
   theme: Theme,
   done: (value: AgentFields | null) => void,
 ) {
-  return new Form<AgentFields>(tui, done, {
-    title: "Create Agent",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new LabelledInput("tools", theme),
-      new LabelledInput("model", theme),
-    ],
-    parse: parseAgentFormValues,
-    footer:
-      "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
-    spacing: 1,
-  });
+  return new Form<AgentFields>(
+    {
+      title: "Create Agent",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new LabelledInput("tools", theme),
+        new LabelledInput("model", theme),
+      ],
+      parse: parseAgentFormValues,
+      footer:
+        "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 async function handleAgentCommand(

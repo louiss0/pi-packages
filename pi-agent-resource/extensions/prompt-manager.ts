@@ -111,18 +111,22 @@ export function createPromptForm(
   theme: Theme,
   done: (value: PromptFields | null) => void,
 ) {
-  return new Form<PromptFields>(tui, done, {
-    title: "Create Prompt",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new LabelledInput("argument-hint", theme),
-    ],
-    parse: parsePromptFormValues,
-    footer:
-      "* required | argument-hint is optional | Enter next/submit | Tab switch field | Esc cancel\nTemplate opens in the editor overlay next. Use <> for required hints and [] for optional hints.",
-    spacing: 1,
-  });
+  return new Form<PromptFields>(
+    {
+      title: "Create Prompt",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new LabelledInput("argument-hint", theme),
+      ],
+      parse: parsePromptFormValues,
+      footer:
+        "* required | argument-hint is optional | Enter next/submit | Tab switch field | Esc cancel\nTemplate opens in the editor overlay next. Use <> for required hints and [] for optional hints.",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 class PromptTemplateOverlay extends Container {
