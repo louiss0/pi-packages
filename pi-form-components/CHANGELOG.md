@@ -1,3 +1,7 @@
+# 2.0.0 (2026-05-25)
+
+This was a version bump only for pi-form-components to align it with other projects, there were no code changes.
+
 # 1.0.0 (2026-05-25)
 
 ### 🚀 Features
