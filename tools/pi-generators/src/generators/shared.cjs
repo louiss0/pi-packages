@@ -98,7 +98,11 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   packageJson.private = false;
   packageJson.publishConfig = { access: "public" };
   packageJson.description ??= `Pi package scaffold for ${projectRoot}`;
-  packageJson.repository = repositoryUrl;
+  packageJson.repository = {
+    type: "git",
+    url: repositoryUrl,
+    directory: projectRoot,
+  };
   packageJson.homepage = repositoryUrl;
   packageJson.bugs = { url: `${repositoryUrl}/issues` };
 
