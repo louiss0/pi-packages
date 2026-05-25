@@ -1,8 +1,10 @@
 {
   "name": "@code-fixer-23/pi-agent-resource",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "This extension is useful for making agent skills, propmts and subagents",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "files": [
     "extensions",
     "shared",
@@ -39,7 +41,10 @@
     "vitest": "^4.1.4"
   },
   "pi": {
-    "extensions": ["extensions", "extensions/!*.test.ts"]
+    "extensions": [
+      "extensions",
+      "extensions/!*.test.ts"
+    ]
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",

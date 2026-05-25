@@ -1,3 +1,13 @@
+## 1.0.1 (2026-05-25)
+
+### 🩹 Fixes
+
+- **workspace:** require pi-package on unbundled packages ([48c0953](https://github.com/louiss0/pi-packages/commit/48c0953))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 0.2.1 (2026-05-01)
 
 This was a version bump only for @code-fixer-23/nu-bash to align it with other projects, there were no code changes.
