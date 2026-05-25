@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
-  "repository": "https://github.com/louiss0/pi-packages",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "tools/pi-generators"
+  },
   "homepage": "https://github.com/louiss0/pi-packages",
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"

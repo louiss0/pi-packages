@@ -2,9 +2,7 @@
   "name": "@code-fixer-23/pi-agent-resource",
   "version": "3.0.0",
   "description": "This extension is useful for making agent skills, propmts and subagents",
-  "keywords": [
-    "pi-package"
-  ],
+  "keywords": ["pi-package"],
   "files": [
     "extensions",
     "shared",
@@ -14,7 +12,11 @@
   ],
   "author": "Shelton Louis",
   "license": "ISC",
-  "repository": "https://github.com/louiss0/pi-packages",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-agent-resource"
+  },
   "homepage": "https://github.com/louiss0/pi-packages",
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
@@ -41,10 +43,7 @@
     "vitest": "^4.1.4"
   },
   "pi": {
-    "extensions": [
-      "extensions",
-      "extensions/!*.test.ts"
-    ]
+    "extensions": ["extensions", "extensions/!*.test.ts"]
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
