@@ -19,12 +19,7 @@ import type {
 import { Type } from "@sinclair/typebox";
 
 import { getCommandSuggestions, type CommandCompletionItem } from "./command";
-import {
-  getHistoryQuery,
-  HistoryPicker,
-  HISTORY_LIMIT,
-  parseHistoryCommands,
-} from "./history";
+import { getHistoryQuery, HistoryPicker, HISTORY_LIMIT, parseHistoryCommands } from "./history";
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
@@ -84,12 +79,7 @@ class NuAutocompleteProvider implements AutocompleteProvider {
       };
     }
 
-    return this.baseProvider.getSuggestions(
-      lines,
-      cursorLine,
-      cursorCol,
-      options,
-    );
+    return this.baseProvider.getSuggestions(lines, cursorLine, cursorCol, options);
   }
 
   applyCompletion(
@@ -105,25 +95,15 @@ class NuAutocompleteProvider implements AutocompleteProvider {
     const completionItem = item as CommandCompletionItem;
 
     if (!commandPrefix) {
-      return this.baseProvider.applyCompletion(
-        lines,
-        cursorLine,
-        cursorCol,
-        item,
-        prefix,
-      );
+      return this.baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
     }
 
-    const beforeCommandTrigger = line.slice(
-      0,
-      cursorCol - commandPrefix[0].length,
-    );
+    const beforeCommandTrigger = line.slice(0, cursorCol - commandPrefix[0].length);
     const afterCursor = line.slice(cursorCol);
     const newLines = [...lines];
 
     if (completionItem.requiresClosure) {
-      newLines[cursorLine] =
-        `${beforeCommandTrigger}${item.value} {|$in| $in }${afterCursor}`;
+      newLines[cursorLine] = `${beforeCommandTrigger}${item.value} {|$in| $in }${afterCursor}`;
       return {
         lines: newLines,
         cursorLine,
@@ -378,29 +358,23 @@ async function executeNushellCommand(
 const nushellGuidelines = [
   "Prefer Nushell-native commands over Bash-style text pipelines. Nushell works best when commands pass structured values such as lists, records, and tables instead of plain text.",
 
+  "Don't use && or || for command chaining. Use ; example `command1 ; command2`",
+
   "Do not assume Nushell is Bash. Avoid Bash-only syntax such as test brackets, awk-heavy parsing, sed-heavy parsing, xargs-first workflows, and output redirection with >.",
 
   "Use `save` for writing pipeline output to a file. Example: `'hello' | save output.txt` instead of `echo 'hello' > output.txt`.",
 
   "When command output is a string with multiple lines, convert it into a list before processing it. Use `lines` for newline-separated output.",
 
-  "When command output is a delimited string, convert it before filtering or mapping. Use `split row` to create a list and `split column` to create a table.",
-
-  "Use `split words` when a string needs to become a list of shell-like words, but do not use it as a full Bash parser.",
+  "Use `split words` when a string needs to become a list of shell-like words",
 
   "Use `str trim` before comparing strings that may contain extra whitespace.",
 
-  "Use `str contains`, `str starts-with`, `str ends-with`, `str replace`, and regex operators instead of piping through grep, sed, or awk when the data is already in Nushell.",
+  "Use `str contains`, `str starts-with`, `str ends-with`, `str replace`, and regex operators instead of piping through grep, sed, or awk",
 
   "Prefer `where` for filtering structured data. Example: `ls | where type == dir` instead of `ls -d */`.",
 
-  "Prefer `get`, `select`, `reject`, `rename`, `insert`, `update`, and `upsert` for shaping records and tables instead of parsing display output.",
-
   "When iterating over lists or tables, use `each`. Remember that a table is a list of records, so `each` receives one row record at a time.",
-
-  "When a closure inside `each` returns a stream and the result should be flattened, use `each --flatten`.",
-
-  "For recursive file discovery, prefer Nushell glob patterns such as `ls **/*.rs` instead of Bash `find . -name '*.rs'`.",
 
   "Treat globs and strings differently. Quoted strings like `'*.txt'` or `\"*.txt\"` are literal strings, while bare patterns like `*.txt` may be interpreted as globs by commands that accept globs.",
 
@@ -432,21 +406,9 @@ const nushellGuidelines = [
 
   "Do not rely on Unix-only tools such as grep, sed, awk, find, xargs, tr, or cut unless the task explicitly requires them or the environment is known to provide them.",
 
-  "For command success and failure, prefer Nushell error handling instead of Bash `$?` habits.",
-
   "Avoid producing commands that depend on shell-specific quoting tricks. Prefer Nushell lists, records, and variables to build arguments safely.",
 
-  "When passing multiple arguments to a command, keep them as separate arguments rather than one joined string whenever possible.",
-
-  "When the agent receives a command as a single string, decide whether it is meant to be executed as text or transformed into data. For data transformation, convert the string using `lines`, `split row`, `split words`, `parse`, or a `from ...` command.",
-
   "When transforming Bash-like command output, first identify the output shape: newline list, delimiter-separated rows, key-value lines, JSON/YAML/TOML, filesystem paths, or free text.",
-
-  "For newline command output, use: `<command> | lines`.",
-
-  "For comma-separated values, use: `<string> | split row ','` for a list or `<string> | split column ','` for columns.",
-
-  "For whitespace-separated values, use: `<string> | split words`.",
 
   "For key-value text, prefer `parse` or `split column` followed by `rename` so the result becomes a table with meaningful column names.",
 
@@ -454,23 +416,18 @@ const nushellGuidelines = [
 
   "Prefer `http get` and Nushell-native JSON handling instead of `curl | jq` for simple API reads.",
 
-  "Prefer `select field1 field2` instead of `jq '{field1, field2}'` when working with structured records or tables.",
-
   "Prefer `where name =~ 'pattern'` or `find` over `grep` when filtering Nushell values.",
 
   "Prefer `str replace` over `sed` for simple string replacements.",
 
   "Prefer `math`, `length`, `first`, `last`, `sort-by`, `uniq`, and `group-by` over Bash pipelines when working with lists or tables.",
 
-  "Before writing a Nushell command, ask: 'What type is flowing through the pipeline right now: string, list, record, table, path, glob, or binary?'",
-
   "Do not parse Nushell table display output. The display table is for humans; use the underlying structured values instead.",
-
-  "When in doubt, make the pipeline more explicit: convert strings into lists, lists into tables, tables into selected records, and records into serialized output only at the end.",
 ];
 
 const nushellRipgrepAdvancedGuidelines = [
   "When using ripgrep with Nushell follow these guidelines",
+
   "Choose ripgrep output mode based on the next Nushell operation. Human-readable output is different from machine-readable output.",
 
   "Use `rg --json` whenever search results will be filtered, transformed, grouped, ranked, counted, or consumed by additional Nushell commands.",
@@ -603,21 +560,12 @@ export default function nuBashExtension(pi: ExtensionAPI) {
         const result = await pi.exec(NUSHELL_COMMAND, getNuArgs(command), {
           cwd: ctx.cwd,
         });
-        const message = formatToolOutput(
-          result.stdout,
-          result.stderr,
-          result.code,
-        );
+        const message = formatToolOutput(result.stdout, result.stderr, result.code);
 
-        ctx.ui.notify(
-          `Executed: ${command}\n${message}`,
-          result.code === 0 ? "info" : "error",
-        );
+        ctx.ui.notify(`Executed: ${command}\n${message}`, result.code === 0 ? "info" : "error");
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to execute Nushell history command.";
+          error instanceof Error ? error.message : "Failed to execute Nushell history command.";
         ctx.ui.notify(message, "error");
       }
     },
@@ -632,8 +580,7 @@ export default function nuBashExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "bash",
     label: "nushell",
-    description:
-      "Execute shell commands through Nushell instead of the default bash backend.",
+    description: "Execute shell commands through Nushell instead of the default bash backend.",
     promptSnippet: "Run Nushell commands in the current working directory",
     promptGuidelines: [
       ...nushellGuidelines,
@@ -644,8 +591,7 @@ export default function nuBashExtension(pi: ExtensionAPI) {
       command: Type.String({ description: "Bash command to execute" }),
       timeout: Type.Optional(
         Type.Number({
-          description:
-            "Optional timeout in seconds before the command is aborted",
+          description: "Optional timeout in seconds before the command is aborted",
         }),
       ),
     }),
