@@ -6,7 +6,10 @@ const path = require("node:path");
 const { formatFiles, readJson, writeJson } = require("@nx/devkit");
 
 const packageScope = "@code-fixer-23";
-const piAgentVersion = "^0.67.2";
+const piPeerDependencies = {
+  "@earendil-works/pi-coding-agent": "*",
+  "@earendil-works/pi-tui": "*",
+};
 const repositoryUrl = "https://github.com/louiss0/pi-packages";
 const packageTags = ["npm:public", "project:package", "status:supported"];
 const extensionTags = ["npm:public", "project:extension", "status:supported"];
@@ -108,9 +111,19 @@ function updatePackageJson(tree, projectRoot, projectKind) {
 
   delete packageJson.scripts;
 
-  packageJson.dependencies = {
-    "@earendil-works/pi-coding-agent": piAgentVersion,
-    ...packageJson.dependencies,
+  packageJson.dependencies ??= {};
+
+  for (const packageName of Object.keys(piPeerDependencies)) {
+    delete packageJson.dependencies[packageName];
+  }
+
+  if (Object.keys(packageJson.dependencies).length === 0) {
+    delete packageJson.dependencies;
+  }
+
+  packageJson.peerDependencies = {
+    ...packageJson.peerDependencies,
+    ...piPeerDependencies,
   };
 
   if (packageJson.devDependencies?.tsx) {
