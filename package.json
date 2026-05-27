@@ -11,6 +11,8 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@code-fixer-23/pi-generators": "workspace:*",
+    "@earendil-works/pi-coding-agent": "^0.75.3",
+    "@earendil-works/pi-tui": "^0.75.3",
     "@eslint/js": "^9.8.0",
     "@nx/eslint": "22.7.0",
     "@nx/eslint-plugin": "22.7.0",
