@@ -1,11 +1,16 @@
 # @code-fixer-23/pi-bash-tooljack-nu
 
+
+
 `@code-fixer-23/pi-bash-tooljack-nu` keeps Pi's bash-oriented workflow but executes it through Nushell, adds command-aware completion, and makes command reuse faster with both history search and Command Hash Search.
 
 [![npm version](https://img.shields.io/npm/v/%40code-fixer-23%2Fpi-bash-tooljack-nu)](https://www.npmjs.com/package/@code-fixer-23/pi-bash-tooljack-nu)
 [![npm downloads](https://img.shields.io/npm/dm/%40code-fixer-23%2Fpi-bash-tooljack-nu)](https://www.npmjs.com/package/@code-fixer-23/pi-bash-tooljack-nu)
 [![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
 [![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
+
+![Pi Bash Tooljack Nu](./assets/Big-Bash-Tooljack-nu.png)
+
 
 ## Tools
 
