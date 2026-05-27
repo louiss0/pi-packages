@@ -1,76 +1,84 @@
 # @code-fixer-23/pi-form-components
 
-Form component library for Pi extensions.
+`@code-fixer-23/pi-form-components` provides reusable Pi TUI form building blocks for extension packages, including an options-first `Form` API, labeled text inputs, confirmation checkboxes, and small shared utilities.
 
-## 📦 Package Information
+[![npm version](https://img.shields.io/npm/v/%40code-fixer-23%2Fpi-form-components)](https://www.npmjs.com/package/@code-fixer-23/pi-form-components)
+[![npm downloads](https://img.shields.io/npm/dm/%40code-fixer-23%2Fpi-form-components)](https://www.npmjs.com/package/@code-fixer-23/pi-form-components)
+[![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
+[![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
-- **Version**: 0.0.1
-- **Publishable**: ❌ No (Private Package)
-- **Tag**: `scope:shared`
-- **Module Boundaries**: Base library - no external dependencies allowed
+## Components
 
-## 🔒 Private Package
+### `Form`
 
-This is an **internal library** that:
-- Will NOT be published to NPM
-- Provides shared utilities for other packages
-- Serves as the foundation layer for the monorepo
+`Form` coordinates focus, validation, submission, and footer rendering for a group of Pi TUI form fields.
 
-## 🚀 Features
-
-This package provides core utilities that are shared across all other packages:
-
-- Common helper functions
-- Shared types and interfaces
-- Base utilities used by `@org/strings`, `@org/async`, and `@org/colors`
-
-## 📝 Usage
-
-This package is automatically available to all other packages in the monorepo:
-
-```typescript
-// In any other package (strings, async, colors)
-import { someUtility } from '@org/utils';
-
-// Use the shared functionality
-const result = someUtility(input);
+```ts
+new Form(
+  {
+    title: "Create Prompt",
+    fields,
+    parse,
+    footer: "Enter next/submit | Tab switch field | Esc cancel",
+    spacing: 1,
+  },
+  tui,
+  done,
+);
 ```
 
-## 🏗️ Building
+Constructor arguments:
 
-```bash
-# Build the package
-nx build utils
+- `object:options` configures the form and is now the first argument
+  - `string:title` centers a title above the fields
+  - `FormField[]:fields` defines the ordered interactive inputs
+  - `Parse<T>:parse` validates the collected values and returns field errors
+  - `string:footer` adds optional help text below the fields
+  - `number:spacing` controls the blank lines inserted between fields
+- `TUI:tui` requests rerenders after focus and validation changes
+- `function:done` receives either the parsed values or `null` when the form is cancelled
 
-# The build output will be in dist/packages/utils
+### `LabelledInput`
+
+`LabelledInput` renders a field label, accepts text input, and displays one or more validation errors directly under the input.
+
+Constructor arguments:
+
+- `string:name` becomes both the visible label and the submitted field key
+- `Theme:theme` colors the selected label prefix and error messages
+
+### `ConfirmationBox`
+
+`ConfirmationBox` renders a toggleable checkbox-style field for boolean form values.
+
+Constructor arguments:
+
+- `Theme:theme` colors the checkbox and validation errors
+- `string:message` is the prompt shown next to the checkbox
+- `string:name` optionally overrides the submitted field key and defaults to `confirm`
+
+### `validateType`
+
+`validateType` is a tiny shared helper that checks a runtime value against a JavaScript `typeof` string.
+
+Arguments:
+
+- `unknown:value` is the value being checked
+- `string:typeToValidate` is the expected `typeof` result
+
+## Features
+
+- Validation errors stay attached to their owning fields and are re-evaluated as the user keeps typing after a failed submit.
+- Keyboard navigation is built into `Form`: `Enter` advances or submits, `Tab` and `Shift`+`Tab` switch fields, arrow keys move focus, and `Esc` cancels the entire form.
+- Focus syncing automatically updates both field focus state and optional selected-state rendering so custom fields can highlight the active row consistently.
+
+## Development
+
+Run tasks through Nx from the workspace root:
+
+```sh
+pnpm nx run pi-form-components:lint
+pnpm nx run pi-form-components:typecheck
+pnpm nx run pi-form-components:test
+pnpm nx run pi-form-components:metadata
 ```
-
-## 📋 Available Commands
-
-```bash
-nx build utils    # Build the package
-nx lint utils     # Lint the package
-```
-
-## 🔒 Module Boundaries
-
-This package has the tag `scope:shared` which means:
-- **Can be imported by**: All packages (`scope:strings`, `scope:async`, `scope:colors`)
-- **Can import from**: Nothing (it's the base layer)
-
-This ensures a clean dependency hierarchy where `utils` serves as the foundation without creating circular dependencies.
-
-## 🏛️ Architecture Role
-
-As the shared foundation of the monorepo:
-1. Contains no business logic specific to strings, async, or colors
-2. Provides only generic, reusable utilities
-3. Has no external dependencies beyond TypeScript's standard library
-4. Ensures consistency across all packages
-
-## ⚠️ Important Notes
-
-- This package is marked as `"private": true` in package.json
-- It will be excluded from NPM publishing when running `nx release`
-- Changes to this package may affect all other packages in the monorepo
-- Keep utilities generic and well-tested as they form the foundation

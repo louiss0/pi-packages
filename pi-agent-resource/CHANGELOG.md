@@ -1,3 +1,32 @@
+# 3.0.0 (2026-05-25)
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 2.0.0
+
+# 2.0.0 (2026-05-25)
+
+### 🚀 Features
+
+- **workspace:** add pi package generators ([eab1ba9](https://github.com/louiss0/pi-packages/commit/eab1ba9))
+- **pi-agent-resource:** add local prompt command ([fedf7e1](https://github.com/louiss0/pi-packages/commit/fedf7e1))
+- **pi-agent-resource:** add local agent command ([c99ceef](https://github.com/louiss0/pi-packages/commit/c99ceef))
+- **pi-agent-resource:** add local skill command ([2a627ee](https://github.com/louiss0/pi-packages/commit/2a627ee))
+
+### 🩹 Fixes
+
+- **workspace:** require pi-package on unbundled packages ([48c0953](https://github.com/louiss0/pi-packages/commit/48c0953))
+- **workspace:** wire pi-form-components as shared dep and fix test configs ([a12e4ff](https://github.com/louiss0/pi-packages/commit/a12e4ff))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 1.0.0
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+- Oz
+
 # 1.0.0 (2026-04-30)
 
 ### 🚀 Features

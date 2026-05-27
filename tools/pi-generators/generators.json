@@ -1,0 +1,14 @@
+{
+  "generators": {
+    "package": {
+      "factory": "./src/generators/package/generator.cjs",
+      "schema": "./src/generators/package/schema.json",
+      "description": "Scaffold a Pi package for this workspace."
+    },
+    "extension": {
+      "factory": "./src/generators/extension/generator.cjs",
+      "schema": "./src/generators/extension/schema.json",
+      "description": "Scaffold a Pi extension package for this workspace."
+    }
+  }
+}

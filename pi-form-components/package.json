@@ -1,10 +1,17 @@
 {
-"name": "@code-fixer-23/pi-form-components",
-  "version": "0.0.1",
+  "name": "@code-fixer-23/pi-form-components",
+  "version": "2.0.0",
   "private": false,
-  "files": [
-    "dist"
-  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-form-components"
+  },
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "files": ["dist"],
   "publishConfig": {
     "access": "public"
   },
@@ -21,22 +28,15 @@
     }
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.67.2",
-    "@mariozechner/pi-tui": "^0.67.2",
     "tslib": "^2.3.0"
   },
-  "scripts": {
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc -p tsconfig.lib.json --noEmit"
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "vite": "^8.0.0",
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^4.1.4"
-  },
-  "nx": {
-    "tags": [
-      "scope:shared"
-    ]
   }
 }

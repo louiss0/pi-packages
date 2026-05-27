@@ -1,199 +1,74 @@
-# Nx TypeScript Repository
+# pi-packages
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Nx workspace for Pi packages published under `@code-fixer-23`.
 
-✨ A repository showcasing key [Nx](https://nx.dev) features for TypeScript monorepos ✨
+## Projects
 
-🚀 If you haven't connected to Nx Cloud yet, [complete your setup here](https://cloud.nx.app/setup/connect-workspace/guide). Get faster builds with remote caching, distributed task execution, and self-healing CI. [See how your workspace can benefit](#nx-cloud).
+- `pi-form-components` — shared package dependency layer
+- `pi-bash-tooljack-nu` — Pi extension package
+- `pi-agent-resource` — Pi extension package
+- `tools/pi-generators` — local Nx generators for new packages
 
-## 📦 Project Overview
+## Package policy
 
-This repository demonstrates a production-ready TypeScript monorepo with:
+This workspace uses two architectural tags:
 
-- **3 Publishable Packages** - Ready for NPM publishing
+- `project:package` — packages other workspace projects may depend on
+- `project:extension` — standalone Pi extension packages that may only depend on package-layer projects
 
-  - `@org/pi-form-components` - Form component utilities
-  - `@org/bash-tooljack-nu` - Nushell-backed bash tooljack extension
-  - `@org/pi-agent-resource` - Agent skills, prompts and subagents
+And one lifecycle tag set:
 
-## 🚀 Quick Start
+- `status:supported`
+- `status:deprecated`
 
-```bash
-# Clone the repository
-git clone <your-fork-url>
-cd typescript-template
+Current rule enforcement lives in `eslint.config.mjs` and `tools/validate-package-metadata.mjs`.
 
-# Install dependencies
-npm install
+### Metadata rules
 
-# Run typechecks across packages
-npx nx run-many -t typecheck
+- extension packages must include the `pi-package` keyword
+- package-level `scripts` are not allowed
+- runnable tasks belong in `project.json`
 
-# Run tests
-npx nx run-many -t test
+## Generate a new package
 
-# Lint all projects
-npx nx run-many -t lint
+Use the local generators instead of scaffolding by hand.
 
-# Run everything in parallel
-npx nx run-many -t lint typecheck test --parallel=3
+### Extension package
 
-# Visualize the project graph
-npx nx graph
+```sh
+pnpm nx g @code-fixer-23/pi-generators:extension my-package --no-interactive
 ```
 
-## ⭐ Featured Nx Capabilities
+### Shared package
 
-This repository showcases several powerful Nx features:
-
-### 1. 🔒 Module Boundaries
-
-Enforces architectural constraints using tags. Each package has specific dependencies it can use:
-
-- `scope:shared` (utils) - Can be used by all packages
-- `scope:strings` - Can only depend on shared utilities
-- `scope:async` - Can only depend on shared utilities
-- `scope:colors` - Can only depend on shared utilities
-
-**Try it out:**
-
-```bash
-# See the current project graph and boundaries
-npx nx graph
-
-# View a specific project's details
-npx nx show project strings --web
+```sh
+pnpm nx g @code-fixer-23/pi-generators:package my-package --no-interactive
 ```
 
-[Learn more about module boundaries →](https://nx.dev/features/enforce-module-boundaries)
+### Add prompts or skills too
 
-### 2. 🛠️ Custom Run Commands
+Both generators always include `extensions` and can also add `prompts` or `skills`.
 
-Packages can define custom commands beyond standard build/test/lint:
-
-```bash
-# Run the custom build-base command for strings package
-npx nx run strings:build-base
-
-# See all available targets for a project
-npx nx show project strings
+```sh
+pnpm nx g @code-fixer-23/pi-generators:extension my-package \
+  --projectFolders prompts skills \
+  --runner vitest \
+  --no-interactive
 ```
 
-[Learn more about custom run commands →](https://nx.dev/concepts/executors-and-configurations)
+The generators are built on `@code-fixer-23/create-pi-package` and then normalize the output for this workspace.
 
-### 3. 🔧 Self-Healing CI
+## Common commands
 
-The CI pipeline includes `nx fix-ci` which automatically identifies and suggests fixes for common issues. To test it, you can make a change to `async-retry.spec.ts` so that it fails, and create a PR.
-
-```bash
-# Run tests and see the failure
-npx nx test async
-
-# In CI, this command provides automated fixes
-npx nx fix-ci
+```sh
+pnpm nx show projects
+pnpm nx affected -t lint,typecheck,test,metadata
+pnpm nx graph
+pnpm nx release --dry-run
 ```
 
-[Learn more about self-healing CI →](https://nx.dev/ci/features/self-healing-ci)
+## Notes
 
-### 4. 📦 Package Publishing
-
-Manage releases and publishing with Nx Release:
-
-```bash
-# Dry run to see what would be published
-npx nx release --dry-run
-
-# Version and release packages
-npx nx release
-
-# Publish only specific packages
-npx nx release publish --projects=strings,colors
-```
-
-[Learn more about Nx Release →](https://nx.dev/features/manage-releases)
-
-## 📁 Project Structure
-
-```
-├── pi-form-components/  - Form component utilities
-├── bash-tooljack-nu/    - Nushell-backed bash tooljack extension
-├── pi-agent-resource/   - Agent skills, prompts and subagents
-├── nx.json              - Nx configuration
-├── tsconfig.json        - TypeScript configuration
-└── eslint.config.mjs    - ESLint with module boundary rules
-```
-
-## 🏷️ Understanding Tags
-
-This repository uses tags to enforce module boundaries:
-
-| Package                   | Tag             | Can Import From        |
-| ------------------------- | --------------- | ---------------------- |
-| `@org/pi-form-components` | `scope:shared`  | Nothing (base library) |
-| `@org/bash-tooljack-nu`   | `scope:nu-bash` | `scope:shared`         |
-| `@org/pi-agent-resource`  | `scope:resource`| `scope:shared`         |
-
-The ESLint configuration enforces these boundaries, preventing circular dependencies and maintaining clean architecture.
-
-## 🧪 Testing Module Boundaries
-
-To see module boundary enforcement in action:
-
-1. Try importing `@org/colors` into `@org/strings`
-2. Run `npx nx lint strings`
-3. You'll see an error about violating module boundaries
-
-## 📚 Useful Commands
-
-```bash
-# Project exploration
-npx nx graph                                    # Interactive dependency graph
-npx nx list                                     # List installed plugins
-npx nx show project strings --web              # View project details
-
-# Development
-npx nx typecheck strings                       # Typecheck a specific package
-npx nx test async                              # Test a specific package
-npx nx lint colors                             # Lint a specific package
-
-# Running multiple tasks
-npx nx run-many -t typecheck                   # Typecheck all projects
-npx nx run-many -t test --parallel=3          # Test in parallel
-npx nx run-many -t lint typecheck test        # Run multiple targets
-
-# Affected commands (great for CI)
-npx nx affected -t typecheck                   # Typecheck only affected projects
-npx nx affected -t test                        # Test only affected projects
-
-# Release management
-npx nx release --dry-run                       # Preview release changes
-npx nx release                                 # Create a new release
-```
-
-## Nx Cloud
-
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## 🔗 Learn More
-
-- [Nx Documentation](https://nx.dev)
-- [Module Boundaries](https://nx.dev/features/enforce-module-boundaries)
-- [Custom Commands](https://nx.dev/concepts/executors-and-configurations)
-- [Self-Healing CI](https://nx.dev/ci/features/self-healing-ci)
-- [Releasing Packages](https://nx.dev/features/manage-releases)
-- [Nx Cloud](https://nx.dev/ci/intro/why-nx-cloud)
-
-## 💬 Community
-
-Join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [X (Twitter)](https://twitter.com/nxdevtools)
-- [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [YouTube](https://www.youtube.com/@nxdevtools)
-- [Blog](https://nx.dev/blog)
+- this repository stays on `main` unless the user asks otherwise
+- `pnpm-workspace.yaml` lists package folders explicitly, so generators update it for you
+- `tsconfig.json` references are also updated by the generators

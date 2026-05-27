@@ -1,16 +1,12 @@
 name: Release
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed
   workflow_dispatch:
-    inputs:
-      dry-run:
-        description: Run Nx Release without publishing changes
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -19,12 +15,14 @@ permissions:
 jobs:
   release:
     name: Nx Release
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Git author
@@ -40,12 +38,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Derive Nx SHAs
+        uses: nrwl/nx-set-shas@v4
 
       - name: Load npm token from 1Password
         uses: 1password/load-secrets-action@v3
@@ -53,14 +54,12 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           NPM_TOKEN: op://Development/Code Fixer 23 NPM Token/credential
 
+      - name: Export npm auth token
+        run: echo "NODE_AUTH_TOKEN=$NPM_TOKEN" >> "$GITHUB_ENV"
+
       - name: Run Nx Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry-run }}" == "true" ]]; then
-            pnpm exec nx release --dry-run
-          else
-            pnpm exec nx release --yes
-          fi
+          pnpm exec nx release --yes

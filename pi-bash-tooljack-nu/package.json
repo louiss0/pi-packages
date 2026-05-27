@@ -1,39 +1,34 @@
 {
   "type": "module",
   "name": "@code-fixer-23/pi-bash-tooljack-nu",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Pi extension that hijacks the bash tool and routes it through Nushell",
   "author": {
     "name": "Shelton Louis",
     "email": "louisshelton0@gmail.com"
   },
-  "scripts": {
-    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "eslint .",
-    "format": "biome format --write .",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-bash-tooljack-nu"
   },
-  "keywords": [
-    "pi-package"
-  ],
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "keywords": ["pi-package"],
   "publishConfig": {
     "access": "public"
   },
-  "nx": {
-    "includedScripts": [
-      "check"
-    ]
-  },
   "pi": {
-    "extensions": [
-      "src/index.ts"
-    ]
+    "extensions": ["src/index.ts"]
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.67.2",
-    "@mariozechner/pi-tui": "^0.67.2",
     "@sinclair/typebox": "^0.34.49",
     "valibot": "^1.3.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   }
 }

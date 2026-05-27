@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Key, type TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -10,9 +10,9 @@ import {
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
   );
 
   return {
@@ -27,7 +27,6 @@ vi.mock("node:os", () => ({
 
 import registerAgentManager, {
   createAgentForm,
-  GLOBAL_AGENT_DIRECTORY,
   handleCreate,
   handleDelete,
   handleEdit,
@@ -38,7 +37,13 @@ import registerAgentManager, {
 
 describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
-  const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
+  const expectedAgentPath = join(
+    "/test-home",
+    ".pi",
+    "agent",
+    "agents",
+    "oracle.md",
+  );
   const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
 
   function createTheme() {
@@ -78,27 +83,40 @@ describe("extensions/agent-manager", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local agent command is about to run", async () => {
+    it("registers a dedicated command for local agents", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn().mockReturnValue(true);
+      const getFlag = vi.fn();
       const notify = vi.fn();
 
       registerAgentManager({ registerCommand, registerFlag, getFlag } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-agent", {
-        description: "Use project agents from .pi/agents for agent commands",
-        type: "boolean",
-        default: false,
-      });
-
-      const command = registerCommand.mock.calls[0]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
-      };
-      await command.handler(
-        "create",
-        { cwd: localCwd, ui: { notify, custom: vi.fn() } } as never,
+      expect(registerFlag).not.toHaveBeenCalled();
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:agent",
+        expect.objectContaining({
+          description: "This is for managing global agents",
+        }),
       );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-agent",
+        expect.objectContaining({
+          description: "This is for managing project agents",
+        }),
+      );
+
+      const command = registerCommand.mock.calls[1]?.[1] as {
+        handler: (
+          arg: string,
+          ctx: { cwd: string; ui: { notify: typeof notify } },
+        ) => Promise<void>;
+      };
+      await command.handler("create", {
+        cwd: localCwd,
+        ui: { notify, custom: vi.fn() },
+      } as never);
 
       expect(notify).toHaveBeenNthCalledWith(
         1,
@@ -149,7 +167,9 @@ describe("extensions/agent-manager", () => {
 
       const lines = form.render(100).join("\n");
 
-      expect(lines).toContain("Name must be lowercase letters, numbers, and dashes only");
+      expect(lines).toContain(
+        "Name must be lowercase letters, numbers, and dashes only",
+      );
       expect(lines).toContain("Description must be at least 35 characters");
       expect(lines).toContain("Tools must be a lowercase comma-separated list");
       expect(lines).toContain("Model must be at least 2 characters");
@@ -175,7 +195,9 @@ describe("extensions/agent-manager", () => {
       const lines = form.render(100).join("\n");
 
       expect(lines).not.toContain("Name is required");
-      expect(lines).not.toContain("Name must be lowercase letters, numbers, and dashes only");
+      expect(lines).not.toContain(
+        "Name must be lowercase letters, numbers, and dashes only",
+      );
       expect(lines).toContain("Description must be at least 35 characters");
       expect(lines).toContain("Tools are required");
       expect(lines).toContain("Model must be at least 2 characters");
@@ -212,7 +234,10 @@ describe("extensions/agent-manager", () => {
 
       await handleCreate({ ui: { custom, notify } } as never);
 
-      const content = await getResourceFileSystem().readFile(expectedAgentPath, "utf8");
+      const content = await getResourceFileSystem().readFile(
+        expectedAgentPath,
+        "utf8",
+      );
 
       expect(content).toContain("name: oracle");
       expect(notify).toHaveBeenCalledWith("Agent created");
@@ -227,9 +252,15 @@ describe("extensions/agent-manager", () => {
       });
       const notify = vi.fn();
 
-      await handleCreate({ cwd: localCwd, ui: { custom, notify } } as never, "local");
+      await handleCreate(
+        { cwd: localCwd, ui: { custom, notify } } as never,
+        "local",
+      );
 
-      const content = await getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8");
+      const content = await getResourceFileSystem().readFile(
+        expectedLocalAgentPath,
+        "utf8",
+      );
 
       expect(content).toContain("name: oracle");
       expect(notify).toHaveBeenCalledWith("Agent created");
@@ -238,9 +269,13 @@ describe("extensions/agent-manager", () => {
     it("reports cancellation when agent creation is dismissed", async () => {
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom: vi.fn().mockResolvedValueOnce(null), notify } } as never);
+      await handleCreate({
+        ui: { custom: vi.fn().mockResolvedValueOnce(null), notify },
+      } as never);
 
-      await expect(getResourceFileSystem().readFile(expectedAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(notify).toHaveBeenCalledWith("Agent creation cancelled", "info");
     });
   });
@@ -256,10 +291,16 @@ describe("extensions/agent-manager", () => {
 
       await handleEdit({ ui: { notify, select, editor } } as never);
 
-      const content = await getResourceFileSystem().readFile(expectedAgentPath, "utf8");
+      const content = await getResourceFileSystem().readFile(
+        expectedAgentPath,
+        "utf8",
+      );
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
-      expect(editor).toHaveBeenCalledWith("Edit Agent", "---\nname: oracle\n---\n");
+      expect(editor).toHaveBeenCalledWith(
+        "Edit Agent",
+        "---\nname: oracle\n---\n",
+      );
       expect(content).toBe("updated agent content");
       expect(notify).toHaveBeenCalledWith("Agent edited");
     });
@@ -269,12 +310,20 @@ describe("extensions/agent-manager", () => {
         [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
-      const editor = vi.fn().mockResolvedValueOnce("updated local agent content");
+      const editor = vi
+        .fn()
+        .mockResolvedValueOnce("updated local agent content");
       const notify = vi.fn();
 
-      await handleEdit({ cwd: localCwd, ui: { notify, select, editor } } as never, "local");
+      await handleEdit(
+        { cwd: localCwd, ui: { notify, select, editor } } as never,
+        "local",
+      );
 
-      const content = await getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8");
+      const content = await getResourceFileSystem().readFile(
+        expectedLocalAgentPath,
+        "utf8",
+      );
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
       expect(content).toBe("updated local agent content");
@@ -292,7 +341,9 @@ describe("extensions/agent-manager", () => {
 
       await handleDelete({ ui: { notify, select } } as never);
 
-      await expect(getResourceFileSystem().readFile(expectedAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(select).toHaveBeenCalledWith("Delete Agent", ["global: oracle"]);
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
@@ -304,9 +355,14 @@ describe("extensions/agent-manager", () => {
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
       const notify = vi.fn();
 
-      await handleDelete({ cwd: localCwd, ui: { notify, select } } as never, "local");
+      await handleDelete(
+        { cwd: localCwd, ui: { notify, select } } as never,
+        "local",
+      );
 
-      await expect(getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8")).rejects.toThrow();
+      await expect(
+        getResourceFileSystem().readFile(expectedLocalAgentPath, "utf8"),
+      ).rejects.toThrow();
       expect(select).toHaveBeenCalledWith("Delete Agent", ["local: oracle"]);
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });

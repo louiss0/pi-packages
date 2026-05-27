@@ -1,0 +1,20 @@
+{
+  "name": "@code-fixer-23/pi-generators",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "tools/pi-generators"
+  },
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "generators": "./generators.json",
+  "dependencies": {
+    "@code-fixer-23/create-pi-package": "^1.2.0",
+    "@nx/devkit": "22.7.0"
+  }
+}

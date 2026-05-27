@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Key, type TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -11,9 +11,9 @@ import {
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
   );
 
   return {
@@ -85,27 +85,44 @@ describe("skill manager handlers", () => {
     title: string,
   ) {
     const [factory, options] = custom.mock.calls[callIndex] as [
-      (tui: TUI, theme: Theme, keyboard: unknown, done: (value: unknown) => void) => unknown,
+      (
+        tui: TUI,
+        theme: Theme,
+        keyboard: unknown,
+        done: (value: unknown) => void,
+      ) => unknown,
       unknown,
     ];
     const component = factory(createTui(), createTheme(), {}, vi.fn());
 
     expect(component).toBeInstanceOf(Form);
     expect(
-      (component as Form<Record<string, string | boolean>>).render(80).join("\n"),
+      (component as Form<Record<string, string | boolean>>)
+        .render(80)
+        .join("\n"),
     ).toContain(title);
     expect(options).toEqual(formOverlayOptions);
   }
 
-  function expectEditorOverlayFactory(custom: ReturnType<typeof vi.fn>, callIndex: number) {
+  function expectEditorOverlayFactory(
+    custom: ReturnType<typeof vi.fn>,
+    callIndex: number,
+  ) {
     const [factory, options] = custom.mock.calls[callIndex] as [
-      (tui: TUI, theme: Theme, keyboard: unknown, done: (value: unknown) => void) => unknown,
+      (
+        tui: TUI,
+        theme: Theme,
+        keyboard: unknown,
+        done: (value: unknown) => void,
+      ) => unknown,
       unknown,
     ];
     const component = factory(createTui(), createTheme(), {}, vi.fn());
 
     expect(
-      (component as { render: (width: number) => string[] }).render(80).join("\n"),
+      (component as { render: (width: number) => string[] })
+        .render(80)
+        .join("\n"),
     ).toContain("Edit Skill Markdown");
     expect(options).toEqual(modalEditorOverlayOptions);
   }
@@ -138,30 +155,49 @@ describe("skill manager handlers", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local skill command is about to run", async () => {
+    it("registers a dedicated command for local skills", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn((name: string) => name === "local-skill");
+      const getFlag = vi.fn(() => false);
       const notify = vi.fn();
       const custom = vi.fn().mockResolvedValueOnce(null);
 
       registerSkillManager({ registerCommand, registerFlag, getFlag } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-skill", {
-        description: "Use project skills from .pi/skills for skill commands",
-        type: "boolean",
-        default: false,
-      });
       expect(registerFlag).toHaveBeenCalledWith("external-skill-editor", {
         description: "Use the external editor for skill edit commands",
         type: "boolean",
         default: false,
       });
+      expect(registerFlag).toHaveBeenCalledTimes(1);
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:skill",
+        expect.objectContaining({
+          description: "This is for managing global skills",
+        }),
+      );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-skill",
+        expect.objectContaining({
+          description: "This is for managing project skills",
+        }),
+      );
 
-      const command = registerCommand.mock.calls[0]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify; custom: typeof custom } }) => Promise<void>;
+      const localCommand = registerCommand.mock.calls[1]?.[1] as {
+        handler: (
+          arg: string,
+          ctx: {
+            cwd: string;
+            ui: { notify: typeof notify; custom: typeof custom };
+          },
+        ) => Promise<void>;
       };
-      await command.handler("create", { cwd: localCwd, ui: { notify, custom } });
+      await localCommand.handler("create", {
+        cwd: localCwd,
+        ui: { notify, custom },
+      });
 
       expect(notify).toHaveBeenNthCalledWith(
         1,
@@ -194,7 +230,9 @@ describe("skill manager handlers", () => {
 
       const lines = form.render(80).join("\n");
 
-      expect(lines).toContain("Must be lowercase alphanumeric with dashes only");
+      expect(lines).toContain(
+        "Must be lowercase alphanumeric with dashes only",
+      );
       expect(lines).toContain("Description is required");
     });
 
@@ -213,7 +251,9 @@ describe("skill manager handlers", () => {
       const lines = form.render(80).join("\n");
 
       expect(lines).not.toContain("Name is required");
-      expect(lines).not.toContain("Must be lowercase alphanumeric with dashes only");
+      expect(lines).not.toContain(
+        "Must be lowercase alphanumeric with dashes only",
+      );
       expect(lines).toContain("Description is required");
     });
   });
@@ -267,7 +307,9 @@ describe("skill manager handlers", () => {
       const lines = form.render(80).join("\n");
 
       expect(lines).not.toContain("License must be a valid path");
-      expect(lines).not.toContain("Compatibility must be 500 characters or fewer");
+      expect(lines).not.toContain(
+        "Compatibility must be 500 characters or fewer",
+      );
       expect(lines).toContain("Allowed tools must be a comma-separated list");
     });
   });
@@ -324,9 +366,14 @@ describe("skill manager handlers", () => {
     await handleCreate({ ui: { custom, notify } } as never);
 
     expectFormFactory(custom, 0, "Create Skill");
-    const content = await getResourceFileSystem().readFile(expectedSkillPath, "utf8");
+    const content = await getResourceFileSystem().readFile(
+      expectedSkillPath,
+      "utf8",
+    );
     expect(content).toContain("# Test Skill");
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${expectedSkillPath}`,
+    );
   });
 
   it("handleCreate writes a local skill when the local scope is requested", async () => {
@@ -337,9 +384,15 @@ describe("skill manager handlers", () => {
     });
     const notify = vi.fn();
 
-    await handleCreate({ cwd: localCwd, ui: { custom, notify } } as never, "local");
+    await handleCreate(
+      { cwd: localCwd, ui: { custom, notify } } as never,
+      "local",
+    );
 
-    const content = await getResourceFileSystem().readFile(expectedLocalSkillPath, "utf8");
+    const content = await getResourceFileSystem().readFile(
+      expectedLocalSkillPath,
+      "utf8",
+    );
     expect(content).toContain("# Test Skill");
     expect(notify).toHaveBeenCalledWith(
       `Skill created successfully: ${expectedLocalSkillPath}`,
@@ -365,9 +418,14 @@ describe("skill manager handlers", () => {
 
     expectFormFactory(custom, 0, "Create Skill");
     expectFormFactory(custom, 1, "Skill Details");
-    const content = await getResourceFileSystem().readFile(expectedSkillPath, "utf8");
+    const content = await getResourceFileSystem().readFile(
+      expectedSkillPath,
+      "utf8",
+    );
     expect(content).toContain("allowed-tools: 'read, write'");
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${expectedSkillPath}`,
+    );
   });
 
   it("handleCreate creates the skill when the optional form is dismissed", async () => {
@@ -383,9 +441,14 @@ describe("skill manager handlers", () => {
 
     await handleCreate({ ui: { custom, notify } } as never);
 
-    const content = await getResourceFileSystem().readFile(expectedSkillPath, "utf8");
+    const content = await getResourceFileSystem().readFile(
+      expectedSkillPath,
+      "utf8",
+    );
     expect(content).toContain("# Test Skill");
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${expectedSkillPath}`,
+    );
   });
 
   it("handleCreate reports an existing skill without overwriting it", async () => {
@@ -405,7 +468,10 @@ describe("skill manager handlers", () => {
       },
     } as never);
 
-    expect(notify).toHaveBeenCalledWith("Skill already exists: test-skill", "error");
+    expect(notify).toHaveBeenCalledWith(
+      "Skill already exists: test-skill",
+      "error",
+    );
   });
 
   it("handleEdit uses an 80% overlay editor by default", async () => {
@@ -421,11 +487,14 @@ describe("skill manager handlers", () => {
 
     expectEditorOverlayFactory(custom, 1);
     expect(spawn).not.toHaveBeenCalled();
-    expect(await getResourceFileSystem().readFile(expectedSkillPath, "utf8")).toBe(
-      "updated skill content",
-    );
+    expect(
+      await getResourceFileSystem().readFile(expectedSkillPath, "utf8"),
+    ).toBe("updated skill content");
     expect(reload).toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith("Skill updated. Reloading skills...", "info");
+    expect(notify).toHaveBeenCalledWith(
+      "Skill updated. Reloading skills...",
+      "info",
+    );
   });
 
   it("handleEdit uses the external editor without shell mode", async () => {
@@ -452,7 +521,10 @@ describe("skill manager handlers", () => {
       expect.objectContaining({ shell: false }),
     );
     expect(reload).toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith("Skill updated. Reloading skills...", "info");
+    expect(notify).toHaveBeenCalledWith(
+      "Skill updated. Reloading skills...",
+      "info",
+    );
   });
 
   it("handleEdit reports cancellation when no skill is selected", async () => {
@@ -481,7 +553,9 @@ describe("skill manager handlers", () => {
 
     await handleDelete({ ui: { custom, notify } } as never);
 
-    await expect(getResourceFileSystem().readFile(expectedSkillPath, "utf8")).rejects.toThrow();
+    await expect(
+      getResourceFileSystem().readFile(expectedSkillPath, "utf8"),
+    ).rejects.toThrow();
     expect(notify).toHaveBeenCalledWith(
       `Skill deleted successfully: ${expectedSkillDirectory}`,
     );
@@ -494,7 +568,10 @@ describe("skill manager handlers", () => {
     const custom = vi.fn().mockResolvedValueOnce(expectedLocalSkillPath);
     const notify = vi.fn();
 
-    await handleDelete({ cwd: localCwd, ui: { custom, notify } } as never, "local");
+    await handleDelete(
+      { cwd: localCwd, ui: { custom, notify } } as never,
+      "local",
+    );
 
     await expect(
       getResourceFileSystem().readFile(expectedLocalSkillPath, "utf8"),

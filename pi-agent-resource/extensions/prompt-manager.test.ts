@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Key, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -10,9 +10,9 @@ import {
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
-vi.mock("@mariozechner/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@mariozechner/pi-tui")>(
-    "@mariozechner/pi-tui",
+vi.mock("@earendil-works/pi-tui", async () => {
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
   );
 
   return {
@@ -27,7 +27,6 @@ vi.mock("node:os", () => ({
 
 import registerPromptManager, {
   createPromptForm,
-  GLOBAL_PROMPT_DIRECTORY,
   handleCreate,
   handleDelete,
   handleEdit,
@@ -89,27 +88,44 @@ describe("extensions/prompt-manager", () => {
   });
 
   describe("extension registration", () => {
-    it("notifies when a local prompt command is about to run", async () => {
+    it("registers a dedicated command for local prompts", async () => {
       const registerCommand = vi.fn();
       const registerFlag = vi.fn();
-      const getFlag = vi.fn().mockReturnValue(true);
+      const getFlag = vi.fn();
       const notify = vi.fn();
 
-      registerPromptManager({ registerCommand, registerFlag, getFlag } as never);
+      registerPromptManager({
+        registerCommand,
+        registerFlag,
+        getFlag,
+      } as never);
 
-      expect(registerFlag).toHaveBeenCalledWith("local-prompt", {
-        description: "Use project prompts from .pi/prompts for prompt commands",
-        type: "boolean",
-        default: false,
-      });
-
-      const command = registerCommand.mock.calls[0]?.[1] as {
-        handler: (arg: string, ctx: { cwd: string; ui: { notify: typeof notify } }) => Promise<void>;
-      };
-      await command.handler(
-        "create",
-        { cwd: localCwd, ui: { notify, custom: vi.fn() } } as never,
+      expect(registerFlag).not.toHaveBeenCalled();
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        1,
+        "resource:prompts",
+        expect.objectContaining({
+          description: "This is for managing global prompts",
+        }),
       );
+      expect(registerCommand).toHaveBeenNthCalledWith(
+        2,
+        "resource:local-prompt",
+        expect.objectContaining({
+          description: "This is for managing project prompts",
+        }),
+      );
+
+      const command = registerCommand.mock.calls[1]?.[1] as {
+        handler: (
+          arg: string,
+          ctx: { cwd: string; ui: { notify: typeof notify } },
+        ) => Promise<void>;
+      };
+      await command.handler("create", {
+        cwd: localCwd,
+        ui: { notify, custom: vi.fn() },
+      } as never);
 
       expect(notify).toHaveBeenNthCalledWith(
         1,
@@ -184,7 +200,10 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      await handleCreate({ cwd: localCwd, ui: { custom, notify } } as never, "local");
+      await handleCreate(
+        { cwd: localCwd, ui: { custom, notify } } as never,
+        "local",
+      );
 
       const content = await getResourceFileSystem().readFile(
         expectedLocalPromptPath,
@@ -228,10 +247,15 @@ describe("extensions/prompt-manager", () => {
       const select = vi
         .fn()
         .mockResolvedValueOnce("local: create-react-component");
-      const editor = vi.fn().mockResolvedValueOnce("updated local prompt content");
+      const editor = vi
+        .fn()
+        .mockResolvedValueOnce("updated local prompt content");
       const notify = vi.fn();
 
-      await handleEdit({ cwd: localCwd, ui: { notify, select, editor } } as never, "local");
+      await handleEdit(
+        { cwd: localCwd, ui: { notify, select, editor } } as never,
+        "local",
+      );
 
       const content = await getResourceFileSystem().readFile(
         expectedLocalPromptPath,
@@ -251,7 +275,9 @@ describe("extensions/prompt-manager", () => {
       seedMemoryResourceFileSystem({
         [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
 
       await handleDelete({ ui: { notify, select } } as never);
@@ -266,10 +292,15 @@ describe("extensions/prompt-manager", () => {
       seedMemoryResourceFileSystem({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("local: create-react-component");
       const notify = vi.fn();
 
-      await handleDelete({ cwd: localCwd, ui: { notify, select } } as never, "local");
+      await handleDelete(
+        { cwd: localCwd, ui: { notify, select } } as never,
+        "local",
+      );
 
       await expect(
         getResourceFileSystem().readFile(expectedLocalPromptPath, "utf8"),

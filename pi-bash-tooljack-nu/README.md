@@ -1,104 +1,46 @@
-# pi-bash-tooljack-nu
+# @code-fixer-23/pi-bash-tooljack-nu
 
-`@code-fixer-23/pi-bash-tooljack-nu` is a Pi extension that keeps Pi's bash-facing workflow but executes commands with Nushell.
+`@code-fixer-23/pi-bash-tooljack-nu` keeps Pi's bash-oriented workflow but executes it through Nushell, adds command-aware completion, and makes command reuse faster with both history search and Command Hash Search.
 
-This package is for development on the extension itself. It is not user documentation for Pi or Nushell.
+[![npm version](https://img.shields.io/npm/v/%40code-fixer-23%2Fpi-bash-tooljack-nu)](https://www.npmjs.com/package/@code-fixer-23/pi-bash-tooljack-nu)
+[![npm downloads](https://img.shields.io/npm/dm/%40code-fixer-23%2Fpi-bash-tooljack-nu)](https://www.npmjs.com/package/@code-fixer-23/pi-bash-tooljack-nu)
+[![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
+[![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
-## What this project is
+## Tools
 
-Pi exposes a `bash` tool and shell-style command entry points such as `!` and `!!`.
-This extension swaps the underlying shell implementation from Bash to Nushell while preserving that familiar interface.
+### `bash`
 
-At a high level the extension:
+The `bash` tool preserves Pi's familiar shell tool name while executing the command with `nu -c` instead of Bash. Output streams back while the command runs, cancellations are propagated to the Nushell process tree, timeouts are enforced, and oversized output is truncated into a saved `nu-tool-output_<timestamp>.txt` file.
 
-- routes Pi bash tool execution through `nu -c`
-- routes shell command entry through Nushell
-- streams stdout and stderr back into Pi
-- handles cancellation and timeouts for spawned Nushell processes
-- truncates oversized tool output and writes the full output to a file
-- adds Nushell-aware editor behavior such as command and `$env` autocomplete
-- provides a recent Nushell history picker for command reuse
+Arguments:
 
-## Project layout
+- `string:command` is the Nushell command text to execute in the current working directory
+- `number:timeout` optionally aborts the command after the given number of seconds
 
-- `src/index.ts` - extension entrypoint, process execution, editor wiring, truncation, and command registration
-- `src/command.ts` - Nushell command metadata lookup and autocomplete parsing
-- `src/history.ts` - recent history query, filtering, and picker UI
-- `src/*.spec.ts` - Vitest coverage for the extension helpers and behaviors
+## Shortcuts
 
-## Prerequisites
+### `Ctrl`+`H`
 
-Before developing locally, make sure you have:
+Opens a recent Nushell history picker, filters out `pi` commands, lets you type to narrow the list in place, and executes the selected history entry directly through Nushell when you press `Enter`. This makes it easy to rerun or adapt previous shell work without retyping it into the editor.
 
-- Node.js
-- pnpm
-- Nushell installed and available as `nu`
-- Pi available locally if you want to run the extension interactively
+## Features
 
-## Install
+- `#` starts **Command Hash Search** inside the editor. When you type `#` followed by a command prefix, the extension queries Nushell command metadata and suggests matches by name, category, description, and search terms.
+- `#` also improves insertion behavior for closure-taking commands. When a selected command expects a closure or block, the completion inserts ` {|$in| $in }` so the pipeline is ready to edit immediately.
+- `$env` powers Nushell-aware environment completion. Typing `$env` or `$env.` suggests the Nushell environment record and matching environment variable names from the current process.
+- `session_start` installs a custom editor wrapper so Pi's editor keeps its normal autocomplete flow while gaining Nushell-specific completion behavior.
+- `user_bash` replaces Pi's default bash operations with Nushell-backed execution so shell entry points continue to work with the Nushell runtime.
+- Large command output is preserved instead of dropped. When output exceeds Pi's byte or line limits, the full text is written to disk and the tool returns a compact pointer to that file.
 
-From the workspace root:
+## Development
+
+Run tasks through Nx from the workspace root:
 
 ```sh
-pnpm install
-```
-
-## Develop locally
-
-Run the package checks through Nx from the workspace root:
-
-```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:check
-```
-
-You can also run individual tasks:
-
-```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:typecheck
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:lint
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:test
-```
-
-If you want to work from the package directory instead:
-
-```sh
-cd pi-bash-tooljack-nu
-pnpm check
-```
-
-## Run the extension in Pi
-
-From the workspace root:
-
-```sh
-pi --extensions ./pi-bash-tooljack-nu
-```
-
-That loads the extension from this package so you can verify command execution, autocomplete, and history behavior in a real Pi session.
-
-## What to test when making changes
-
-When editing this project, verify the parts affected by your change:
-
-- bash tool execution still runs through Nushell
-- command cancellation and timeouts still stop the Nushell process tree
-- autocomplete still returns Nushell commands and `$env` suggestions
-- closure-aware completions still insert closure scaffolding where needed
-- history queries still exclude Pi commands and render recent commands correctly
-- large command output is still truncated and persisted correctly
-
-## Notes for contributors
-
-- This package is an Nx library inside the `pi-packages` workspace.
-- Prefer running tasks through `pnpm nx run ...` from the workspace root.
-- The package entrypoint is declared in `package.json` under `pi.extensions`.
-- The extension assumes `nu` is present on `PATH`.
-
-## Release sanity check
-
-Before publishing, run:
-
-```sh
-pnpm nx run @code-fixer-23/pi-bash-tooljack-nu:check
-pnpm --dir pi-bash-tooljack-nu pack --dry-run
+pnpm nx run pi-bash-tooljack-nu:typecheck
+pnpm nx run pi-bash-tooljack-nu:lint
+pnpm nx run pi-bash-tooljack-nu:test
+pnpm nx run pi-bash-tooljack-nu:metadata
+pnpm nx run pi-bash-tooljack-nu:check
 ```

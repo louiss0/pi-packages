@@ -1,17 +1,17 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    name: '@code-fixer-23/pi-bash-tooljack-nu',
+    name: "pi-bash-tooljack-nu",
     watch: false,
     globals: true,
-    environment: 'node',
+    environment: "node",
     passWithNoTests: true,
-    include: ['src/**/*.{test,spec}.ts'],
-    reporters: ['default'],
+    include: ["src/**/*.{test,spec}.ts"],
+    reporters: ["default"],
     coverage: {
-      reportsDirectory: './test-output/vitest/coverage',
-      provider: 'v8' as const,
+      reportsDirectory: "./test-output/vitest/coverage",
+      provider: "v8" as const,
     },
   },
 });

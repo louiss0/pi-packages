@@ -1,10 +1,7 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "namedInputs": {
-    "default": [
-      "{projectRoot}/**/*",
-      "sharedGlobals"
-    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
@@ -49,20 +46,32 @@
     }
   ],
   "release": {
-    "projects": [
-      "!@code-fixer-23/pi-form-components",
-      "!@code-fixer-23/source"
-    ],
-    "projectsRelationship": "independent",
+    "conventionalCommits": {
+      "enabled": true
+    },
+    "changelog": {
+      "projectChangelogs": true
+    },
+    "groups": {
+      "extensions": {
+        "projects": ["tag:project:extension"],
+        "projectsRelationship": "independent"
+      },
+      "packages": {
+        "projects": ["tag:project:package"],
+        "projectsRelationship": "independent"
+      }
+    },
+    "releaseTag": {
+      "pattern": "{projectName}@{version}"
+    },
     "version": {
-      "preVersionCommand": "npx nx run-many -t typecheck,test"
+      "preVersionCommand": "pnpm nx affected -t typecheck test metadata"
     }
   },
   "targetDefaults": {
     "test": {
-      "dependsOn": [
-        "^typecheck"
-      ]
+      "dependsOn": ["^typecheck"]
     }
   },
   "analytics": true

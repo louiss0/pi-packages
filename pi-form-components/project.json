@@ -1,0 +1,29 @@
+{
+  "name": "pi-form-components",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "root": "pi-form-components",
+  "targets": {
+    "biome": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "metadata": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/validate-package-metadata.mjs {projectRoot}"
+      }
+    }
+  },
+  "tags": ["npm:public", "scope:shared", "project:package", "status:supported"]
+}

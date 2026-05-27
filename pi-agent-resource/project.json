@@ -1,28 +1,9 @@
 {
-  "name": "pi-bash-tooljack-nu",
+  "name": "pi-agent-resource",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
-  "sourceRoot": "pi-bash-tooljack-nu/src",
+  "root": "pi-agent-resource",
   "targets": {
-    "typecheck": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc -p tsconfig.lib.json --noEmit",
-        "cwd": "{projectRoot}"
-      }
-    },
-    "test": {
-      "executor": "@nx/vitest:test",
-      "options": {
-        "configFile": "{projectRoot}/vitest.config.ts"
-      }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint",
-      "options": {
-        "lintFilePatterns": ["{projectRoot}/**/*.ts", "{projectRoot}/**/*.js"]
-      }
-    },
     "biome": {
       "executor": "nx:run-commands",
       "options": {
@@ -35,13 +16,6 @@
       "options": {
         "command": "pnpm exec biome format --write --config-path biome.json {projectRoot}",
         "cwd": "{workspaceRoot}"
-      }
-    },
-    "check": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["typecheck", "lint", "test", "metadata"],
-      "options": {
-        "command": "echo 'All checks passed'"
       }
     },
     "metadata": {

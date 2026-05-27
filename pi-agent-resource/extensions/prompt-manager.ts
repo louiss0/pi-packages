@@ -4,7 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   Theme,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Editor,
@@ -13,7 +13,7 @@ import {
   Spacer,
   Text,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import {
   InferOutput,
   maxLength,
@@ -38,7 +38,7 @@ const extensionName = "prompt-manager";
 const PI_DIRECTORY_NAME = ".pi";
 const AGENT_DIRECTORY_NAME = "agent";
 const PROMPTS_DIRECTORY_NAME = "prompts";
-const LOCAL_PROMPT_FLAG = "local-prompt";
+const LOCAL_PROMPT_COMMAND_NAME = "resource:local-prompt";
 
 export const GLOBAL_PROMPT_DIRECTORY = join(
   homedir(),
@@ -46,9 +46,13 @@ export const GLOBAL_PROMPT_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   PROMPTS_DIRECTORY_NAME,
 );
-export const LOCAL_PROMPT_DIRECTORY = join(PI_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME);
+export const LOCAL_PROMPT_DIRECTORY = join(
+  PI_DIRECTORY_NAME,
+  PROMPTS_DIRECTORY_NAME,
+);
 const promptNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const argumentHintPattern = /^(?:\s*(?:<[^<>\s]+>|\[[^\[\]\s]+\])\s*)*$/;
+const argumentHintPattern =
+  /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
 
 const PromptFieldsSchema = object({
   name: pipe(
@@ -107,18 +111,22 @@ export function createPromptForm(
   theme: Theme,
   done: (value: PromptFields | null) => void,
 ) {
-  return new Form<PromptFields>(tui, done, {
-    title: "Create Prompt",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new LabelledInput("argument-hint", theme),
-    ],
-    parse: parsePromptFormValues,
-    footer:
-      "* required | argument-hint is optional | Enter next/submit | Tab switch field | Esc cancel\nTemplate opens in the editor overlay next. Use <> for required hints and [] for optional hints.",
-    spacing: 1,
-  });
+  return new Form<PromptFields>(
+    {
+      title: "Create Prompt",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new LabelledInput("argument-hint", theme),
+      ],
+      parse: parsePromptFormValues,
+      footer:
+        "* required | argument-hint is optional | Enter next/submit | Tab switch field | Esc cancel\nTemplate opens in the editor overlay next. Use <> for required hints and [] for optional hints.",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 class PromptTemplateOverlay extends Container {
@@ -169,54 +177,64 @@ class PromptTemplateOverlay extends Container {
   }
 }
 
-export default (pi: ExtensionAPI) => {
-  pi.registerFlag(LOCAL_PROMPT_FLAG, {
-    description: "Use project prompts from .pi/prompts for prompt commands",
-    type: "boolean",
-    default: false,
-  });
+async function handlePromptCommand(
+  arg: string,
+  ctx: ExtensionContext,
+  scope: PromptScope,
+) {
+  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+  const result = parsePromptCommandArgument(arg);
+  if (!result.success) {
+    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
+    return;
+  }
 
+  if (scope === "local") {
+    ctx.ui.notify(
+      `Using local prompts from ${getPromptDirectory("local", ctx.cwd || process.cwd())}`,
+      "info",
+    );
+  }
+
+  switch (result.output) {
+    case "create":
+      await handleCreate(ctx, scope);
+      break;
+    case "edit":
+      await handleEdit(ctx, scope);
+      break;
+    case "delete":
+      await handleDelete(ctx, scope);
+      break;
+  }
+}
+
+export default (pi: ExtensionAPI) => {
   pi.registerCommand("resource:prompts", {
-    description: "This is for managing prompts",
+    description: "This is for managing global prompts",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("prompt"),
-    handler: async (arg, ctx) => {
-      notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-      const result = parsePromptCommandArgument(arg);
-      if (!result.success) {
-        ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-        return;
-      }
+    handler: async (arg, ctx) => handlePromptCommand(arg, ctx, "global"),
+  });
 
-      const scope = pi.getFlag(LOCAL_PROMPT_FLAG) === true ? "local" : "global";
-
-      if (scope === "local") {
-        ctx.ui.notify(
-          `Using local prompts from ${getPromptDirectory("local", ctx.cwd || process.cwd())}`,
-          "info",
-        );
-      }
-
-      switch (result.output) {
-        case "create":
-          await handleCreate(ctx, scope);
-          break;
-        case "edit":
-          await handleEdit(ctx, scope);
-          break;
-        case "delete":
-          await handleDelete(ctx, scope);
-          break;
-      }
-    },
+  pi.registerCommand(LOCAL_PROMPT_COMMAND_NAME, {
+    description: "This is for managing project prompts",
+    getArgumentCompletions:
+      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("prompt"),
+    handler: async (arg, ctx) => handlePromptCommand(arg, ctx, "local"),
   });
 };
 
 function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_PROMPT_DIRECTORY) : GLOBAL_PROMPT_DIRECTORY;
+  return scope === "local"
+    ? join(cwd, LOCAL_PROMPT_DIRECTORY)
+    : GLOBAL_PROMPT_DIRECTORY;
 }
 
-export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const values = await ctx.ui.custom<PromptFields | null>(
     (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
     formOverlayOptions,
@@ -250,7 +268,10 @@ export async function handleCreate(ctx: ExtensionContext, scope: PromptScope = "
   ctx.ui.notify("Prompt created");
 }
 
-export async function handleEdit(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleEdit(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const prompt = await pickPrompt(ctx, "Edit Prompt", scope);
 
   if (!prompt) {
@@ -271,7 +292,10 @@ export async function handleEdit(ctx: ExtensionContext, scope: PromptScope = "gl
   ctx.ui.notify("Prompt edited");
 }
 
-export async function handleDelete(ctx: ExtensionContext, scope: PromptScope = "global") {
+export async function handleDelete(
+  ctx: ExtensionContext,
+  scope: PromptScope = "global",
+) {
   const prompt = await pickPrompt(ctx, "Delete Prompt", scope);
 
   if (!prompt) {
@@ -299,7 +323,11 @@ function renderFrontmatter(values: PromptFields) {
   ].join("\n");
 }
 
-async function pickPrompt(ctx: ExtensionContext, title: string, scope: PromptScope) {
+async function pickPrompt(
+  ctx: ExtensionContext,
+  title: string,
+  scope: PromptScope,
+) {
   const choices = await listPromptChoices(scope, ctx.cwd || process.cwd());
 
   if (choices.length === 0) {
@@ -324,7 +352,8 @@ async function listPromptChoices(scope: PromptScope, cwd: string) {
   const choices: PromptChoice[] = [];
 
   try {
-    const entries = await getResourceFileSystem().readDirectoryEntries(directory);
+    const entries =
+      await getResourceFileSystem().readDirectoryEntries(directory);
     choices.push(
       ...entries.map((entry) => {
         const entryPath = join(directory, entry.name);

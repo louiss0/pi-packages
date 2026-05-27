@@ -10,12 +10,12 @@ import {
   type ExtensionContext,
   formatSize,
   truncateTail,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type {
   AutocompleteItem,
   AutocompleteProvider,
   AutocompleteSuggestions,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 import { getCommandSuggestions, type CommandCompletionItem } from "./command";
@@ -358,29 +358,23 @@ async function executeNushellCommand(
 const nushellGuidelines = [
   "Prefer Nushell-native commands over Bash-style text pipelines. Nushell works best when commands pass structured values such as lists, records, and tables instead of plain text.",
 
+  "Don't use && or || for command chaining. Use ; example `command1 ; command2`",
+
   "Do not assume Nushell is Bash. Avoid Bash-only syntax such as test brackets, awk-heavy parsing, sed-heavy parsing, xargs-first workflows, and output redirection with >.",
 
   "Use `save` for writing pipeline output to a file. Example: `'hello' | save output.txt` instead of `echo 'hello' > output.txt`.",
 
   "When command output is a string with multiple lines, convert it into a list before processing it. Use `lines` for newline-separated output.",
 
-  "When command output is a delimited string, convert it before filtering or mapping. Use `split row` to create a list and `split column` to create a table.",
-
-  "Use `split words` when a string needs to become a list of shell-like words, but do not use it as a full Bash parser.",
+  "Use `split words` when a string needs to become a list of shell-like words",
 
   "Use `str trim` before comparing strings that may contain extra whitespace.",
 
-  "Use `str contains`, `str starts-with`, `str ends-with`, `str replace`, and regex operators instead of piping through grep, sed, or awk when the data is already in Nushell.",
+  "Use `str contains`, `str starts-with`, `str ends-with`, `str replace`, and regex operators instead of piping through grep, sed, or awk",
 
   "Prefer `where` for filtering structured data. Example: `ls | where type == dir` instead of `ls -d */`.",
 
-  "Prefer `get`, `select`, `reject`, `rename`, `insert`, `update`, and `upsert` for shaping records and tables instead of parsing display output.",
-
   "When iterating over lists or tables, use `each`. Remember that a table is a list of records, so `each` receives one row record at a time.",
-
-  "When a closure inside `each` returns a stream and the result should be flattened, use `each --flatten`.",
-
-  "For recursive file discovery, prefer Nushell glob patterns such as `ls **/*.rs` instead of Bash `find . -name '*.rs'`.",
 
   "Treat globs and strings differently. Quoted strings like `'*.txt'` or `\"*.txt\"` are literal strings, while bare patterns like `*.txt` may be interpreted as globs by commands that accept globs.",
 
@@ -430,11 +424,7 @@ const nushellGuidelines = [
 
   "Prefer `math`, `length`, `first`, `last`, `sort-by`, `uniq`, and `group-by` over Bash pipelines when working with lists or tables.",
 
-  "Before writing a Nushell command, ask: 'What type is flowing through the pipeline right now: string, list, record, table, path, glob, or binary?'",
-
   "Do not parse Nushell table display output. The display table is for humans; use the underlying structured values instead.",
-
-  "When in doubt, make the pipeline more explicit: convert strings into lists, lists into tables, tables into selected records, and records into serialized output only at the end.",
 ];
 
 const nushellRipgrepAdvancedGuidelines = [

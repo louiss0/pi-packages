@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "cli": "nx",
+  "$id": "extension",
+  "title": "Pi Extension",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Package folder and project name.",
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      }
+    },
+    "projectFolders": {
+      "type": "array",
+      "description": "Extra Pi resource folders to scaffold alongside extensions.",
+      "items": {
+        "type": "string",
+        "enum": ["prompts", "skills"]
+      },
+      "default": []
+    },
+    "runner": {
+      "type": "string",
+      "description": "Test runner for the generated Pi scaffold.",
+      "enum": ["vitest", "jest"],
+      "default": "vitest"
+    },
+    "instructions": {
+      "type": "boolean",
+      "description": "Also create AGENTS.md and CLAUDE.md in the generated package.",
+      "default": false
+    }
+  },
+  "required": ["name"]
+}

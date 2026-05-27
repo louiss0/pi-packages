@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -10,7 +10,7 @@ import {
   Text,
   type TUI,
   truncateToWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 export class LabelledInput extends Container implements Component {
   #name: string;
@@ -130,7 +130,9 @@ export class ConfirmationBox extends Container implements Component {
     const prefix = this.#focused ? "> " : "  ";
     const box = this.#theme.fg("accent", ` ${this.#value ? "[x]" : "[ ]"}`);
     const lines = [truncateToWidth(`${prefix}${box} ${this.#message}`, width)];
-    const errorLines = this.#errorText.render(width).filter((line) => line.length > 0);
+    const errorLines = this.#errorText
+      .render(width)
+      .filter((line) => line.length > 0);
 
     return [...lines, ...errorLines];
   }
@@ -150,19 +152,23 @@ export type FormField = Component & {
   value: string | number | boolean;
 };
 
-export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
+export type Parse<T extends Record<string, string | number | boolean>> = (
+  value: T,
+) =>
   | {
       [key in keyof T]?: string;
     }
   | undefined;
 
-type FormOptions<T extends Record<string, string | number | boolean>> = {
+export interface FormOptions<
+  T extends Record<string, string | number | boolean>,
+> {
   title: string;
   fields: FormField[];
   parse: Parse<T>;
   footer?: string;
   spacing?: number;
-};
+}
 
 export class Form<T extends Record<string, string | number | boolean>>
   extends Container
@@ -178,9 +184,9 @@ export class Form<T extends Record<string, string | number | boolean>>
   #parse: Parse<T>;
 
   constructor(
+    options: FormOptions<T>,
     private tui: TUI,
     private done: (value: T | null) => void,
-    options: FormOptions<T>,
   ) {
     super();
 
@@ -244,7 +250,10 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     if (matchesKey(data, Key.enter)) {
-      if (this.#fields.length === 0 || this.#activeFieldIndex === this.#fields.length - 1) {
+      if (
+        this.#fields.length === 0 ||
+        this.#activeFieldIndex === this.#fields.length - 1
+      ) {
         this.#submit();
         return;
       }
@@ -265,7 +274,8 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     this.#activeFieldIndex =
-      (this.#activeFieldIndex + direction + this.#fields.length) % this.#fields.length;
+      (this.#activeFieldIndex + direction + this.#fields.length) %
+      this.#fields.length;
     this.#syncFieldFocus();
     this.tui.requestRender();
   }

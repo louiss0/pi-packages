@@ -20,8 +20,14 @@ export const parseObjectErrors = <T extends Record<string, unknown>>(
     }
 
     const currentError = errors.get(key);
-    errors.set(key, currentError ? `${currentError}\n${issue.message}` : issue.message);
+    errors.set(
+      key,
+      currentError ? `${currentError}\n${issue.message}` : issue.message,
+    );
   }
 
-  return Object.fromEntries(errors.entries()) as Record<keyof typeof values, string>;
+  return Object.fromEntries(errors.entries()) as Record<
+    keyof typeof values,
+    string
+  >;
 };

@@ -1,19 +1,19 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: __dirname,
-  cacheDir: '../node_modules/.vite/packages/pi-form-components',
+  cacheDir: "../node_modules/.vite/packages/pi-form-components",
   plugins: [],
   test: {
-    name: '@code-fixer-23/pi-form-components',
+    name: "pi-form-components",
     watch: false,
     globals: true,
-    environment: 'node',
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
+    environment: "node",
+    include: ["src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    reporters: ["default"],
     coverage: {
-      reportsDirectory: './test-output/vitest/coverage',
-      provider: 'v8' as const,
+      reportsDirectory: "./test-output/vitest/coverage",
+      provider: "v8" as const,
     },
   },
 }));

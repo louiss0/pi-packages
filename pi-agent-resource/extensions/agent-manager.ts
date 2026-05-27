@@ -1,7 +1,11 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ExtensionAPI, ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
-import type { TUI } from "@mariozechner/pi-tui";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
+import type { TUI } from "@earendil-works/pi-tui";
 import {
   InferOutput,
   maxLength,
@@ -25,7 +29,7 @@ const extensionName = "agent-manager";
 const PI_DIRECTORY_NAME = ".pi";
 const AGENT_DIRECTORY_NAME = "agent";
 const AGENTS_DIRECTORY_NAME = "agents";
-const LOCAL_AGENT_FLAG = "local-agent";
+const LOCAL_AGENT_COMMAND_NAME = "resource:local-agent";
 
 export const GLOBAL_AGENT_DIRECTORY = join(
   homedir(),
@@ -33,7 +37,10 @@ export const GLOBAL_AGENT_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   AGENTS_DIRECTORY_NAME,
 );
-export const LOCAL_AGENT_DIRECTORY = join(PI_DIRECTORY_NAME, AGENTS_DIRECTORY_NAME);
+export const LOCAL_AGENT_DIRECTORY = join(
+  PI_DIRECTORY_NAME,
+  AGENTS_DIRECTORY_NAME,
+);
 const agentNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const lowerCommaSeparatedToolsPattern = /^[a-z0-9:-]+(?:\s*,\s*[a-z0-9:-]+)*$/;
 
@@ -42,7 +49,10 @@ const AgentFieldsSchema = object({
     string(),
     minLength(1, "Name is required"),
     maxLength(48, "Name must be 48 characters or fewer"),
-    regex(agentNamePattern, "Name must be lowercase letters, numbers, and dashes only"),
+    regex(
+      agentNamePattern,
+      "Name must be lowercase letters, numbers, and dashes only",
+    ),
   ),
   description: pipe(
     string(),
@@ -52,7 +62,10 @@ const AgentFieldsSchema = object({
   tools: pipe(
     string(),
     minLength(1, "Tools are required"),
-    regex(lowerCommaSeparatedToolsPattern, "Tools must be a lowercase comma-separated list"),
+    regex(
+      lowerCommaSeparatedToolsPattern,
+      "Tools must be a lowercase comma-separated list",
+    ),
   ),
   model: pipe(
     string(),
@@ -89,70 +102,88 @@ export function parseAgentCommandArgument(argument: string) {
   };
 }
 
-export function createAgentForm(tui: TUI, theme: Theme, done: (value: AgentFields | null) => void) {
-  return new Form<AgentFields>(tui, done, {
-    title: "Create Agent",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new LabelledInput("tools", theme),
-      new LabelledInput("model", theme),
-    ],
-    parse: parseAgentFormValues,
-    footer:
-      "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
-    spacing: 1,
-  });
+export function createAgentForm(
+  tui: TUI,
+  theme: Theme,
+  done: (value: AgentFields | null) => void,
+) {
+  return new Form<AgentFields>(
+    {
+      title: "Create Agent",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new LabelledInput("tools", theme),
+        new LabelledInput("model", theme),
+      ],
+      parse: parseAgentFormValues,
+      footer:
+        "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
+}
+
+async function handleAgentCommand(
+  arg: string,
+  ctx: ExtensionContext,
+  scope: AgentScope,
+) {
+  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+  const result = parseAgentCommandArgument(arg);
+  if (!result.success) {
+    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
+    return;
+  }
+
+  if (scope === "local") {
+    ctx.ui.notify(
+      `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
+      "info",
+    );
+  }
+
+  switch (result.output) {
+    case "create":
+      await handleCreate(ctx, scope);
+      break;
+    case "edit":
+      await handleEdit(ctx, scope);
+      break;
+    case "delete":
+      await handleDelete(ctx, scope);
+      break;
+  }
 }
 
 export default (pi: ExtensionAPI) => {
-  pi.registerFlag(LOCAL_AGENT_FLAG, {
-    description: "Use project agents from .pi/agents for agent commands",
-    type: "boolean",
-    default: false,
-  });
-
   pi.registerCommand("resource:agent", {
-    description: "This is for managing agents",
+    description: "This is for managing global agents",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
-    handler: async (arg, ctx) => {
-      notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-      const result = parseAgentCommandArgument(arg);
-      if (!result.success) {
-        ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-        return;
-      }
+    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "global"),
+  });
 
-      const scope = pi.getFlag(LOCAL_AGENT_FLAG) === true ? "local" : "global";
-
-      if (scope === "local") {
-        ctx.ui.notify(
-          `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
-          "info",
-        );
-      }
-
-      switch (result.output) {
-        case "create":
-          await handleCreate(ctx, scope);
-          break;
-        case "edit":
-          await handleEdit(ctx, scope);
-          break;
-        case "delete":
-          await handleDelete(ctx, scope);
-          break;
-      }
-    },
+  pi.registerCommand(LOCAL_AGENT_COMMAND_NAME, {
+    description: "This is for managing project agents",
+    getArgumentCompletions:
+      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
+    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "local"),
   });
 };
 
 function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY;
+  return scope === "local"
+    ? join(cwd, LOCAL_AGENT_DIRECTORY)
+    : GLOBAL_AGENT_DIRECTORY;
 }
 
-export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -171,7 +202,10 @@ export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "g
   ctx.ui.notify("Agent created");
 }
 
-export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleEdit(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const agent = await pickAgent(ctx, "Edit Agent", scope);
 
   if (!agent) {
@@ -192,7 +226,10 @@ export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "glo
   ctx.ui.notify("Agent edited");
 }
 
-export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleDelete(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+) {
   const agent = await pickAgent(ctx, "Delete Agent", scope);
 
   if (!agent) {
@@ -205,11 +242,19 @@ export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "g
 }
 
 function renderFrontmatter(values: AgentFields) {
-  return ["---", ...Object.entries(values).map(([key, value]) => `${key}: ${value}`), "---", ""]
-    .join("\n");
+  return [
+    "---",
+    ...Object.entries(values).map(([key, value]) => `${key}: ${value}`),
+    "---",
+    "",
+  ].join("\n");
 }
 
-async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope) {
+async function pickAgent(
+  ctx: ExtensionContext,
+  title: string,
+  scope: AgentScope,
+) {
   const choices = await listAgentChoices(scope, ctx.cwd || process.cwd());
 
   if (choices.length === 0) {

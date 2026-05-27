@@ -43,13 +43,18 @@ function createEnum<const T extends string>(values: T[]) {
 
 export const SubCommands = createEnum(SUBCOMMANDS.options);
 
-export function getFilterSubcommandArgumentCompletionFromStringUsingSubLabel(subLabel: string) {
-  const completions = generateSubcommandArgumentCompletionsUsingSubLabel(subLabel);
+export function getFilterSubcommandArgumentCompletionFromStringUsingSubLabel(
+  subLabel: string,
+) {
+  const completions =
+    generateSubcommandArgumentCompletionsUsingSubLabel(subLabel);
   return (value: string) =>
     completions.filter((completion) => completion.value.startsWith(value));
 }
 
-export function generateSubcommandArgumentCompletionsUsingSubLabel(subLabel: string) {
+export function generateSubcommandArgumentCompletionsUsingSubLabel(
+  subLabel: string,
+) {
   return SubCommands.values.map((option) =>
     option === "create"
       ? {

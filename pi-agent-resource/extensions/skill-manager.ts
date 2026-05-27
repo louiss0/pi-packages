@@ -3,7 +3,7 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
   Theme,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -16,7 +16,7 @@ import {
   Text,
   type SelectItem,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,7 +30,11 @@ import {
   regex,
   string,
 } from "valibot";
-import { ConfirmationBox, Form, LabelledInput } from "@code-fixer-23/pi-form-components";
+import {
+  ConfirmationBox,
+  Form,
+  LabelledInput,
+} from "@code-fixer-23/pi-form-components";
 import { getResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
@@ -46,8 +50,8 @@ const PI_DIRECTORY_NAME = ".pi";
 const AGENT_DIRECTORY_NAME = "agent";
 const SKILLS_DIRECTORY_NAME = "skills";
 const SKILL_FILE_NAME = "SKILL.md";
-const LOCAL_SKILL_FLAG = "local-skill";
 const EXTERNAL_EDITOR_FLAG = "external-skill-editor";
+const LOCAL_SKILL_COMMAND_NAME = "resource:local-skill";
 
 export const GLOBAL_SKILLS_DIRECTORY = join(
   homedir(),
@@ -55,13 +59,17 @@ export const GLOBAL_SKILLS_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   SKILLS_DIRECTORY_NAME,
 );
-export const LOCAL_SKILLS_DIRECTORY = join(PI_DIRECTORY_NAME, SKILLS_DIRECTORY_NAME);
+export const LOCAL_SKILLS_DIRECTORY = join(
+  PI_DIRECTORY_NAME,
+  SKILLS_DIRECTORY_NAME,
+);
 export const PROJECT_EDITOR_CONFIG_FILE = ".pi-resource.toml";
 
 const skillNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const pathLikePattern =
   /^(?:$|~?[/.\\]|[A-Za-z]:[\\/]|\.\.?[\\/]|[^<>:"|?*\r\n]+(?:[\\/][^<>:"|?*\r\n]+)*)$/;
-const commaSeparatedAllowedToolsPattern = /^(?:$|[a-z][a-z0-9-]*(?:\s*,\s*[a-z][a-z0-9-]*)*)$/;
+const commaSeparatedAllowedToolsPattern =
+  /^(?:$|[a-z][a-z0-9-]*(?:\s*,\s*[a-z][a-z0-9-]*)*)$/;
 
 const RequiredAgentSkillFieldsSchema = object({
   name: pipe(
@@ -78,27 +86,39 @@ const RequiredAgentSkillFieldsSchema = object({
 });
 
 const OptionalAgentSkillFormFieldsSchema = object({
-  license: optional(pipe(string(), regex(pathLikePattern, "License must be a valid path")), ""),
+  license: optional(
+    pipe(string(), regex(pathLikePattern, "License must be a valid path")),
+    "",
+  ),
   compatibility: optional(
-    pipe(string(), maxLength(500, "Compatibility must be 500 characters or fewer")),
+    pipe(
+      string(),
+      maxLength(500, "Compatibility must be 500 characters or fewer"),
+    ),
     "",
   ),
   allowedTools: optional(
     pipe(
       string(),
-      regex(commaSeparatedAllowedToolsPattern, "Allowed tools must be a comma-separated list"),
+      regex(
+        commaSeparatedAllowedToolsPattern,
+        "Allowed tools must be a comma-separated list",
+      ),
     ),
     "",
   ),
 });
 
-type RequiredAgentSkillFields = InferOutput<typeof RequiredAgentSkillFieldsSchema>;
-type OptionalAgentSkillFormFields = InferOutput<typeof OptionalAgentSkillFormFieldsSchema>;
-type SkillFrontmatterFields = RequiredAgentSkillFields & OptionalAgentSkillFormFields;
+type RequiredAgentSkillFields = InferOutput<
+  typeof RequiredAgentSkillFieldsSchema
+>;
+type OptionalAgentSkillFormFields = InferOutput<
+  typeof OptionalAgentSkillFormFieldsSchema
+>;
+type SkillFrontmatterFields = RequiredAgentSkillFields &
+  OptionalAgentSkillFormFields;
 type SkillEditorMode = "external";
-type SkillSubcommand = "create" | "edit" | "delete";
 type SkillScope = "global" | "local";
-type ParsedSkillCommandArgument = SkillSubcommand;
 
 class SkillEditorOverlay extends Container implements Focusable {
   #editor: Editor;
@@ -140,7 +160,11 @@ class SkillEditorOverlay extends Container implements Focusable {
     this.addChild(new Spacer(1));
     this.addChild(this.#editor);
     this.addChild(new Spacer(1));
-    this.addChild(new Text(theme.fg("dim", "Enter submit | Shift+Enter newline | Esc cancel")));
+    this.addChild(
+      new Text(
+        theme.fg("dim", "Enter submit | Shift+Enter newline | Esc cancel"),
+      ),
+    );
   }
 
   handleInput(data: string) {
@@ -157,30 +181,38 @@ export function parseRequiredSkillFormValues(values: RequiredAgentSkillFields) {
   return parseObjectErrors(RequiredAgentSkillFieldsSchema, values);
 }
 
-export function parseOptionalSkillFormValues(values: OptionalAgentSkillFormFields) {
+export function parseOptionalSkillFormValues(
+  values: OptionalAgentSkillFormFields,
+) {
   return parseObjectErrors(OptionalAgentSkillFormFieldsSchema, values);
 }
 
 export function createRequiredSkillForm(
   tui: TUI,
   theme: Theme,
-  done: (value: (RequiredAgentSkillFields & { confirm: boolean }) | null) => void,
+  done: (
+    value: (RequiredAgentSkillFields & { confirm: boolean }) | null,
+  ) => void,
 ) {
-  return new Form<RequiredAgentSkillFields & { confirm: boolean }>(tui, done, {
-    title: "Create Skill",
-    fields: [
-      new LabelledInput("name", theme),
-      new LabelledInput("description", theme),
-      new ConfirmationBox(theme, "Do you want to fill in the next fields?"),
-    ],
-    parse: (values) =>
-      parseRequiredSkillFormValues({
-        name: values.name,
-        description: values.description,
-      }),
-    footer: "Enter next/submit | Tab switch field | Esc cancel",
-    spacing: 1,
-  });
+  return new Form<RequiredAgentSkillFields & { confirm: boolean }>(
+    {
+      title: "Create Skill",
+      fields: [
+        new LabelledInput("name", theme),
+        new LabelledInput("description", theme),
+        new ConfirmationBox(theme, "Do you want to fill in the next fields?"),
+      ],
+      parse: (values) =>
+        parseRequiredSkillFormValues({
+          name: values.name,
+          description: values.description,
+        }),
+      footer: "Enter next/submit | Tab switch field | Esc cancel",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 export function createOptionalSkillForm(
@@ -188,17 +220,21 @@ export function createOptionalSkillForm(
   theme: Theme,
   done: (value: OptionalAgentSkillFormFields | null) => void,
 ) {
-  return new Form<OptionalAgentSkillFormFields>(tui, done, {
-    title: "Skill Details",
-    fields: [
-      new LabelledInput("license", theme),
-      new LabelledInput("compatibility", theme),
-      new LabelledInput("allowedTools", theme),
-    ],
-    parse: (values) => parseOptionalSkillFormValues(values),
-    footer: "Enter next/submit | Tab switch field | Esc cancel",
-    spacing: 1,
-  });
+  return new Form<OptionalAgentSkillFormFields>(
+    {
+      title: "Skill Details",
+      fields: [
+        new LabelledInput("license", theme),
+        new LabelledInput("compatibility", theme),
+        new LabelledInput("allowedTools", theme),
+      ],
+      parse: (values) => parseOptionalSkillFormValues(values),
+      footer: "Enter next/submit | Tab switch field | Esc cancel",
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
 }
 
 export function parseSkillCommandArgument(argument: string) {
@@ -217,10 +253,16 @@ export function parseSkillCommandArgument(argument: string) {
   };
 }
 
-export async function handleCreate(ctx: ExtensionCommandContext, scope: SkillScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionCommandContext,
+  scope: SkillScope = "global",
+) {
   const requiredValues = await ctx.ui.custom<
     (RequiredAgentSkillFields & { confirm: boolean }) | null
-  >((tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done), formOverlayOptions);
+  >(
+    (tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done),
+    formOverlayOptions,
+  );
 
   if (!requiredValues) {
     ctx.ui.notify("Skill creation cancelled", "info");
@@ -234,10 +276,11 @@ export async function handleCreate(ctx: ExtensionCommandContext, scope: SkillSco
   };
 
   if (requiredValues.confirm) {
-    const submittedOptionalValues = await ctx.ui.custom<OptionalAgentSkillFormFields | null>(
-      (tui, theme, _kb, done) => createOptionalSkillForm(tui, theme, done),
-      formOverlayOptions,
-    );
+    const submittedOptionalValues =
+      await ctx.ui.custom<OptionalAgentSkillFormFields | null>(
+        (tui, theme, _kb, done) => createOptionalSkillForm(tui, theme, done),
+        formOverlayOptions,
+      );
 
     if (submittedOptionalValues) {
       optionalValues = submittedOptionalValues;
@@ -279,7 +322,10 @@ export async function handleEdit(
   }
 
   const currentContent = await readSkillFile(skillPath);
-  const editMode = await resolveSkillEditMode(requestedEditMode, ctx.cwd || process.cwd());
+  const editMode = await resolveSkillEditMode(
+    requestedEditMode,
+    ctx.cwd || process.cwd(),
+  );
 
   if (editMode === "external") {
     const editor = process.env.VISUAL || process.env.EDITOR;
@@ -292,7 +338,8 @@ export async function handleEdit(
     await openExternalEditor(editor, skillPath);
   } else {
     const editedContent = await ctx.ui.custom<string | undefined>(
-      (tui, theme, _kb, done) => new SkillEditorOverlay(tui, theme, currentContent, done),
+      (tui, theme, _kb, done) =>
+        new SkillEditorOverlay(tui, theme, currentContent, done),
       modalEditorOverlayOptions,
     );
 
@@ -324,7 +371,10 @@ export async function handleDelete(
   ctx.ui.notify(`Skill deleted successfully: ${skillDirectory}`);
 }
 
-async function resolveSkillEditMode(requestedEditMode?: SkillEditorMode, cwd = process.cwd()) {
+async function resolveSkillEditMode(
+  requestedEditMode?: SkillEditorMode,
+  cwd = process.cwd(),
+) {
   if (requestedEditMode) {
     return requestedEditMode;
   }
@@ -366,10 +416,16 @@ async function readProjectEditorConfig(cwd = process.cwd()) {
 }
 
 function getSkillsDirectory(scope: SkillScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY;
+  return scope === "local"
+    ? join(cwd, LOCAL_SKILLS_DIRECTORY)
+    : GLOBAL_SKILLS_DIRECTORY;
 }
 
-async function createSkillFile(fields: SkillFrontmatterFields, scope: SkillScope, cwd: string) {
+async function createSkillFile(
+  fields: SkillFrontmatterFields,
+  scope: SkillScope,
+  cwd: string,
+) {
   const skillDirectory = join(getSkillsDirectory(scope, cwd), fields.name);
   const skillPath = join(skillDirectory, SKILL_FILE_NAME);
   const fileSystem = getResourceFileSystem();
@@ -390,7 +446,9 @@ function renderSkillMarkdown(fields: SkillFrontmatterFields) {
     ...(fields.compatibility
       ? [`compatibility: ${formatYamlValue(fields.compatibility)}`]
       : []),
-    ...(fields.allowedTools ? [`allowed-tools: ${formatYamlValue(fields.allowedTools)}`] : []),
+    ...(fields.allowedTools
+      ? [`allowed-tools: ${formatYamlValue(fields.allowedTools)}`]
+      : []),
     "---",
   ].join("\n");
 
@@ -446,8 +504,13 @@ function humanizeSkillName(name: string) {
     .join(" ");
 }
 
-async function pickSkillPath(ctx: ExtensionContext, title: string, scope: SkillScope) {
-  const cwd = "cwd" in ctx && typeof ctx.cwd === "string" ? ctx.cwd : process.cwd();
+async function pickSkillPath(
+  ctx: ExtensionContext,
+  title: string,
+  scope: SkillScope,
+) {
+  const cwd =
+    "cwd" in ctx && typeof ctx.cwd === "string" ? ctx.cwd : process.cwd();
   const skillNames = await listSkillNames(scope, cwd);
 
   if (skillNames.length === 0) {
@@ -455,49 +518,52 @@ async function pickSkillPath(ctx: ExtensionContext, title: string, scope: SkillS
     return null;
   }
 
-  return ctx.ui.custom<string | null>(
-    (tui, theme, _kb, done) => {
-      const items: SelectItem[] = skillNames.map((skillName) => ({
-        value: skillName,
-        label: skillName,
-      }));
+  return ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
+    const items: SelectItem[] = skillNames.map((skillName) => ({
+      value: skillName,
+      label: skillName,
+    }));
 
-      const selectList = new SelectList(items, Math.min(items.length, 8), {
-        selectedPrefix: (text) => theme.fg("accent", text),
-        selectedText: (text) => theme.fg("accent", text),
-        description: (text) => theme.fg("muted", text),
-        scrollInfo: (text) => theme.fg("dim", text),
-        noMatch: (text) => theme.fg("warning", text),
-      });
+    const selectList = new SelectList(items, Math.min(items.length, 8), {
+      selectedPrefix: (text) => theme.fg("accent", text),
+      selectedText: (text) => theme.fg("accent", text),
+      description: (text) => theme.fg("muted", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    });
 
-      selectList.onSelect = (item) =>
-        done(join(getSkillsDirectory(scope, cwd), item.value, SKILL_FILE_NAME));
-      selectList.onCancel = () => done(null);
+    selectList.onSelect = (item) =>
+      done(join(getSkillsDirectory(scope, cwd), item.value, SKILL_FILE_NAME));
+    selectList.onCancel = () => done(null);
 
-      const container = new Container();
-      container.addChild(new Text(theme.fg("accent", title)));
-      container.addChild(new Spacer(1));
-      container.addChild(selectList);
-      container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("dim", "^v navigate | enter select | esc cancel")));
+    const container = new Container();
+    container.addChild(new Text(theme.fg("accent", title)));
+    container.addChild(new Spacer(1));
+    container.addChild(selectList);
+    container.addChild(new Spacer(1));
+    container.addChild(
+      new Text(theme.fg("dim", "^v navigate | enter select | esc cancel")),
+    );
 
-      return {
-        render: (width) => container.render(width),
-        invalidate: () => container.invalidate(),
-        handleInput: (data) => {
-          selectList.handleInput(data);
-          tui.requestRender();
-        },
-      } satisfies Component;
-    },
-    formOverlayOptions,
-  );
+    return {
+      render: (width) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data) => {
+        selectList.handleInput(data);
+        tui.requestRender();
+      },
+    } satisfies Component;
+  }, formOverlayOptions);
 }
 
 async function listSkillNames(scope: SkillScope, cwd: string) {
   try {
-    const entries = await getResourceFileSystem().readDirectoryEntries(getSkillsDirectory(scope, cwd));
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    const entries = await getResourceFileSystem().readDirectoryEntries(
+      getSkillsDirectory(scope, cwd),
+    );
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
   } catch {
     return [];
   }
@@ -507,10 +573,14 @@ function openExternalEditor(editor: string, filePath: string) {
   const editorCommand = parseExternalEditorCommand(editor);
 
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(editorCommand.command, [...editorCommand.args, filePath], {
-      stdio: "inherit",
-      shell: false,
-    });
+    const child = spawn(
+      editorCommand.command,
+      [...editorCommand.args, filePath],
+      {
+        stdio: "inherit",
+        shell: false,
+      },
+    );
 
     child.on("error", reject);
     child.on("exit", (code) => {
@@ -604,12 +674,52 @@ async function readSkillFile(filePath: string) {
   return getResourceFileSystem().readFile(filePath, "utf8");
 }
 
+async function handleSkillCommand(
+  pi: ExtensionAPI,
+  arg: string,
+  ctx: ExtensionCommandContext,
+  scope: SkillScope,
+) {
+  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+  const result = parseSkillCommandArgument(arg);
+
+  if (!result.success) {
+    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
+    return;
+  }
+
+  const editMode =
+    pi.getFlag(EXTERNAL_EDITOR_FLAG) === true ? "external" : undefined;
+
+  if (editMode === "external" && result.output !== "edit") {
+    ctx.ui.notify(
+      `Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`,
+      "error",
+    );
+    return;
+  }
+
+  if (scope === "local") {
+    ctx.ui.notify(
+      `Using local skills from ${getSkillsDirectory("local", ctx.cwd || process.cwd())}`,
+      "info",
+    );
+  }
+
+  switch (result.output) {
+    case "create":
+      await handleCreate(ctx, scope);
+      break;
+    case "edit":
+      await handleEdit(ctx, editMode, scope);
+      break;
+    case "delete":
+      await handleDelete(ctx, scope);
+      break;
+  }
+}
+
 export default (pi: ExtensionAPI) => {
-  pi.registerFlag(LOCAL_SKILL_FLAG, {
-    description: "Use project skills from .pi/skills for skill commands",
-    type: "boolean",
-    default: false,
-  });
   pi.registerFlag(EXTERNAL_EDITOR_FLAG, {
     description: "Use the external editor for skill edit commands",
     type: "boolean",
@@ -617,44 +727,16 @@ export default (pi: ExtensionAPI) => {
   });
 
   pi.registerCommand("resource:skill", {
-    description: "This is for managing skills",
+    description: "This is for managing global skills",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("skill"),
-    handler: async (arg, ctx) => {
-      notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-      const result = parseSkillCommandArgument(arg);
+    handler: async (arg, ctx) => handleSkillCommand(pi, arg, ctx, "global"),
+  });
 
-      if (!result.success) {
-        ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-        return;
-      }
-
-      const scope = pi.getFlag(LOCAL_SKILL_FLAG) === true ? "local" : "global";
-      const editMode = pi.getFlag(EXTERNAL_EDITOR_FLAG) === true ? "external" : undefined;
-
-      if (editMode === "external" && result.output !== "edit") {
-        ctx.ui.notify(`Invalid command: --${EXTERNAL_EDITOR_FLAG} can only be used with edit`, "error");
-        return;
-      }
-
-      if (scope === "local") {
-        ctx.ui.notify(
-          `Using local skills from ${getSkillsDirectory("local", ctx.cwd || process.cwd())}`,
-          "info",
-        );
-      }
-
-      switch (result.output) {
-        case "create":
-          await handleCreate(ctx, scope);
-          break;
-        case "edit":
-          await handleEdit(ctx, editMode, scope);
-          break;
-        case "delete":
-          await handleDelete(ctx, scope);
-          break;
-      }
-    },
+  pi.registerCommand(LOCAL_SKILL_COMMAND_NAME, {
+    description: "This is for managing project skills",
+    getArgumentCompletions:
+      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("skill"),
+    handler: async (arg, ctx) => handleSkillCommand(pi, arg, ctx, "local"),
   });
 };

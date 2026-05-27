@@ -1,58 +1,57 @@
 {
-"name": "@code-fixer-23/pi-agent-resource",
-	"version": "1.0.0",
-	"description": "This extension is useful for making agent skills, propmts and subagents",
-  "scripts": {
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest",
-    "release": "nx release",
-    "release:dry-run": "nx release --dry-run"
+  "name": "@code-fixer-23/pi-agent-resource",
+  "version": "3.0.0",
+  "description": "This extension is useful for making agent skills, propmts and subagents",
+  "keywords": ["pi-package"],
+  "files": [
+    "extensions",
+    "shared",
+    "README.md",
+    "CHANGELOG.md",
+    "!**/*.test.ts"
+  ],
+  "author": "Shelton Louis",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-agent-resource"
   },
-	"keywords": [
-		"pi-package"
-	],
-	"files": [
-		"extensions",
-		"shared",
-		"README.md",
-		"CHANGELOG.md",
-		"!**/*.test.ts"
-	],
-	"author": "Shelton Louis",
-	"license": "ISC",
-	"packageManager": "pnpm@10.33.0",
-	"publishConfig": {
-		"access": "public"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.4.12",
-		"@eslint/js": "^10.0.1",
-		"@eslint/json": "^1.2.0",
-		"@nx/eslint": "22.7.1",
-		"@nx/vite": "22.7.1",
-		"@nx/vitest": "22.7.1",
-		"@vitest/coverage-v8": "^4.1.4",
-		"@vitest/ui": "^4.1.4",
-		"eslint": "^10.2.1",
-		"globals": "^17.5.0",
-		"jiti": "^2.6.1",
-		"nx": "22.7.1",
-		"typescript-eslint": "^8.59.0",
-		"vite": "^8.0.8",
-		"vitest": "^4.1.4"
-	},
-	"pi": {
-		"extensions": [
-			"extensions",
-			"extensions/!*.test.ts"
-		]
-	},
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.12",
+    "@eslint/js": "^10.0.1",
+    "@eslint/json": "^1.2.0",
+    "@nx/eslint": "22.7.1",
+    "@nx/vite": "22.7.1",
+    "@nx/vitest": "22.7.1",
+    "@vitest/coverage-v8": "^4.1.4",
+    "@vitest/ui": "^4.1.4",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "jiti": "^2.6.1",
+    "nx": "22.7.1",
+    "typescript-eslint": "^8.59.0",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
+  },
+  "pi": {
+    "extensions": ["extensions", "extensions/!*.test.ts"]
+  },
   "dependencies": {
-		"@mariozechner/pi-coding-agent": "^0.67.2",
-		"@mariozechner/pi-tui": "^0.67.2",
-"@code-fixer-23/pi-form-components": "workspace:*",
-		"memfs": "^4.57.2",
-		"valibot": "^1.3.1"
-	},
-	"nx": {}
+    "@code-fixer-23/pi-form-components": "workspace:*",
+    "memfs": "^4.57.2",
+    "valibot": "^1.3.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
 }
