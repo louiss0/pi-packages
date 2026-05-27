@@ -410,29 +410,17 @@ const nushellGuidelines = [
 
   "Use `^command` when the agent must force execution of an external command that has the same name as a Nushell command.",
 
-  "Do not rely on Unix-only tools such as grep, sed, awk, find, xargs, tr, or cut unless the task explicitly requires them or the environment is known to provide them.",
+  "Do not rely on Unix-only tools such as grep, sed, awk, find, xargs, tr",
 
   "For command success and failure, prefer Nushell error handling instead of Bash `$?` habits.",
 
   "Avoid producing commands that depend on shell-specific quoting tricks. Prefer Nushell lists, records, and variables to build arguments safely.",
 
-  "When passing multiple arguments to a command, keep them as separate arguments rather than one joined string whenever possible.",
-
-  "When the agent receives a command as a single string, decide whether it is meant to be executed as text or transformed into data. For data transformation, convert the string using `lines`, `split row`, `split words`, `parse`, or a `from ...` command.",
-
-  "When transforming Bash-like command output, first identify the output shape: newline list, delimiter-separated rows, key-value lines, JSON/YAML/TOML, filesystem paths, or free text.",
-
-  "For newline command output, use: `<command> | lines`.",
-
-  "For comma-separated values, use: `<string> | split row ','` for a list or `<string> | split column ','` for columns.",
-
-  "For whitespace-separated values, use: `<string> | split words`.",
-
   "For key-value text, prefer `parse` or `split column` followed by `rename` so the result becomes a table with meaningful column names.",
 
   "For JSON output from tools, request JSON from the tool when possible and pipe to `from json` if Nushell does not parse it automatically.",
 
-  "Prefer `http get` and Nushell-native JSON handling instead of `curl | jq` for simple API reads.",
+  "Prefer `http` instead of `curl | jq` for API reads.",
 
   "Prefer `select field1 field2` instead of `jq '{field1, field2}'` when working with structured records or tables.",
 
@@ -451,97 +439,16 @@ const nushellGuidelines = [
 
 const nushellRipgrepAdvancedGuidelines = [
   "When using ripgrep with Nushell follow these guidelines",
-  "Choose ripgrep output mode based on the next Nushell operation. Human-readable output is different from machine-readable output.",
-
-  "Use `rg --json` whenever search results will be filtered, transformed, grouped, ranked, counted, or consumed by additional Nushell commands.",
-
-  "Use plain `rg` output only for direct terminal display intended for humans.",
-
-  "Treat `rg --json` as the canonical structured mode for agents.",
-
-  "Parse `rg --json` output using `from json --objects` because ripgrep emits newline-delimited JSON objects instead of a single JSON array.",
-
-  "Filter ripgrep JSON messages by their `type` field. Common values are `begin`, `match`, `context`, `end`, and `summary`.",
-
-  "Most search workflows should filter to only `match` records after `from json --objects`.",
-
-  "When extracting match text from `rg --json`, use `data.lines.text`.",
-
-  "When extracting file paths from `rg --json`, use `data.path.text`.",
-
-  "When extracting line numbers from `rg --json`, use `data.line_number`.",
-
-  "When extracting exact match spans from `rg --json`, inspect `data.submatches`.",
-
-  "Do not parse standard ripgrep output using fragile string splitting unless the output format is tightly controlled.",
-
-  "Avoid parsing `rg` output with `split column ':'` because file names and matched text may legally contain colons.",
-
-  "Use `rg --files` for fast project file discovery that respects ignore rules.",
-
-  "Convert `rg --files` output into Nushell lists with `lines`.",
-
-  "Use `rg --files-with-matches` when only filenames are needed instead of full search matches.",
-
-  "Use `rg --count` when only per-file match counts are needed.",
-
-  "Use `rg --count-matches` when total individual match counts are needed instead of line counts.",
-
-  "Use `rg -l` or `rg --files-with-matches` for project navigation tasks such as symbol lookup, feature discovery, or implementation tracing.",
-
-  "Prefer `rg -t <type>` over manual extension filtering when ripgrep already supports the desired file type.",
-
-  "Use `rg --type-list` to inspect supported language and file-type mappings before creating custom globs.",
-
-  "Use `-g` globs for search inclusion and exclusion rules that belong directly to ripgrep traversal behavior.",
-
-  "Prefer `-g '*.ts'` or `-g '!dist/**'` over post-filtering file lists when the filtering belongs to filesystem traversal.",
-
-  "Use repeated `-g` flags for layered include and exclude behavior.",
-
-  "Use `rg -uuu` only when intentionally bypassing ignore rules, hidden-file filtering, and binary filtering.",
-
-  "Do not use unrestricted search by default because it can dramatically increase search size and noise.",
-
-  "Use `rg --hidden` when hidden project files such as `.github`, `.env.example`, `.vscode`, or `.config` directories are relevant.",
-
-  "Use `rg --no-ignore` when repository ignore rules are preventing necessary matches.",
-
-  "Use `rg --multiline` only when matches are expected to span lines because multiline search increases memory usage and may reduce performance.",
-
-  "Use `rg --multiline-dotall` when `.` should match newline characters during multiline searches.",
-
-  "Use `--pcre2` only when advanced regex features such as lookbehind or backreferences are required.",
-
-  "Prefer ripgrep's default regex engine for performance unless PCRE2-specific features are necessary.",
-
-  "Use `--fixed-strings` when searching literal text that may contain regex metacharacters.",
-
-  "Use `--smart-case` for user-facing searches where lowercase patterns should become case-insensitive automatically.",
-
-  "Use `--ignore-case` only when unconditional case-insensitive matching is required.",
-
-  "Use `--glob-case-insensitive` when glob matching should ignore filename casing.",
-
-  "Use `rg --sort path` only when deterministic ordering matters more than search speed.",
-
-  "Avoid sorting ripgrep results unless deterministic ordering is required because sorting disables parallel traversal.",
-
-  "Use `rg --stats` during diagnostics or performance analysis workflows.",
-
-  "Use `rg --debug` or `rg --trace` when diagnosing ignored files, glob behavior, or traversal issues.",
-
-  "When piping ripgrep into another streaming command, consider `--line-buffered` for real-time processing workflows.",
-
-  "When searching compressed text assets, use `rg -z` or `rg --search-zip`.",
-
-  "When processing binary-safe pipelines, consider `--null` or `--null-data` for NUL-delimited interoperability.",
-
-  "Do not use ripgrep to parse structured formats such as JSON, YAML, or TOML when Nushell can load them directly using `open` or `from ...` commands.",
-
-  "Prefer Nushell filtering after ripgrep discovery. Let ripgrep discover candidate files and let Nushell transform structured results.",
-
-  "Think of ripgrep as a filesystem-aware search engine and Nushell as the structured data processor that follows it.",
+  `Prefer
+    \`rg <argument> --json
+     | from json --objects
+     | get data
+     | filter {|item| [$item.path?, $item.lines?] | all {|it| $it != null  }  }
+     | reject submatches
+     | to nuon\`
+     `,
+  "Always use single quotes for Ripgrep arguments",
+  "If not using `--json`, use `rg <argument> | lines`",
 ];
 
 const nushellFileReplacementGuidelines = [
@@ -549,25 +456,13 @@ const nushellFileReplacementGuidelines = [
 
   "Use Nushell-native replacement as the default: `open --raw file | str replace --all 'old' 'new' | save --force file`.",
 
-  "Do not assume `rg` is installed. Treat `rg` as an optional accelerator for finding candidate files, not as a required replacement tool.",
-
-  "When `rg` is available, use `rg --files-with-matches 'old' | lines` to find files before replacing text.",
-
-  "When `rg` is not available, use Nushell-native discovery such as `glob`, `ls`, `open --raw`, and `str contains` to find candidate files.",
-
   "Use this Nushell-only candidate search pattern: `glob **/* | where { |f| ($f | path type) == file } | where { |f| open --raw $f | str contains 'old' }`.",
 
   "Use this Nushell-only replacement pattern: `glob **/* | where { |f| ($f | path type) == file } | where { |f| open --raw $f | str contains 'old' } | each { |f| open --raw $f | str replace --all 'old' 'new' | save --force $f }`.",
 
   "Prefer filtering candidate files before replacing text so the agent does not rewrite unrelated files.",
 
-  "Avoid replacing text in binary files, dependency directories, generated directories, caches, lock files, and build outputs unless explicitly requested.",
-
-  "Use literal replacement by default. Use regex replacement only when regex behavior is required.",
-
   "For structured files such as JSON, TOML, YAML, and CSV, prefer `open`, structured updates, and `save --force` instead of raw text replacement.",
-
-  "Only use programming language tooling when the task requires semantic parsing, AST transforms, or language-aware refactoring.",
 ];
 
 export default function nuBashExtension(pi: ExtensionAPI) {
