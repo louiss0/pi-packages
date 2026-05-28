@@ -6,6 +6,7 @@
     "pi-package"
   ],
   "files": [
+    "assets",
     "extensions",
     "shared",
     "README.md",

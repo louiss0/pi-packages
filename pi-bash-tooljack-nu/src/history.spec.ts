@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { getHistoryQuery, parseHistoryCommands, shouldIncludeHistoryCommand } from "./history";
+import {
+  getHistoryQuery,
+  getRecentFirstHistoryItems,
+  parseHistoryCommands,
+  shouldIncludeHistoryCommand,
+} from "./history";
 
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
@@ -36,4 +41,11 @@ describe("history helpers", () => {
     expect(shouldIncludeHistoryCommand("echo pi")).toBe(true);
   });
 
+  it("reorders history items so the newest command appears first", () => {
+    expect(getRecentFirstHistoryItems(["oldest", "middle", "newest"])).toEqual([
+      "newest",
+      "middle",
+      "oldest",
+    ]);
+  });
 });

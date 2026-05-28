@@ -30,6 +30,10 @@ export function parseHistoryCommands(output: string) {
   );
 }
 
+export function getRecentFirstHistoryItems<T extends string>(items: T[]) {
+  return [...items].reverse();
+}
+
 export class HistoryPicker<T extends string> extends Picker<T> {
   constructor(
     configOptions: HistoryPickerConfigOptions<T>,
