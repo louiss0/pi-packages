@@ -23,7 +23,7 @@
         "lintFilePatterns": ["{projectRoot}/**/*.ts", "{projectRoot}/**/*.js"]
       }
     },
-    "biome": {
+    "check": {
       "executor": "nx:run-commands",
       "options": {
         "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
@@ -37,13 +37,7 @@
         "cwd": "{workspaceRoot}"
       }
     },
-    "check": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["typecheck", "lint", "test", "metadata"],
-      "options": {
-        "command": "echo 'All checks passed'"
-      }
-    },
+
     "metadata": {
       "executor": "nx:run-commands",
       "options": {

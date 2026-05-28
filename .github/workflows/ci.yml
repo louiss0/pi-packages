@@ -39,8 +39,8 @@ jobs:
       - name: Derive Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Run affected Biome checks
-        run: pnpm exec nx affected -t biome
+      - name: Run affected Format checks
+        run: pnpm exec nx affected -t check
 
       - name: Run affected checks
         run: pnpm exec nx affected -t lint test build typecheck metadata

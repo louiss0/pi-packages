@@ -4,7 +4,7 @@
   "projectType": "library",
   "root": "pi-agent-resource",
   "targets": {
-    "biome": {
+    "check": {
       "executor": "nx:run-commands",
       "options": {
         "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
