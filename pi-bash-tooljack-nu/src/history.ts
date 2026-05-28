@@ -1,6 +1,7 @@
-import type { SelectItem, TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import { Theme } from "@earendil-works/pi-coding-agent";
 import { Picker } from "@code-fixer-23/pi-form-components";
+
 const HISTORY_LIMIT = 100;
 const HISTORY_EXCLUSION_PATTERN = "(?i)^\\s*pi\\b";
 const PI_COMMAND_PATTERN = /^\s*pi\b/i;
@@ -27,16 +28,6 @@ export function parseHistoryCommands(output: string) {
   return parsedOutput.filter(
     (value): value is string => typeof value === "string" && shouldIncludeHistoryCommand(value),
   );
-}
-
-export function buildHistoryItems(commands: string[]): SelectItem[] {
-  return commands
-    .map((command, index) => ({
-      value: command,
-      label: command,
-      description: `${index + 1}`,
-    }))
-    .reverse();
 }
 
 export class HistoryPicker<T extends string> extends Picker<T> {
