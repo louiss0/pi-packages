@@ -2,7 +2,7 @@ import { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Picker } from "./components.js";
+import { Picker } from "./components";
 
 const DOWN_ARROW = "\u001b[B";
 
@@ -34,11 +34,7 @@ function createItems(count: number) {
 }
 
 describe("Picker", () => {
-  let done: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    done = vi.fn();
-  });
+  const done = vi.fn();
 
   it("loads more items when selection reaches the bottom of the loaded window", () => {
     const tui = createTui();
