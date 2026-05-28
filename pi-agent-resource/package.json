@@ -4,6 +4,7 @@
   "description": "This extension is useful for making agent skills, propmts and subagents",
   "keywords": ["pi-package"],
   "files": [
+    "assets",
     "extensions",
     "shared",
     "README.md",
@@ -21,7 +22,6 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
-  "packageManager": "pnpm@10.33.0",
   "publishConfig": {
     "access": "public"
   },
@@ -43,7 +43,8 @@
     "vitest": "^4.1.4"
   },
   "pi": {
-    "extensions": ["extensions", "extensions/!*.test.ts"]
+    "extensions": ["extensions", "extensions/!*.test.ts"],
+    "image": "./assets/Small-Agent-Resource.png"
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
