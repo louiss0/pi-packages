@@ -46,9 +46,6 @@
     }
   ],
   "release": {
-    "conventionalCommits": {
-      "enabled": true
-    },
     "changelog": {
       "projectChangelogs": true
     },
@@ -66,6 +63,7 @@
       "pattern": "{projectName}@{version}"
     },
     "version": {
+      "conventionalCommits": true,
       "preVersionCommand": "pnpm nx affected -t typecheck test metadata"
     }
   },
