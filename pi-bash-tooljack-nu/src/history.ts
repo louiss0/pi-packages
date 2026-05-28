@@ -26,7 +26,8 @@ export function parseHistoryCommands(output: string) {
   }
 
   return parsedOutput.filter(
-    (value): value is string => typeof value === "string" && shouldIncludeHistoryCommand(value),
+    (value): value is string =>
+      typeof value === "string" && shouldIncludeHistoryCommand(value),
   );
 }
 

@@ -1,4 +1,8 @@
-import { DynamicBorder, ThemeColor, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  DynamicBorder,
+  ThemeColor,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -16,7 +20,12 @@ import {
 
 type PickerText = Exclude<
   ThemeColor,
-  `b${string}` | `t${string}` | `c${string}` | `md${string}` | `u${string}` | `sy${string}`
+  | `b${string}`
+  | `t${string}`
+  | `c${string}`
+  | `md${string}`
+  | `u${string}`
+  | `sy${string}`
 >;
 
 type PickerOptions<T extends string> = {
@@ -29,7 +38,11 @@ type PickerOptions<T extends string> = {
     title?: PickerText;
     helpText?: PickerText;
     item?: Record<
-      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
       PickerText
     >;
     border?: Extract<ThemeColor, `border${string}`>;
@@ -47,7 +60,11 @@ export class Picker<T extends string> implements Component {
   #selectedValue: T | null = null;
   #styles: NonNullable<PickerOptions<T>["styles"]> & {
     item: Record<
-      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
       PickerText
     >;
   };
@@ -64,7 +81,9 @@ export class Picker<T extends string> implements Component {
       items: config.items,
       itemLimit: config.itemLimit,
       lazyLoadStep: config.lazyLoadStep ?? config.itemLimit,
-      helpText: config.helpText ?? "type to filter • ↑↓ navigate • enter execute • esc cancel",
+      helpText:
+        config.helpText ??
+        "type to filter • ↑↓ navigate • enter execute • esc cancel",
       styles: {
         helpText: config.styles?.helpText ?? "accent",
         border: config.styles?.border ?? "borderAccent",
@@ -85,15 +104,23 @@ export class Picker<T extends string> implements Component {
     this.#styles = styles;
     this.#visibleCount = Math.min(items.length, itemLimit);
 
-    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
+    this.#container.addChild(
+      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
+    );
 
-    this.#container.addChild(new Text(this.theme.fg(styles.title, this.theme.bold(title))));
+    this.#container.addChild(
+      new Text(this.theme.fg(styles.title, this.theme.bold(title))),
+    );
 
     this.#container.addChild(this.#filterLabel);
     this.#container.addChild(this.#listContainer);
-    this.#container.addChild(new Text(this.theme.fg(styles.helpText, helpText)));
+    this.#container.addChild(
+      new Text(this.theme.fg(styles.helpText, helpText)),
+    );
 
-    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
+    this.#container.addChild(
+      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
+    );
 
     this.#syncSelectList();
     this.#syncFilter();
@@ -139,13 +166,20 @@ export class Picker<T extends string> implements Component {
   }
 
   #createSelectList(items: SelectItem[]) {
-    const selectList = new SelectList(items, Math.min(items.length, this.#itemLimit), {
-      selectedPrefix: (text) => this.theme.fg(this.#styles.item.selectedPrefix, text),
-      selectedText: (text) => this.theme.fg(this.#styles.item.selectedText, text),
-      description: (text) => this.theme.fg(this.#styles.item.description, text),
-      scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
-      noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
-    });
+    const selectList = new SelectList(
+      items,
+      Math.min(items.length, this.#itemLimit),
+      {
+        selectedPrefix: (text) =>
+          this.theme.fg(this.#styles.item.selectedPrefix, text),
+        selectedText: (text) =>
+          this.theme.fg(this.#styles.item.selectedText, text),
+        description: (text) =>
+          this.theme.fg(this.#styles.item.description, text),
+        scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
+        noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
+      },
+    );
 
     selectList.onSelect = (item) => this.done(item.value as T);
     selectList.onCancel = () => this.done(null);
@@ -172,7 +206,9 @@ export class Picker<T extends string> implements Component {
     nextSelectList.setFilter(this.#Filter.value);
 
     if (this.#selectedValue !== null) {
-      const selectedIndex = items.findIndex((item) => item.value === this.#selectedValue);
+      const selectedIndex = items.findIndex(
+        (item) => item.value === this.#selectedValue,
+      );
       if (selectedIndex >= 0) {
         nextSelectList.setSelectedIndex(selectedIndex);
       }
@@ -187,7 +223,10 @@ export class Picker<T extends string> implements Component {
   }
 
   #maybeLoadMore(selectedValue: T) {
-    if (this.#Filter.value.length > 0 || this.#visibleCount >= this.#items.length) {
+    if (
+      this.#Filter.value.length > 0 ||
+      this.#visibleCount >= this.#items.length
+    ) {
       return;
     }
 
@@ -197,7 +236,10 @@ export class Picker<T extends string> implements Component {
       return;
     }
 
-    this.#visibleCount = Math.min(this.#items.length, this.#visibleCount + this.#lazyLoadStep);
+    this.#visibleCount = Math.min(
+      this.#items.length,
+      this.#visibleCount + this.#lazyLoadStep,
+    );
     this.#syncSelectList();
     this.#syncFilter();
     this.tui.requestRender();
@@ -342,7 +384,9 @@ export class ConfirmationBox extends Container implements Component {
     const prefix = this.#focused ? "> " : "  ";
     const box = this.#theme.fg("accent", ` ${this.#value ? "[x]" : "[ ]"}`);
     const lines = [truncateToWidth(`${prefix}${box} ${this.#message}`, width)];
-    const errorLines = this.#errorText.render(width).filter((line) => line.length > 0);
+    const errorLines = this.#errorText
+      .render(width)
+      .filter((line) => line.length > 0);
 
     return [...lines, ...errorLines];
   }
@@ -362,13 +406,17 @@ export type FormField = Component & {
   value: string | number | boolean;
 };
 
-export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
+export type Parse<T extends Record<string, string | number | boolean>> = (
+  value: T,
+) =>
   | {
       [key in keyof T]?: string;
     }
   | undefined;
 
-export interface FormOptions<T extends Record<string, string | number | boolean>> {
+export interface FormOptions<
+  T extends Record<string, string | number | boolean>,
+> {
   title: string;
   fields: FormField[];
   parse: Parse<T>;
@@ -456,7 +504,10 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     if (matchesKey(data, Key.enter)) {
-      if (this.#fields.length === 0 || this.#activeFieldIndex === this.#fields.length - 1) {
+      if (
+        this.#fields.length === 0 ||
+        this.#activeFieldIndex === this.#fields.length - 1
+      ) {
         this.#submit();
         return;
       }
@@ -477,7 +528,8 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     this.#activeFieldIndex =
-      (this.#activeFieldIndex + direction + this.#fields.length) % this.#fields.length;
+      (this.#activeFieldIndex + direction + this.#fields.length) %
+      this.#fields.length;
     this.#syncFieldFocus();
     this.tui.requestRender();
   }
@@ -563,6 +615,8 @@ export class Form<T extends Record<string, string | number | boolean>>
       return [];
     }
 
-    return this.#footer.split(/\r?\n/).map((line) => truncateToWidth(line, width));
+    return this.#footer
+      .split(/\r?\n/)
+      .map((line) => truncateToWidth(line, width));
   }
 }
