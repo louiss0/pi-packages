@@ -26,6 +26,12 @@
         "cwd": "{projectRoot}"
       }
     },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "{projectRoot}/vitest.config.ts"
+      }
+    },
     "metadata": {
       "executor": "nx:run-commands",
       "options": {

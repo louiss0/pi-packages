@@ -6,11 +6,12 @@ import {
   Input,
   Key,
   matchesKey,
+  type SelectItem,
+  SelectList,
   Spacer,
   Text,
   type TUI,
   truncateToWidth,
-  SelectList,
 } from "@earendil-works/pi-tui";
 
 type PickerText = Exclude<
@@ -19,10 +20,11 @@ type PickerText = Exclude<
 >;
 
 type PickerOptions<T extends string> = {
-  commands: Array<T>;
+  items: Array<T>;
   itemLimit: number;
   title: string;
   helpText?: string;
+  lazyLoadStep?: number;
   styles?: {
     title?: PickerText;
     helpText?: PickerText;
@@ -37,18 +39,31 @@ type PickerOptions<T extends string> = {
 export class Picker<T extends string> implements Component {
   readonly #container = new Container();
   readonly #filterLabel = new Text();
-  readonly #selectList: SelectList;
+  readonly #listContainer = new Container();
+  #items: Array<T>;
   #itemLimit: number;
+  #lazyLoadStep: number;
+  #selectList: SelectList | null = null;
+  #selectedValue: T | null = null;
+  #styles: NonNullable<PickerOptions<T>["styles"]> & {
+    item: Record<
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      PickerText
+    >;
+  };
+  #visibleCount: number;
+
   constructor(
     config: PickerOptions<T>,
     private readonly theme: Theme,
     private readonly tui: TUI,
     private readonly done: (value: T | null) => void,
   ) {
-    const { commands, itemLimit, title, helpText, styles } = {
+    const { items, itemLimit, lazyLoadStep, title, helpText, styles } = {
       title: config.title,
-      commands: config.commands,
+      items: config.items,
       itemLimit: config.itemLimit,
+      lazyLoadStep: config.lazyLoadStep ?? config.itemLimit,
       helpText: config.helpText ?? "type to filter • ↑↓ navigate • enter execute • esc cancel",
       styles: {
         helpText: config.styles?.helpText ?? "accent",
@@ -64,34 +79,23 @@ export class Picker<T extends string> implements Component {
       },
     } satisfies PickerOptions<T>;
 
-    const items = commands.map((command, index) => ({
-      value: command,
-      label: command,
-      description: `${index + 1}`,
-    }));
-
-    this.#selectList = new SelectList(items, Math.min(items.length, itemLimit), {
-      selectedPrefix: (text) => this.theme.fg(styles.item.selectedPrefix, text),
-      selectedText: (text) => this.theme.fg(styles.item.selectedText, text),
-      description: (text) => this.theme.fg(styles.item.description, text),
-      scrollInfo: (text) => this.theme.fg(styles.item.scrollInfo, text),
-      noMatch: (text) => this.theme.fg(styles.item.noMatch, text),
-    });
-
+    this.#items = items;
     this.#itemLimit = itemLimit;
+    this.#lazyLoadStep = lazyLoadStep;
+    this.#styles = styles;
+    this.#visibleCount = Math.min(items.length, itemLimit);
 
     this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
 
     this.#container.addChild(new Text(this.theme.fg(styles.title, this.theme.bold(title))));
 
     this.#container.addChild(this.#filterLabel);
-    this.#container.addChild(this.#selectList);
+    this.#container.addChild(this.#listContainer);
     this.#container.addChild(new Text(this.theme.fg(styles.helpText, helpText)));
 
     this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
 
-    this.#selectList.onSelect = (item) => this.done(item.value as T);
-    this.#selectList.onCancel = () => this.done(null);
+    this.#syncSelectList();
     this.#syncFilter();
   }
 
@@ -107,23 +111,96 @@ export class Picker<T extends string> implements Component {
     const nextFilter = this.#Filter.updateFilter(this.#Filter.value, data);
     if (nextFilter !== this.#Filter.value) {
       this.#Filter.value = nextFilter;
+      this.#syncSelectList();
       this.#syncFilter();
       this.tui.requestRender();
       return;
     }
 
-    this.#selectList.handleInput(data);
+    this.#selectList?.handleInput(data);
     this.tui.requestRender();
   }
 
   #syncFilter() {
-    this.#selectList.setFilter(this.#Filter.value);
-    this.#filterLabel.setText(
-      this.theme.fg(
-        "muted",
-        `Filter: ${this.#Filter.value || `(type to narrow the last ${this.#itemLimit} commands)`}`,
-      ),
-    );
+    const loadedItemCount = this.#getVisibleItems().length;
+    const helperText = this.#Filter.value
+      ? this.#Filter.value
+      : `(type to narrow ${loadedItemCount} loaded item${loadedItemCount === 1 ? "" : "s"})`;
+
+    this.#filterLabel.setText(this.theme.fg("muted", `Filter: ${helperText}`));
+  }
+
+  #createItems(items: Array<T>): SelectItem[] {
+    return items.map((command, index) => ({
+      value: command,
+      label: command,
+      description: `${index + 1}`,
+    }));
+  }
+
+  #createSelectList(items: SelectItem[]) {
+    const selectList = new SelectList(items, Math.min(items.length, this.#itemLimit), {
+      selectedPrefix: (text) => this.theme.fg(this.#styles.item.selectedPrefix, text),
+      selectedText: (text) => this.theme.fg(this.#styles.item.selectedText, text),
+      description: (text) => this.theme.fg(this.#styles.item.description, text),
+      scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
+      noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
+    });
+
+    selectList.onSelect = (item) => this.done(item.value as T);
+    selectList.onCancel = () => this.done(null);
+    selectList.onSelectionChange = (item) => {
+      this.#selectedValue = item.value as T;
+      this.#maybeLoadMore(item.value as T);
+    };
+
+    return selectList;
+  }
+
+  #getVisibleItems() {
+    if (this.#Filter.value.length > 0) {
+      return this.#items;
+    }
+
+    return this.#items.slice(0, this.#visibleCount);
+  }
+
+  #syncSelectList() {
+    const items = this.#createItems(this.#getVisibleItems());
+    const nextSelectList = this.#createSelectList(items);
+
+    nextSelectList.setFilter(this.#Filter.value);
+
+    if (this.#selectedValue !== null) {
+      const selectedIndex = items.findIndex((item) => item.value === this.#selectedValue);
+      if (selectedIndex >= 0) {
+        nextSelectList.setSelectedIndex(selectedIndex);
+      }
+    }
+
+    if (this.#selectList !== null) {
+      this.#listContainer.removeChild(this.#selectList);
+    }
+
+    this.#selectList = nextSelectList;
+    this.#listContainer.addChild(nextSelectList);
+  }
+
+  #maybeLoadMore(selectedValue: T) {
+    if (this.#Filter.value.length > 0 || this.#visibleCount >= this.#items.length) {
+      return;
+    }
+
+    const visibleItems = this.#getVisibleItems();
+    const lastVisibleItem = visibleItems.at(-1);
+    if (lastVisibleItem !== selectedValue) {
+      return;
+    }
+
+    this.#visibleCount = Math.min(this.#items.length, this.#visibleCount + this.#lazyLoadStep);
+    this.#syncSelectList();
+    this.#syncFilter();
+    this.tui.requestRender();
   }
 
   #Filter = new (class {

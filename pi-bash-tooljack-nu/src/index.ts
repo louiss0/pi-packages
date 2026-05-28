@@ -20,7 +20,7 @@ import type {
 import { Type } from "@sinclair/typebox";
 
 import { getCommandSuggestions, type CommandCompletionItem } from "./command";
-import { getHistoryQuery, HistoryPicker, HISTORY_LIMIT, parseHistoryCommands } from "./history";
+import { getHistoryQuery, HistoryPicker, parseHistoryCommands } from "./history";
 
 const NUSHELL_COMMAND = "nu";
 const CANCEL_HINT = "Press Escape to cancel.";
@@ -260,8 +260,8 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
     (tui, theme, _keybindings, done) =>
       new HistoryPicker(
         {
-          commands,
-          itemLimit: HISTORY_LIMIT,
+          items: commands,
+          itemLimit: 15,
         },
         theme,
         tui,
