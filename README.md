@@ -72,3 +72,4 @@ pnpm nx release --dry-run
 - this repository stays on `main` unless the user asks otherwise
 - `pnpm-workspace.yaml` lists package folders explicitly, so generators update it for you
 - `tsconfig.json` references are also updated by the generators
+- When adding an image or video link use `https://raw.githubusercontent.com/louiss0/pi-packages/main/<package-name>/assets/<image-or-video>`
