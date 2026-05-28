@@ -1,4 +1,4 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, ThemeColor, type Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -10,7 +10,142 @@ import {
   Text,
   type TUI,
   truncateToWidth,
+  SelectList,
 } from "@earendil-works/pi-tui";
+
+type PickerText = Exclude<
+  ThemeColor,
+  `b${string}` | `t${string}` | `c${string}` | `md${string}` | `u${string}` | `sy${string}`
+>;
+
+type PickerOptions<T extends string> = {
+  commands: Array<T>;
+  itemLimit: number;
+  title: string;
+  helpText?: string;
+  styles?: {
+    title?: PickerText;
+    helpText?: PickerText;
+    item?: Record<
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      PickerText
+    >;
+    border?: Extract<ThemeColor, `border${string}`>;
+  };
+};
+
+export class Picker<T extends string> implements Component {
+  readonly #container = new Container();
+  readonly #filterLabel = new Text();
+  readonly #selectList: SelectList;
+  #itemLimit: number;
+  constructor(
+    config: PickerOptions<T>,
+    private readonly theme: Theme,
+    private readonly tui: TUI,
+    private readonly done: (value: T | null) => void,
+  ) {
+    const { commands, itemLimit, title, helpText, styles } = {
+      title: config.title,
+      commands: config.commands,
+      itemLimit: config.itemLimit,
+      helpText: config.helpText ?? "type to filter • ↑↓ navigate • enter execute • esc cancel",
+      styles: {
+        helpText: config.styles?.helpText ?? "accent",
+        border: config.styles?.border ?? "borderAccent",
+        title: config.styles?.title ?? "accent",
+        item: {
+          selectedPrefix: config.styles?.item?.selectedPrefix ?? "accent",
+          selectedText: config.styles?.item?.selectedText ?? "accent",
+          description: config.styles?.item?.description ?? "muted",
+          scrollInfo: config.styles?.item?.scrollInfo ?? "dim",
+          noMatch: config.styles?.item?.noMatch ?? "warning",
+        },
+      },
+    } satisfies PickerOptions<T>;
+
+    const items = commands.map((command, index) => ({
+      value: command,
+      label: command,
+      description: `${index + 1}`,
+    }));
+
+    this.#selectList = new SelectList(items, Math.min(items.length, itemLimit), {
+      selectedPrefix: (text) => this.theme.fg(styles.item.selectedPrefix, text),
+      selectedText: (text) => this.theme.fg(styles.item.selectedText, text),
+      description: (text) => this.theme.fg(styles.item.description, text),
+      scrollInfo: (text) => this.theme.fg(styles.item.scrollInfo, text),
+      noMatch: (text) => this.theme.fg(styles.item.noMatch, text),
+    });
+
+    this.#itemLimit = itemLimit;
+
+    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
+
+    this.#container.addChild(new Text(this.theme.fg(styles.title, this.theme.bold(title))));
+
+    this.#container.addChild(this.#filterLabel);
+    this.#container.addChild(this.#selectList);
+    this.#container.addChild(new Text(this.theme.fg(styles.helpText, helpText)));
+
+    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
+
+    this.#selectList.onSelect = (item) => this.done(item.value as T);
+    this.#selectList.onCancel = () => this.done(null);
+    this.#syncFilter();
+  }
+
+  render(width: number) {
+    return this.#container.render(width);
+  }
+
+  invalidate() {
+    this.#container.invalidate();
+  }
+
+  handleInput(data: string) {
+    const nextFilter = this.#Filter.updateFilter(this.#Filter.value, data);
+    if (nextFilter !== this.#Filter.value) {
+      this.#Filter.value = nextFilter;
+      this.#syncFilter();
+      this.tui.requestRender();
+      return;
+    }
+
+    this.#selectList.handleInput(data);
+    this.tui.requestRender();
+  }
+
+  #syncFilter() {
+    this.#selectList.setFilter(this.#Filter.value);
+    this.#filterLabel.setText(
+      this.theme.fg(
+        "muted",
+        `Filter: ${this.#Filter.value || `(type to narrow the last ${this.#itemLimit} commands)`}`,
+      ),
+    );
+  }
+
+  #Filter = new (class {
+    value = "";
+    #HIDDEN_INPUT_PATTERN = /\p{C}/u;
+    updateFilter(currentFilter: string, input: string) {
+      if (input === "\u0015") {
+        return "";
+      }
+
+      if (input === "\b" || input === "\u007f") {
+        return currentFilter.slice(0, -1);
+      }
+
+      if (input.length === 1 && !this.#HIDDEN_INPUT_PATTERN.test(input)) {
+        return `${currentFilter}${input}`;
+      }
+
+      return currentFilter;
+    }
+  })();
+}
 
 export class LabelledInput extends Container implements Component {
   #name: string;
@@ -130,9 +265,7 @@ export class ConfirmationBox extends Container implements Component {
     const prefix = this.#focused ? "> " : "  ";
     const box = this.#theme.fg("accent", ` ${this.#value ? "[x]" : "[ ]"}`);
     const lines = [truncateToWidth(`${prefix}${box} ${this.#message}`, width)];
-    const errorLines = this.#errorText
-      .render(width)
-      .filter((line) => line.length > 0);
+    const errorLines = this.#errorText.render(width).filter((line) => line.length > 0);
 
     return [...lines, ...errorLines];
   }
@@ -152,17 +285,13 @@ export type FormField = Component & {
   value: string | number | boolean;
 };
 
-export type Parse<T extends Record<string, string | number | boolean>> = (
-  value: T,
-) =>
+export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
   | {
       [key in keyof T]?: string;
     }
   | undefined;
 
-export interface FormOptions<
-  T extends Record<string, string | number | boolean>,
-> {
+export interface FormOptions<T extends Record<string, string | number | boolean>> {
   title: string;
   fields: FormField[];
   parse: Parse<T>;
@@ -250,10 +379,7 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     if (matchesKey(data, Key.enter)) {
-      if (
-        this.#fields.length === 0 ||
-        this.#activeFieldIndex === this.#fields.length - 1
-      ) {
+      if (this.#fields.length === 0 || this.#activeFieldIndex === this.#fields.length - 1) {
         this.#submit();
         return;
       }
@@ -274,8 +400,7 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     this.#activeFieldIndex =
-      (this.#activeFieldIndex + direction + this.#fields.length) %
-      this.#fields.length;
+      (this.#activeFieldIndex + direction + this.#fields.length) % this.#fields.length;
     this.#syncFieldFocus();
     this.tui.requestRender();
   }
@@ -361,8 +486,6 @@ export class Form<T extends Record<string, string | number | boolean>>
       return [];
     }
 
-    return this.#footer
-      .split(/\r?\n/)
-      .map((line) => truncateToWidth(line, width));
+    return this.#footer.split(/\r?\n/).map((line) => truncateToWidth(line, width));
   }
 }
