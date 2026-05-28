@@ -26,7 +26,7 @@
     "extensions": [
       "src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/louiss0/pi-packages/assets/Small-PI-Bash-Tooljack-nu-v2.jpg"
+    "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-bash-tooljack-nu/assets/Small-PI-Bash-Tooljack-nu-v2.jpg"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.49",
