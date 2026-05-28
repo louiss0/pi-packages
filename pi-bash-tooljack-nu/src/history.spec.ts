@@ -2,16 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   getHistoryQuery,
-  HISTORY_LIMIT,
+  getRecentFirstHistoryItems,
   parseHistoryCommands,
   shouldIncludeHistoryCommand,
-  updateHistoryFilter,
 } from "./history";
 
 describe("history helpers", () => {
   it("builds the last-100 history query", () => {
     expect(getHistoryQuery()).toBe(
-      `history | where command !~ '(?i)^\\s*pi\\b' | last ${HISTORY_LIMIT} | get command | to json`,
+      "history | where command !~ '(?i)^\\s*pi\\b' | last 100 | get command | to json",
     );
   });
 
@@ -42,11 +41,11 @@ describe("history helpers", () => {
     expect(shouldIncludeHistoryCommand("echo pi")).toBe(true);
   });
 
-  it("updates the inline filter from typed input", () => {
-    expect(updateHistoryFilter("git", " ")).toBe("git ");
-    expect(updateHistoryFilter("git ", "s")).toBe("git s");
-    expect(updateHistoryFilter("git s", "\u007f")).toBe("git ");
-    expect(updateHistoryFilter("git ", "\u0015")).toBe("");
-    expect(updateHistoryFilter("git", "\u001b[A")).toBe("git");
+  it("reorders history items so the newest command appears first", () => {
+    expect(getRecentFirstHistoryItems(["oldest", "middle", "newest"])).toEqual([
+      "newest",
+      "middle",
+      "oldest",
+    ]);
   });
 });

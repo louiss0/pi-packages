@@ -18,6 +18,20 @@
         "cwd": "{workspaceRoot}"
       }
     },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "pnpm exec vite build --config vite.lib.config.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "options": {
+        "configFile": "{projectRoot}/vitest.config.ts"
+      }
+    },
     "metadata": {
       "executor": "nx:run-commands",
       "options": {

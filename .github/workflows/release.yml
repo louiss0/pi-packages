@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            .github/pnpm-cache-key
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies

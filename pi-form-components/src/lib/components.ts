@@ -1,4 +1,8 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import {
+  DynamicBorder,
+  ThemeColor,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -6,11 +10,261 @@ import {
   Input,
   Key,
   matchesKey,
+  type SelectItem,
+  SelectList,
   Spacer,
   Text,
   type TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
+
+type PickerText = Exclude<
+  ThemeColor,
+  | `b${string}`
+  | `t${string}`
+  | `c${string}`
+  | `md${string}`
+  | `u${string}`
+  | `sy${string}`
+>;
+
+type PickerOptions<T extends string> = {
+  items: Array<T>;
+  itemLimit: number;
+  title: string;
+  helpText?: string;
+  lazyLoadStep?: number;
+  styles?: {
+    title?: PickerText;
+    helpText?: PickerText;
+    item?: Record<
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
+      PickerText
+    >;
+    border?: Extract<ThemeColor, `border${string}`>;
+  };
+};
+
+export class Picker<T extends string> implements Component {
+  readonly #container = new Container();
+  readonly #filterLabel = new Text();
+  readonly #listContainer = new Container();
+  #items: Array<T>;
+  #itemLimit: number;
+  #lazyLoadStep: number;
+  #selectList: SelectList | null = null;
+  #selectedValue: T | null = null;
+  #styles: NonNullable<PickerOptions<T>["styles"]> & {
+    item: Record<
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
+      PickerText
+    >;
+  };
+  #visibleCount: number;
+
+  constructor(
+    config: PickerOptions<T>,
+    private readonly theme: Theme,
+    private readonly tui: TUI,
+    private readonly done: (value: T | null) => void,
+  ) {
+    const { items, itemLimit, lazyLoadStep, title, helpText, styles } = {
+      title: config.title,
+      items: config.items,
+      itemLimit: config.itemLimit,
+      lazyLoadStep: config.lazyLoadStep ?? config.itemLimit,
+      helpText:
+        config.helpText ??
+        "type to filter • ↑↓ navigate • enter execute • esc cancel",
+      styles: {
+        helpText: config.styles?.helpText ?? "accent",
+        border: config.styles?.border ?? "borderAccent",
+        title: config.styles?.title ?? "accent",
+        item: {
+          selectedPrefix: config.styles?.item?.selectedPrefix ?? "accent",
+          selectedText: config.styles?.item?.selectedText ?? "accent",
+          description: config.styles?.item?.description ?? "muted",
+          scrollInfo: config.styles?.item?.scrollInfo ?? "dim",
+          noMatch: config.styles?.item?.noMatch ?? "warning",
+        },
+      },
+    } satisfies PickerOptions<T>;
+
+    this.#items = items;
+    this.#itemLimit = itemLimit;
+    this.#lazyLoadStep = lazyLoadStep;
+    this.#styles = styles;
+    this.#visibleCount = Math.min(items.length, itemLimit);
+
+    this.#container.addChild(
+      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
+    );
+
+    this.#container.addChild(
+      new Text(this.theme.fg(styles.title, this.theme.bold(title))),
+    );
+
+    this.#container.addChild(this.#filterLabel);
+    this.#container.addChild(this.#listContainer);
+    this.#container.addChild(
+      new Text(this.theme.fg(styles.helpText, helpText)),
+    );
+
+    this.#container.addChild(
+      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
+    );
+
+    this.#syncSelectList();
+    this.#syncFilter();
+  }
+
+  render(width: number) {
+    return this.#container.render(width);
+  }
+
+  invalidate() {
+    this.#container.invalidate();
+  }
+
+  handleInput(data: string) {
+    const nextFilter = this.#Filter.updateFilter(this.#Filter.value, data);
+    if (nextFilter !== this.#Filter.value) {
+      this.#Filter.value = nextFilter;
+      this.#syncSelectList();
+      this.#syncFilter();
+      this.tui.requestRender();
+      return;
+    }
+
+    this.#selectList?.handleInput(data);
+    this.tui.requestRender();
+  }
+
+  #syncFilter() {
+    const loadedItemCount = this.#getVisibleItems().length;
+    const helperText = this.#Filter.value
+      ? this.#Filter.value
+      : `(type to narrow ${loadedItemCount} loaded item${loadedItemCount === 1 ? "" : "s"})`;
+
+    this.#filterLabel.setText(this.theme.fg("muted", `Filter: ${helperText}`));
+  }
+
+  #createItems(items: Array<T>): SelectItem[] {
+    return items.map((command, index) => ({
+      value: command,
+      label: command,
+      description: `${index + 1}`,
+    }));
+  }
+
+  #createSelectList(items: SelectItem[]) {
+    const selectList = new SelectList(
+      items,
+      Math.min(items.length, this.#itemLimit),
+      {
+        selectedPrefix: (text) =>
+          this.theme.fg(this.#styles.item.selectedPrefix, text),
+        selectedText: (text) =>
+          this.theme.fg(this.#styles.item.selectedText, text),
+        description: (text) =>
+          this.theme.fg(this.#styles.item.description, text),
+        scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
+        noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
+      },
+    );
+
+    selectList.onSelect = (item) => this.done(item.value as T);
+    selectList.onCancel = () => this.done(null);
+    selectList.onSelectionChange = (item) => {
+      this.#selectedValue = item.value as T;
+      this.#maybeLoadMore(item.value as T);
+    };
+
+    return selectList;
+  }
+
+  #getVisibleItems() {
+    if (this.#Filter.value.length > 0) {
+      return this.#items;
+    }
+
+    return this.#items.slice(0, this.#visibleCount);
+  }
+
+  #syncSelectList() {
+    const items = this.#createItems(this.#getVisibleItems());
+    const nextSelectList = this.#createSelectList(items);
+
+    nextSelectList.setFilter(this.#Filter.value);
+
+    if (this.#selectedValue !== null) {
+      const selectedIndex = items.findIndex(
+        (item) => item.value === this.#selectedValue,
+      );
+      if (selectedIndex >= 0) {
+        nextSelectList.setSelectedIndex(selectedIndex);
+      }
+    }
+
+    if (this.#selectList !== null) {
+      this.#listContainer.removeChild(this.#selectList);
+    }
+
+    this.#selectList = nextSelectList;
+    this.#listContainer.addChild(nextSelectList);
+  }
+
+  #maybeLoadMore(selectedValue: T) {
+    if (
+      this.#Filter.value.length > 0 ||
+      this.#visibleCount >= this.#items.length
+    ) {
+      return;
+    }
+
+    const visibleItems = this.#getVisibleItems();
+    const lastVisibleItem = visibleItems.at(-1);
+    if (lastVisibleItem !== selectedValue) {
+      return;
+    }
+
+    this.#visibleCount = Math.min(
+      this.#items.length,
+      this.#visibleCount + this.#lazyLoadStep,
+    );
+    this.#syncSelectList();
+    this.#syncFilter();
+    this.tui.requestRender();
+  }
+
+  #Filter = new (class {
+    value = "";
+    #HIDDEN_INPUT_PATTERN = /\p{C}/u;
+    updateFilter(currentFilter: string, input: string) {
+      if (input === "\u0015") {
+        return "";
+      }
+
+      if (input === "\b" || input === "\u007f") {
+        return currentFilter.slice(0, -1);
+      }
+
+      if (input.length === 1 && !this.#HIDDEN_INPUT_PATTERN.test(input)) {
+        return `${currentFilter}${input}`;
+      }
+
+      return currentFilter;
+    }
+  })();
+}
 
 export class LabelledInput extends Container implements Component {
   #name: string;
