@@ -7,6 +7,8 @@
 [![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
 [![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
+![Agent Resource](./assets/Big-Agent-Resource.png)
+
 ## Agent Manager Extension
 
 ### Commands
