@@ -49,7 +49,7 @@
       "extensions",
       "extensions/!*.test.ts"
     ],
-    "image": "./assets/Small-Agent-Resource.png"
+    "image": "https://raw.githubusercontent.com/louiss0/pi-packages/assets/Small-Agent-Resource.png"
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
