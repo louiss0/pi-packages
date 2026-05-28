@@ -1,3 +1,17 @@
+## 1.1.0 (2026-05-28)
+
+### 🚀 Features
+
+- **pi-bash-tooljack-nu:** add shared picker and streaming Nushell updates ([#2](https://github.com/louiss0/pi-packages/pull/2))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 2.0.1
+
+### ❤️ Thank You
+
+- shelton louis @louiss0
+
 ## 1.0.2 (2026-05-25)
 
 This was a version bump only for pi-bash-tooljack-nu to align it with other projects, there were no code changes.
