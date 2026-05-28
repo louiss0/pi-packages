@@ -29,9 +29,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: |
-            pnpm-lock.yaml
-            .github/pnpm-cache-key
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
