@@ -1,3 +1,13 @@
+## 1.1.1 (2026-05-28)
+
+### 🩹 Fixes
+
+- remove bad link to images ([461429e](https://github.com/louiss0/pi-packages/commit/461429e))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.0 (2026-05-28)
 
 ### 🚀 Features
