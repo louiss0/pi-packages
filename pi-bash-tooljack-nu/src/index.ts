@@ -263,11 +263,9 @@ async function selectHistoryCommand(ctx: ExtensionContext) {
           commands,
           itemLimit: HISTORY_LIMIT,
         },
-        {
-          theme,
-          tui,
-          done,
-        },
+        theme,
+        tui,
+        done,
       ),
     {
       overlay: true,
