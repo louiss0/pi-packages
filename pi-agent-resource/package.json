@@ -53,8 +53,7 @@
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
-    "memfs": "^4.57.2",
-    "valibot": "^1.3.1"
+    "memfs": "^4.57.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

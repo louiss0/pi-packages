@@ -29,9 +29,8 @@
     "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-bash-tooljack-nu/assets/Small-PI-Bash-Tooljack-nu-v2.jpg"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.49",
-    "valibot": "^1.3.1",
-    "@code-fixer-23/pi-form-components": "workspace:*"
+    "@code-fixer-23/pi-form-components": "workspace:*",
+    "@sinclair/typebox": "^0.34.49"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

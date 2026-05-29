@@ -36,5 +36,8 @@
     "verdaccio": "6.4.0",
     "vite": "^8.0.0",
     "vitest": "4.0.9"
+  },
+  "dependencies": {
+    "valibot": "^1.4.0"
   }
 }
