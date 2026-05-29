@@ -2,6 +2,7 @@ packages:
   - "pi-form-components"
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
+  - "internal/*"
   - "tools/pi-generators"
 allowBuilds:
   '@biomejs/biome': true

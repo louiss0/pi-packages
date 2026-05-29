@@ -90,6 +90,8 @@ importers:
         specifier: 4.0.9
         version: 4.0.9(@types/node@20.19.9)(@vitest/ui@4.0.9)(jiti@2.4.2)(lightningcss@1.32.0)(yaml@2.8.4)
 
+  internal/prompt-parser: {}
+
   pi-agent-resource:
     dependencies:
       '@code-fixer-23/pi-form-components':

@@ -7,11 +7,12 @@ Nx workspace for Pi packages published under `@code-fixer-23`.
 - `pi-form-components` — shared package dependency layer
 - `pi-bash-tooljack-nu` — Pi extension package
 - `pi-agent-resource` — Pi extension package
+- `internal/*` — private workspace-only packages
 - `tools/pi-generators` — local Nx generators for new packages
 
 ## Package policy
 
-This workspace uses two architectural tags:
+Public packages use two architectural tags:
 
 - `project:package` — packages other workspace projects may depend on
 - `project:extension` — standalone Pi extension packages that may only depend on package-layer projects
@@ -28,6 +29,17 @@ Current rule enforcement lives in `eslint.config.mjs` and `tools/validate-packag
 - extension packages must include the `pi-package` keyword
 - package-level `scripts` are not allowed
 - runnable tasks belong in `project.json`
+
+### Internal packages
+
+Internal packages live under `internal/*`. They are included in the pnpm
+workspace, can be referenced by Nx, and are intentionally excluded from
+`nx release` because release groups only select `project:package` and
+`project:extension`.
+
+They do not need repository metadata, publish metadata, lifecycle tags, or
+architectural tags. They are unbundled implementation packages intended to be
+consumed by other workspace packages.
 
 ## Generate a new package
 

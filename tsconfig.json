@@ -11,6 +11,9 @@
     },
     {
       "path": "./pi-agent-resource"
+    },
+    {
+      "path": "./internal/prompt-parser"
     }
   ]
 }

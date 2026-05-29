@@ -10,16 +10,29 @@ if (!projectRoot) {
   process.exit(1);
 }
 
+if (projectRoot === "internal" || projectRoot.startsWith("internal/")) {
+  console.log(`metadata skipped: ${projectRoot}`);
+  process.exit(0);
+}
+
 const packageJsonPath = path.join(projectRoot, "package.json");
 const projectJsonPath = path.join(projectRoot, "project.json");
 
 const [packageJsonText, projectJsonText] = await Promise.all([
   readFile(packageJsonPath, "utf8"),
-  readFile(projectJsonPath, "utf8"),
+  readFile(projectJsonPath, "utf8").catch((error) => {
+    if (error.code === "ENOENT") {
+      return undefined;
+    }
+
+    throw error;
+  }),
 ]);
 
 const packageJson = JSON.parse(packageJsonText);
-const projectJson = JSON.parse(projectJsonText);
+const projectJson = projectJsonText
+  ? JSON.parse(projectJsonText)
+  : packageJson.nx;
 const tags = new Set(projectJson.tags ?? []);
 const keywords = new Set(packageJson.keywords ?? []);
 const expectedRepository = {

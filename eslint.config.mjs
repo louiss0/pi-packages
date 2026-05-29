@@ -23,11 +23,11 @@ export default [
           depConstraints: [
             {
               sourceTag: 'project:package',
-              onlyDependOnLibsWithTags: ['project:package'],
+              notDependOnLibsWithTags: ['project:extension'],
             },
             {
               sourceTag: 'project:extension',
-              onlyDependOnLibsWithTags: ['project:package'],
+              notDependOnLibsWithTags: ['project:extension'],
             },
             {
               sourceTag: 'status:supported',
