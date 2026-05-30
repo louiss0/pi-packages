@@ -14,6 +14,9 @@
     },
     {
       "path": "./internal/prompt-parser"
+    },
+    {
+      "path": "./pi-prompt-guard"
     }
   ]
 }

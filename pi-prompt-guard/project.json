@@ -1,0 +1,73 @@
+{
+  "name": "pi-prompt-guard",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "root": "pi-prompt-guard",
+  "sourceRoot": "pi-prompt-guard/extensions",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": [
+          "{projectRoot}/**/*.ts",
+          "{projectRoot}/**/*.js",
+          "{projectRoot}/**/*.mts",
+          "{projectRoot}/**/*.mjs",
+          "{projectRoot}/**/*.cts",
+          "{projectRoot}/**/*.cjs"
+        ]
+      }
+    },
+    "biome": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "metadata": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/validate-package-metadata.mjs {projectRoot}"
+      }
+    },
+    "check": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "typecheck",
+        "lint",
+        "test",
+        "metadata"
+      ],
+      "options": {
+        "command": "echo 'All checks passed'"
+      }
+    }
+  },
+  "tags": [
+    "npm:public",
+    "project:extension",
+    "status:supported"
+  ]
+}
