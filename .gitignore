@@ -4,6 +4,7 @@
 dist
 tmp
 out-tsc
+bundled
 
 # dependencies
 node_modules

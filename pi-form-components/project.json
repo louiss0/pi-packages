@@ -22,8 +22,23 @@
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "pnpm exec vite build --config vite.lib.config.ts && node ../tools/replace-package-source-paths.mjs . dist",
+        "command": "pnpm exec vite build --config vite.lib.config.ts",
         "cwd": "{projectRoot}"
+      }
+    },
+    "prepare-production-package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node ../tools/prepare-bundled-package.mjs . ../bundled dist",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "nx-release-publish": {
+      "executor": "@nx/js:release-publish",
+      "dependsOn": ["prepare-production-package"],
+      "options": {
+        "packageRoot": "bundled/pi-form-components"
       }
     },
     "test": {

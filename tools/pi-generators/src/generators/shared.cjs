@@ -162,6 +162,26 @@ function getTestTarget(runner) {
   };
 }
 
+function getPackageTargets(projectRoot) {
+  return {
+    "prepare-production-package": {
+      executor: "nx:run-commands",
+      dependsOn: ["build"],
+      options: {
+        command: "node ../tools/prepare-bundled-package.mjs . ../bundled dist",
+        cwd: "{projectRoot}",
+      },
+    },
+    "nx-release-publish": {
+      executor: "@nx/js:release-publish",
+      dependsOn: ["prepare-production-package"],
+      options: {
+        packageRoot: `bundled/${projectRoot}`,
+      },
+    },
+  };
+}
+
 function writeProjectJson(tree, projectRoot, projectKind, runner) {
   const tags = projectKind === "package" ? packageTags : extensionTags;
   const projectJsonPath = `${projectRoot}/project.json`;
@@ -215,6 +235,7 @@ function writeProjectJson(tree, projectRoot, projectKind, runner) {
           command: "node tools/validate-package-metadata.mjs {projectRoot}",
         },
       },
+      ...(projectKind === "package" ? getPackageTargets(projectRoot) : {}),
     },
     tags,
   };
