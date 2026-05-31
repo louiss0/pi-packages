@@ -98,30 +98,30 @@ class WidgetController {
     get #widgetTitle() {
         return this.#key
             .split("-")
-            .map((word) => word.charAt(0).toUpperCase()})
+            .map((word) => word.charAt(0).toUpperCase())
             .join("");
-}
+    }
 
-constructor(ui: ExtensionUIContext) {
-    this.#ui = ui;
-}
+    constructor(ui: ExtensionUIContext) {
+        this.#ui = ui;
+    }
 
-#setStatus(status: "guarding" | "ready" | "unguarding") {
-    this.#ui.setWidget(this.#key, [
-        this.#ui.theme.bold(this.#widgetTitle),
-        this.#ui.theme.fg(status === "guarding" ? "warning" : "text", status),
-    ]);
-}
+    #setStatus(status: "guarding" | "ready" | "unguarding") {
+        this.#ui.setWidget(this.#key, [
+            this.#ui.theme.bold(this.#widgetTitle),
+            this.#ui.theme.fg(status === "guarding" ? "warning" : "text", status),
+        ]);
+    }
 
-setStatusToGuarding() {
-    this.#setStatus("guarding");
-}
+    setStatusToGuarding() {
+        this.#setStatus("guarding");
+    }
 
-setStatusToReady() {
-    this.#setStatus("ready");
-}
+    setStatusToReady() {
+        this.#setStatus("ready");
+    }
 
-setStatusToUnguarding() {
-    this.#setStatus("unguarding");
-}
+    setStatusToUnguarding() {
+        this.#setStatus("unguarding");
+    }
 }
