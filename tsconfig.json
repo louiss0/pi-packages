@@ -17,6 +17,9 @@
     },
     {
       "path": "./pi-prompt-guard"
+    },
+    {
+      "path": "./pi-prompt-form"
     }
   ]
 }

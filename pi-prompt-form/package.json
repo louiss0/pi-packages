@@ -1,0 +1,30 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "name": "@code-fixer-23/pi-prompt-form",
+  "version": "0.0.1",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Pi package scaffold for pi-prompt-form",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-prompt-form"
+  },
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "keywords": [
+    "pi-package"
+  ]
+}

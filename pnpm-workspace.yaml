@@ -4,6 +4,7 @@ packages:
   - "pi-agent-resource"
   - "internal/*"
   - "tools/pi-generators"
+  - "pi-prompt-form"
   - "pi-prompt-guard"
 allowBuilds:
   '@biomejs/biome': true
