@@ -1,7 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import { handlePromptInput, tokenizePromptInput, validatePromptArguments } from "./index.js";
+import {
+  handlePromptInput,
+  tokenizePromptInput,
+  validatePromptArguments,
+} from "./index.js";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -93,9 +97,7 @@ describe("validatePromptArguments", () => {
         promptArguments: [{ name: "project", required: true, position: 1 }],
         placeholders: [{ kind: "single", position: 2 }],
       }),
-    ).toBe(
-      "Prompt /release references argument 2 but only declares 1.",
-    );
+    ).toBe("Prompt /release references argument 2 but only declares 1.");
   });
 
   it("returns an error when prompt placeholders exceed declared arguments", () => {
@@ -117,7 +119,9 @@ describe("validatePromptArguments", () => {
         promptArguments: [],
         placeholders: [{ kind: "named", name: "ARGUMENTS" }],
       }),
-    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
+    ).toBe(
+      "Prompt /release uses $ARGUMENTS but does not declare any arguments.",
+    );
   });
 });
 
@@ -183,7 +187,10 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`),
+      readPromptFile: vi.fn(
+        async () =>
+          `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });
@@ -206,7 +213,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $1`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });
@@ -229,7 +238,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });
@@ -252,7 +263,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+      ),
     });
 
     expect(result).toEqual({ action: "continue" });
@@ -272,7 +285,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $@`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $@`,
+      ),
     });
 
     expect(result).toEqual({ action: "continue" });
@@ -292,7 +307,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $2`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });
@@ -315,7 +332,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+      ),
     });
 
     expect(result).toEqual({ action: "continue" });

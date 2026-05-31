@@ -15,7 +15,9 @@ const packageTags = ["npm:public", "project:package", "status:supported"];
 const extensionTags = ["npm:public", "project:extension", "status:supported"];
 
 function normalizeProjectFolders(projectFolders = []) {
-  const entries = Array.isArray(projectFolders) ? projectFolders : [projectFolders];
+  const entries = Array.isArray(projectFolders)
+    ? projectFolders
+    : [projectFolders];
   const extras = new Set(["extensions"]);
 
   for (const entry of entries) {
@@ -36,7 +38,9 @@ function normalizeProjectFolders(projectFolders = []) {
 }
 
 function getCreatePiPackageBin() {
-  const packageJsonPath = require.resolve("@code-fixer-23/create-pi-package/package.json");
+  const packageJsonPath = require.resolve(
+    "@code-fixer-23/create-pi-package/package.json",
+  );
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   const packageRoot = path.dirname(packageJsonPath);
 
@@ -66,7 +70,9 @@ function runCreatePiPackage(options) {
   });
 
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || "create-pi-package failed");
+    throw new Error(
+      result.stderr || result.stdout || "create-pi-package failed",
+    );
   }
 
   return path.join(tempRoot, options.name);
@@ -149,7 +155,8 @@ function getTestTarget(runner) {
   return {
     executor: "nx:run-commands",
     options: {
-      command: "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
+      command:
+        "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
       cwd: "{projectRoot}",
     },
   };
@@ -189,14 +196,16 @@ function writeProjectJson(tree, projectRoot, projectKind, runner) {
       check: {
         executor: "nx:run-commands",
         options: {
-          command: "pnpm exec biome format --config-path biome.json {projectRoot}",
+          command:
+            "pnpm exec biome format --config-path biome.json {projectRoot}",
           cwd: "{workspaceRoot}",
         },
       },
       format: {
         executor: "nx:run-commands",
         options: {
-          command: "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+          command:
+            "pnpm exec biome format --write --config-path biome.json {projectRoot}",
           cwd: "{workspaceRoot}",
         },
       },

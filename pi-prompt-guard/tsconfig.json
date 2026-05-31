@@ -22,9 +22,7 @@
     "noImplicitReturns": true,
     "noImplicitThis": true
   },
-  "include": [
-    "extensions/**/*.ts"
-  ],
+  "include": ["extensions/**/*.ts"],
   "references": [
     {
       "path": "../internal/prompt-parser"
