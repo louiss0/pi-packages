@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import { handlePromptInput, validatePromptArguments } from "./index.js";
+import { handlePromptInput, tokenizePromptInput, validatePromptArguments } from "./index.js";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -13,6 +13,23 @@ function createPromptCommand(command: PromptCommand) {
   return command;
 }
 
+describe("tokenizePromptInput", () => {
+  it("supports quoted arguments", () => {
+    expect(tokenizePromptInput('/release "my project" 1.0.0')).toEqual({
+      commandName: "release",
+      passedArguments: ["my project", "1.0.0"],
+    });
+  });
+
+  it("returns an error for unterminated quotes", () => {
+    expect(tokenizePromptInput('/release "my project')).toBeInstanceOf(Error);
+    expect(tokenizePromptInput('/release "my project')).toHaveProperty(
+      "message",
+      "Unterminated quoted argument. If an argument contains spaces, wrap it in single or double quotes.",
+    );
+  });
+});
+
 describe("validatePromptArguments", () => {
   it("returns an error when required arguments are missing", () => {
     expect(
@@ -22,7 +39,9 @@ describe("validatePromptArguments", () => {
         promptArguments: [{ name: "project", required: true, position: 1 }],
         placeholders: [{ kind: "single", position: 1 }],
       }),
-    ).toBe("Missing required arguments for /release: <project>");
+    ).toBe(
+      "Missing required arguments for /release: <project>. If an argument contains spaces, wrap it in single or double quotes.",
+    );
   });
 
   it("returns an error when too many positional arguments are passed", () => {
@@ -39,7 +58,9 @@ describe("validatePromptArguments", () => {
           { kind: "single", position: 2 },
         ],
       }),
-    ).toBe("Too many arguments for /release: expected at most 2 but received 3");
+    ).toBe(
+      "Too many arguments for /release: expected at most 2 but received 3. If an argument contains spaces, wrap it in single or double quotes.",
+    );
   });
 
   it("allows extra arguments when the prompt uses $ARGUMENTS", () => {
@@ -72,7 +93,31 @@ describe("validatePromptArguments", () => {
         promptArguments: [{ name: "project", required: true, position: 1 }],
         placeholders: [{ kind: "single", position: 2 }],
       }),
-    ).toBe("Missing argument for /release: placeholder requires argument 2");
+    ).toBe(
+      "Prompt /release references argument 2 but only declares 1.",
+    );
+  });
+
+  it("returns an error when prompt placeholders exceed declared arguments", () => {
+    expect(
+      validatePromptArguments({
+        commandName: "release",
+        passedArguments: ["pkg", "1.0.0"],
+        promptArguments: [{ name: "project", required: true, position: 1 }],
+        placeholders: [{ kind: "single", position: 2 }],
+      }),
+    ).toBe("Prompt /release references argument 2 but only declares 1.");
+  });
+
+  it("returns an error when $ARGUMENTS is used without declared arguments", () => {
+    expect(
+      validatePromptArguments({
+        commandName: "release",
+        passedArguments: ["pkg"],
+        promptArguments: [],
+        placeholders: [{ kind: "named", name: "ARGUMENTS" }],
+      }),
+    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
   });
 });
 
@@ -106,6 +151,23 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith("Prompt not found: /missing", "error");
+  });
+
+  it("returns handled for invalid quoting", async () => {
+    const notify = vi.fn();
+
+    const result = await handlePromptInput({
+      text: '/release "my project',
+      ui: { notify },
+      getCommands: vi.fn(() => []),
+      readPromptFile: vi.fn(),
+    });
+
+    expect(result).toEqual({ action: "handled" });
+    expect(notify).toHaveBeenCalledWith(
+      "Unterminated quoted argument. If an argument contains spaces, wrap it in single or double quotes.",
+      "error",
+    );
   });
 
   it("returns handled and notifies when prompt parsing fails", async () => {
@@ -148,7 +210,10 @@ describe("handlePromptInput", () => {
     });
 
     expect(result).toEqual({ action: "handled" });
-    expect(notify).toHaveBeenCalledWith("Missing required arguments for /release: <project>", "error");
+    expect(notify).toHaveBeenCalledWith(
+      "Missing required arguments for /release: <project>. If an argument contains spaces, wrap it in single or double quotes.",
+      "error",
+    );
   });
 
   it("returns handled and notifies when too many arguments are passed", async () => {
@@ -169,9 +234,29 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Too many arguments for /release: expected at most 2 but received 3",
+      "Too many arguments for /release: expected at most 2 but received 3. If an argument contains spaces, wrap it in single or double quotes.",
       "error",
     );
+  });
+
+  it("returns continue when quoted arguments are valid", async () => {
+    const notify = vi.fn();
+
+    const result = await handlePromptInput({
+      text: '/release "my project" 1.0.0',
+      ui: { notify },
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "release",
+          source: "prompt",
+          sourceInfo: { path: "release.md" },
+        }),
+      ]),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`),
+    });
+
+    expect(result).toEqual({ action: "continue" });
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("returns continue when rest arguments are allowed", async () => {
@@ -192,6 +277,29 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("returns handled when prompt placeholders exceed declared arguments", async () => {
+    const notify = vi.fn();
+
+    const result = await handlePromptInput({
+      text: "/release pkg",
+      ui: { notify },
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "release",
+          source: "prompt",
+          sourceInfo: { path: "release.md" },
+        }),
+      ]),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
+    });
+
+    expect(result).toEqual({ action: "handled" });
+    expect(notify).toHaveBeenCalledWith(
+      "Prompt /release references argument 2 but only declares 1.",
+      "error",
+    );
   });
 
   it("returns continue when prompt parsing and argument validation succeed", async () => {

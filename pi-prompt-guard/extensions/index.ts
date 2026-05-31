@@ -61,6 +61,13 @@ type PromptInputContext = {
   readPromptFile: (path: string) => Promise<string>;
 };
 
+type TokenizedPromptInput = {
+  commandName: string;
+  passedArguments: string[];
+};
+
+const QUOTING_GUIDANCE = 'If an argument contains spaces, wrap it in single or double quotes.';
+
 export async function handlePromptInput({
   text,
   ui,
@@ -71,8 +78,14 @@ export async function handlePromptInput({
     return { action: "continue" };
   }
 
-  const [unparsedCommandName, ...passedArguments] = text.trim().split(/\s+/);
-  const commandName = unparsedCommandName?.replace(/^\/+/, "");
+  const tokenizedInput = tokenizePromptInput(text);
+
+  if (tokenizedInput instanceof Error) {
+    ui.notify(tokenizedInput.message, "error");
+    return { action: "handled" };
+  }
+
+  const { commandName, passedArguments } = tokenizedInput;
 
   if (!commandName) {
     return { action: "continue" };
@@ -117,6 +130,56 @@ export async function handlePromptInput({
   return { action: "continue" };
 }
 
+export function tokenizePromptInput(text: string): TokenizedPromptInput | Error {
+  const tokens: string[] = [];
+  let currentToken = "";
+  let activeQuote: '"' | "'" | null = null;
+
+  for (const character of text.trim()) {
+    if (activeQuote) {
+      if (character === activeQuote) {
+        activeQuote = null;
+      } else {
+        currentToken += character;
+      }
+
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      activeQuote = character;
+      continue;
+    }
+
+    if (/\s/.test(character)) {
+      if (currentToken) {
+        tokens.push(currentToken);
+        currentToken = "";
+      }
+
+      continue;
+    }
+
+    currentToken += character;
+  }
+
+  if (activeQuote) {
+    return new Error(`Unterminated quoted argument. ${QUOTING_GUIDANCE}`);
+  }
+
+  if (currentToken) {
+    tokens.push(currentToken);
+  }
+
+  const [unparsedCommandName, ...passedArguments] = tokens;
+  const commandName = unparsedCommandName?.replace(/^\/+/, "") ?? "";
+
+  return {
+    commandName,
+    passedArguments,
+  };
+}
+
 type PromptArgumentValidation = {
   commandName: string;
   passedArguments: string[];
@@ -130,17 +193,6 @@ export function validatePromptArguments({
   promptArguments,
   placeholders,
 }: PromptArgumentValidation): string | null {
-  const requiredArguments = promptArguments.filter((argument) => argument.required);
-
-  if (passedArguments.length < requiredArguments.length) {
-    const missingArguments = requiredArguments
-      .slice(passedArguments.length)
-      .map((argument) => `<${argument.name}>`)
-      .join(" ");
-
-    return `Missing required arguments for /${commandName}: ${missingArguments}`;
-  }
-
   const highestExplicitPosition = placeholders.reduce((highestPosition, placeholder) => {
     if (placeholder.kind === "single") {
       return Math.max(highestPosition, placeholder.position);
@@ -153,17 +205,45 @@ export function validatePromptArguments({
     return highestPosition;
   }, 0);
 
+  const highestFiniteSliceEnd = placeholders.reduce((highestPosition, placeholder) => {
+    if (placeholder.kind === "slice" && placeholder.end !== Number.POSITIVE_INFINITY) {
+      return Math.max(highestPosition, placeholder.end);
+    }
+
+    return highestPosition;
+  }, 0);
+
   const usesArgumentsPlaceholder = placeholders.some((placeholder) => placeholder.kind === "named");
   const usesRestPlaceholder = placeholders.some((placeholder) => placeholder.kind === "rest");
   const declaredArgumentCount = promptArguments.length;
-  const allowedArgumentCount = Math.max(declaredArgumentCount, highestExplicitPosition);
+  const requiredArguments = promptArguments.filter((argument) => argument.required);
+  const highestReferencedPosition = Math.max(highestExplicitPosition, highestFiniteSliceEnd);
 
-  if (!usesRestPlaceholder && !usesArgumentsPlaceholder && passedArguments.length > allowedArgumentCount) {
-    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}`;
+  if (!usesArgumentsPlaceholder && !usesRestPlaceholder && highestReferencedPosition > declaredArgumentCount) {
+    return `Prompt /${commandName} references argument ${highestReferencedPosition} but only declares ${declaredArgumentCount}.`;
+  }
+
+  if (usesArgumentsPlaceholder && declaredArgumentCount === 0) {
+    return `Prompt /${commandName} uses $ARGUMENTS but does not declare any arguments.`;
+  }
+
+  if (passedArguments.length < requiredArguments.length) {
+    const missingArguments = requiredArguments
+      .slice(passedArguments.length)
+      .map((argument) => `<${argument.name}>`)
+      .join(" ");
+
+    return `Missing required arguments for /${commandName}: ${missingArguments}. ${QUOTING_GUIDANCE}`;
   }
 
   if (highestExplicitPosition > 0 && passedArguments.length < highestExplicitPosition) {
-    return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}`;
+    return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}. ${QUOTING_GUIDANCE}`;
+  }
+
+  const allowedArgumentCount = Math.max(declaredArgumentCount, highestExplicitPosition);
+
+  if (!usesRestPlaceholder && !usesArgumentsPlaceholder && passedArguments.length > allowedArgumentCount) {
+    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}. ${QUOTING_GUIDANCE}`;
   }
 
   const invalidSlice = placeholders.find(
