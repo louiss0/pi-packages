@@ -22,7 +22,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "pnpm exec vite build --config vite.lib.config.ts",
+        "command": "pnpm exec vite build --config vite.lib.config.ts && node ../tools/replace-package-source-paths.mjs . dist",
         "cwd": "{projectRoot}"
       }
     },
