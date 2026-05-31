@@ -7,15 +7,14 @@ import { type ExtensionAPI, type ExtensionUIContext } from "@earendil-works/pi-c
 import { readFile } from "node:fs/promises";
 
 export default function (pi: ExtensionAPI) {
-  let widgetController: WidgetController;
+  let widgetHost: PiPromptGuardWidgetHost;
 
   pi.on("session_start", (_event, ctx) => {
-    widgetController = new WidgetController(ctx.ui);
-    widgetController.setStatusToReady();
+    widgetHost = new PiPromptGuardWidgetHost(ctx.ui);
   });
 
   pi.on("input", async (event, ctx) => {
-    widgetController.setStatusToGuarding();
+    widgetHost.setStatusToGuarding();
 
     return handlePromptInput({
       text: event.text,
@@ -26,11 +25,11 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", () => {
-    widgetController.setStatusToUnguarding();
+    widgetHost.setStatusToUnguardingIfItIsNotGuarding();
   });
 
   pi.on("turn_end", () => {
-    widgetController.setStatusToReady();
+    widgetHost.setStatusToReady();
   });
 
   pi.events.emit("pi-prompt-guard:loaded", { name: "@code-fixer-23/pi-prompt-guard" });
@@ -260,7 +259,7 @@ export function validatePromptArguments({
   return null;
 }
 
-class WidgetController {
+class PiPromptGuardWidgetHost {
   #ui: ExtensionUIContext;
 
   readonly #key = "pi-prompt-guard";
@@ -276,7 +275,10 @@ class WidgetController {
     this.#ui = ui;
   }
 
+  #status: "guarding" | "ready" | "unguarding" = "ready";
+
   #setStatus(status: "guarding" | "ready" | "unguarding") {
+    this.#status = status;
     this.#ui.setWidget(this.#key, [
       this.#ui.theme.bold(this.#widgetTitle),
       this.#ui.theme.fg(status === "guarding" ? "warning" : "text", status),
@@ -291,7 +293,9 @@ class WidgetController {
     this.#setStatus("ready");
   }
 
-  setStatusToUnguarding() {
-    this.#setStatus("unguarding");
+  setStatusToUnguardingIfItIsNotGuarding() {
+    if (this.#status !== "guarding") {
+      this.#setStatus("unguarding");
+    }
   }
 }
