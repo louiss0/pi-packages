@@ -177,21 +177,15 @@ export function parsePlaceholders(
   return placeholders;
 }
 
-export const promptParser = {
-  parseTemplate,
-  parseArgumentHint,
-  parsePlaceholders,
-};
-
 export function parsePrompt(markdown: string): ParsedPrompt | Error {
-  const template = promptParser.parseTemplate(markdown);
-  const parsedArguments = promptParser.parseArgumentHint(template.argumentHint);
+  const template = parseTemplate(markdown);
+  const parsedArguments = parseArgumentHint(template.argumentHint);
 
   if (parsedArguments instanceof InvalidArgumentHintError) {
     return parsedArguments;
   }
 
-  const parsedPlaceholders = promptParser.parsePlaceholders(template.content);
+  const parsedPlaceholders = parsePlaceholders(template.content);
 
   if (parsedPlaceholders instanceof InvalidPlaceholderError) {
     return parsedPlaceholders;
