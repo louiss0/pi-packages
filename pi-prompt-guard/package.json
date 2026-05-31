@@ -20,8 +20,12 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
+  "keywords": ["pi-package"],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
+  },
+  "dependencies": {
+    "@code-fixer-23/pi-prompt-parser": "workspace:*"
   }
 }
