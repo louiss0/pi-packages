@@ -14,10 +14,12 @@ describe("handlePromptInput", () => {
     expect(result).toEqual({ action: "continue" });
   });
 
-  it("returns continue when the command is not a prompt", async () => {
+  it("returns handled when the command is not a prompt", async () => {
+    const notify = vi.fn();
+
     const result = await handlePromptInput({
       text: "/missing",
-      ui: { notify: vi.fn() },
+      ui: { notify },
       getCommands: vi.fn(() => [
         {
           name: "missing",
@@ -28,7 +30,8 @@ describe("handlePromptInput", () => {
       readPromptFile: vi.fn(),
     });
 
-    expect(result).toEqual({ action: "continue" });
+    expect(result).toEqual({ action: "handled" });
+    expect(notify).toHaveBeenCalledWith("Prompt not found: /missing", "error");
   });
 
   it("returns handled and notifies when prompt parsing fails", async () => {

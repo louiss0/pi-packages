@@ -1,4 +1,8 @@
-import { parsePrompt } from "@code-fixer-23/pi-prompt-parser";
+import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "@code-fixer-23/pi-prompt-parser";
 import { type ExtensionAPI, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { readFile } from "node:fs/promises";
 
@@ -71,14 +75,23 @@ export async function handlePromptInput({
   const promptCommand = promptCommands.find((command) => command.name === commandName);
 
   if (!promptCommand) {
-    return { action: "continue" };
+    ui.notify(`Prompt not found: /${commandName}`, "error");
+    return { action: "handled" };
   }
 
   const markdown = await readPromptFile(promptCommand.sourceInfo.path);
-  const parsedPrompt = parsePrompt(markdown);
+  const template = parseTemplate(markdown);
+  const parsedArguments = parseArgumentHint(template.argumentHint);
 
-  if (parsedPrompt instanceof Error) {
-    ui.notify(parsedPrompt.message, "error");
+  if (parsedArguments instanceof Error) {
+    ui.notify(parsedArguments.message, "error");
+    return { action: "handled" };
+  }
+
+  const parsedPlaceholders = parsePlaceholders(template.content);
+
+  if (parsedPlaceholders instanceof Error) {
+    ui.notify(parsedPlaceholders.message, "error");
     return { action: "handled" };
   }
 
