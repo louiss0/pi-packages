@@ -1,7 +1,11 @@
+import { vi } from "vitest";
+
 import {
   parseTemplate,
   parsePlaceholders,
   parseArgumentHint,
+  parsePrompt,
+  promptParser,
   InvalidArgumentHintError,
   InvalidPlaceholderError,
 } from "./prompt-parser.js";
@@ -67,6 +71,26 @@ describe("parseArgumentHint", () => {
       "message",
       "Invalid argument hint: <project-name> [project-version] <project> all optional arguments must be at the end",
     );
+  });
+});
+
+describe("parsePrompt", () => {
+  it("calls the parser steps in order", () => {
+    const parseTemplateSpy = vi.spyOn(promptParser, "parseTemplate");
+    const parseArgumentHintSpy = vi.spyOn(promptParser, "parseArgumentHint");
+    const parsePlaceholdersSpy = vi.spyOn(promptParser, "parsePlaceholders");
+
+    parsePrompt(`---
+argument-hint: <project>
+---
+Hello $1
+`);
+
+    expect(parseTemplateSpy).toHaveBeenCalledOnce();
+    expect(parseArgumentHintSpy).toHaveBeenCalledOnce();
+    expect(parsePlaceholdersSpy).toHaveBeenCalledOnce();
+    expect(parseTemplateSpy).toHaveBeenCalledBefore(parseArgumentHintSpy);
+    expect(parseArgumentHintSpy).toHaveBeenCalledBefore(parsePlaceholdersSpy);
   });
 });
 
@@ -158,5 +182,5 @@ function assertError<T extends new (...args: never[]) => Error>(
   result: unknown,
   error: T,
 ): asserts result is InstanceType<T> {
-  expect(result).toBeInstanceOf(error.constructor);
+  expect(result).toBeInstanceOf(error);
 }

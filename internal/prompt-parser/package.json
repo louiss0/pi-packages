@@ -20,7 +20,10 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "prompt-parser"
+    "name": "prompt-parser",
+    "tags": ["npm:private", "status:supported"]
   },
-  "dependencies": {}
+  "dependencies": {
+    "gray-matter-es": "^0.2.1"
+  }
 }
