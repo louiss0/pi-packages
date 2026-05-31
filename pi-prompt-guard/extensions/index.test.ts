@@ -1,11 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  handlePromptInput,
-  tokenizePromptInput,
-  validatePromptArguments,
-} from "./index.js";
+import { handlePromptInput, tokenizePromptInput, validatePromptArguments } from "./index.js";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -29,7 +25,7 @@ describe("tokenizePromptInput", () => {
     expect(tokenizePromptInput('/release "my project')).toBeInstanceOf(Error);
     expect(tokenizePromptInput('/release "my project')).toHaveProperty(
       "message",
-      "Unterminated quoted argument. If an argument contains spaces, wrap it in single or double quotes.",
+      "Unterminated quoted argument.\nIf an argument contains spaces, wrap it in single or double quotes.",
     );
   });
 });
@@ -44,7 +40,7 @@ describe("validatePromptArguments", () => {
         placeholders: [{ kind: "single", position: 1 }],
       }),
     ).toBe(
-      "Missing required arguments for /release: <project>. If an argument contains spaces, wrap it in single or double quotes.",
+      "Missing required arguments for /release: <project>.\nIf an argument contains spaces, wrap it in single or double quotes.",
     );
   });
 
@@ -63,7 +59,7 @@ describe("validatePromptArguments", () => {
         ],
       }),
     ).toBe(
-      "Too many arguments for /release: expected at most 2 but received 3. If an argument contains spaces, wrap it in single or double quotes.",
+      "Too many arguments for /release: expected at most 2 but received 3.\nIf an argument contains spaces, wrap it in single or double quotes.",
     );
   });
 
@@ -119,9 +115,7 @@ describe("validatePromptArguments", () => {
         promptArguments: [],
         placeholders: [{ kind: "named", name: "ARGUMENTS" }],
       }),
-    ).toBe(
-      "Prompt /release uses $ARGUMENTS but does not declare any arguments.",
-    );
+    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
   });
 });
 
@@ -169,7 +163,7 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Unterminated quoted argument. If an argument contains spaces, wrap it in single or double quotes.",
+      "Unterminated quoted argument.\nIf an argument contains spaces, wrap it in single or double quotes.",
       "error",
     );
   });
@@ -188,8 +182,7 @@ describe("handlePromptInput", () => {
         }),
       ]),
       readPromptFile: vi.fn(
-        async () =>
-          `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
+        async () => `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
       ),
     });
 
@@ -213,14 +206,12 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $1`,
-      ),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
     });
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Missing required arguments for /release: <project>. If an argument contains spaces, wrap it in single or double quotes.",
+      "Missing required arguments for /release: <project>.\nIf an argument contains spaces, wrap it in single or double quotes.",
       "error",
     );
   });
@@ -245,7 +236,7 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Too many arguments for /release: expected at most 2 but received 3. If an argument contains spaces, wrap it in single or double quotes.",
+      "Too many arguments for /release: expected at most 2 but received 3.\nIf an argument contains spaces, wrap it in single or double quotes.",
       "error",
     );
   });
@@ -285,9 +276,7 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $@`,
-      ),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $@`),
     });
 
     expect(result).toEqual({ action: "continue" });
@@ -307,9 +296,7 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $2`,
-      ),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
     });
 
     expect(result).toEqual({ action: "handled" });
