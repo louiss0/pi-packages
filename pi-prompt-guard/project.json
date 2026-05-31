@@ -33,7 +33,7 @@
         ]
       }
     },
-    "biome": {
+    "check": {
       "executor": "nx:run-commands",
       "options": {
         "command": "pnpm exec biome format --config-path biome.json {projectRoot}",
@@ -52,23 +52,7 @@
       "options": {
         "command": "node tools/validate-package-metadata.mjs {projectRoot}"
       }
-    },
-    "check": {
-      "executor": "nx:run-commands",
-      "dependsOn": [
-        "typecheck",
-        "lint",
-        "test",
-        "metadata"
-      ],
-      "options": {
-        "command": "echo 'All checks passed'"
-      }
     }
   },
-  "tags": [
-    "npm:public",
-    "project:extension",
-    "status:supported"
-  ]
+  "tags": ["npm:public", "project:extension", "status:supported"]
 }
