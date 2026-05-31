@@ -230,11 +230,11 @@ export function validatePromptArguments({
       .map((argument) => `<${argument.name}>`)
       .join(" ");
 
-    return `Missing required arguments for /${commandName}: ${missingArguments}. ${QUOTING_GUIDANCE}`;
+    return `Missing required arguments for /${commandName}: ${missingArguments}.\n${QUOTING_GUIDANCE}`;
   }
 
   if (highestExplicitPosition > 0 && passedArguments.length < highestExplicitPosition) {
-    return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}. ${QUOTING_GUIDANCE}`;
+    return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}.\n${QUOTING_GUIDANCE}`;
   }
 
   const allowedArgumentCount = Math.max(declaredArgumentCount, highestExplicitPosition);
@@ -244,7 +244,7 @@ export function validatePromptArguments({
     !usesArgumentsPlaceholder &&
     passedArguments.length > allowedArgumentCount
   ) {
-    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}. ${QUOTING_GUIDANCE}`;
+    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}.\n${QUOTING_GUIDANCE}`;
   }
 
   const invalidSlice = placeholders.find(
