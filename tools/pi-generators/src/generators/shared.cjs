@@ -130,7 +130,11 @@ function updatePackageJson(tree, projectRoot, projectKind) {
     delete packageJson.devDependencies.tsx;
   }
 
-  if (projectKind !== "extension") {
+  if (projectKind === "extension") {
+    const keywords = new Set(packageJson.keywords ?? []);
+    keywords.add("pi-package");
+    packageJson.keywords = [...keywords];
+  } else {
     delete packageJson.keywords;
   }
 
