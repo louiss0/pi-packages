@@ -1,5 +1,7 @@
 # pi-prompt-guard
 
+![pi-prompt-guard](https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-prompt-guard/assets/big-pi-prompt-guard.png)
+
 [![npm version](https://img.shields.io/npm/v/%40code-fixer-23%2Fpi-prompt-guard)](https://www.npmjs.com/package/@code-fixer-23/pi-prompt-guard)
 [![npm downloads](https://img.shields.io/npm/dm/%40code-fixer-23%2Fpi-prompt-guard)](https://www.npmjs.com/package/@code-fixer-23/pi-prompt-guard)
 [![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
