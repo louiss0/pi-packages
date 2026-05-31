@@ -5,7 +5,7 @@
     "vitest": "latest"
   },
   "name": "@code-fixer-23/pi-prompt-guard",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -20,14 +20,24 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
-  "keywords": ["pi-package"],
-  "files": ["assets", "extensions", "README.md", "!**/*.test.ts"],
+  "keywords": [
+    "pi-package"
+  ],
+  "files": [
+    "assets",
+    "extensions",
+    "README.md",
+    "!**/*.test.ts"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
   },
   "pi": {
-    "extensions": ["extensions", "extensions/!*.test.ts"],
+    "extensions": [
+      "extensions",
+      "extensions/!*.test.ts"
+    ],
     "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-prompt-guard/assets/small-pi-prompt-guard.png"
   },
   "dependencies": {
