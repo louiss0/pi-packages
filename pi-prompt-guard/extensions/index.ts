@@ -35,17 +35,9 @@ export default function (pi: ExtensionAPI) {
   pi.events.emit("pi-prompt-guard:loaded", { name: "@code-fixer-23/pi-prompt-guard" });
 }
 
-type PromptArgument = {
-  name: string;
-  required: boolean;
-  position: number;
-};
+type PromptArgument = Exclude<ReturnType<typeof parseArgumentHint>, Error>;
 
-type PromptPlaceholder =
-  | { kind: "single"; position: number }
-  | { kind: "slice"; start: number; end: number }
-  | { kind: "named"; name: "ARGUMENTS" }
-  | { kind: "rest" };
+type PromptPlaceholder = Exclude<ReturnType<typeof parsePlaceholders>, Error>;
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -65,7 +57,7 @@ type TokenizedPromptInput = {
   passedArguments: string[];
 };
 
-const QUOTING_GUIDANCE = 'If an argument contains spaces, wrap it in single or double quotes.';
+const QUOTING_GUIDANCE = "If an argument contains spaces, wrap it in single or double quotes.";
 
 export async function handlePromptInput({
   text,
@@ -182,8 +174,8 @@ export function tokenizePromptInput(text: string): TokenizedPromptInput | Error 
 type PromptArgumentValidation = {
   commandName: string;
   passedArguments: string[];
-  promptArguments: PromptArgument[];
-  placeholders: PromptPlaceholder[];
+  promptArguments: PromptArgument;
+  placeholders: PromptPlaceholder;
 };
 
 export function validatePromptArguments({
@@ -212,13 +204,19 @@ export function validatePromptArguments({
     return highestPosition;
   }, 0);
 
-  const usesArgumentsPlaceholder = placeholders.some((placeholder) => placeholder.kind === "named");
+  const usesArgumentsPlaceholder = placeholders.some(
+    (placeholder) => placeholder.kind === "named",
+  );
   const usesRestPlaceholder = placeholders.some((placeholder) => placeholder.kind === "rest");
   const declaredArgumentCount = promptArguments.length;
   const requiredArguments = promptArguments.filter((argument) => argument.required);
   const highestReferencedPosition = Math.max(highestExplicitPosition, highestFiniteSliceEnd);
 
-  if (!usesArgumentsPlaceholder && !usesRestPlaceholder && highestReferencedPosition > declaredArgumentCount) {
+  if (
+    !usesArgumentsPlaceholder &&
+    !usesRestPlaceholder &&
+    highestReferencedPosition > declaredArgumentCount
+  ) {
     return `Prompt /${commandName} references argument ${highestReferencedPosition} but only declares ${declaredArgumentCount}.`;
   }
 
@@ -241,7 +239,11 @@ export function validatePromptArguments({
 
   const allowedArgumentCount = Math.max(declaredArgumentCount, highestExplicitPosition);
 
-  if (!usesRestPlaceholder && !usesArgumentsPlaceholder && passedArguments.length > allowedArgumentCount) {
+  if (
+    !usesRestPlaceholder &&
+    !usesArgumentsPlaceholder &&
+    passedArguments.length > allowedArgumentCount
+  ) {
     return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}. ${QUOTING_GUIDANCE}`;
   }
 
@@ -281,7 +283,7 @@ class PiPromptGuardWidgetHost {
     this.#status = status;
     this.#ui.setWidget(this.#key, [
       this.#ui.theme.bold(this.#widgetTitle),
-      this.#ui.theme.fg(status === "guarding" ? "warning" : "text", status),
+      this.#ui.theme.fg(this.#status === "guarding" ? "warning" : "text", this.#status),
     ]);
   }
 
