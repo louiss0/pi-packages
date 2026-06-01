@@ -1,8 +1,4 @@
-import {
-  DynamicBorder,
-  type Theme,
-  type ThemeColor,
-} from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -14,7 +10,6 @@ import {
   SelectList,
   Spacer,
   Text,
-  type TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 
@@ -27,6 +22,19 @@ type PickerText = Exclude<
   | `u${string}`
   | `sy${string}`
 >;
+
+export interface PickerTheme {
+  bold(text: string): string;
+  fg(color: ThemeColor, text: string): string;
+}
+
+export interface FormTheme {
+  fg(color: ThemeColor, text: string): string;
+}
+
+export interface FormTui {
+  requestRender(): void;
+}
 
 type PickerOptions<T extends string> = {
   items: Array<T>;
@@ -72,8 +80,8 @@ export class Picker<T extends string> implements Component {
 
   constructor(
     config: PickerOptions<T>,
-    private readonly theme: Theme,
-    private readonly tui: TUI,
+    private readonly theme: PickerTheme,
+    private readonly tui: FormTui,
     private readonly done: (value: T | null) => void,
   ) {
     const { items, itemLimit, lazyLoadStep, title, helpText, styles } = {
@@ -271,9 +279,9 @@ export class LabelledInput extends Container implements Component {
   #errorText = new Text("");
   #input = new Input();
   #labelText: Text;
-  #theme: Theme;
+  #theme: FormTheme;
 
-  constructor(name: string, theme: Theme, initialValue = "") {
+  constructor(name: string, theme: FormTheme, initialValue = "") {
     super();
     this.#name = name;
     this.#labelText = new Text(name);
@@ -331,9 +339,9 @@ export class ConfirmationBox extends Container implements Component {
   #focused = false;
   #name: string;
   #message: string;
-  #theme: Theme;
+  #theme: FormTheme;
   #errorText = new Text("");
-  constructor(theme: Theme, message: string, name = "confirm") {
+  constructor(theme: FormTheme, message: string, name = "confirm") {
     super();
     this.#name = name;
     this.#message = message;
@@ -440,7 +448,7 @@ export class Form<T extends Record<string, string | number | boolean>>
 
   constructor(
     options: FormOptions<T>,
-    private tui: TUI,
+    private tui: FormTui,
     private done: (value: T | null) => void,
   ) {
     super();
