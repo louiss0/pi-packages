@@ -49,6 +49,8 @@ export default function (pi: ExtensionAPI) {
       if (!result.success) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
+
+      await rootPackResourceReducer(result.output, ctx);
     },
   });
 
