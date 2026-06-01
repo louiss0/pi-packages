@@ -178,16 +178,16 @@ importers:
 
   pi-form-components:
     dependencies:
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.78.0(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.78.0
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
     devDependencies:
-      '@earendil-works/pi-coding-agent':
-        specifier: ^0.78.0
-        version: 0.78.0(ws@8.21.0)(zod@4.4.3)
-      '@earendil-works/pi-tui':
-        specifier: ^0.78.0
-        version: 0.78.0
       vite:
         specifier: ^8.0.0
         version: 8.0.10(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0)
