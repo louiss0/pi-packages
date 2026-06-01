@@ -32,7 +32,8 @@
     "extensions": [
       "extensions",
       "extensions/!*.test.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-prompt-form/assets/Small-PI_Prompt-Form.jpg"
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
