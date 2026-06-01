@@ -13,6 +13,7 @@
     "directory": "pi-bash-tooljack-nu"
   },
   "homepage": "https://github.com/louiss0/pi-packages",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },

@@ -11,6 +11,7 @@
     "access": "public"
   },
   "description": "Pi package scaffold for pi-prompt-guard",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/louiss0/pi-packages",

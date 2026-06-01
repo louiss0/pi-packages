@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Key, type TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -12,14 +12,9 @@ import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+  return vi.importActual<typeof import("@earendil-works/pi-tui")>(
     "@earendil-works/pi-tui",
   );
-
-  return {
-    ...module,
-    matchesKey: (data: string, key: string) => data === key,
-  };
 });
 
 vi.mock("node:os", () => ({
@@ -31,6 +26,10 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { spawn } from "node:child_process";
+
+const TAB_KEY = "\t";
+const ENTER_KEY = "\r";
+
 import registerSkillManager, {
   createOptionalSkillForm,
   createRequiredSkillForm,
@@ -224,9 +223,9 @@ describe("skill manager handlers", () => {
       form.handleInput("B");
       form.handleInput("a");
       form.handleInput("d");
-      form.handleInput(Key.tab);
-      form.handleInput(Key.tab);
-      form.handleInput(Key.enter);
+      form.handleInput(TAB_KEY);
+      form.handleInput(TAB_KEY);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(80).join("\n");
 
@@ -244,9 +243,9 @@ describe("skill manager handlers", () => {
         form.handleInput(character);
       }
 
-      form.handleInput(Key.tab);
-      form.handleInput(Key.tab);
-      form.handleInput(Key.enter);
+      form.handleInput(TAB_KEY);
+      form.handleInput(TAB_KEY);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(80).join("\n");
 
@@ -276,15 +275,15 @@ describe("skill manager handlers", () => {
       for (const character of "bad:path") {
         form.handleInput(character);
       }
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
       for (const character of "x".repeat(501)) {
         form.handleInput(character);
       }
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
       for (const character of "bash read") {
         form.handleInput(character);
       }
-      form.handleInput(Key.enter);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(80).join("\n");
 
@@ -297,12 +296,12 @@ describe("skill manager handlers", () => {
       const form = createOptionalSkillForm(createTui(), createTheme(), vi.fn());
 
       form.focused = true;
-      form.handleInput(Key.tab);
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
+      form.handleInput(TAB_KEY);
       for (const character of "bash read") {
         form.handleInput(character);
       }
-      form.handleInput(Key.enter);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(80).join("\n");
 

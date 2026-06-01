@@ -1,6 +1,6 @@
 import { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { describe, expect, it, vi } from "vitest";
+import { vi } from "vitest";
 
 import { Picker } from "./components";
 

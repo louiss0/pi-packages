@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
-import { describe, expect, it, vi } from "vitest";
+import { vi } from "vitest";
 
 import {
   buildPromptInvocation,

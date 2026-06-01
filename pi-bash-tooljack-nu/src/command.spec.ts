@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll } from "vitest";
 
 import { getCommandSuggestions } from "./command";
 

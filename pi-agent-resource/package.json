@@ -12,7 +12,7 @@
     "!**/*.test.ts"
   ],
   "author": "Shelton Louis",
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/louiss0/pi-packages",

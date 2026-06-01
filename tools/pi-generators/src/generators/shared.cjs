@@ -13,6 +13,32 @@ const piPeerDependencies = {
 const repositoryUrl = "https://github.com/louiss0/pi-packages";
 const packageTags = ["npm:public", "project:package", "status:supported"];
 const extensionTags = ["npm:public", "project:extension", "status:supported"];
+const licenseAuthor = "Shelton Louis";
+
+function getMitLicenseText(year = new Date().getFullYear()) {
+  return `MIT License
+
+Copyright (c) ${year} ${licenseAuthor}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+}
 
 function normalizeProjectFolders(projectFolders = []) {
   const entries = Array.isArray(projectFolders)
@@ -100,6 +126,7 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   packageJson.version ??= "0.0.1";
   packageJson.private = false;
   packageJson.publishConfig = { access: "public" };
+  packageJson.license = "MIT";
   packageJson.description ??= `Pi package scaffold for ${projectRoot}`;
   packageJson.repository = {
     type: "git",
@@ -259,6 +286,93 @@ function updatePnpmWorkspace(tree, projectRoot) {
   tree.write(workspacePath, nextContent);
 }
 
+function writeLicenseFile(tree, projectRoot) {
+  tree.write(`${projectRoot}/LICENSE`, getMitLicenseText());
+}
+
+function normalizeVitestImports(tree, projectRoot) {
+  visitFiles(tree, projectRoot, (filePath) => {
+    if (!/\.(test|spec)\.ts$/.test(filePath)) {
+      return;
+    }
+
+    const content = tree.read(filePath, "utf8");
+
+    if (!content) {
+      return;
+    }
+
+    const nextContent = content.replace(
+      /^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']vitest["'];?\r?\n/m,
+      (_, specifiers) => {
+        const keptSpecifiers = specifiers
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0 && value !== "describe" && value !== "it" && value !== "test" && value !== "expect")
+          .join(", ");
+
+        return keptSpecifiers.length > 0
+          ? `import { ${keptSpecifiers} } from "vitest";\n`
+          : "";
+      },
+    );
+
+    if (nextContent !== content) {
+      tree.write(filePath, nextContent);
+    }
+  });
+}
+
+function ensureVitestGlobals(tree, projectRoot) {
+  visitFiles(tree, projectRoot, (filePath) => {
+    const isConfigFile = /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(
+      filePath,
+    );
+    const isSpecTsConfig = /(?:^|\/)tsconfig\.spec\.json$/.test(filePath);
+
+    if (!isConfigFile && !isSpecTsConfig) {
+      return;
+    }
+
+    const content = tree.read(filePath, "utf8");
+
+    if (!content) {
+      return;
+    }
+
+    let nextContent = content;
+
+    if (isConfigFile) {
+      if (/globals\s*:\s*false/.test(nextContent)) {
+        nextContent = nextContent.replace(/globals\s*:\s*false/g, "globals: true");
+      } else if (/test\s*:\s*\{/.test(nextContent) && !/globals\s*:\s*true/.test(nextContent)) {
+        nextContent = nextContent.replace(/test\s*:\s*\{/, (match) => `${match}\n    globals: true,`);
+      }
+    }
+
+    if (isSpecTsConfig) {
+      nextContent = nextContent.replace(/\s*,?\s*"vitest"\s*(?=[\],])/g, "");
+    }
+
+    if (nextContent !== content) {
+      tree.write(filePath, nextContent);
+    }
+  });
+}
+
+function visitFiles(tree, root, callback) {
+  for (const entry of tree.children(root)) {
+    const entryPath = `${root}/${entry}`;
+
+    if (tree.isFile(entryPath)) {
+      callback(entryPath);
+      continue;
+    }
+
+    visitFiles(tree, entryPath, callback);
+  }
+}
+
 function updateTsConfigReferences(tree, projectRoot) {
   const tsconfigPath = "tsconfig.json";
   const tsconfig = readJson(tree, tsconfigPath);
@@ -293,6 +407,9 @@ async function createPiPackageGenerator(tree, options, projectKind) {
 
   copyDirectoryToTree(tree, generatedRoot, options.name);
   updatePackageJson(tree, options.name, projectKind);
+  writeLicenseFile(tree, options.name);
+  ensureVitestGlobals(tree, options.name);
+  normalizeVitestImports(tree, options.name);
   writeProjectJson(tree, options.name, projectKind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);

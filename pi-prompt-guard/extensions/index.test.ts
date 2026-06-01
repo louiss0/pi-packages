@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import { vi } from "vitest";
 
 import { handlePromptInput, tokenizePromptInput, validatePromptArguments } from "./index.js";
 

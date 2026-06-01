@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Key, type TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
@@ -11,19 +11,17 @@ import {
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+  return vi.importActual<typeof import("@earendil-works/pi-tui")>(
     "@earendil-works/pi-tui",
   );
-
-  return {
-    ...module,
-    matchesKey: (data: string, key: string) => data === key,
-  };
 });
 
 vi.mock("node:os", () => ({
   homedir: () => "/test-home",
 }));
+
+const TAB_KEY = "\t";
+const ENTER_KEY = "\r";
 
 import registerAgentManager, {
   createAgentForm,
@@ -147,23 +145,23 @@ describe("extensions/agent-manager", () => {
       form.handleInput("c");
       form.handleInput("l");
       form.handleInput("e");
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
 
       form.handleInput("s");
       form.handleInput("h");
       form.handleInput("o");
       form.handleInput("r");
       form.handleInput("t");
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
 
       form.handleInput("R");
       form.handleInput("e");
       form.handleInput("a");
       form.handleInput("d");
-      form.handleInput(Key.tab);
+      form.handleInput(TAB_KEY);
 
       form.handleInput("C");
-      form.handleInput(Key.enter);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(100).join("\n");
 
@@ -187,10 +185,10 @@ describe("extensions/agent-manager", () => {
       form.handleInput("l");
       form.handleInput("e");
 
-      form.handleInput(Key.tab);
-      form.handleInput(Key.tab);
-      form.handleInput(Key.tab);
-      form.handleInput(Key.enter);
+      form.handleInput(TAB_KEY);
+      form.handleInput(TAB_KEY);
+      form.handleInput(TAB_KEY);
+      form.handleInput(ENTER_KEY);
 
       const lines = form.render(100).join("\n");
 
