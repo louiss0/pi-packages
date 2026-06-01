@@ -265,7 +265,7 @@ export function createPromptArgumentsForm({
         "Enter next/submit | Tab switch field | Esc cancel\nRequired arguments come from <> and optional arguments come from [].",
       spacing: 1,
     },
-    tui as never,
+    tui,
     done,
   );
 }
