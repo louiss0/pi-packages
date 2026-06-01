@@ -1,8 +1,4 @@
-import {
-  DynamicBorder,
-  ThemeColor,
-  type Theme,
-} from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
@@ -273,10 +269,11 @@ export class LabelledInput extends Container implements Component {
   #labelText: Text;
   #theme: Theme;
 
-  constructor(name: string, theme: Theme) {
+  constructor(name: string, theme: Theme, initialValue = "") {
     super();
     this.#name = name;
     this.#labelText = new Text(name);
+    this.#input.setValue(initialValue);
     this.addChild(this.#labelText);
     this.addChild(this.#input);
     this.addChild(this.#errorText);

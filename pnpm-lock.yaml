@@ -198,6 +198,31 @@ importers:
         specifier: ^4.1.4
         version: 4.1.5(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(vite@8.0.10(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
 
+  pi-prompt-form:
+    dependencies:
+      '@code-fixer-23/pi-form-components':
+        specifier: workspace:*
+        version: link:../pi-form-components
+      '@code-fixer-23/pi-prompt-parser':
+        specifier: workspace:*
+        version: link:../internal/prompt-parser
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.78.0(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.78.0
+      valibot:
+        specifier: ^1.4.1
+        version: 1.4.1(typescript@6.0.3)
+    devDependencies:
+      typescript:
+        specifier: latest
+        version: 6.0.3
+      vitest:
+        specifier: latest
+        version: 4.1.7(@types/node@25.9.1)(@vitest/coverage-v8@4.1.7)(@vitest/ui@4.1.7)(vite@8.0.14(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
+
   pi-prompt-guard:
     dependencies:
       '@code-fixer-23/pi-prompt-parser':
@@ -9481,7 +9506,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(vite@8.0.10(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
+      vitest: 4.1.5(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(vite@8.0.10(@types/node@25.9.1)(jiti@2.6.1)(yaml@2.9.0))
 
   '@vitest/coverage-v8@4.1.7(vitest@4.1.7)':
     dependencies:
@@ -9584,7 +9609,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(vite@8.0.10(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
+      vitest: 4.1.5(@types/node@25.9.1)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(vite@8.0.10(@types/node@25.9.1)(jiti@2.6.1)(yaml@2.9.0))
 
   '@vitest/ui@4.1.7(vitest@4.1.7)':
     dependencies:
