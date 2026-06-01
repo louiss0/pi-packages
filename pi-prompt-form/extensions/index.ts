@@ -55,7 +55,15 @@ type PromptArgumentField = PromptArgument & {
 };
 
 export default function (pi: ExtensionAPI) {
+  let widgetHost: PiPromptFormWidgetHost | null = null;
+
+  pi.on("session_start", (_event, ctx) => {
+    widgetHost = new PiPromptFormWidgetHost(ctx.ui);
+  });
+
   pi.on("input", async (event, ctx) => {
+    widgetHost?.setStatusToFilling();
+
     return handlePromptInput({
       text: event.text,
       hasUI: ctx.hasUI,
@@ -63,6 +71,14 @@ export default function (pi: ExtensionAPI) {
       getCommands: () => pi.getCommands(),
       readPromptFile: (path) => readFile(path, "utf-8"),
     });
+  });
+
+  pi.on("before_agent_start", () => {
+    widgetHost?.setStatusToTransformingIfItIsNotFilling();
+  });
+
+  pi.on("turn_end", () => {
+    widgetHost?.setStatusToReady();
   });
 }
 
@@ -410,3 +426,46 @@ function quotePromptArgument(value: string) {
   return JSON.stringify(value);
 }
 
+class PiPromptFormWidgetHost {
+  #ui: ExtensionUIContext;
+
+  readonly #key = "pi-prompt-form";
+
+  get #widgetTitle() {
+    return this.#key
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase())
+      .join("");
+  }
+
+  constructor(ui: ExtensionUIContext) {
+    this.#ui = ui;
+  }
+
+  #status: "filling" | "ready" | "transforming" = "ready";
+
+  #setStatus(status: "filling" | "ready" | "transforming") {
+    this.#status = status;
+    this.#ui.setWidget(this.#key, [
+      this.#ui.theme.bold(this.#widgetTitle),
+      this.#ui.theme.fg(
+        this.#status === "filling" ? "warning" : "text",
+        this.#status,
+      ),
+    ]);
+  }
+
+  setStatusToFilling() {
+    this.#setStatus("filling");
+  }
+
+  setStatusToReady() {
+    this.#setStatus("ready");
+  }
+
+  setStatusToTransformingIfItIsNotFilling() {
+    if (this.#status !== "filling") {
+      this.#setStatus("transforming");
+    }
+  }
+}
