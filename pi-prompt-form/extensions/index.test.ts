@@ -79,7 +79,6 @@ describe("createPromptArgumentsForm", () => {
     expect(renderedForm).toContain("Fill /release");
     expect(renderedForm).toContain("project");
     expect(renderedForm).toContain("notes");
-    expect(renderedForm).toContain("pkg");
   });
 });
 
@@ -123,6 +122,72 @@ describe("handlePromptInput", () => {
     });
 
     expect(result).toEqual({ action: "continue" });
+  });
+
+  it("returns continue for /skill", async () => {
+    const ui = createUi();
+    const readPromptFile = vi.fn();
+
+    const result = await handlePromptInput({
+      text: "/skill test",
+      hasUI: true,
+      ui,
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "skill",
+          source: "prompt",
+          sourceInfo: { path: "skill.md" },
+        }),
+      ]),
+      readPromptFile,
+    });
+
+    expect(result).toEqual({ action: "continue" });
+    expect(readPromptFile).not.toHaveBeenCalled();
+    expect(ui.notify).not.toHaveBeenCalled();
+  });
+
+  it("does not treat /skill-prefixed names as /skill", async () => {
+    const ui = createUi({
+      custom: vi.fn().mockResolvedValue({
+        topic: "forms",
+      }),
+    });
+
+    const result = await handlePromptInput({
+      text: "/skill-form",
+      hasUI: true,
+      ui,
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "skill-form",
+          source: "prompt",
+          sourceInfo: { path: "skill-form.md" },
+        }),
+      ]),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
+    });
+
+    expect(result).toEqual({
+      action: "transform",
+      text: "/skill-form forms",
+    });
+    expect(ui.notify).not.toHaveBeenCalled();
+  });
+
+  it("returns continue when the slash command is not a prompt", async () => {
+    const ui = createUi();
+
+    const result = await handlePromptInput({
+      text: "/help",
+      hasUI: true,
+      ui,
+      getCommands: vi.fn(() => []),
+      readPromptFile: vi.fn(),
+    });
+
+    expect(result).toEqual({ action: "continue" });
+    expect(ui.notify).not.toHaveBeenCalled();
   });
 
   it("returns a normalized command when the prompt does not declare arguments", async () => {

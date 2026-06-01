@@ -59,6 +59,7 @@ type TokenizedPromptInput = {
   passedArguments: string[];
 };
 
+const NON_SKILL_COMMAND_PATTERN = /^\/(?!skill(?:\s|$)).+/;
 const QUOTING_GUIDANCE = "If an argument contains spaces, wrap it in single or double quotes.";
 
 export async function handlePromptInput({
@@ -67,7 +68,7 @@ export async function handlePromptInput({
   getCommands,
   readPromptFile,
 }: PromptInputContext): Promise<{ action: "continue" | "handled" }> {
-  if (!text.startsWith("/")) {
+  if (!NON_SKILL_COMMAND_PATTERN.test(text.trim())) {
     return { action: "continue" };
   }
 
@@ -88,8 +89,7 @@ export async function handlePromptInput({
   const promptCommand = promptCommands.find((command) => command.name === commandName);
 
   if (!promptCommand) {
-    ui.notify(`Prompt not found: /${commandName}`, "error");
-    return { action: "handled" };
+    return { action: "continue" };
   }
 
   const markdown = await readPromptFile(promptCommand.sourceInfo.path);

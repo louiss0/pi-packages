@@ -131,7 +131,7 @@ describe("handlePromptInput", () => {
     expect(result).toEqual({ action: "continue" });
   });
 
-  it("returns handled when the command is not a prompt", async () => {
+  it("returns continue when the command is not a prompt", async () => {
     const notify = vi.fn();
 
     const result = await handlePromptInput({
@@ -147,8 +147,50 @@ describe("handlePromptInput", () => {
       readPromptFile: vi.fn(),
     });
 
-    expect(result).toEqual({ action: "handled" });
-    expect(notify).toHaveBeenCalledWith("Prompt not found: /missing", "error");
+    expect(result).toEqual({ action: "continue" });
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("returns continue for /skill", async () => {
+    const notify = vi.fn();
+    const readPromptFile = vi.fn();
+
+    const result = await handlePromptInput({
+      text: "/skill test",
+      ui: { notify },
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "skill",
+          source: "prompt",
+          sourceInfo: { path: "skill.md" },
+        }),
+      ]),
+      readPromptFile,
+    });
+
+    expect(result).toEqual({ action: "continue" });
+    expect(readPromptFile).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("does not treat /skill-prefixed names as /skill", async () => {
+    const notify = vi.fn();
+
+    const result = await handlePromptInput({
+      text: "/skill-form forms",
+      ui: { notify },
+      getCommands: vi.fn(() => [
+        createPromptCommand({
+          name: "skill-form",
+          source: "prompt",
+          sourceInfo: { path: "skill-form.md" },
+        }),
+      ]),
+      readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
+    });
+
+    expect(result).toEqual({ action: "continue" });
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("returns handled for invalid quoting", async () => {

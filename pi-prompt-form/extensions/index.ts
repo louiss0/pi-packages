@@ -42,6 +42,8 @@ type TokenizedPromptInput = {
   passedArguments: string[];
 };
 
+const NON_SKILL_COMMAND_PATTERN = /^\/(?!skill(?:\s|$)).+/;
+
 type PromptArgumentValues = Record<string, string>;
 
 type PromptArgumentField = PromptArgument & {
@@ -75,7 +77,7 @@ export async function handlePromptInput({
   getCommands,
   readPromptFile,
 }: PromptInputContext) {
-  if (!hasUI || !text.startsWith("/")) {
+  if (!hasUI || !NON_SKILL_COMMAND_PATTERN.test(text.trim())) {
     return { action: "continue" } as const;
   }
 
@@ -88,13 +90,16 @@ export async function handlePromptInput({
 
   const { commandName, passedArguments } = tokenizedInput;
 
+  if (!commandName) {
+    return { action: "continue" } as const;
+  }
+
   const promptCommand = getCommands()
     .filter((command) => command.source === "prompt")
     .find((command) => command.name === commandName);
 
   if (!promptCommand) {
-    ui.notify(`No prompt command found for /${commandName}`, "error");
-    return { action: "handled" } as const;
+    return { action: "continue" } as const;
   }
 
   const markdown = await readPromptFile(promptCommand.sourceInfo.path);
