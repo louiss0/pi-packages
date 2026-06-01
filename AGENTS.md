@@ -33,4 +33,7 @@
 - Use `project:package` for packages that other workspace packages may depend on
 - Use `project:extension` for standalone Pi extension packages that must not depend on other extension packages
 - Extension packages must include the `pi-package` keyword in `package.json`
-- Do not add package-level `scripts`; define runnable work through Nx targets in `project.json`
+- Do not add package-level `scripts`; define runnable work through Nx targets in `project.json`C
+- do not add package-level devDependencies for shared Pi runtime packages when they already exist at the workspace root
+- avoid leaking external class types with private fields across package boundaries in exported APIs
+- for workspace packages, prefer root-managed versions and type surfaces based on local/public abstractions instead of concrete foreign class types
