@@ -164,13 +164,13 @@ export function parsePlaceholders(
   }
 
   const hasRestPlaceholder = placeholders.some((placeholder) => placeholder.kind === "rest");
-  const hasArgumentsPlaceholder = placeholders.some(
-    (placeholder) => placeholder.kind === "named" || placeholder.kind === "single" || placeholder.kind === "slice",
+  const hasNamedArgumentsPlaceholder = placeholders.some(
+    (placeholder) => placeholder.kind === "named",
   );
 
-  if (hasRestPlaceholder && hasArgumentsPlaceholder) {
+  if (hasRestPlaceholder && hasNamedArgumentsPlaceholder) {
     return new InvalidPlaceholderError(
-      `Invalid placeholder: ${markdownContent} don't mix args and rest placeholders`,
+      `Invalid placeholder: ${markdownContent} don't mix $ARGUMENTS and $@ placeholders`,
     );
   }
 

@@ -161,13 +161,20 @@ describe("parsePlaceholders", () => {
     });
   });
 
-  it("should return an error when args and rest are used together ", () => {
+  it("allows positional placeholders to mix with $@", () => {
+    expect(parsePlaceholders("$1 $@")).toEqual([
+      { kind: "single", position: 1 },
+      { kind: "rest" },
+    ]);
+  });
+
+  it("should return an error when $ARGUMENTS and $@ are used together", () => {
     const result = parsePlaceholders("$@ $ARGUMENTS");
 
     assertError(result, InvalidPlaceholderError);
     expect(result).toHaveProperty(
       "message",
-      "Invalid placeholder: $@ $ARGUMENTS don't mix args and rest placeholders",
+      "Invalid placeholder: $@ $ARGUMENTS don't mix $ARGUMENTS and $@ placeholders",
     );
   });
 });
