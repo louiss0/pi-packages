@@ -245,12 +245,6 @@ type PromptArgumentsFormOptions = {
   done: (value: PromptArgumentValues | null) => void;
 };
 
-// Argument of type
-// 'import("C:/Users/bvlou/projects/pi-packages/node_modules/.pnpm/@earendil-works+pi-coding-agent@0.78.0_ws@8.21.0_zod@4.4.3/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme").Theme' is not assignable to parameter of type
-// 'import("C:/Users/bvlou/projects/pi-packages/node_modules/.pnpm/@earendil-works+pi-coding-agent@0.75.3_ws@8.21.0_zod@4.4.3/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme").Theme' with 'exactOptionalPropertyTypes: true'.
-// Consider adding 'undefined' to the types of the target's properties.
-//   Types have separate declarations of a private property 'fgColors'.
-
 export function createPromptArgumentsForm({
   commandName,
   argumentFields,
