@@ -5,13 +5,7 @@ import {
   type ExtensionUIContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import {
-  parseArgumentHint,
-  parsePlaceholders,
-  parseTemplate,
-} from "./internal/prompt-parser";
 import type { TUI } from "@earendil-works/pi-tui";
-
 import {
   type BaseIssue,
   minLength,
@@ -22,6 +16,11 @@ import {
   safeParse,
   string,
 } from "valibot";
+import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "./internal/prompt-parser";
 
 const formOverlayOptions = {
   overlay: true,

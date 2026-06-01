@@ -209,6 +209,18 @@ function getPackageTargets(projectRoot) {
   };
 }
 
+function getExtensionTargets() {
+  return {
+    "make-extension": {
+      executor: "nx:run-commands",
+      options: {
+        command: "pnpm exec tsx ./scripts/create-extension.ts",
+        cwd: "{projectRoot}",
+      },
+    },
+  };
+}
+
 function writeProjectJson(tree, projectRoot, projectKind, runner) {
   const tags = projectKind === "package" ? packageTags : extensionTags;
   const projectJsonPath = `${projectRoot}/project.json`;
@@ -263,6 +275,7 @@ function writeProjectJson(tree, projectRoot, projectKind, runner) {
         },
       },
       ...(projectKind === "package" ? getPackageTargets(projectRoot) : {}),
+      ...(projectKind === "extension" ? getExtensionTargets() : {}),
     },
     tags,
   };
