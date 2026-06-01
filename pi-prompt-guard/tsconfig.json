@@ -24,9 +24,5 @@
     "noImplicitThis": true
   },
   "include": ["extensions/**/*.ts"],
-  "references": [
-    {
-      "path": "../internal/prompt-parser"
-    }
-  ]
+  "references": []
 }

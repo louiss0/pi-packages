@@ -44,6 +44,6 @@
     "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-prompt-guard/assets/small-pi-prompt-guard.png"
   },
   "dependencies": {
-    "@code-fixer-23/pi-prompt-parser": "workspace:*"
+    "gray-matter-es": "^0.2.1"
   }
 }

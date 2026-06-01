@@ -1,25 +1,26 @@
-import {
-  parseArgumentHint,
-  parsePlaceholders,
-  parseTemplate,
-} from "@code-fixer-23/pi-prompt-parser";
+import { readFile } from "node:fs/promises";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   type ExtensionUIContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
-import { readFile } from "node:fs/promises";
 import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "./internal/prompt-parser";
+import type { TUI } from "@earendil-works/pi-tui";
+
+import {
+  type BaseIssue,
   minLength,
   object,
   optional,
   pipe,
+  type StringIssue,
   safeParse,
   string,
-  type BaseIssue,
-  type StringIssue,
 } from "valibot";
 
 const formOverlayOptions = {
@@ -408,3 +409,4 @@ function quotePromptArgument(value: string) {
 
   return JSON.stringify(value);
 }
+
