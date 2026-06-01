@@ -2,7 +2,9 @@
   "name": "@code-fixer-23/pi-agent-resource",
   "version": "3.0.2",
   "description": "This extension is useful for making agent skills, propmts and subagents",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "files": [
     "assets",
     "extensions",
@@ -43,7 +45,10 @@
     "vitest": "^4.1.4"
   },
   "pi": {
-    "extensions": ["extensions", "extensions/!*.test.ts"],
+    "extensions": [
+      "extensions",
+      "extensions/!*.test.ts"
+    ],
     "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-agent-resource/assets/Small-Agent-Resource.png"
   },
   "dependencies": {

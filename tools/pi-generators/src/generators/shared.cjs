@@ -308,7 +308,14 @@ function normalizeVitestImports(tree, projectRoot) {
         const keptSpecifiers = specifiers
           .split(",")
           .map((value) => value.trim())
-          .filter((value) => value.length > 0 && value !== "describe" && value !== "it" && value !== "test" && value !== "expect")
+          .filter(
+            (value) =>
+              value.length > 0 &&
+              value !== "describe" &&
+              value !== "it" &&
+              value !== "test" &&
+              value !== "expect",
+          )
           .join(", ");
 
         return keptSpecifiers.length > 0
@@ -325,9 +332,8 @@ function normalizeVitestImports(tree, projectRoot) {
 
 function ensureVitestGlobals(tree, projectRoot) {
   visitFiles(tree, projectRoot, (filePath) => {
-    const isConfigFile = /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(
-      filePath,
-    );
+    const isConfigFile =
+      /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(filePath);
     const isSpecTsConfig = /(?:^|\/)tsconfig\.spec\.json$/.test(filePath);
 
     if (!isConfigFile && !isSpecTsConfig) {
@@ -344,9 +350,18 @@ function ensureVitestGlobals(tree, projectRoot) {
 
     if (isConfigFile) {
       if (/globals\s*:\s*false/.test(nextContent)) {
-        nextContent = nextContent.replace(/globals\s*:\s*false/g, "globals: true");
-      } else if (/test\s*:\s*\{/.test(nextContent) && !/globals\s*:\s*true/.test(nextContent)) {
-        nextContent = nextContent.replace(/test\s*:\s*\{/, (match) => `${match}\n    globals: true,`);
+        nextContent = nextContent.replace(
+          /globals\s*:\s*false/g,
+          "globals: true",
+        );
+      } else if (
+        /test\s*:\s*\{/.test(nextContent) &&
+        !/globals\s*:\s*true/.test(nextContent)
+      ) {
+        nextContent = nextContent.replace(
+          /test\s*:\s*\{/,
+          (match) => `${match}\n    globals: true,`,
+        );
       }
     }
 

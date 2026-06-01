@@ -1,38 +1,30 @@
 // vitest.config.ts
-    import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 
-    export default defineConfig({
-      test: {
-        environment: "node",
+export default defineConfig({
+  test: {
+    environment: "node",
 
-        include: ["extensions/**/*.test.ts"],
+    include: ["extensions/**/*.test.ts"],
 
-        exclude: [
-          "node_modules",
-          "dist",
-          ".idea",
-          ".git"
-        ],
+    exclude: ["node_modules", "dist", ".idea", ".git"],
 
-        globals: true,
+    globals: true,
 
-        clearMocks: true,
-        restoreMocks: true,
-        mockReset: true,
+    clearMocks: true,
+    restoreMocks: true,
+    mockReset: true,
 
-        watch: false,
+    watch: false,
 
-        coverage: {
-          provider: "v8",
+    coverage: {
+      provider: "v8",
 
-          reporter: ["text", "html"],
+      reporter: ["text", "html"],
 
-          include: ["extensions/**/*.ts"],
+      include: ["extensions/**/*.ts"],
 
-          exclude: [
-            "extensions/**/*.test.ts",
-            "extensions/**/*.d.ts"
-          ]
-        }
-      }
-    });
+      exclude: ["extensions/**/*.test.ts", "extensions/**/*.d.ts"],
+    },
+  },
+});

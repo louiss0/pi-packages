@@ -1,7 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
-import { handlePromptInput, tokenizePromptInput, validatePromptArguments } from "./index.js";
+import {
+  handlePromptInput,
+  tokenizePromptInput,
+  validatePromptArguments,
+} from "./index.js";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -115,7 +119,9 @@ describe("validatePromptArguments", () => {
         promptArguments: [],
         placeholders: [{ kind: "named", name: "ARGUMENTS" }],
       }),
-    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
+    ).toBe(
+      "Prompt /release uses $ARGUMENTS but does not declare any arguments.",
+    );
   });
 });
 
@@ -186,7 +192,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "skill-form.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <topic>\n---\nHello $1`,
+      ),
     });
 
     expect(result).toEqual({ action: "continue" });
@@ -224,7 +232,8 @@ describe("handlePromptInput", () => {
         }),
       ]),
       readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
+        async () =>
+          `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
       ),
     });
 
@@ -248,7 +257,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $1`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });
@@ -318,7 +329,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $@`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $@`,
+      ),
     });
 
     expect(result).toEqual({ action: "continue" });
@@ -338,7 +351,9 @@ describe("handlePromptInput", () => {
           sourceInfo: { path: "release.md" },
         }),
       ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
+      readPromptFile: vi.fn(
+        async () => `---\nargument-hint: <project>\n---\nHello $2`,
+      ),
     });
 
     expect(result).toEqual({ action: "handled" });

@@ -4,12 +4,7 @@
     "outDir": "../dist/out-tsc",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": [
-      "vitest/globals",
-      "vitest/importMeta",
-      "vite/client",
-      "node"
-    ]
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node"]
   },
   "include": [
     "build.config.ts",

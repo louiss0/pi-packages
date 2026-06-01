@@ -34,43 +34,47 @@ describe("getCommandSuggestions", () => {
   }, 30_000);
 
   describe("suggestions are returned based on prefix", () => {
-    it.for(["each", "str", "path"])(
-      "returns suggestions based on prefix %s",
-      async (prefix) => {
-        const suggestions = await getCommandSuggestions(prefix);
+    it.for([
+      "each",
+      "str",
+      "path",
+    ])("returns suggestions based on prefix %s", async (prefix) => {
+      const suggestions = await getCommandSuggestions(prefix);
 
-        if (!hasNuShell) {
-          expect(suggestions).toBeNull();
-          return;
-        }
+      if (!hasNuShell) {
+        expect(suggestions).toBeNull();
+        return;
+      }
 
-        expect(suggestions?.items.length).toBeGreaterThan(0);
-        expect(
-          suggestions?.items.some((item) => item.value.startsWith(prefix)),
-        ).toBe(true);
-      },
-    );
+      expect(suggestions?.items.length).toBeGreaterThan(0);
+      expect(
+        suggestions?.items.some((item) => item.value.startsWith(prefix)),
+      ).toBe(true);
+    });
   });
 
   describe("marks command as requires closure when it does", () => {
-    it.for(["each", "do", "group-by", "sort-by", "par-each"])(
-      "returns suggestions based on prefix %s",
-      async (prefix) => {
-        const suggestions = await getCommandSuggestions(prefix);
+    it.for([
+      "each",
+      "do",
+      "group-by",
+      "sort-by",
+      "par-each",
+    ])("returns suggestions based on prefix %s", async (prefix) => {
+      const suggestions = await getCommandSuggestions(prefix);
 
-        if (!hasNuShell) {
-          expect(suggestions).toBeNull();
-          return;
-        }
+      if (!hasNuShell) {
+        expect(suggestions).toBeNull();
+        return;
+      }
 
-        const prefixItems = suggestions?.items.filter((item) =>
-          item.value.startsWith(prefix),
-        );
+      const prefixItems = suggestions?.items.filter((item) =>
+        item.value.startsWith(prefix),
+      );
 
-        expect(prefixItems?.length).toBeGreaterThan(0);
-        expect(prefixItems?.every((item) => item.requiresClosure)).toBe(true);
-      },
-    );
+      expect(prefixItems?.length).toBeGreaterThan(0);
+      expect(prefixItems?.every((item) => item.requiresClosure)).toBe(true);
+    });
   });
 
   it("returns null when are no commands available", async () => {
@@ -80,19 +84,22 @@ describe("getCommandSuggestions", () => {
   }, 30_000);
 
   describe("How it returns results based on category", () => {
-    it.for(["strings", "math", "filesystem", "random", "formats"])(
-      "returns suggestions based on category %s",
-      async (prefix) => {
-        const result = await getCommandSuggestions(prefix);
+    it.for([
+      "strings",
+      "math",
+      "filesystem",
+      "random",
+      "formats",
+    ])("returns suggestions based on category %s", async (prefix) => {
+      const result = await getCommandSuggestions(prefix);
 
-        if (!hasNuShell) {
-          expect(result).toBeNull();
-          return;
-        }
+      if (!hasNuShell) {
+        expect(result).toBeNull();
+        return;
+      }
 
-        expect(result?.items.length).toBeGreaterThan(0);
-      },
-    );
+      expect(result?.items.length).toBeGreaterThan(0);
+    });
   });
 
   describe("How it returns results based on search terms", () => {

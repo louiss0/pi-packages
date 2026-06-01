@@ -29,7 +29,10 @@ const formOverlayOptions = {
   },
 } as const;
 
-type PromptArgument = Exclude<ReturnType<typeof parseArgumentHint>, Error>[number];
+type PromptArgument = Exclude<
+  ReturnType<typeof parseArgumentHint>,
+  Error
+>[number];
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -137,7 +140,10 @@ export async function handlePromptInput({
     } as const;
   }
 
-  const argumentFields = createPromptArgumentFields(parsedArguments, passedArguments);
+  const argumentFields = createPromptArgumentFields(
+    parsedArguments,
+    passedArguments,
+  );
   const values = await ui.custom<PromptArgumentValues | null>(
     (tui, theme, _keyboard, done) =>
       createPromptArgumentsForm({
@@ -169,11 +175,18 @@ export async function handlePromptInput({
 
   return {
     action: "transform",
-    text: buildPromptInvocation(commandName, argumentFields, values, extraValue),
+    text: buildPromptInvocation(
+      commandName,
+      argumentFields,
+      values,
+      extraValue,
+    ),
   } as const;
 }
 
-export function tokenizePromptInput(text: string): TokenizedPromptInput | Error {
+export function tokenizePromptInput(
+  text: string,
+): TokenizedPromptInput | Error {
   const tokens: string[] = [];
   let currentToken = "";
   let activeQuote: '"' | "'" | null = null;
@@ -258,7 +271,8 @@ export function createPromptArgumentsForm({
     {
       title: `Fill /${commandName}`,
       fields: argumentFields.map(
-        (argument) => new LabelledInput(argument.name, theme, argument.initialValue),
+        (argument) =>
+          new LabelledInput(argument.name, theme, argument.initialValue),
       ),
       parse: (values) => parsePromptArgumentValues(schema, values),
       footer:
@@ -295,7 +309,9 @@ function parsePromptArgumentValues(
 
   const errors = new Map<string, string>();
 
-  for (const issue of result.issues as Array<BaseIssue<unknown> | StringIssue>) {
+  for (const issue of result.issues as Array<
+    BaseIssue<unknown> | StringIssue
+  >) {
     const key = issue.path?.[0]?.key;
 
     if (typeof key !== "string") {
@@ -303,7 +319,10 @@ function parsePromptArgumentValues(
     }
 
     const currentError = errors.get(key);
-    errors.set(key, currentError ? `${currentError}\n${issue.message}` : issue.message);
+    errors.set(
+      key,
+      currentError ? `${currentError}\n${issue.message}` : issue.message,
+    );
   }
 
   return Object.fromEntries(errors.entries()) as Record<string, string>;
@@ -323,7 +342,8 @@ async function maybeCollectExtraValue({
   initialValue,
 }: MaybeCollectExtraValueOptions) {
   const supportsExtraValue = placeholders.some(
-    (placeholder) => placeholder.kind === "named" || placeholder.kind === "rest",
+    (placeholder) =>
+      placeholder.kind === "named" || placeholder.kind === "rest",
   );
 
   if (!supportsExtraValue) {
@@ -339,7 +359,10 @@ async function maybeCollectExtraValue({
     return initialValue;
   }
 
-  const extraValue = await ui.input(`Extra info for /${commandName}`, initialValue);
+  const extraValue = await ui.input(
+    `Extra info for /${commandName}`,
+    initialValue,
+  );
 
   return extraValue === undefined ? null : extraValue.trim();
 }
