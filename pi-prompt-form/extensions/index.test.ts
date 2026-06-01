@@ -73,7 +73,7 @@ describe("createPromptArgumentsForm", () => {
       commandName: "release",
       argumentFields: [
         { name: "project", required: true, position: 1, initialValue: "pkg" },
-        { name: "draft", required: false, position: 2, initialValue: false },
+        { name: "notes", required: false, position: 2, initialValue: "" },
       ],
       tui: createTui(),
       theme: createTheme(),
@@ -86,17 +86,17 @@ describe("createPromptArgumentsForm", () => {
 });
 
 describe("buildPromptInvocation", () => {
-  it("quotes values with spaces and omits unchecked checkboxes", () => {
+  it("quotes values with spaces and trims trailing optional blanks", () => {
     expect(
       buildPromptInvocation(
         "release",
         [
           { name: "project", required: true, position: 1, initialValue: "" },
-          { name: "draft", required: false, position: 2, initialValue: false },
+          { name: "notes", required: false, position: 2, initialValue: "" },
         ],
         {
           project: "my project",
-          draft: false,
+          notes: "",
         },
       ),
     ).toBe('/release "my project"');
@@ -148,11 +148,11 @@ describe("handlePromptInput", () => {
     expect(ui.custom).not.toHaveBeenCalled();
   });
 
-  it("shows a form and transforms checkbox values back into the prompt", async () => {
+  it("shows a form and transforms text values back into the prompt", async () => {
     const ui = createUi({
       custom: vi.fn().mockResolvedValue({
         project: "my project",
-        draft: true,
+        notes: "1.0.0",
       }),
     });
 
@@ -168,13 +168,13 @@ describe("handlePromptInput", () => {
         }),
       ]),
       readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project> [draft]\n---\nHello $1 $2`,
+        async () => `---\nargument-hint: <project> [notes]\n---\nHello $1 $2`,
       ),
     });
 
     expect(result).toEqual({
       action: "transform",
-      text: '/release "my project" draft',
+      text: '/release "my project" 1.0.0',
     });
     expect(ui.custom).toHaveBeenCalledOnce();
     expect(ui.notify).not.toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe("handlePromptInput", () => {
             theme: Theme,
             keybindings: never,
             done: (value: string | null) => void,
-          ) => Form<Record<string, string | boolean>>,
+          ) => Form<Record<string, string>>,
         ) => {
           const form = factory(createTui(), createTheme(), {} as never, vi.fn());
           return form.render(120).join("\n");
@@ -213,41 +213,6 @@ describe("handlePromptInput", () => {
 
     const renderedForm = (ui.custom as ReturnType<typeof vi.fn>).mock.results[0]?.value;
     await expect(renderedForm).resolves.toContain("my project");
-  });
-
-  it("prefills checkbox arguments when the flag name was already typed", async () => {
-    const ui = createUi({
-      custom: vi.fn().mockImplementation(
-        async (
-          factory: (
-            tui: TUI,
-            theme: Theme,
-            keybindings: never,
-            done: (value: string | null) => void,
-          ) => Form<Record<string, string | boolean>>,
-        ) => {
-          const form = factory(createTui(), createTheme(), {} as never, vi.fn());
-          return form.render(120).join("\n");
-        },
-      ),
-    });
-
-    await handlePromptInput({
-      text: "/release project draft",
-      hasUI: true,
-      ui,
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(async () => `---\nargument-hint: <project> [draft]\n---\nHello $1 $2`),
-    });
-
-    const renderedForm = (ui.custom as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-    await expect(renderedForm).resolves.toContain("[x]");
   });
 
   it("asks for extra trailing info when placeholders support it", async () => {

@@ -3,12 +3,7 @@ import {
   parsePlaceholders,
   parseTemplate,
 } from "@code-fixer-23/pi-prompt-parser";
-import {
-  ConfirmationBox,
-  Form,
-  LabelledInput,
-  type FormField,
-} from "@code-fixer-23/pi-form-components";
+import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   type ExtensionUIContext,
@@ -17,7 +12,6 @@ import {
 import type { TUI } from "@earendil-works/pi-tui";
 import { readFile } from "node:fs/promises";
 import {
-  boolean,
   minLength,
   object,
   optional,
@@ -48,12 +42,10 @@ type TokenizedPromptInput = {
   passedArguments: string[];
 };
 
-type PromptArgumentValue = string | boolean;
-
-type PromptArgumentValues = Record<string, PromptArgumentValue>;
+type PromptArgumentValues = Record<string, string>;
 
 type PromptArgumentField = PromptArgument & {
-  initialValue: PromptArgumentValue;
+  initialValue: string;
 };
 
 export default function (pi: ExtensionAPI) {
@@ -237,9 +229,7 @@ function createPromptArgumentFields(
 ): PromptArgumentField[] {
   return promptArguments.map((argument, index) => ({
     ...argument,
-    initialValue: argument.required
-      ? (passedArguments[index] ?? "")
-      : passedArguments[index] === argument.name,
+    initialValue: passedArguments[index] ?? "",
   }));
 }
 
@@ -253,6 +243,12 @@ type PromptArgumentsFormOptions = {
   done: (value: PromptArgumentValues | null) => void;
 };
 
+// Argument of type
+// 'import("C:/Users/bvlou/projects/pi-packages/node_modules/.pnpm/@earendil-works+pi-coding-agent@0.78.0_ws@8.21.0_zod@4.4.3/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme").Theme' is not assignable to parameter of type
+// 'import("C:/Users/bvlou/projects/pi-packages/node_modules/.pnpm/@earendil-works+pi-coding-agent@0.75.3_ws@8.21.0_zod@4.4.3/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme").Theme' with 'exactOptionalPropertyTypes: true'.
+// Consider adding 'undefined' to the types of the target's properties.
+//   Types have separate declarations of a private property 'fgColors'.
+
 export function createPromptArgumentsForm({
   commandName,
   argumentFields,
@@ -262,10 +258,12 @@ export function createPromptArgumentsForm({
 }: PromptArgumentsFormOptions) {
   const schema = createPromptArgumentsSchema(argumentFields);
 
-  return new Form<Record<string, string | boolean>>(
+  return new Form<Record<string, string>>(
     {
       title: `Fill /${commandName}`,
-      fields: createPromptFormFields(argumentFields, theme),
+      fields: argumentFields.map(
+        (argument) => new LabelledInput(argument.name, theme, argument.initialValue),
+      ),
       parse: (values) => parsePromptArgumentValues(schema, values),
       footer:
         "Enter next/submit | Tab switch field | Esc cancel\nRequired arguments come from <> and optional arguments come from [].",
@@ -276,40 +274,13 @@ export function createPromptArgumentsForm({
   );
 }
 
-function createPromptFormFields(
-  argumentFields: PromptArgumentField[],
-  theme: Theme,
-): FormField[] {
-  return argumentFields.map((argument) => {
-    if (argument.required) {
-      return new LabelledInput(
-        argument.name,
-        theme as never,
-        argument.initialValue as string,
-      );
-    }
-
-    const checkbox = new ConfirmationBox(
-      theme as never,
-      argument.name,
-      argument.name,
-    );
-
-    if (argument.initialValue === true) {
-      checkbox.confirm();
-    }
-
-    return checkbox;
-  });
-}
-
 function createPromptArgumentsSchema(argumentFields: PromptArgumentField[]) {
   const entries = Object.fromEntries(
     argumentFields.map((argument) => [
       argument.name,
       argument.required
         ? pipe(string(), minLength(1, `${argument.name} is required`))
-        : optional(boolean(), false),
+        : optional(string(), ""),
     ]),
   );
 
@@ -336,10 +307,7 @@ function parsePromptArgumentValues(
     }
 
     const currentError = errors.get(key);
-    errors.set(
-      key,
-      currentError ? `${currentError}\n${issue.message}` : issue.message,
-    );
+    errors.set(key, currentError ? `${currentError}\n${issue.message}` : issue.message);
   }
 
   return Object.fromEntries(errors.entries()) as Record<string, string>;
@@ -359,8 +327,7 @@ async function maybeCollectExtraValue({
   initialValue,
 }: MaybeCollectExtraValueOptions) {
   const supportsExtraValue = placeholders.some(
-    (placeholder) =>
-      placeholder.kind === "named" || placeholder.kind === "rest",
+    (placeholder) => placeholder.kind === "named" || placeholder.kind === "rest",
   );
 
   if (!supportsExtraValue) {
@@ -376,10 +343,7 @@ async function maybeCollectExtraValue({
     return initialValue;
   }
 
-  const extraValue = await ui.input(
-    `Extra info for /${commandName}`,
-    initialValue,
-  );
+  const extraValue = await ui.input(`Extra info for /${commandName}`, initialValue);
 
   return extraValue === undefined ? null : extraValue.trim();
 }
@@ -401,15 +365,9 @@ export function buildPromptInvocation(
   values: PromptArgumentValues,
   extraValue = "",
 ) {
-  const serializedArguments = argumentFields.map((argument) => {
-    const value = values[argument.name];
-
-    if (argument.required) {
-      return typeof value === "string" ? value.trim() : "";
-    }
-
-    return value === true ? argument.name : "";
-  });
+  const serializedArguments = argumentFields
+    .map((argument) => values[argument.name] ?? "")
+    .map((value) => value.trim());
 
   while (serializedArguments.at(-1) === "") {
     serializedArguments.pop();
