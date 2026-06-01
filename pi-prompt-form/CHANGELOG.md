@@ -1,3 +1,17 @@
+## 1.1.0 (2026-06-01)
+
+### 🚀 Features
+
+- **pi-prompt-form:** add prompt form widget ([6cd09b9](https://github.com/louiss0/pi-packages/commit/6cd09b9))
+
+### 🩹 Fixes
+
+- **prompt-packages:** inline private parser code ([3a92b16](https://github.com/louiss0/pi-packages/commit/3a92b16))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 # 1.0.0 (2026-06-01)
 
 ### 🚀 Features
