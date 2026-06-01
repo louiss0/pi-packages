@@ -1,8 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionUIContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import { describe, expect, it, vi } from "vitest";
@@ -41,9 +37,7 @@ function createTui() {
 }
 
 function createUi(
-  overrides?: Partial<
-    Pick<ExtensionUIContext, "confirm" | "custom" | "input" | "notify">
-  >,
+  overrides?: Partial<Pick<ExtensionUIContext, "confirm" | "custom" | "input" | "notify">>,
 ) {
   return {
     confirm: vi.fn(async () => false),
@@ -82,6 +76,8 @@ describe("createPromptArgumentsForm", () => {
 
     expect(form).toBeInstanceOf(Form);
     expect(form.render(80).join("\n")).toContain("Fill /release");
+    expect(form.render(80).join("\n")).toContain("project");
+    expect(form.render(80).join("\n")).toContain("release");
   });
 });
 
@@ -182,19 +178,21 @@ describe("handlePromptInput", () => {
 
   it("prefills existing typed text arguments in the form", async () => {
     const ui = createUi({
-      custom: vi.fn().mockImplementation(
-        async (
-          factory: (
-            tui: TUI,
-            theme: Theme,
-            keybindings: never,
-            done: (value: string | null) => void,
-          ) => Form<Record<string, string>>,
-        ) => {
-          const form = factory(createTui(), createTheme(), {} as never, vi.fn());
-          return form.render(120).join("\n");
-        },
-      ),
+      custom: vi
+        .fn()
+        .mockImplementation(
+          async (
+            factory: (
+              tui: TUI,
+              theme: Theme,
+              keybindings: never,
+              done: (value: string | null) => void,
+            ) => Form<Record<string, string>>,
+          ) => {
+            const form = factory(createTui(), createTheme(), {} as never, vi.fn());
+            return form.render(120).join("\n");
+          },
+        ),
     });
 
     await handlePromptInput({
