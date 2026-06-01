@@ -8,7 +8,7 @@ import {
   createPromptArgumentsForm,
   handlePromptInput,
   tokenizePromptInput,
-} from "./index.js";
+} from "./index";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -75,9 +75,11 @@ describe("createPromptArgumentsForm", () => {
     });
 
     expect(form).toBeInstanceOf(Form);
-    expect(form.render(80).join("\n")).toContain("Fill /release");
-    expect(form.render(80).join("\n")).toContain("project");
-    expect(form.render(80).join("\n")).toContain("release");
+    const renderedForm = form.render(80).join("\n");
+    expect(renderedForm).toContain("Fill /release");
+    expect(renderedForm).toContain("project");
+    expect(renderedForm).toContain("notes");
+    expect(renderedForm).toContain("pkg");
   });
 });
 
