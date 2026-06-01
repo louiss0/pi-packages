@@ -334,9 +334,14 @@ function ensureVitestGlobals(tree, projectRoot) {
   visitFiles(tree, projectRoot, (filePath) => {
     const isConfigFile =
       /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(filePath);
-    const isSpecTsConfig = /(?:^|\/)tsconfig\.spec\.json$/.test(filePath);
+    const isTsConfig = /(?:^|\/)tsconfig(?:\.spec)?\.json$/.test(filePath);
 
-    if (!isConfigFile && !isSpecTsConfig) {
+    if (!isConfigFile && !isTsConfig) {
+      return;
+    }
+
+    if (isTsConfig) {
+      ensureVitestTsConfigTypes(tree, filePath);
       return;
     }
 
@@ -348,31 +353,44 @@ function ensureVitestGlobals(tree, projectRoot) {
 
     let nextContent = content;
 
-    if (isConfigFile) {
-      if (/globals\s*:\s*false/.test(nextContent)) {
-        nextContent = nextContent.replace(
-          /globals\s*:\s*false/g,
-          "globals: true",
-        );
-      } else if (
-        /test\s*:\s*\{/.test(nextContent) &&
-        !/globals\s*:\s*true/.test(nextContent)
-      ) {
-        nextContent = nextContent.replace(
-          /test\s*:\s*\{/,
-          (match) => `${match}\n    globals: true,`,
-        );
-      }
-    }
-
-    if (isSpecTsConfig) {
-      nextContent = nextContent.replace(/\s*,?\s*"vitest"\s*(?=[\],])/g, "");
+    if (/globals\s*:\s*false/.test(nextContent)) {
+      nextContent = nextContent.replace(
+        /globals\s*:\s*false/g,
+        "globals: true",
+      );
+    } else if (
+      /test\s*:\s*\{/.test(nextContent) &&
+      !/globals\s*:\s*true/.test(nextContent)
+    ) {
+      nextContent = nextContent.replace(
+        /test\s*:\s*\{/,
+        (match) => `${match}\n    globals: true,`,
+      );
     }
 
     if (nextContent !== content) {
       tree.write(filePath, nextContent);
     }
   });
+}
+
+function ensureVitestTsConfigTypes(tree, filePath) {
+  const tsconfig = readJson(tree, filePath);
+  const currentTypes = tsconfig.compilerOptions?.types ?? [];
+  const nextTypes = [
+    ...new Set([
+      ...currentTypes.filter((value) => value !== "vitest"),
+      "vitest/globals",
+      "node",
+    ]),
+  ];
+
+  tsconfig.compilerOptions = {
+    ...tsconfig.compilerOptions,
+    types: nextTypes,
+  };
+
+  writeJson(tree, filePath, tsconfig);
 }
 
 function visitFiles(tree, root, callback) {
@@ -423,8 +441,11 @@ async function createPiPackageGenerator(tree, options, projectKind) {
   copyDirectoryToTree(tree, generatedRoot, options.name);
   updatePackageJson(tree, options.name, projectKind);
   writeLicenseFile(tree, options.name);
-  ensureVitestGlobals(tree, options.name);
-  normalizeVitestImports(tree, options.name);
+
+  if ((options.runner ?? "vitest") === "vitest") {
+    ensureVitestGlobals(tree, options.name);
+    normalizeVitestImports(tree, options.name);
+  }
   writeProjectJson(tree, options.name, projectKind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);

@@ -1,5 +1,3 @@
-import type { TUI } from "@earendil-works/pi-tui";
-import { Theme } from "@earendil-works/pi-coding-agent";
 import { Picker } from "@code-fixer-23/pi-form-components";
 
 const HISTORY_LIMIT = 100;
@@ -10,6 +8,9 @@ interface HistoryPickerConfigOptions<T extends string> {
   items: T[];
   itemLimit: number;
 }
+
+type PickerTheme = ConstructorParameters<typeof Picker<string>>[1];
+type PickerTui = ConstructorParameters<typeof Picker<string>>[2];
 
 export function getHistoryQuery(limit = HISTORY_LIMIT) {
   return `history | where command !~ '${HISTORY_EXCLUSION_PATTERN}' | last ${limit} | get command | to json`;
@@ -38,10 +39,15 @@ export function getRecentFirstHistoryItems<T extends string>(items: T[]) {
 export class HistoryPicker<T extends string> extends Picker<T> {
   constructor(
     configOptions: HistoryPickerConfigOptions<T>,
-    theme: Theme,
-    tui: TUI,
+    theme: unknown,
+    tui: unknown,
     done: (value: T | null) => void,
   ) {
-    super({ title: "Nushell History", ...configOptions }, theme, tui, done);
+    super(
+      { title: "Nushell History", ...configOptions },
+      theme as PickerTheme,
+      tui as PickerTui,
+      done,
+    );
   }
 }
