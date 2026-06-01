@@ -88,16 +88,13 @@ export async function handlePromptInput({
 
   const { commandName, passedArguments } = tokenizedInput;
 
-  if (!commandName) {
-    return { action: "continue" } as const;
-  }
-
   const promptCommand = getCommands()
     .filter((command) => command.source === "prompt")
     .find((command) => command.name === commandName);
 
   if (!promptCommand) {
-    return { action: "continue" } as const;
+    ui.notify(`No prompt command found for /${commandName}`, "error");
+    return { action: "handled" } as const;
   }
 
   const markdown = await readPromptFile(promptCommand.sourceInfo.path);
@@ -284,7 +281,7 @@ function createPromptArgumentsSchema(argumentFields: PromptArgumentField[]) {
     ]),
   );
 
-  return object(entries as never);
+  return object(entries);
 }
 
 function parsePromptArgumentValues(
