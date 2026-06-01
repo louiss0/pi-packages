@@ -1,4 +1,7 @@
-import { DynamicBorder, type ThemeColor } from "@earendil-works/pi-coding-agent";
+import {
+  DynamicBorder,
+  type ThemeColor,
+} from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
