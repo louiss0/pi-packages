@@ -1,26 +1,18 @@
-import {
-  getResourceFileSystem,
-  resetResourceFileSystem,
-  useMemoryResourceFileSystem,
-} from "./filesystem";
-import { resetDevelopmentExtensionNotice } from "./runtime";
+import { getMemoryResourceFileSystem } from "./filesystem";
 
 describe("shared/filesystem", () => {
-  let memoryFileSystem: ReturnType<typeof useMemoryResourceFileSystem>;
+  let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
 
   beforeEach(() => {
-    vi.unstubAllEnvs();
-    resetDevelopmentExtensionNotice();
-    resetResourceFileSystem();
+    memoryFileSystem = getMemoryResourceFileSystem();
   });
 
   afterEach(() => {
-    resetResourceFileSystem();
+    memoryFileSystem.reset();
   });
 
-  it("uses memfs when development mode is enabled", async () => {
-    vi.stubEnv("MODE", "development");
-    const fileSystem = getResourceFileSystem();
+  it("uses memfs explicitly", async () => {
+    const fileSystem = memoryFileSystem;
 
     await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });
     await fileSystem.writeFile(
@@ -30,36 +22,41 @@ describe("shared/filesystem", () => {
 
     await expect(
       fileSystem.readFile("/workspace/.pi/agents/test.md", "utf8"),
-    ).resolves.toBe("hello");
+    ).resolves.toEqual({
+      data: "hello",
+      success: true,
+    });
   });
 
   it("can seed and clear the memory filesystem explicitly in tests", async () => {
-    memoryFileSystem = useMemoryResourceFileSystem();
     memoryFileSystem.seed({
       "/workspace/.pi/prompts/test.md": "prompt",
     });
 
     await expect(
-      getResourceFileSystem().readFile(
+      memoryFileSystem.readFile(
         "/workspace/.pi/prompts/test.md",
         "utf8",
       ),
-    ).resolves.toBe("prompt");
+    ).resolves.toEqual({
+      data: "prompt",
+      success: true,
+    });
 
-    resetResourceFileSystem();
-    memoryFileSystem = useMemoryResourceFileSystem();
+    memoryFileSystem.reset();
 
     await expect(
-      getResourceFileSystem().readFile(
+      memoryFileSystem.readFile(
         "/workspace/.pi/prompts/test.md",
         "utf8",
       ),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({
+      success: false,
+    });
   });
 
   it("removes files and directories with explicit methods", async () => {
-    memoryFileSystem = useMemoryResourceFileSystem();
-    const fileSystem = getResourceFileSystem();
+    const fileSystem = memoryFileSystem;
 
     await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {
       recursive: true,
@@ -77,7 +74,9 @@ describe("shared/filesystem", () => {
         "/workspace/.pi/agent/skills/test-skill/SKILL.md",
         "utf8",
       ),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({
+      success: false,
+    });
 
     await fileSystem.writeFile(
       "/workspace/.pi/agent/skills/test-skill/SKILL.md",
@@ -90,6 +89,8 @@ describe("shared/filesystem", () => {
         "/workspace/.pi/agent/skills/test-skill/SKILL.md",
         "utf8",
       ),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({
+      success: false,
+    });
   });
 });

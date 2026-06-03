@@ -31,7 +31,10 @@ import {
   regex,
   string,
 } from "valibot";
-import { getResourceFileSystem } from "../shared/filesystem";
+import {
+  getNodeResourceFileSystem,
+  type ResourceFileSystem,
+} from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -223,7 +226,11 @@ export function parseSkillCommandArgument(argument: string) {
   };
 }
 
-export async function handleCreate(ctx: ExtensionCommandContext, scope: SkillScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionCommandContext,
+  scope: SkillScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
   const requiredValues = await ctx.ui.custom<
     (RequiredAgentSkillFields & { confirm: boolean }) | null
   >((tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done), formOverlayOptions);
@@ -259,6 +266,7 @@ export async function handleCreate(ctx: ExtensionCommandContext, scope: SkillSco
       },
       scope,
       ctx.cwd || process.cwd(),
+      fileSystem,
     );
 
     ctx.ui.notify(`Skill created successfully: ${filePath}`);
@@ -276,16 +284,26 @@ export async function handleEdit(
   ctx: ExtensionCommandContext,
   requestedEditMode?: SkillEditorMode,
   scope: SkillScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
 ) {
-  const skillPath = await pickSkillPath(ctx, "Edit Skill", scope);
+  const skillPath = await pickSkillPath(ctx, "Edit Skill", scope, fileSystem);
 
   if (!skillPath) {
     ctx.ui.notify("Skill edit cancelled", "info");
     return;
   }
 
-  const currentContent = await readSkillFile(skillPath);
-  const editMode = await resolveSkillEditMode(requestedEditMode, ctx.cwd || process.cwd());
+  const currentContentResult = await readSkillFile(skillPath, fileSystem);
+  if (!currentContentResult.success) {
+    ctx.ui.notify(`Skill edit failed: ${currentContentResult.error.message}`, "error");
+    return;
+  }
+
+  const editMode = await resolveSkillEditMode(
+    requestedEditMode,
+    ctx.cwd || process.cwd(),
+    fileSystem,
+  );
 
   if (editMode === "external") {
     const editor = process.env.VISUAL || process.env.EDITOR;
@@ -298,7 +316,8 @@ export async function handleEdit(
     await openExternalEditor(editor, skillPath);
   } else {
     const editedContent = await ctx.ui.custom<string | undefined>(
-      (tui, theme, _kb, done) => new SkillEditorOverlay(tui, theme, currentContent, done),
+      (tui, theme, _kb, done) =>
+        new SkillEditorOverlay(tui, theme, currentContentResult.data, done),
       modalEditorOverlayOptions,
     );
 
@@ -307,15 +326,23 @@ export async function handleEdit(
       return;
     }
 
-    await getResourceFileSystem().writeFile(skillPath, editedContent);
+    const writeResult = await fileSystem.writeFile(skillPath, editedContent);
+    if (!writeResult.success) {
+      ctx.ui.notify(`Skill edit failed: ${writeResult.error.message}`, "error");
+      return;
+    }
   }
 
   ctx.ui.notify("Skill updated. Reloading skills...", "info");
   await ctx.reload();
 }
 
-export async function handleDelete(ctx: ExtensionCommandContext, scope: SkillScope = "global") {
-  const skillPath = await pickSkillPath(ctx, "Delete Skill", scope);
+export async function handleDelete(
+  ctx: ExtensionCommandContext,
+  scope: SkillScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
+  const skillPath = await pickSkillPath(ctx, "Delete Skill", scope, fileSystem);
 
   if (!skillPath) {
     ctx.ui.notify("Skill deletion cancelled", "info");
@@ -323,61 +350,86 @@ export async function handleDelete(ctx: ExtensionCommandContext, scope: SkillSco
   }
 
   const skillDirectory = dirname(skillPath);
-  await getResourceFileSystem().removeDirectory(skillDirectory);
+  const deleteResult = await fileSystem.removeDirectory(skillDirectory);
+  if (!deleteResult.success) {
+    ctx.ui.notify(`Skill deletion failed: ${deleteResult.error.message}`, "error");
+    return;
+  }
+
   ctx.ui.notify(`Skill deleted successfully: ${skillDirectory}`);
 }
 
-async function resolveSkillEditMode(requestedEditMode?: SkillEditorMode, cwd = process.cwd()) {
+async function resolveSkillEditMode(
+  requestedEditMode?: SkillEditorMode,
+  cwd = process.cwd(),
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
   if (requestedEditMode) {
     return requestedEditMode;
   }
 
-  const projectConfig = await readProjectEditorConfig(cwd);
+  const projectConfig = await readProjectEditorConfig(cwd, fileSystem);
   return projectConfig.skillEditor ?? "pi";
 }
 
-async function readProjectEditorConfig(cwd = process.cwd()) {
-  try {
-    const config = await getResourceFileSystem().readFile(
-      join(cwd, PROJECT_EDITOR_CONFIG_FILE),
-      "utf8",
-    );
-    let isInSkillSection = false;
+async function readProjectEditorConfig(
+  cwd = process.cwd(),
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
+  const configResult = await fileSystem.readFile(
+    join(cwd, PROJECT_EDITOR_CONFIG_FILE),
+    "utf8",
+  );
 
-    for (const line of config.split(/\r?\n/)) {
-      const trimmedLine = line.trim();
-
-      if (trimmedLine.startsWith("[") && trimmedLine.endsWith("]")) {
-        isInSkillSection = trimmedLine === "[skill]";
-        continue;
-      }
-
-      if (!isInSkillSection) {
-        continue;
-      }
-
-      const editorMatch = trimmedLine.match(/^editor\s*=\s*"(external)"$/);
-      if (editorMatch) {
-        return { skillEditor: editorMatch[1] as SkillEditorMode };
-      }
-    }
-
-    return { skillEditor: undefined };
-  } catch {
+  if (!configResult.success) {
     return { skillEditor: undefined };
   }
+
+  let isInSkillSection = false;
+
+  for (const line of configResult.data.split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+
+    if (trimmedLine.startsWith("[") && trimmedLine.endsWith("]")) {
+      isInSkillSection = trimmedLine === "[skill]";
+      continue;
+    }
+
+    if (!isInSkillSection) {
+      continue;
+    }
+
+    const editorMatch = trimmedLine.match(/^editor\s*=\s*"(external)"$/);
+    if (editorMatch) {
+      return { skillEditor: editorMatch[1] as SkillEditorMode };
+    }
+  }
+
+  return { skillEditor: undefined };
 }
 
 function getSkillsDirectory(scope: SkillScope, cwd = process.cwd()) {
   return scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY;
 }
 
-async function createSkillFile(fields: SkillFrontmatterFields, scope: SkillScope, cwd: string) {
+async function createSkillFile(
+  fields: SkillFrontmatterFields,
+  scope: SkillScope,
+  cwd: string,
+  fileSystem: ResourceFileSystem,
+) {
   const skillDirectory = join(getSkillsDirectory(scope, cwd), fields.name);
   const skillPath = join(skillDirectory, SKILL_FILE_NAME);
-  const fileSystem = getResourceFileSystem();
-  await fileSystem.mkdir(skillDirectory, { recursive: true });
-  await fileSystem.writeFile(skillPath, renderSkillMarkdown(fields));
+  const directoryResult = await fileSystem.mkdir(skillDirectory, { recursive: true });
+  if (!directoryResult.success) {
+    throw directoryResult.error;
+  }
+
+  const writeResult = await fileSystem.writeFile(skillPath, renderSkillMarkdown(fields));
+  if (!writeResult.success) {
+    throw writeResult.error;
+  }
+
   return skillPath;
 }
 
@@ -446,9 +498,14 @@ function humanizeSkillName(name: string) {
     .join(" ");
 }
 
-async function pickSkillPath(ctx: ExtensionContext, title: string, scope: SkillScope) {
+async function pickSkillPath(
+  ctx: ExtensionContext,
+  title: string,
+  scope: SkillScope,
+  fileSystem: ResourceFileSystem,
+) {
   const cwd = "cwd" in ctx && typeof ctx.cwd === "string" ? ctx.cwd : process.cwd();
-  const skillNames = await listSkillNames(scope, cwd);
+  const skillNames = await listSkillNames(scope, cwd, fileSystem);
 
   if (skillNames.length === 0) {
     ctx.ui.notify("No skills found", "info");
@@ -491,15 +548,16 @@ async function pickSkillPath(ctx: ExtensionContext, title: string, scope: SkillS
   }, formOverlayOptions);
 }
 
-async function listSkillNames(scope: SkillScope, cwd: string) {
-  try {
-    const entries = await getResourceFileSystem().readDirectoryEntries(
-      getSkillsDirectory(scope, cwd),
-    );
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch {
+async function listSkillNames(scope: SkillScope, cwd: string, fileSystem: ResourceFileSystem) {
+  const entriesResult = await fileSystem.readDirectoryEntries(
+    getSkillsDirectory(scope, cwd),
+  );
+
+  if (!entriesResult.success) {
     return [];
   }
+
+  return entriesResult.data.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 }
 
 function openExternalEditor(editor: string, filePath: string) {
@@ -599,8 +657,8 @@ function tokenizeCommandLine(commandLine: string) {
   return parts;
 }
 
-async function readSkillFile(filePath: string) {
-  return getResourceFileSystem().readFile(filePath, "utf8");
+async function readSkillFile(filePath: string, fileSystem: ResourceFileSystem) {
+  return fileSystem.readFile(filePath, "utf8");
 }
 
 async function handleSkillCommand(

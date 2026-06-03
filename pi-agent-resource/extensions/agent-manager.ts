@@ -4,7 +4,10 @@ import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { InferOutput, maxLength, minLength, object, pipe, regex, string } from "valibot";
-import { getResourceFileSystem } from "../shared/filesystem";
+import {
+  getNodeResourceFileSystem,
+  type ResourceFileSystem,
+} from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -153,7 +156,11 @@ function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
   return scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY;
 }
 
-export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "global") {
+export async function handleCreate(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -164,53 +171,76 @@ export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "g
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
   const agentDirectory = getAgentDirectory(scope, ctx.cwd || process.cwd());
   const filePath = join(agentDirectory, `${values.name}.md`);
 
-  try {
-    await fileSystem.mkdir(agentDirectory, { recursive: true });
-    await fileSystem.writeFile(filePath, renderFrontmatter(values));
-    ctx.ui.notify("Agent created");
-  } catch (error) {
-    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", error), "error");
+  const directoryResult = await fileSystem.mkdir(agentDirectory, { recursive: true });
+  if (!directoryResult.success) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", directoryResult.error), "error");
+    return;
   }
+
+  const writeResult = await fileSystem.writeFile(filePath, renderFrontmatter(values));
+  if (!writeResult.success) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", writeResult.error), "error");
+    return;
+  }
+
+  ctx.ui.notify("Agent created");
 }
 
-export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "global") {
-  const agent = await pickAgent(ctx, "Edit Agent", scope);
+export async function handleEdit(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
+  const agent = await pickAgent(ctx, "Edit Agent", scope, fileSystem);
 
   if (!agent) {
     ctx.ui.notify("Agent editing cancelled", "info");
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
-  const content = await fileSystem.readFile(agent.path, "utf8");
-  const editedContent = await ctx.ui.editor("Edit Agent", content);
+  const readResult = await fileSystem.readFile(agent.path, "utf8");
+  if (!readResult.success) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent edit failed", readResult.error), "error");
+    return;
+  }
+
+  const editedContent = await ctx.ui.editor("Edit Agent", readResult.data);
 
   if (editedContent === undefined) {
     ctx.ui.notify("Agent editing cancelled", "info");
     return;
   }
 
-  try {
-    await fileSystem.writeFile(agent.path, editedContent);
-    ctx.ui.notify("Agent edited");
-  } catch (error) {
-    ctx.ui.notify(getFileSystemErrorMessage("Agent edit failed", error), "error");
+  const writeResult = await fileSystem.writeFile(agent.path, editedContent);
+  if (!writeResult.success) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent edit failed", writeResult.error), "error");
+    return;
   }
+
+  ctx.ui.notify("Agent edited");
 }
 
-export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "global") {
-  const agent = await pickAgent(ctx, "Delete Agent", scope);
+export async function handleDelete(
+  ctx: ExtensionContext,
+  scope: AgentScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+) {
+  const agent = await pickAgent(ctx, "Delete Agent", scope, fileSystem);
 
   if (!agent) {
     ctx.ui.notify("Agent deleting cancelled", "info");
     return;
   }
 
-  await getResourceFileSystem().removeFile(agent.path);
+  const deleteResult = await fileSystem.removeFile(agent.path);
+  if (!deleteResult.success) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent delete failed", deleteResult.error), "error");
+    return;
+  }
+
   ctx.ui.notify("Agent deleted");
 }
 
@@ -231,8 +261,13 @@ function getFileSystemErrorMessage(action: string, error: unknown) {
   return action;
 }
 
-async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope) {
-  const choices = await listAgentChoices(scope, ctx.cwd || process.cwd());
+async function pickAgent(
+  ctx: ExtensionContext,
+  title: string,
+  scope: AgentScope,
+  fileSystem: ResourceFileSystem,
+) {
+  const choices = await listAgentChoices(scope, ctx.cwd || process.cwd(), fileSystem);
 
   if (choices.length === 0) {
     ctx.ui.notify("No agents found", "info");
@@ -251,16 +286,16 @@ async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listAgentChoices(scope: AgentScope, cwd: string) {
-  try {
-    const directory = getAgentDirectory(scope, cwd);
-    const names = await getResourceFileSystem().readDirectoryNames(directory);
+async function listAgentChoices(scope: AgentScope, cwd: string, fileSystem: ResourceFileSystem) {
+  const directory = getAgentDirectory(scope, cwd);
+  const namesResult = await fileSystem.readDirectoryNames(directory);
 
-    return names.map((name) => ({
-      path: join(directory, name),
-      label: `${scope}: ${basename(name, ".md")}`,
-    })) satisfies AgentChoice[];
-  } catch {
+  if (!namesResult.success) {
     return [];
   }
+
+  return namesResult.data.map((name) => ({
+    path: join(directory, name),
+    label: `${scope}: ${basename(name, ".md")}`,
+  })) satisfies AgentChoice[];
 }

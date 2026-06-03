@@ -25,7 +25,10 @@ import {
   string,
 } from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
-import { getResourceFileSystem } from "../shared/filesystem";
+import {
+  getNodeResourceFileSystem,
+  type ResourceFileSystem,
+} from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -234,6 +237,7 @@ function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
 ) {
   const values = await ctx.ui.custom<PromptFields | null>(
     (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
@@ -256,46 +260,66 @@ export async function handleCreate(
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
   const promptDirectory = getPromptDirectory(scope, ctx.cwd || process.cwd());
   const filePath = join(promptDirectory, `${values.name}.md`);
-  await fileSystem.mkdir(promptDirectory, { recursive: true });
-  await fileSystem.writeFile(
+  const directoryResult = await fileSystem.mkdir(promptDirectory, { recursive: true });
+  if (!directoryResult.success) {
+    ctx.ui.notify(`Prompt creation failed: ${directoryResult.error.message}`, "error");
+    return;
+  }
+
+  const writeResult = await fileSystem.writeFile(
     filePath,
     `${renderFrontmatter(values)}\n${template}`.trimEnd() + "\n",
   );
+  if (!writeResult.success) {
+    ctx.ui.notify(`Prompt creation failed: ${writeResult.error.message}`, "error");
+    return;
+  }
+
   ctx.ui.notify("Prompt created");
 }
 
 export async function handleEdit(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
 ) {
-  const prompt = await pickPrompt(ctx, "Edit Prompt", scope);
+  const prompt = await pickPrompt(ctx, "Edit Prompt", scope, fileSystem);
 
   if (!prompt) {
     ctx.ui.notify("Prompt editing cancelled", "info");
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
-  const content = await fileSystem.readFile(prompt.path, "utf8");
-  const editedContent = await ctx.ui.editor("Edit Prompt", content);
+  const contentResult = await fileSystem.readFile(prompt.path, "utf8");
+  if (!contentResult.success) {
+    ctx.ui.notify(`Prompt edit failed: ${contentResult.error.message}`, "error");
+    return;
+  }
+
+  const editedContent = await ctx.ui.editor("Edit Prompt", contentResult.data);
 
   if (editedContent === undefined) {
     ctx.ui.notify("Prompt editing cancelled", "info");
     return;
   }
 
-  await fileSystem.writeFile(prompt.path, editedContent);
+  const writeResult = await fileSystem.writeFile(prompt.path, editedContent);
+  if (!writeResult.success) {
+    ctx.ui.notify(`Prompt edit failed: ${writeResult.error.message}`, "error");
+    return;
+  }
+
   ctx.ui.notify("Prompt edited");
 }
 
 export async function handleDelete(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
 ) {
-  const prompt = await pickPrompt(ctx, "Delete Prompt", scope);
+  const prompt = await pickPrompt(ctx, "Delete Prompt", scope, fileSystem);
 
   if (!prompt) {
     ctx.ui.notify("Prompt deleting cancelled", "info");
@@ -303,11 +327,13 @@ export async function handleDelete(
   }
 
   const isGroupedPrompt = prompt.deletePath !== prompt.path;
+  const deleteResult = isGroupedPrompt
+    ? await fileSystem.removeDirectory(prompt.deletePath)
+    : await fileSystem.removeFile(prompt.deletePath);
 
-  if (isGroupedPrompt) {
-    await getResourceFileSystem().removeDirectory(prompt.deletePath);
-  } else {
-    await getResourceFileSystem().removeFile(prompt.deletePath);
+  if (!deleteResult.success) {
+    ctx.ui.notify(`Prompt delete failed: ${deleteResult.error.message}`, "error");
+    return;
   }
 
   ctx.ui.notify("Prompt deleted");
@@ -326,8 +352,9 @@ async function pickPrompt(
   ctx: ExtensionContext,
   title: string,
   scope: PromptScope,
+  fileSystem: ResourceFileSystem,
 ) {
-  const choices = await listPromptChoices(scope, ctx.cwd || process.cwd());
+  const choices = await listPromptChoices(scope, ctx.cwd || process.cwd(), fileSystem);
 
   if (choices.length === 0) {
     ctx.ui.notify("No prompts found", "info");
@@ -346,30 +373,30 @@ async function pickPrompt(
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listPromptChoices(scope: PromptScope, cwd: string) {
+async function listPromptChoices(scope: PromptScope, cwd: string, fileSystem: ResourceFileSystem) {
   const directory = getPromptDirectory(scope, cwd);
   const choices: PromptChoice[] = [];
 
-  try {
-    const entries =
-      await getResourceFileSystem().readDirectoryEntries(directory);
-    choices.push(
-      ...entries.map((entry) => {
-        const entryPath = join(directory, entry.name);
-        const promptPath = entry.isDirectory()
-          ? join(entryPath, "_index.md")
-          : entryPath;
+  const entriesResult = await fileSystem.readDirectoryEntries(directory);
 
-        return {
-          path: promptPath,
-          deletePath: entryPath,
-          label: `${scope}: ${basename(entry.name, ".md")}`,
-        };
-      }),
-    );
-  } catch {
-    // Ignore missing directories.
+  if (!entriesResult.success) {
+    return choices;
   }
+
+  choices.push(
+    ...entriesResult.data.map((entry) => {
+      const entryPath = join(directory, entry.name);
+      const promptPath = entry.isDirectory()
+        ? join(entryPath, "_index.md")
+        : entryPath;
+
+      return {
+        path: promptPath,
+        deletePath: entryPath,
+        label: `${scope}: ${basename(entry.name, ".md")}`,
+      };
+    }),
+  );
 
   return choices;
 }

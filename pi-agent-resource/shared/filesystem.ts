@@ -6,47 +6,75 @@ import {
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 import { fs as memoryFs, vol } from "memfs";
-import { isDevelopmentExtensionRuntime } from "./runtime";
 
 export type ResourceDirectoryEntry = {
   name: string;
   isDirectory(): boolean;
 };
 
+export type ResourceResult<T> =
+  | {
+      error: Error;
+      success: false;
+    }
+  | {
+      data: T;
+      success: true;
+    };
+
 export interface ResourceFileSystem {
-  mkdir(path: string, options: { recursive: true }): Promise<unknown>;
-  readDirectoryNames(path: string): Promise<string[]>;
-  readDirectoryEntries(path: string): Promise<ResourceDirectoryEntry[]>;
-  readFile(path: string, encoding: "utf8"): Promise<string>;
-  removeDirectory(path: string): Promise<void>;
-  removeFile(path: string): Promise<void>;
-  writeFile(path: string, content: string): Promise<void>;
+  mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>>;
+  readDirectoryNames(path: string): Promise<ResourceResult<string[]>>;
+  readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>>;
+  readFile(path: string, encoding: "utf8"): Promise<ResourceResult<string>>;
+  removeDirectory(path: string): Promise<ResourceResult<void>>;
+  removeFile(path: string): Promise<ResourceResult<void>>;
+  writeFile(path: string, content: string): Promise<ResourceResult<void>>;
 }
 
-let configuredFileSystem: ResourceFileSystem | undefined;
-let memoryFileSystem: MemoryFileSystem | undefined;
+async function getResourceResult<T>(action: () => Promise<T>): Promise<ResourceResult<T>> {
+  try {
+    return {
+      data: await action(),
+      success: true,
+    };
+  } catch (error) {
+    return {
+      error: getResourceError(error),
+      success: false,
+    };
+  }
+}
+
+function getResourceError(error: unknown) {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(String(error));
+}
 
 export class NodeFileSystem implements ResourceFileSystem {
   mkdir(path: string, options: { recursive: true }) {
-    return nodeMkdir(path, options);
+    return getResourceResult(() => nodeMkdir(path, options));
   }
   readDirectoryNames(path: string) {
-    return nodeReaddir(path);
+    return getResourceResult(() => nodeReaddir(path));
   }
   readDirectoryEntries(path: string) {
-    return nodeReaddir(path, { withFileTypes: true });
+    return getResourceResult(() => nodeReaddir(path, { withFileTypes: true }));
   }
-  readFile(path: string, encoding: "utf8"): Promise<string> {
-    return nodeReadFile(path, encoding);
+  readFile(path: string, encoding: "utf8"): Promise<ResourceResult<string>> {
+    return getResourceResult(() => nodeReadFile(path, encoding));
   }
   removeDirectory(path: string) {
-    return nodeRm(path, { force: true, recursive: true });
+    return getResourceResult(() => nodeRm(path, { force: true, recursive: true }));
   }
   removeFile(path: string) {
-    return nodeRm(path, { force: true });
+    return getResourceResult(() => nodeRm(path, { force: true }));
   }
   writeFile(path: string, content: string) {
-    return nodeWriteFile(path, content, { encoding: "utf-8" });
+    return getResourceResult(() => nodeWriteFile(path, content, { encoding: "utf-8" }));
   }
 }
 
@@ -59,78 +87,69 @@ export class MemoryFileSystem implements ResourceFileSystem {
     vol.fromJSON(filesByPath, "/");
   }
 
-  mkdir(path: string, options: { recursive: true }): Promise<unknown> {
-    return memoryFs.promises.mkdir(path, options);
+  mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>> {
+    return getResourceResult(() => memoryFs.promises.mkdir(path, options));
   }
-  async readDirectoryNames(path: string): Promise<string[]> {
-    const names = await memoryFs.promises.readdir(path, { encoding: "utf8" });
+  readDirectoryNames(path: string): Promise<ResourceResult<string[]>> {
+    return getResourceResult(async () => {
+      const names = await memoryFs.promises.readdir(path, { encoding: "utf8" });
 
-    return names.map((name) => {
-      if (typeof name === "string") {
-        return name;
-      }
+      return names.map((name) => {
+        if (typeof name === "string") {
+          return name;
+        }
 
-      return name.toString();
+        return name.toString();
+      });
     });
   }
-  async readDirectoryEntries(path: string): Promise<ResourceDirectoryEntry[]> {
-    const entries = await memoryFs.promises.readdir(path, { withFileTypes: true });
-    const directoryEntries: ResourceDirectoryEntry[] = [];
+  readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>> {
+    return getResourceResult(async () => {
+      const entries = await memoryFs.promises.readdir(path, { withFileTypes: true });
+      const directoryEntries: ResourceDirectoryEntry[] = [];
 
-    return entries.reduce((directoryEntries, entry) => {
-      if (typeof entry === "string" || Buffer.isBuffer(entry)) {
+      return entries.reduce((directoryEntries, entry) => {
+        if (typeof entry === "string" || Buffer.isBuffer(entry)) {
+          return directoryEntries;
+        }
+
+        directoryEntries.push({
+          name: entry.name.toString(),
+          isDirectory: () => entry.isDirectory(),
+        });
+
         return directoryEntries;
+      }, directoryEntries);
+    });
+  }
+  readFile(path: string, encoding: "utf8"): Promise<ResourceResult<string>> {
+    return getResourceResult(async () => {
+      const content = await memoryFs.promises.readFile(path, { encoding: "utf8" });
+
+      if (typeof content === "string") {
+        return content;
       }
 
-      directoryEntries.push({
-        name: entry.name.toString(),
-        isDirectory: () => entry.isDirectory(),
-      });
-
-      return directoryEntries;
-    }, directoryEntries);
+      return content.toString(encoding);
+    });
   }
-  async readFile(path: string, encoding: "utf8"): Promise<string> {
-    const content = await memoryFs.promises.readFile(path, { encoding: "utf8" });
-
-    if (typeof content === "string") {
-      return content;
-    }
-
-    return content.toString(encoding);
+  removeDirectory(path: string): Promise<ResourceResult<void>> {
+    return getResourceResult(() => memoryFs.promises.rm(path, { force: true, recursive: true }));
   }
-  removeDirectory(path: string): Promise<void> {
-    return memoryFs.promises.rm(path, { force: true, recursive: true });
+  removeFile(path: string): Promise<ResourceResult<void>> {
+    return getResourceResult(() => memoryFs.promises.rm(path, { force: true }));
   }
-  removeFile(path: string): Promise<void> {
-    return memoryFs.promises.rm(path, { force: true });
-  }
-  writeFile(path: string, content: string): Promise<void> {
-    return memoryFs.promises.writeFile(path, content, { encoding: "utf8" });
+  writeFile(path: string, content: string): Promise<ResourceResult<void>> {
+    return getResourceResult(() =>
+      memoryFs.promises.writeFile(path, content, { encoding: "utf8" }),
+    );
   }
 }
 
-export function getResourceFileSystem() {
-  if (configuredFileSystem) {
-    return configuredFileSystem;
-  }
-
-  if (isDevelopmentExtensionRuntime()) {
-    memoryFileSystem ??= new MemoryFileSystem();
-    return memoryFileSystem;
-  }
-
+export function getNodeResourceFileSystem() {
   return new NodeFileSystem();
 }
 
-export function useMemoryResourceFileSystem() {
-  memoryFileSystem ??= new MemoryFileSystem();
-  configuredFileSystem = memoryFileSystem;
-  memoryFileSystem.reset();
-  return memoryFileSystem;
-}
-
-export function resetResourceFileSystem() {
-  configuredFileSystem = undefined;
-  memoryFileSystem?.reset();
+export function getMemoryResourceFileSystem() {
+  return new MemoryFileSystem();
 }
