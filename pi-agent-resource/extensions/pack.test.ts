@@ -52,7 +52,7 @@ const mockCustomUIFactory = async <T>(
 
 describe("Pack", () => {
   describe("Testing rootPackResourceReducer", () => {
-    it("creates a pack when create is passed in", async () => {
+    it("creates a pack when create is passed in", () => {
       const output = "front-end";
       const selectionChoices = ["prompts", "skills", "agents"] as const;
 
@@ -67,7 +67,7 @@ describe("Pack", () => {
       const mockCreatePackResourceSelector =
         getMockCreatePackResourceSelector(selectionChoices);
 
-      await rootPackResourceReducer("create", {
+      rootPackResourceReducer("create", {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
       });
@@ -81,7 +81,7 @@ describe("Pack", () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
     });
 
-    it("deletes a pack when delete is passed in", async () => {
+    it("deletes a pack when delete is passed in", () => {
       const output = "C#";
 
       const ctx = {
@@ -90,7 +90,7 @@ describe("Pack", () => {
           notify: vi.fn(),
         },
       };
-      await rootPackResourceReducer("delete", { ctx: createTestContext(ctx) });
+      rootPackResourceReducer("delete", { ctx: createTestContext(ctx) });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
         "pack",
