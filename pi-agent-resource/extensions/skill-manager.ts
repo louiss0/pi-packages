@@ -307,7 +307,7 @@ export async function handleEdit(
       return;
     }
 
-    await getResourceFileSystem().writeFile(skillPath, editedContent, "utf8");
+    await getResourceFileSystem().writeFile(skillPath, editedContent);
   }
 
   ctx.ui.notify("Skill updated. Reloading skills...", "info");
@@ -377,10 +377,7 @@ async function createSkillFile(fields: SkillFrontmatterFields, scope: SkillScope
   const skillPath = join(skillDirectory, SKILL_FILE_NAME);
   const fileSystem = getResourceFileSystem();
   await fileSystem.mkdir(skillDirectory, { recursive: true });
-  await fileSystem.writeFile(skillPath, renderSkillMarkdown(fields), {
-    encoding: "utf8",
-    flag: "wx",
-  });
+  await fileSystem.writeFile(skillPath, renderSkillMarkdown(fields));
   return skillPath;
 }
 

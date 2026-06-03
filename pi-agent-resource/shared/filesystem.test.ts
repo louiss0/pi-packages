@@ -26,7 +26,6 @@ describe("shared/filesystem", () => {
     await fileSystem.writeFile(
       "/workspace/.pi/agents/test.md",
       "hello",
-      "utf8",
     );
 
     await expect(
@@ -68,7 +67,6 @@ describe("shared/filesystem", () => {
     await fileSystem.writeFile(
       "/workspace/.pi/agent/skills/test-skill/SKILL.md",
       "skill",
-      "utf8",
     );
     await fileSystem.removeFile(
       "/workspace/.pi/agent/skills/test-skill/SKILL.md",
@@ -84,7 +82,6 @@ describe("shared/filesystem", () => {
     await fileSystem.writeFile(
       "/workspace/.pi/agent/skills/test-skill/SKILL.md",
       "skill",
-      "utf8",
     );
     await fileSystem.removeDirectory("/workspace/.pi/agent/skills/test-skill");
 

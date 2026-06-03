@@ -13,8 +13,6 @@ export type ResourceDirectoryEntry = {
   isDirectory(): boolean;
 };
 
-export type ResourceWriteFileOptions = "utf8" | { encoding: "utf8"; flag: "wx" };
-
 export interface ResourceFileSystem {
   mkdir(path: string, options: { recursive: true }): Promise<unknown>;
   readDirectoryNames(path: string): Promise<string[]>;
@@ -22,7 +20,7 @@ export interface ResourceFileSystem {
   readFile(path: string, encoding: "utf8"): Promise<string>;
   removeDirectory(path: string): Promise<void>;
   removeFile(path: string): Promise<void>;
-  writeFile(path: string, content: string, options: ResourceWriteFileOptions): Promise<void>;
+  writeFile(path: string, content: string): Promise<void>;
 }
 
 let configuredFileSystem: ResourceFileSystem | undefined;

@@ -167,9 +167,14 @@ export async function handleCreate(ctx: ExtensionContext, scope: AgentScope = "g
   const fileSystem = getResourceFileSystem();
   const agentDirectory = getAgentDirectory(scope, ctx.cwd || process.cwd());
   const filePath = join(agentDirectory, `${values.name}.md`);
-  await fileSystem.mkdir(agentDirectory, { recursive: true });
-  await fileSystem.writeFile(filePath, renderFrontmatter(values), "utf8");
-  ctx.ui.notify("Agent created");
+
+  try {
+    await fileSystem.mkdir(agentDirectory, { recursive: true });
+    await fileSystem.writeFile(filePath, renderFrontmatter(values));
+    ctx.ui.notify("Agent created");
+  } catch (error) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", error), "error");
+  }
 }
 
 export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "global") {
@@ -189,8 +194,12 @@ export async function handleEdit(ctx: ExtensionContext, scope: AgentScope = "glo
     return;
   }
 
-  await fileSystem.writeFile(agent.path, editedContent, "utf8");
-  ctx.ui.notify("Agent edited");
+  try {
+    await fileSystem.writeFile(agent.path, editedContent);
+    ctx.ui.notify("Agent edited");
+  } catch (error) {
+    ctx.ui.notify(getFileSystemErrorMessage("Agent edit failed", error), "error");
+  }
 }
 
 export async function handleDelete(ctx: ExtensionContext, scope: AgentScope = "global") {
@@ -212,6 +221,14 @@ function renderFrontmatter(values: AgentFields) {
     "---",
     "",
   ].join("\n");
+}
+
+function getFileSystemErrorMessage(action: string, error: unknown) {
+  if (error instanceof Error) {
+    return `${action}: ${error.message}`;
+  }
+
+  return action;
 }
 
 async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope) {

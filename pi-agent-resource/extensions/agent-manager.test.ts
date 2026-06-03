@@ -243,6 +243,27 @@ describe("extensions/agent-manager", () => {
       expect(notify).toHaveBeenCalledWith("Agent created");
     });
 
+    it("reports filesystem errors when agent creation fails", async () => {
+      const custom = vi.fn().mockResolvedValueOnce({
+        name: "oracle",
+        description: "made for careful research and deep code review work",
+        tools: "read,write,bash",
+        model: "claude",
+      });
+      const notify = vi.fn();
+      vi.spyOn(memoryFileSystem, "writeFile").mockRejectedValueOnce(
+        new Error("write denied"),
+      );
+
+      await handleCreate({ ui: { custom, notify } } as never);
+
+      expect(notify).toHaveBeenCalledWith(
+        "Agent creation failed: write denied",
+        "error",
+      );
+      expect(notify).not.toHaveBeenCalledWith("Agent created");
+    });
+
     it("reports cancellation when agent creation is dismissed", async () => {
       const notify = vi.fn();
 
@@ -291,6 +312,26 @@ describe("extensions/agent-manager", () => {
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
       expect(content).toBe("updated local agent content");
       expect(notify).toHaveBeenCalledWith("Agent edited");
+    });
+
+    it("reports filesystem errors when agent editing fails", async () => {
+      memoryFileSystem.seed({
+        [expectedAgentPath]: "---\nname: oracle\n---\n",
+      });
+      const select = vi.fn().mockResolvedValueOnce("global: oracle");
+      const editor = vi.fn().mockResolvedValueOnce("updated agent content");
+      const notify = vi.fn();
+      vi.spyOn(memoryFileSystem, "writeFile").mockRejectedValueOnce(
+        new Error("write denied"),
+      );
+
+      await handleEdit({ ui: { notify, select, editor } } as never);
+
+      expect(notify).toHaveBeenCalledWith(
+        "Agent edit failed: write denied",
+        "error",
+      );
+      expect(notify).not.toHaveBeenCalledWith("Agent edited");
     });
   });
 

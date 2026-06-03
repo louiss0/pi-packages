@@ -263,7 +263,6 @@ export async function handleCreate(
   await fileSystem.writeFile(
     filePath,
     `${renderFrontmatter(values)}\n${template}`.trimEnd() + "\n",
-    "utf8",
   );
   ctx.ui.notify("Prompt created");
 }
@@ -288,7 +287,7 @@ export async function handleEdit(
     return;
   }
 
-  await fileSystem.writeFile(prompt.path, editedContent, "utf8");
+  await fileSystem.writeFile(prompt.path, editedContent);
   ctx.ui.notify("Prompt edited");
 }
 
