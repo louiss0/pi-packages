@@ -5,7 +5,6 @@ import type { TUI } from "@earendil-works/pi-tui";
 import {
   getResourceFileSystem,
   resetResourceFileSystem,
-  seedMemoryResourceFileSystem,
   useMemoryResourceFileSystem,
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
@@ -35,6 +34,7 @@ describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
   const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
   const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
+  let memoryFileSystem: ReturnType<typeof useMemoryResourceFileSystem>;
 
   function createTheme() {
     return {
@@ -55,7 +55,7 @@ describe("extensions/agent-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    useMemoryResourceFileSystem();
+    memoryFileSystem = useMemoryResourceFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -259,7 +259,7 @@ describe("extensions/agent-manager", () => {
 
   describe("handleEdit", () => {
     it("edits the selected global agent", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
@@ -277,7 +277,7 @@ describe("extensions/agent-manager", () => {
     });
 
     it("edits the selected local agent", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
@@ -296,7 +296,7 @@ describe("extensions/agent-manager", () => {
 
   describe("handleDelete", () => {
     it("deletes the selected global agent", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
@@ -312,7 +312,7 @@ describe("extensions/agent-manager", () => {
     });
 
     it("deletes the selected local agent", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");

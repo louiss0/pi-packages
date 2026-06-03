@@ -5,7 +5,6 @@ import { Form } from "@code-fixer-23/pi-form-components";
 import {
   getResourceFileSystem,
   resetResourceFileSystem,
-  seedMemoryResourceFileSystem,
   useMemoryResourceFileSystem,
 } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
@@ -50,6 +49,7 @@ describe("extensions/prompt-manager", () => {
     "prompts",
     "create-react-component.md",
   );
+  let memoryFileSystem: ReturnType<typeof useMemoryResourceFileSystem>;
 
   function createTheme() {
     return {
@@ -70,7 +70,7 @@ describe("extensions/prompt-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    useMemoryResourceFileSystem();
+    memoryFileSystem = useMemoryResourceFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -217,7 +217,7 @@ describe("extensions/prompt-manager", () => {
 
   describe("handleEdit", () => {
     it("edits the selected global prompt", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi
@@ -241,7 +241,7 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("edits the selected local prompt", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi
@@ -272,7 +272,7 @@ describe("extensions/prompt-manager", () => {
 
   describe("handleDelete", () => {
     it("deletes the selected global prompt", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi
@@ -289,7 +289,7 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("deletes the selected local prompt", async () => {
-      seedMemoryResourceFileSystem({
+      memoryFileSystem.seed({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi

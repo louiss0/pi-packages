@@ -1,12 +1,13 @@
 import {
   getResourceFileSystem,
   resetResourceFileSystem,
-  seedMemoryResourceFileSystem,
   useMemoryResourceFileSystem,
 } from "./filesystem";
 import { resetDevelopmentExtensionNotice } from "./runtime";
 
 describe("shared/filesystem", () => {
+  let memoryFileSystem: ReturnType<typeof useMemoryResourceFileSystem>;
+
   beforeEach(() => {
     vi.unstubAllEnvs();
     resetDevelopmentExtensionNotice();
@@ -34,8 +35,8 @@ describe("shared/filesystem", () => {
   });
 
   it("can seed and clear the memory filesystem explicitly in tests", async () => {
-    useMemoryResourceFileSystem();
-    seedMemoryResourceFileSystem({
+    memoryFileSystem = useMemoryResourceFileSystem();
+    memoryFileSystem.seed({
       "/workspace/.pi/prompts/test.md": "prompt",
     });
 
@@ -47,7 +48,7 @@ describe("shared/filesystem", () => {
     ).resolves.toBe("prompt");
 
     resetResourceFileSystem();
-    useMemoryResourceFileSystem();
+    memoryFileSystem = useMemoryResourceFileSystem();
 
     await expect(
       getResourceFileSystem().readFile(
@@ -58,7 +59,7 @@ describe("shared/filesystem", () => {
   });
 
   it("removes files and directories with explicit methods", async () => {
-    useMemoryResourceFileSystem();
+    memoryFileSystem = useMemoryResourceFileSystem();
     const fileSystem = getResourceFileSystem();
 
     await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {

@@ -13,51 +13,44 @@ export type ResourceDirectoryEntry = {
   isDirectory(): boolean;
 };
 
-export type ResourceWriteFileOptions =
-  | "utf8"
-  | { encoding: "utf8"; flag: "wx" };
+export type ResourceWriteFileOptions = "utf8" | { encoding: "utf8"; flag: "wx" };
 
-export type ResourceFileSystem = {
+export interface ResourceFileSystem {
   mkdir(path: string, options: { recursive: true }): Promise<unknown>;
   readDirectoryNames(path: string): Promise<string[]>;
   readDirectoryEntries(path: string): Promise<ResourceDirectoryEntry[]>;
   readFile(path: string, encoding: "utf8"): Promise<string>;
   removeDirectory(path: string): Promise<void>;
   removeFile(path: string): Promise<void>;
-  writeFile(
-    path: string,
-    content: string,
-    options: ResourceWriteFileOptions,
-  ): Promise<void>;
-};
+  writeFile(path: string, content: string, options: ResourceWriteFileOptions): Promise<void>;
+}
 
 let configuredFileSystem: ResourceFileSystem | undefined;
+let memoryFileSystem: MemoryFileSystem | undefined;
 
-const nodeFileSystem: ResourceFileSystem = {
-  mkdir(path, options) {
+export class NodeFileSystem implements ResourceFileSystem {
+  mkdir(path: string, options: { recursive: true }): Promise<unknown> {
     return nodeMkdir(path, options);
-  },
-  readDirectoryNames(path) {
+  }
+  readDirectoryNames(path: string): Promise<string[]> {
     return nodeReaddir(path) as Promise<string[]>;
-  },
-  readDirectoryEntries(path) {
-    return nodeReaddir(path, { withFileTypes: true }) as Promise<
-      ResourceDirectoryEntry[]
-    >;
-  },
-  readFile(path, encoding) {
+  }
+  readDirectoryEntries(path: string): Promise<ResourceDirectoryEntry[]> {
+    return nodeReaddir(path, { withFileTypes: true }) as Promise<ResourceDirectoryEntry[]>;
+  }
+  readFile(path: string, encoding: "utf8"): Promise<string> {
     return nodeReadFile(path, encoding);
-  },
-  removeDirectory(path) {
+  }
+  removeDirectory(path: string): Promise<void> {
     return nodeRm(path, { force: true, recursive: true });
-  },
-  removeFile(path) {
+  }
+  removeFile(path: string): Promise<void> {
     return nodeRm(path, { force: true });
-  },
-  writeFile(path, content, options) {
+  }
+  writeFile(path: string, content: string, options: ResourceWriteFileOptions): Promise<void> {
     return nodeWriteFile(path, content, options);
-  },
-};
+  }
+}
 
 function toMemoryWriteFileOptions(options: ResourceWriteFileOptions) {
   if (typeof options === "string") {
@@ -67,35 +60,39 @@ function toMemoryWriteFileOptions(options: ResourceWriteFileOptions) {
   return options;
 }
 
-const memoryFileSystem: ResourceFileSystem = {
-  mkdir(path, options) {
+export class MemoryFileSystem implements ResourceFileSystem {
+  reset() {
+    vol.reset();
+  }
+
+  seed(filesByPath: Record<string, string>) {
+    vol.fromJSON(filesByPath, "/");
+  }
+
+  mkdir(path: string, options: { recursive: true }): Promise<unknown> {
     return memoryFs.promises.mkdir(path, options);
-  },
-  readDirectoryNames(path) {
+  }
+  readDirectoryNames(path: string): Promise<string[]> {
     return memoryFs.promises.readdir(path) as Promise<string[]>;
-  },
-  readDirectoryEntries(path) {
+  }
+  readDirectoryEntries(path: string): Promise<ResourceDirectoryEntry[]> {
     return memoryFs.promises.readdir(path, { withFileTypes: true }) as Promise<
       ResourceDirectoryEntry[]
     >;
-  },
-  readFile(path, encoding) {
+  }
+  readFile(path: string, encoding: "utf8"): Promise<string> {
     return memoryFs.promises.readFile(path, encoding) as Promise<string>;
-  },
-  removeDirectory(path) {
+  }
+  removeDirectory(path: string): Promise<void> {
     return memoryFs.promises.rm(path, { force: true, recursive: true });
-  },
-  removeFile(path) {
+  }
+  removeFile(path: string): Promise<void> {
     return memoryFs.promises.rm(path, { force: true });
-  },
-  writeFile(path, content, options) {
-    return memoryFs.promises.writeFile(
-      path,
-      content,
-      toMemoryWriteFileOptions(options),
-    );
-  },
-};
+  }
+  writeFile(path: string, content: string, options: ResourceWriteFileOptions): Promise<void> {
+    return memoryFs.promises.writeFile(path, content, toMemoryWriteFileOptions(options));
+  }
+}
 
 export function getResourceFileSystem() {
   if (configuredFileSystem) {
@@ -103,25 +100,21 @@ export function getResourceFileSystem() {
   }
 
   if (isDevelopmentExtensionRuntime()) {
+    memoryFileSystem ??= new MemoryFileSystem();
     return memoryFileSystem;
   }
 
-  return nodeFileSystem;
+  return new NodeFileSystem();
 }
 
 export function useMemoryResourceFileSystem() {
+  memoryFileSystem ??= new MemoryFileSystem();
   configuredFileSystem = memoryFileSystem;
-  vol.reset();
+  memoryFileSystem.reset();
   return memoryFileSystem;
-}
-
-export function seedMemoryResourceFileSystem(
-  filesByPath: Record<string, string>,
-) {
-  vol.fromJSON(filesByPath, "/");
 }
 
 export function resetResourceFileSystem() {
   configuredFileSystem = undefined;
-  vol.reset();
+  memoryFileSystem?.reset();
 }
