@@ -86,13 +86,15 @@ describe("shared/components", () => {
         vi.fn(),
       );
 
-      const lines = getRenderedContentLines(multiSelect.render(80));
+      const lines = multiSelect.render(80);
+      const contentLines = getRenderedContentLines(lines);
 
-      expect(lines[0]).toContain("What fruits do you like?");
-      expect(lines[1]).toContain("[ ] Apple");
-      expect(lines[2]).toContain("[ ] Banana");
-      expect(lines[3]).toContain("[ ] Orange");
-      expect(lines[2]).toContain("Sweet");
+      expect(lines[1]).toContain("What fruits do you like?");
+      expect(lines[2]?.trim()).toBe("");
+      expect(contentLines[1]).toContain("[ ] Apple");
+      expect(contentLines[2]).toContain("[ ] Banana");
+      expect(contentLines[3]).toContain("[ ] Orange");
+      expect(contentLines[2]).toContain("Sweet");
     });
 
     it("toggles the highlighted item when the user presses space", () => {

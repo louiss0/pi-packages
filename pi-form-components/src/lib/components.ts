@@ -100,7 +100,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 
     this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title))));
 
-    const listSpacing = Math.max(0, Math.round(spacing) - 1);
+    const listSpacing = Math.max(0, Math.round(spacing));
     if (listSpacing > 0) {
       this.addChild(new Spacer(listSpacing));
     }
