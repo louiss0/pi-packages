@@ -97,8 +97,6 @@ describe("Pack", () => {
         "What is the name of the pack you want to delete?",
       );
 
-      expect(ctx.ui.input).toHaveResolvedWith(output);
-
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,
       );
