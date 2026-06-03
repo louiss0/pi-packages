@@ -47,17 +47,9 @@ export class NodeFileSystem implements ResourceFileSystem {
   removeFile(path: string) {
     return nodeRm(path, { force: true });
   }
-  writeFile(path: string, content: string, options: ResourceWriteFileOptions) {
-    return nodeWriteFile(path, content, options);
+  writeFile(path: string, content: string) {
+    return nodeWriteFile(path, content, { encoding: "utf-8" });
   }
-}
-
-function toMemoryWriteFileOptions(options: ResourceWriteFileOptions) {
-  if (typeof options === "string") {
-    return { encoding: options };
-  }
-
-  return options;
 }
 
 export class MemoryFileSystem implements ResourceFileSystem {
@@ -87,18 +79,18 @@ export class MemoryFileSystem implements ResourceFileSystem {
     const entries = await memoryFs.promises.readdir(path, { withFileTypes: true });
     const directoryEntries: ResourceDirectoryEntry[] = [];
 
-    for (const entry of entries) {
+    return entries.reduce((directoryEntries, entry) => {
       if (typeof entry === "string" || Buffer.isBuffer(entry)) {
-        continue;
+        return directoryEntries;
       }
 
       directoryEntries.push({
         name: entry.name.toString(),
         isDirectory: () => entry.isDirectory(),
       });
-    }
 
-    return directoryEntries;
+      return directoryEntries;
+    }, directoryEntries);
   }
   async readFile(path: string, encoding: "utf8"): Promise<string> {
     const content = await memoryFs.promises.readFile(path, { encoding: "utf8" });
@@ -115,8 +107,8 @@ export class MemoryFileSystem implements ResourceFileSystem {
   removeFile(path: string): Promise<void> {
     return memoryFs.promises.rm(path, { force: true });
   }
-  writeFile(path: string, content: string, options: ResourceWriteFileOptions): Promise<void> {
-    return memoryFs.promises.writeFile(path, content, toMemoryWriteFileOptions(options));
+  writeFile(path: string, content: string): Promise<void> {
+    return memoryFs.promises.writeFile(path, content, { encoding: "utf8" });
   }
 }
 
