@@ -39,8 +39,9 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 {
   #items: T;
   // MultiSelect owns checked state here. SelectList is only used to render
-  // and navigate the current item, so we rebuild its labels after each toggle.
+  // item rows, so MultiSelect also owns the highlighted index.
   #selectedValues: Array<T[number]["value"]> = [];
+  #selectedIndex = 0;
   #selectList: SelectList;
   #tui: TUI;
   #theme: Theme;
@@ -97,8 +98,12 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
       },
     };
 
-    this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title)), 2, 3));
-    this.addChild(new Spacer(Math.round(spacing * 0.75)));
+    this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title))));
+
+    const listSpacing = Math.max(0, Math.round(spacing) - 1);
+    if (listSpacing > 0) {
+      this.addChild(new Spacer(listSpacing));
+    }
 
     this.#selectList = this.#createSelectList();
     this.addChild(this.#selectList);
@@ -111,17 +116,32 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
       return;
     }
 
+    if (matchesKey(data, Key.up)) {
+      this.#moveSelection(-1);
+      this.#tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.down)) {
+      this.#moveSelection(1);
+      this.#tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.escape)) {
+      this.#done(null);
+      return;
+    }
+
     if (matchesKey(data, Key.enter)) {
       this.#done(this.#selectedValues);
       return;
     }
-
-    this.#selectList.handleInput(data);
-    this.#tui.requestRender();
   }
 
   override invalidate(): void {
     this.#selectedValues = [];
+    this.#selectedIndex = 0;
     this.#syncSelectList();
     this.#tui.requestRender();
   }
@@ -161,7 +181,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 
     const toggledValue = selectedItem.value as T[number]["value"];
     this.#selectedValues = this.#getNextSelectedValues(toggledValue);
-    this.#syncSelectList(toggledValue);
+    this.#syncSelectList();
   }
 
   #getNextSelectedValues(toggledValue: T[number]["value"]) {
@@ -173,17 +193,19 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     return [...this.#selectedValues, toggledValue];
   }
 
-  #syncSelectList(selectedValue?: T[number]["value"]) {
-    const nextSelectList = this.#createSelectList();
-
-    if (selectedValue !== undefined) {
-      const nextItems = this.#getRenderedItems();
-      const nextSelectedIndex = nextItems.findIndex((item) => item.value === selectedValue);
-
-      if (nextSelectedIndex >= 0) {
-        nextSelectList.setSelectedIndex(nextSelectedIndex);
-      }
+  #moveSelection(direction: 1 | -1) {
+    if (this.#items.length === 0) {
+      return;
     }
+
+    this.#selectedIndex =
+      (this.#selectedIndex + direction + this.#items.length) % this.#items.length;
+    this.#syncSelectList();
+  }
+
+  #syncSelectList() {
+    const nextSelectList = this.#createSelectList();
+    nextSelectList.setSelectedIndex(this.#selectedIndex);
 
     this.removeChild(this.#selectList);
     this.#selectList = nextSelectList;

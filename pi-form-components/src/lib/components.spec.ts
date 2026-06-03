@@ -13,8 +13,11 @@ vi.mock("@earendil-works/pi-tui", async () => {
   };
 });
 
-const UP_ARROW = "\u001b[A";
 const DOWN_ARROW = "\u001b[B";
+
+function getRenderedContentLines(lines: string[]) {
+  return lines.filter((line) => line.trim().length > 0);
+}
 
 function createTheme() {
   return new Theme(
@@ -83,12 +86,13 @@ describe("shared/components", () => {
         vi.fn(),
       );
 
-      const lines = multiSelect.render(80).join("\n");
+      const lines = getRenderedContentLines(multiSelect.render(80));
 
-      expect(lines).toContain("What fruits do you like?");
-      expect(lines).toContain("→ [ ] Apple");
-      expect(lines).toContain("[ ] Banana");
-      expect(lines).toContain("Sweet");
+      expect(lines[0]).toContain("What fruits do you like?");
+      expect(lines[1]).toContain("[ ] Apple");
+      expect(lines[2]).toContain("[ ] Banana");
+      expect(lines[3]).toContain("[ ] Orange");
+      expect(lines[2]).toContain("Sweet");
     });
 
     it("toggles the highlighted item when the user presses space", () => {
@@ -109,7 +113,7 @@ describe("shared/components", () => {
       multiSelect.handleInput(Key.space);
 
       const lines = multiSelect.render(80).join("\n");
-      expect(lines).toContain("→ [x] Apple");
+      expect(lines).toContain("[x] Apple");
       expect(lines).toContain("[ ] Banana");
       expect(lines).toContain("[ ] Orange");
     });
@@ -129,12 +133,13 @@ describe("shared/components", () => {
         vi.fn(),
       );
 
-      multiSelect.handleInput(DOWN_ARROW);
+      multiSelect.handleInput(Key.down);
 
-      const lines = multiSelect.render(80).join("\n");
-      expect(lines).toContain("[ ] Apple");
-      expect(lines).toContain("→ [ ] Banana");
-      expect(lines).toContain("[ ] Orange");
+      const lines = getRenderedContentLines(multiSelect.render(80));
+      expect(lines[0]).toContain("What fruits do you like?");
+      expect(lines[1]).toContain("[ ] Apple");
+      expect(lines[2]).toContain("[ ] Banana");
+      expect(lines[3]).toContain("[ ] Orange");
     });
 
     it("changes focus when the user presses down twice then up once", () => {
@@ -152,14 +157,15 @@ describe("shared/components", () => {
         vi.fn(),
       );
 
-      multiSelect.handleInput(DOWN_ARROW);
-      multiSelect.handleInput(DOWN_ARROW);
-      multiSelect.handleInput(UP_ARROW);
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.up);
 
-      const lines = multiSelect.render(80).join("\n");
-      expect(lines).toContain("[ ] Game of Thrones");
-      expect(lines).toContain("→ [ ] Pokemon");
-      expect(lines).toContain("[ ] Orange Is The New Black");
+      const lines = getRenderedContentLines(multiSelect.render(80));
+      expect(lines[0]).toContain("What shows are you into?");
+      expect(lines[1]).toContain("[ ] Game of Thrones");
+      expect(lines[2]).toContain("[ ] Pokemon");
+      expect(lines[3]).toContain("[ ] Orange Is The New Black");
     });
 
     it("allows selecting multiple items while preserving item descriptions", () => {
@@ -179,18 +185,19 @@ describe("shared/components", () => {
       );
 
       multiSelect.handleInput(Key.space);
-      multiSelect.handleInput(DOWN_ARROW);
+      multiSelect.handleInput(Key.down);
       multiSelect.handleInput(Key.space);
-      multiSelect.handleInput(DOWN_ARROW);
-      multiSelect.handleInput(DOWN_ARROW);
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.down);
       multiSelect.handleInput(Key.space);
 
-      const lines = multiSelect.render(80).join("\n");
-      expect(lines).toContain("[x] Strawberry");
-      expect(lines).toContain("[x] Vanilla");
-      expect(lines).toContain("[ ] Caramel");
-      expect(lines).toContain("→ [x] Banana");
-      expect(lines).toContain("Fruit");
+      const lines = getRenderedContentLines(multiSelect.render(80));
+      expect(lines[0]).toContain("What ice cream do you like?");
+      expect(lines[1]).toContain("[x] Strawberry");
+      expect(lines[2]).toContain("[x] Vanilla");
+      expect(lines[3]).toContain("[ ] Caramel");
+      expect(lines[4]).toContain("[x] Banana");
+      expect(lines[4]).toContain("Fruit");
     });
 
     it("submits the selected values in toggle order", () => {
@@ -210,7 +217,7 @@ describe("shared/components", () => {
       );
 
       multiSelect.handleInput(Key.space);
-      multiSelect.handleInput(DOWN_ARROW);
+      multiSelect.handleInput(Key.down);
       multiSelect.handleInput(Key.space);
       multiSelect.handleInput(Key.enter);
 
