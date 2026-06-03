@@ -5,24 +5,18 @@ function getDevelopmentNotice(extensionName: string) {
 }
 
 export function isDevelopmentExtensionRuntime() {
-  return process.env.PI_RESOURCE_DEV === "1";
+  return import.meta.env.MODE === "development";
 }
 
 export function notifyWhenUsingDevelopmentExtension(
   extensionName: string,
   ctx: {
     ui: {
-      notify(
-        message: string,
-        level?: "info" | "error" | "warning" | "success",
-      ): void;
+      notify(message: string, level?: "info" | "error" | "warning" | "success"): void;
     };
   },
 ) {
-  if (
-    !isDevelopmentExtensionRuntime() ||
-    shownDevelopmentNotices.has(extensionName)
-  ) {
+  if (!isDevelopmentExtensionRuntime() || shownDevelopmentNotices.has(extensionName)) {
     return;
   }
 

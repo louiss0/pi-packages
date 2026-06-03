@@ -166,10 +166,30 @@ export function rootPackResourceReducer(
     ctx: ExtensionCommandContext;
   },
 ) {
+  const { createPackResourceSelector, ctx } = deps;
+
   return (
     {
-      [CREATE_COMMAND]: async () => {},
-      [DELETE_COMMAND]: async () => {},
+      [CREATE_COMMAND]: async () => {
+        const packName = await ctx.ui.input(
+          PACK_LABEL,
+          "What is the name of your agent pack?",
+        );
+
+        if (createPackResourceSelector) {
+          await ctx.ui.custom(createPackResourceSelector);
+        }
+
+        ctx.ui.notify(`Pack created successfully with name '${packName}'`);
+      },
+      [DELETE_COMMAND]: async () => {
+        const packName = await ctx.ui.input(
+          PACK_LABEL,
+          "What is the name of the pack you want to delete?",
+        );
+
+        ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
+      },
     } satisfies Record<PackCommand, () => Promise<void>>
   )[arg]();
 }

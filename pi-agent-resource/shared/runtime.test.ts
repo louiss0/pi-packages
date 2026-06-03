@@ -10,14 +10,14 @@ describe("shared/runtime", () => {
     resetDevelopmentExtensionNotice();
   });
 
-  it("detects development mode from a runtime env flag", () => {
-    vi.stubEnv("PI_RESOURCE_DEV", "1");
+  it("detects development mode from Vite import metadata", () => {
+    vi.stubEnv("MODE", "development");
 
     expect(isDevelopmentExtensionRuntime()).toBe(true);
   });
 
   it("notifies once per extension when the extension is running from development sources", () => {
-    vi.stubEnv("PI_RESOURCE_DEV", "1");
+    vi.stubEnv("MODE", "development");
     const notify = vi.fn();
     const ctx = { ui: { notify } };
 
@@ -39,7 +39,7 @@ describe("shared/runtime", () => {
   });
 
   it("stays quiet when development mode is disabled", () => {
-    vi.stubEnv("PI_RESOURCE_DEV", "0");
+    vi.stubEnv("MODE", "test");
     const notify = vi.fn();
 
     notifyWhenUsingDevelopmentExtension("agent-manager", { ui: { notify } });

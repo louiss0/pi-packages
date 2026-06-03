@@ -18,7 +18,7 @@ describe("shared/filesystem", () => {
   });
 
   it("uses memfs when development mode is enabled", async () => {
-    vi.stubEnv("PI_RESOURCE_DEV", "1");
+    vi.stubEnv("MODE", "development");
     const fileSystem = getResourceFileSystem();
 
     await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });

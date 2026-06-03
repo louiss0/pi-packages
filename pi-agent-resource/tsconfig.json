@@ -4,7 +4,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["vitest/globals"],
+    "types": ["node", "vite/client", "vitest/globals", "vitest/importMeta"],
     "strict": true,
     "skipLibCheck": true,
     "composite": true,
