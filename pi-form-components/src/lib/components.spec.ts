@@ -1,8 +1,17 @@
 import { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Input, Key, Text, type TUI } from "@earendil-works/pi-tui";
+import { Container, Input, Key, matchesKey, Text, type TUI } from "@earendil-works/pi-tui";
 import { vi } from "vitest";
+import { itemChoiceStyle, MultiSelect, Picker } from "./components";
 
-import { Picker } from "./components";
+vi.mock("@earendil-works/pi-tui", () => {
+  const module =
+    vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+
+  return {
+    ...module,
+    matchesKey: (data: string, key: string) => data === key,
+  };
+});
 
 const DOWN_ARROW = "\u001b[B";
 
@@ -64,6 +73,153 @@ describe("shared/components", () => {
       requestRender: vi.fn(),
     } as unknown as TUI;
   }
+
+  describe("MultiSelect", () => {
+    it("renders the label and selected items", () => {
+      const multiSelect = new MultiSelect(
+        {
+          title: "What fruits do you like?",
+          items: [
+            { value: "apple", label: "Apple" },
+            { value: "banana", label: "Banana" },
+            { value: "orange", label: "Orange" },
+          ],
+        },
+        createTui(),
+        createTheme(),
+        vi.fn(),
+      );
+
+      const lines = multiSelect.render(45);
+      expect(lines[0]).toContain("What fruits do you like?");
+      expect(lines[1]).toContain("[ ] Apple");
+      expect(lines[2]).toContain("[ ] Banana");
+      expect(lines[3]).toContain("[ ] Orange");
+    });
+
+    it("renders the first selected item when the user presses space", () => {
+      const multiSelect = new MultiSelect(
+        {
+          title: "What fruits do you like?",
+          items: [
+            { value: "apple", label: "Apple" },
+            { value: "banana", label: "Banana" },
+            { value: "orange", label: "Orange" },
+          ],
+        },
+        createTui(),
+        createTheme(),
+        vi.fn(),
+      );
+
+      multiSelect.handleInput(Key.space);
+
+      const lines = multiSelect.render(45).join("\n");
+      expect(lines).toContain("What fruits do you like?");
+      expect(lines).toContain("[x] Apple");
+      expect(lines).toContain("[ ] Banana");
+      expect(lines).toContain("[ ] Orange");
+    });
+
+    it("Changes focus when the user presses down once", () => {
+      const multiSelect = new MultiSelect(
+        {
+          title: "What fruits do you like?",
+          items: [
+            { value: "apple", label: "Apple" },
+            { value: "banana", label: "Banana" },
+            { value: "orange", label: "Orange" },
+          ],
+        },
+        createTui(),
+        createTheme(),
+        vi.fn(),
+      );
+
+      multiSelect.handleInput(Key.down);
+
+      const lines = multiSelect.render(45).join("\n");
+      expect(lines).toContain("What fruits do you like?");
+      expect(lines).toContain("[ ] Apple");
+      expect(lines).toContain("> [ ] Banana");
+      expect(lines).toContain("[ ] Orange");
+    });
+
+    it("Changes focus when the user presses down twice then up once", () => {
+      const multiSelect = new MultiSelect(
+        {
+          title: "What shows are you into?",
+          items: [
+            { value: "GoT", label: "Game of Thrones" },
+            { value: "pokemon", label: "Pokemon" },
+            { value: "orange-is-the-new-black", label: "Orange Is The New Black" },
+          ],
+        },
+        createTui(),
+        createTheme(),
+        vi.fn(),
+      );
+
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.up);
+
+      const lines = multiSelect.render(45).join("\n");
+      expect(lines).toContain("What shows are you into");
+      expect(lines).toContain("[ ] Game of Thrones");
+      expect(lines).toContain("> [ ] Pokemon");
+      expect(lines).toContain("[ ] Orange Is The New Black");
+    });
+
+    it("User can select multiple items", () => {
+      const multiSelect = new MultiSelect(
+        {
+          title: "What ice cream do you like?",
+          items: [
+            { value: "strawberry", label: "Strawberry" },
+            { value: "vanilla", label: "Vanilla" },
+            { value: "caramel", label: "Caramel" },
+            { value: "banana", label: "Banana" },
+          ],
+        },
+        createTui(),
+        createTheme(),
+        vi.fn(),
+      );
+
+      multiSelect.handleInput(Key.space);
+      multiSelect.handleInput(Key.space);
+      multiSelect.handleInput(Key.down);
+      multiSelect.handleInput(Key.space);
+
+      const lines = multiSelect.render(45).join("\n");
+      expect(lines).toContain("What ice cream do you like?");
+      expect(lines).toContain("[x] Strawberry");
+      expect(lines).toContain("[x] Vanilla");
+      expect(lines).toContain("[ ] Caramel");
+      expect(lines).toContain("[x] Banana");
+    });
+
+    describe("Rendering initial select values based on styles", () => {
+      it.for(itemChoiceStyle)("For $s it renders the unselected value", (style) => {
+        const multiSelect = new MultiSelect(
+          {
+            title: "Ice cream",
+            items: [{ value: "strawberry", label: "Strawberry" }],
+            itemChoiceStyle: style,
+          },
+          createTui(),
+          createTheme(),
+          vi.fn(),
+        );
+
+        const lines = multiSelect.render(45).join("\n");
+        expect(lines).toContain(
+          `${multiSelect.itemChoiceStyleRecord[style].unselected} Strawberry`,
+        );
+      });
+    });
+  });
 
   describe("LabelledInput", () => {
     it("renders the label, typed value, and error messages", () => {
