@@ -1,4 +1,10 @@
-import { type ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+  type ExtensionAPI,
+  ExtensionCommandContext,
+  type KeybindingsManager,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
+import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 
 const PACK_LABEL = "pack";
@@ -50,7 +56,12 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      await rootPackResourceReducer(result.output, ctx);
+      await rootPackResourceReducer(result.output, {
+        createPackResourceSelector: getCreatePackResourceSelector(
+          [SKILL_COMMAND, PROMPT_COMMAND, AGENT_COMMAND].map((command) => `${command}s`),
+        ),
+        ctx,
+      });
     },
   });
 
@@ -126,9 +137,35 @@ export default function (pi: ExtensionAPI) {
     },
   });
 }
+
+export function getCreatePackResourceSelector<T extends ReadonlyArray<string>>(choices: T) {
+  return (
+    tui: TUI,
+    theme: Theme,
+    _: KeybindingsManager,
+    done: (result?: T) => void,
+  ): Component => ({
+    invalidate() {
+      tui.requestRender();
+    },
+    handleInput() {
+      done(choices);
+    },
+    render() {
+      return [];
+    },
+  });
+}
+
 type PackCommand = (typeof packCommands.options)[number];
 
-export function rootPackResourceReducer(arg: PackCommand, ctx: ExtensionCommandContext) {
+export function rootPackResourceReducer(
+  arg: PackCommand,
+  deps: {
+    createPackResourceSelector?: ReturnType<typeof getCreatePackResourceSelector>;
+    ctx: ExtensionCommandContext;
+  },
+) {
   return (
     {
       [CREATE_COMMAND]: async () => {},
