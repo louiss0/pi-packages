@@ -19,6 +19,10 @@ type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
   items: T;
   spacing?: number;
   itemChoiceStyle?: ItemChoiceStyle;
+  styles?: {
+    title?: PickerText;
+    item?: Record<"selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch", PickerText>;
+  };
 };
 export const itemChoiceStyle = ["checkbox", "radio", "dot", "diamond"] as const;
 
@@ -33,7 +37,18 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   extends Container
   implements Component
 {
+  #items: T;
+  // MultiSelect owns checked state here. SelectList is only used to render
+  // and navigate the current item, so we rebuild its labels after each toggle.
   #selectedValues: Array<T[number]["value"]> = [];
+  #selectList: SelectList;
+  #tui: TUI;
+  #theme: Theme;
+  #done: (value: Array<T[number]["value"]> | null) => void;
+  #styles: {
+    title: PickerText;
+    item: Record<"selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch", PickerText>;
+  };
 
   readonly itemChoiceStyleRecord = Object.freeze({
     checkbox: {
@@ -56,12 +71,6 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 
   #itemStyle: ItemStyle;
 
-  #tui: TUI;
-
-  #theme: Theme;
-
-  #done: (value: Array<T[number]["value"]> | null) => void;
-
   constructor(
     config: MultiSelectConfig<T>,
     tui: TUI,
@@ -72,36 +81,113 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     this.#items = config.items;
     this.#tui = tui;
     this.#theme = theme;
+    this.#done = done;
 
-    const { title, spacing = 1, itemChoiceStyle = "dot" } = config;
+    const { title, spacing = 1, itemChoiceStyle = "checkbox", styles } = config;
 
     this.#itemStyle = this.itemChoiceStyleRecord[itemChoiceStyle];
+    this.#styles = {
+      title: styles?.title ?? "accent",
+      item: {
+        selectedPrefix: styles?.item?.selectedPrefix ?? "accent",
+        selectedText: styles?.item?.selectedText ?? "accent",
+        description: styles?.item?.description ?? "muted",
+        scrollInfo: styles?.item?.scrollInfo ?? "dim",
+        noMatch: styles?.item?.noMatch ?? "warning",
+      },
+    };
 
-    this.addChild(new Text(theme.bold(title), 2, 3));
-
+    this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title)), 2, 3));
     this.addChild(new Spacer(Math.round(spacing * 0.75)));
 
-    this.#done = done;
+    this.#selectList = this.#createSelectList();
+    this.addChild(this.#selectList);
   }
 
   handleInput(data: string): void {
     if (matchesKey(data, Key.space)) {
-    }
-
-    if (matchesKey(data, Key.up)) {
-    }
-
-    if (matchesKey(data, Key.down)) {
+      this.#toggleSelectedItem();
+      this.#tui.requestRender();
+      return;
     }
 
     if (matchesKey(data, Key.enter)) {
       this.#done(this.#selectedValues);
+      return;
     }
+
+    this.#selectList.handleInput(data);
+    this.#tui.requestRender();
   }
 
   override invalidate(): void {
     this.#selectedValues = [];
+    this.#syncSelectList();
     this.#tui.requestRender();
+  }
+
+  #createSelectList() {
+    const selectList = new SelectList(this.#getRenderedItems(), this.#items.length, {
+      selectedPrefix: (text) => this.#theme.fg(this.#styles.item.selectedPrefix, text),
+      selectedText: (text) => this.#theme.fg(this.#styles.item.selectedText, text),
+      description: (text) => this.#theme.fg(this.#styles.item.description, text),
+      scrollInfo: (text) => this.#theme.fg(this.#styles.item.scrollInfo, text),
+      noMatch: (text) => this.#theme.fg(this.#styles.item.noMatch, text),
+    });
+
+    selectList.onCancel = () => this.#done(null);
+
+    return selectList;
+  }
+
+  #getRenderedItems(): SelectItem[] {
+    return this.#items.map((item) => ({
+      ...item,
+      label: `${this.#getChoicePrefix(item.value as T[number]["value"])} ${item.label || item.value}`,
+    }));
+  }
+
+  #getChoicePrefix(value: T[number]["value"]) {
+    return this.#selectedValues.includes(value)
+      ? this.#itemStyle.selected
+      : this.#itemStyle.unselected;
+  }
+
+  #toggleSelectedItem() {
+    const selectedItem = this.#selectList.getSelectedItem();
+    if (selectedItem === null) {
+      return;
+    }
+
+    const toggledValue = selectedItem.value as T[number]["value"];
+    this.#selectedValues = this.#getNextSelectedValues(toggledValue);
+    this.#syncSelectList(toggledValue);
+  }
+
+  #getNextSelectedValues(toggledValue: T[number]["value"]) {
+    const selectedIndex = this.#selectedValues.indexOf(toggledValue);
+    if (selectedIndex >= 0) {
+      return this.#selectedValues.filter((value) => value !== toggledValue);
+    }
+
+    return [...this.#selectedValues, toggledValue];
+  }
+
+  #syncSelectList(selectedValue?: T[number]["value"]) {
+    const nextSelectList = this.#createSelectList();
+
+    if (selectedValue !== undefined) {
+      const nextItems = this.#getRenderedItems();
+      const nextSelectedIndex = nextItems.findIndex((item) => item.value === selectedValue);
+
+      if (nextSelectedIndex >= 0) {
+        nextSelectList.setSelectedIndex(nextSelectedIndex);
+      }
+    }
+
+    this.removeChild(this.#selectList);
+    this.#selectList = nextSelectList;
+    this.addChild(this.#selectList);
   }
 }
 
