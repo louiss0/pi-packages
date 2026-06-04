@@ -13,8 +13,6 @@ vi.mock("@earendil-works/pi-tui", async () => {
   };
 });
 
-const DOWN_ARROW = "\u001b[B";
-
 function getRenderedContentLines(lines: string[]) {
   return lines.filter((line) => line.trim().length > 0);
 }
@@ -745,7 +743,7 @@ describe("Picker", () => {
     expect(picker.render(120).join("\n")).toContain("5 loaded items");
 
     for (let index = 0; index < 4; index += 1) {
-      picker.handleInput(DOWN_ARROW);
+      picker.handleInput(Key.down);
     }
 
     const output = picker.render(120).join("\n");
