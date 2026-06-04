@@ -4,10 +4,7 @@ import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { InferOutput, maxLength, minLength, object, pipe, regex, string } from "valibot";
-import {
-  getNodeResourceFileSystem,
-  type ResourceFileSystem,
-} from "../shared/filesystem";
+import { getNodeResourceFileSystem, type ResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -63,6 +60,8 @@ type AgentChoice = {
   path: string;
   label: string;
 };
+
+type GetResourceFileSystem = (rootPath: string) => ResourceFileSystem;
 
 export function parseAgentFormValues(values: AgentFields) {
   return parseObjectErrors(AgentFieldsSchema, values);
@@ -159,8 +158,13 @@ function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_AGENT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, AGENTS_DIRECTORY_NAME),
+  );
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -171,18 +175,23 @@ export async function handleCreate(
     return;
   }
 
-  const agentDirectory = getAgentDirectory(scope, ctx.cwd || process.cwd());
-  const filePath = join(agentDirectory, `${values.name}.md`);
+  const filePath = `/${values.name}.md`;
 
-  const directoryResult = await fileSystem.mkdir(agentDirectory, { recursive: true });
+  const directoryResult = await fileSystem.mkdir("", { recursive: true });
   if (!directoryResult.success) {
-    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", directoryResult.error), "error");
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent creation failed", directoryResult.error),
+      "error",
+    );
     return;
   }
 
   const writeResult = await fileSystem.writeFile(filePath, renderFrontmatter(values));
   if (!writeResult.success) {
-    ctx.ui.notify(getFileSystemErrorMessage("Agent creation failed", writeResult.error), "error");
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent creation failed", writeResult.error),
+      "error",
+    );
     return;
   }
 
@@ -192,8 +201,13 @@ export async function handleCreate(
 export async function handleEdit(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_AGENT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, AGENTS_DIRECTORY_NAME),
+  );
   const agent = await pickAgent(ctx, "Edit Agent", scope, fileSystem);
 
   if (!agent) {
@@ -226,8 +240,13 @@ export async function handleEdit(
 export async function handleDelete(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_AGENT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, AGENTS_DIRECTORY_NAME),
+  );
   const agent = await pickAgent(ctx, "Delete Agent", scope, fileSystem);
 
   if (!agent) {
@@ -237,7 +256,10 @@ export async function handleDelete(
 
   const deleteResult = await fileSystem.removeFile(agent.path);
   if (!deleteResult.success) {
-    ctx.ui.notify(getFileSystemErrorMessage("Agent delete failed", deleteResult.error), "error");
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent delete failed", deleteResult.error),
+      "error",
+    );
     return;
   }
 
@@ -267,7 +289,7 @@ async function pickAgent(
   scope: AgentScope,
   fileSystem: ResourceFileSystem,
 ) {
-  const choices = await listAgentChoices(scope, ctx.cwd || process.cwd(), fileSystem);
+  const choices = await listAgentChoices(scope, fileSystem);
 
   if (choices.length === 0) {
     ctx.ui.notify("No agents found", "info");
@@ -286,16 +308,15 @@ async function pickAgent(
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listAgentChoices(scope: AgentScope, cwd: string, fileSystem: ResourceFileSystem) {
-  const directory = getAgentDirectory(scope, cwd);
-  const namesResult = await fileSystem.readDirectoryNames(directory);
+async function listAgentChoices(scope: AgentScope, fileSystem: ResourceFileSystem) {
+  const namesResult = await fileSystem.readDirectoryNames("");
 
   if (!namesResult.success) {
     return [];
   }
 
   return namesResult.data.map((name) => ({
-    path: join(directory, name),
+    path: `/${name}`,
     label: `${scope}: ${basename(name, ".md")}`,
   })) satisfies AgentChoice[];
 }

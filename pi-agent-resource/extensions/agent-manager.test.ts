@@ -28,8 +28,8 @@ import registerAgentManager, {
 
 describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
-  const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
-  const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
+  const expectedAgentPath = "/oracle.md";
+  const expectedLocalAgentPath = "/oracle.md";
   let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
 
   function createTheme() {
@@ -51,7 +51,7 @@ describe("extensions/agent-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem();
+    memoryFileSystem = getMemoryResourceFileSystem(join(".pi", "agent", "agents"));
     resetDevelopmentExtensionNotice();
   });
 
@@ -214,7 +214,11 @@ describe("extensions/agent-manager", () => {
       });
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom, notify } } as never, "global", memoryFileSystem);
+      await handleCreate(
+        { ui: { custom, notify } } as never,
+        "global",
+        () => memoryFileSystem,
+      );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
 
@@ -234,13 +238,15 @@ describe("extensions/agent-manager", () => {
       });
       const notify = vi.fn();
 
+      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
-        memoryFileSystem,
+        () => localFileSystem,
       );
 
-      const content = await memoryFileSystem.readFile(expectedLocalAgentPath, "utf8");
+      const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
 
       expect(content).toMatchObject({
         data: expect.stringContaining("name: oracle"),
@@ -262,7 +268,11 @@ describe("extensions/agent-manager", () => {
         success: false,
       });
 
-      await handleCreate({ ui: { custom, notify } } as never, "global", memoryFileSystem);
+      await handleCreate(
+        { ui: { custom, notify } } as never,
+        "global",
+        () => memoryFileSystem,
+      );
 
       expect(notify).toHaveBeenCalledWith(
         "Agent creation failed: write denied",
@@ -279,7 +289,7 @@ describe("extensions/agent-manager", () => {
           ui: { custom: vi.fn().mockResolvedValueOnce(null), notify },
         } as never,
         "global",
-        memoryFileSystem,
+        () => memoryFileSystem,
       );
 
       await expect(
@@ -294,13 +304,17 @@ describe("extensions/agent-manager", () => {
   describe("handleEdit", () => {
     it("edits the selected global agent", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath]: "---\nname: oracle\n---\n",
+        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated agent content");
       const notify = vi.fn();
 
-      await handleEdit({ ui: { notify, select, editor } } as never, "global", memoryFileSystem);
+      await handleEdit(
+        { ui: { notify, select, editor } } as never,
+        "global",
+        () => memoryFileSystem,
+      );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
 
@@ -314,8 +328,9 @@ describe("extensions/agent-manager", () => {
     });
 
     it("edits the selected local agent", async () => {
-      memoryFileSystem.seed({
-        [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
+      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+      localFileSystem.seed({
+        [expectedLocalAgentPath.slice(1)]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated local agent content");
@@ -324,10 +339,10 @@ describe("extensions/agent-manager", () => {
       await handleEdit(
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
-        memoryFileSystem,
+        () => localFileSystem,
       );
 
-      const content = await memoryFileSystem.readFile(expectedLocalAgentPath, "utf8");
+      const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
       expect(content).toEqual({
@@ -339,7 +354,7 @@ describe("extensions/agent-manager", () => {
 
     it("reports filesystem errors when agent editing fails", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath]: "---\nname: oracle\n---\n",
+        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated agent content");
@@ -349,7 +364,11 @@ describe("extensions/agent-manager", () => {
         success: false,
       });
 
-      await handleEdit({ ui: { notify, select, editor } } as never, "global", memoryFileSystem);
+      await handleEdit(
+        { ui: { notify, select, editor } } as never,
+        "global",
+        () => memoryFileSystem,
+      );
 
       expect(notify).toHaveBeenCalledWith(
         "Agent edit failed: write denied",
@@ -362,12 +381,16 @@ describe("extensions/agent-manager", () => {
   describe("handleDelete", () => {
     it("deletes the selected global agent", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath]: "---\nname: oracle\n---\n",
+        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const notify = vi.fn();
 
-      await handleDelete({ ui: { notify, select } } as never, "global", memoryFileSystem);
+      await handleDelete(
+        { ui: { notify, select } } as never,
+        "global",
+        () => memoryFileSystem,
+      );
 
       await expect(
         memoryFileSystem.readFile(expectedAgentPath, "utf8"),
@@ -379,8 +402,9 @@ describe("extensions/agent-manager", () => {
     });
 
     it("deletes the selected local agent", async () => {
-      memoryFileSystem.seed({
-        [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
+      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+      localFileSystem.seed({
+        [expectedLocalAgentPath.slice(1)]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
       const notify = vi.fn();
@@ -388,11 +412,11 @@ describe("extensions/agent-manager", () => {
       await handleDelete(
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
-        memoryFileSystem,
+        () => localFileSystem,
       );
 
       await expect(
-        memoryFileSystem.readFile(expectedLocalAgentPath, "utf8"),
+        localFileSystem.readFile(expectedLocalAgentPath, "utf8"),
       ).resolves.toMatchObject({
         success: false,
       });

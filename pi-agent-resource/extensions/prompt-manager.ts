@@ -1,10 +1,6 @@
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Editor,
@@ -25,10 +21,7 @@ import {
   string,
 } from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
-import {
-  getNodeResourceFileSystem,
-  type ResourceFileSystem,
-} from "../shared/filesystem";
+import { getNodeResourceFileSystem, type ResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -49,23 +42,16 @@ export const GLOBAL_PROMPT_DIRECTORY = join(
   AGENT_DIRECTORY_NAME,
   PROMPTS_DIRECTORY_NAME,
 );
-export const LOCAL_PROMPT_DIRECTORY = join(
-  PI_DIRECTORY_NAME,
-  PROMPTS_DIRECTORY_NAME,
-);
+export const LOCAL_PROMPT_DIRECTORY = join(PI_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME);
 const promptNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const argumentHintPattern =
-  /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
+const argumentHintPattern = /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
 
 const PromptFieldsSchema = object({
   name: pipe(
     string(),
     minLength(3, "Name must be at least 3 characters"),
     maxLength(48, "Name must be 48 characters or fewer"),
-    regex(
-      promptNamePattern,
-      "Name must be lowercase letters, numbers, and dashes only",
-    ),
+    regex(promptNamePattern, "Name must be lowercase letters, numbers, and dashes only"),
   ),
   description: pipe(
     string(),
@@ -73,10 +59,7 @@ const PromptFieldsSchema = object({
     maxLength(1024, "Description must be 1024 characters or fewer"),
   ),
   "argument-hint": optional(
-    pipe(
-      string(),
-      regex(argumentHintPattern, "Argument hint must use [] or <> tokens"),
-    ),
+    pipe(string(), regex(argumentHintPattern, "Argument hint must use [] or <> tokens")),
     "",
   ),
 });
@@ -88,6 +71,8 @@ type PromptChoice = {
   deletePath: string;
   label: string;
 };
+
+type GetResourceFileSystem = (rootPath: string) => ResourceFileSystem;
 
 export function parsePromptFormValues(values: PromptFields) {
   return parseObjectErrors(PromptFieldsSchema, values);
@@ -136,11 +121,7 @@ class PromptTemplateOverlay extends Container {
   #editor: Editor;
   #done: (value: string | undefined) => void;
 
-  constructor(
-    tui: TUI,
-    theme: Theme,
-    done: (value: string | undefined) => void,
-  ) {
+  constructor(tui: TUI, theme: Theme, done: (value: string | undefined) => void) {
     super();
     this.#done = done;
     this.#editor = new Editor(tui, {
@@ -180,11 +161,7 @@ class PromptTemplateOverlay extends Container {
   }
 }
 
-async function handlePromptCommand(
-  arg: string,
-  ctx: ExtensionContext,
-  scope: PromptScope,
-) {
+async function handlePromptCommand(arg: string, ctx: ExtensionContext, scope: PromptScope) {
   notifyWhenUsingDevelopmentExtension(extensionName, ctx);
   const result = parsePromptCommandArgument(arg);
   if (!result.success) {
@@ -229,16 +206,19 @@ export default (pi: ExtensionAPI) => {
 };
 
 function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
-  return scope === "local"
-    ? join(cwd, LOCAL_PROMPT_DIRECTORY)
-    : GLOBAL_PROMPT_DIRECTORY;
+  return scope === "local" ? join(cwd, LOCAL_PROMPT_DIRECTORY) : GLOBAL_PROMPT_DIRECTORY;
 }
 
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
+  );
   const values = await ctx.ui.custom<PromptFields | null>(
     (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
     formOverlayOptions,
@@ -250,8 +230,7 @@ export async function handleCreate(
   }
 
   const template = await ctx.ui.custom<string | undefined>(
-    (tui, theme, _keyboard, done) =>
-      new PromptTemplateOverlay(tui, theme, done),
+    (tui, theme, _keyboard, done) => new PromptTemplateOverlay(tui, theme, done),
     modalEditorOverlayOptions,
   );
 
@@ -260,9 +239,8 @@ export async function handleCreate(
     return;
   }
 
-  const promptDirectory = getPromptDirectory(scope, ctx.cwd || process.cwd());
-  const filePath = join(promptDirectory, `${values.name}.md`);
-  const directoryResult = await fileSystem.mkdir(promptDirectory, { recursive: true });
+  const filePath = `/${values.name}.md`;
+  const directoryResult = await fileSystem.mkdir("", { recursive: true });
   if (!directoryResult.success) {
     ctx.ui.notify(`Prompt creation failed: ${directoryResult.error.message}`, "error");
     return;
@@ -283,8 +261,13 @@ export async function handleCreate(
 export async function handleEdit(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
+  );
   const prompt = await pickPrompt(ctx, "Edit Prompt", scope, fileSystem);
 
   if (!prompt) {
@@ -317,8 +300,13 @@ export async function handleEdit(
 export async function handleDelete(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
+  );
   const prompt = await pickPrompt(ctx, "Delete Prompt", scope, fileSystem);
 
   if (!prompt) {
@@ -354,7 +342,7 @@ async function pickPrompt(
   scope: PromptScope,
   fileSystem: ResourceFileSystem,
 ) {
-  const choices = await listPromptChoices(scope, ctx.cwd || process.cwd(), fileSystem);
+  const choices = await listPromptChoices(scope, fileSystem);
 
   if (choices.length === 0) {
     ctx.ui.notify("No prompts found", "info");
@@ -373,11 +361,10 @@ async function pickPrompt(
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listPromptChoices(scope: PromptScope, cwd: string, fileSystem: ResourceFileSystem) {
-  const directory = getPromptDirectory(scope, cwd);
+async function listPromptChoices(scope: PromptScope, fileSystem: ResourceFileSystem) {
   const choices: PromptChoice[] = [];
 
-  const entriesResult = await fileSystem.readDirectoryEntries(directory);
+  const entriesResult = await fileSystem.readDirectoryEntries("");
 
   if (!entriesResult.success) {
     return choices;
@@ -385,10 +372,8 @@ async function listPromptChoices(scope: PromptScope, cwd: string, fileSystem: Re
 
   choices.push(
     ...entriesResult.data.map((entry) => {
-      const entryPath = join(directory, entry.name);
-      const promptPath = entry.isDirectory()
-        ? join(entryPath, "_index.md")
-        : entryPath;
+      const entryPath = `/${entry.name}`;
+      const promptPath = entry.isDirectory() ? join(entryPath, "_index.md") : entryPath;
 
       return {
         path: promptPath,

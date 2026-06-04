@@ -33,6 +33,8 @@ import {
 } from "valibot";
 import {
   getNodeResourceFileSystem,
+  getResourceRelativePath,
+  resolveResourcePath,
   type ResourceFileSystem,
 } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
@@ -100,6 +102,7 @@ type OptionalAgentSkillFormFields = InferOutput<typeof OptionalAgentSkillFormFie
 type SkillFrontmatterFields = RequiredAgentSkillFields & OptionalAgentSkillFormFields;
 type SkillEditorMode = "external";
 type SkillScope = "global" | "local";
+type GetResourceFileSystem = (rootPath: string) => ResourceFileSystem;
 
 class SkillEditorOverlay extends Container implements Focusable {
   #editor: Editor;
@@ -229,8 +232,13 @@ export function parseSkillCommandArgument(argument: string) {
 export async function handleCreate(
   ctx: ExtensionCommandContext,
   scope: SkillScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_SKILLS_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, SKILLS_DIRECTORY_NAME),
+  );
   const requiredValues = await ctx.ui.custom<
     (RequiredAgentSkillFields & { confirm: boolean }) | null
   >((tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done), formOverlayOptions);
@@ -264,8 +272,6 @@ export async function handleCreate(
         description: requiredValues.description,
         ...optionalValues,
       },
-      scope,
-      ctx.cwd || process.cwd(),
       fileSystem,
     );
 
@@ -284,8 +290,13 @@ export async function handleEdit(
   ctx: ExtensionCommandContext,
   requestedEditMode?: SkillEditorMode,
   scope: SkillScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_SKILLS_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, SKILLS_DIRECTORY_NAME),
+  );
   const skillPath = await pickSkillPath(ctx, "Edit Skill", scope, fileSystem);
 
   if (!skillPath) {
@@ -326,7 +337,10 @@ export async function handleEdit(
       return;
     }
 
-    const writeResult = await fileSystem.writeFile(skillPath, editedContent);
+    const writeResult = await fileSystem.writeFile(
+      getResourceRelativePath(fileSystem, skillPath),
+      editedContent,
+    );
     if (!writeResult.success) {
       ctx.ui.notify(`Skill edit failed: ${writeResult.error.message}`, "error");
       return;
@@ -340,8 +354,13 @@ export async function handleEdit(
 export async function handleDelete(
   ctx: ExtensionCommandContext,
   scope: SkillScope = "global",
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
 ) {
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(ctx.cwd || process.cwd(), LOCAL_SKILLS_DIRECTORY)
+      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, SKILLS_DIRECTORY_NAME),
+  );
   const skillPath = await pickSkillPath(ctx, "Delete Skill", scope, fileSystem);
 
   if (!skillPath) {
@@ -350,7 +369,9 @@ export async function handleDelete(
   }
 
   const skillDirectory = dirname(skillPath);
-  const deleteResult = await fileSystem.removeDirectory(skillDirectory);
+  const deleteResult = await fileSystem.removeDirectory(
+    getResourceRelativePath(fileSystem, skillDirectory),
+  );
   if (!deleteResult.success) {
     ctx.ui.notify(`Skill deletion failed: ${deleteResult.error.message}`, "error");
     return;
@@ -362,7 +383,7 @@ export async function handleDelete(
 async function resolveSkillEditMode(
   requestedEditMode?: SkillEditorMode,
   cwd = process.cwd(),
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(getSkillsDirectory("global", cwd)),
 ) {
   if (requestedEditMode) {
     return requestedEditMode;
@@ -374,12 +395,9 @@ async function resolveSkillEditMode(
 
 async function readProjectEditorConfig(
   cwd = process.cwd(),
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(""),
 ) {
-  const configResult = await fileSystem.readFile(
-    join(cwd, PROJECT_EDITOR_CONFIG_FILE),
-    "utf8",
-  );
+  const configResult = await fileSystem.readFile(join(cwd, PROJECT_EDITOR_CONFIG_FILE), "utf8");
 
   if (!configResult.success) {
     return { skillEditor: undefined };
@@ -414,11 +432,9 @@ function getSkillsDirectory(scope: SkillScope, cwd = process.cwd()) {
 
 async function createSkillFile(
   fields: SkillFrontmatterFields,
-  scope: SkillScope,
-  cwd: string,
   fileSystem: ResourceFileSystem,
 ) {
-  const skillDirectory = join(getSkillsDirectory(scope, cwd), fields.name);
+  const skillDirectory = `/${fields.name}`;
   const skillPath = join(skillDirectory, SKILL_FILE_NAME);
   const directoryResult = await fileSystem.mkdir(skillDirectory, { recursive: true });
   if (!directoryResult.success) {
@@ -430,7 +446,7 @@ async function createSkillFile(
     throw writeResult.error;
   }
 
-  return skillPath;
+  return resolveResourcePath(fileSystem, skillPath);
 }
 
 function renderSkillMarkdown(fields: SkillFrontmatterFields) {
@@ -504,8 +520,7 @@ async function pickSkillPath(
   scope: SkillScope,
   fileSystem: ResourceFileSystem,
 ) {
-  const cwd = "cwd" in ctx && typeof ctx.cwd === "string" ? ctx.cwd : process.cwd();
-  const skillNames = await listSkillNames(scope, cwd, fileSystem);
+  const skillNames = await listSkillNames(scope, fileSystem);
 
   if (skillNames.length === 0) {
     ctx.ui.notify("No skills found", "info");
@@ -527,7 +542,7 @@ async function pickSkillPath(
     });
 
     selectList.onSelect = (item) =>
-      done(join(getSkillsDirectory(scope, cwd), item.value, SKILL_FILE_NAME));
+      done(resolveResourcePath(fileSystem, join(item.value, SKILL_FILE_NAME)));
     selectList.onCancel = () => done(null);
 
     const container = new Container();
@@ -548,10 +563,8 @@ async function pickSkillPath(
   }, formOverlayOptions);
 }
 
-async function listSkillNames(scope: SkillScope, cwd: string, fileSystem: ResourceFileSystem) {
-  const entriesResult = await fileSystem.readDirectoryEntries(
-    getSkillsDirectory(scope, cwd),
-  );
+async function listSkillNames(scope: SkillScope, fileSystem: ResourceFileSystem) {
+  const entriesResult = await fileSystem.readDirectoryEntries("");
 
   if (!entriesResult.success) {
     return [];
@@ -658,7 +671,7 @@ function tokenizeCommandLine(commandLine: string) {
 }
 
 async function readSkillFile(filePath: string, fileSystem: ResourceFileSystem) {
-  return fileSystem.readFile(filePath, "utf8");
+  return fileSystem.readFile(getResourceRelativePath(fileSystem, filePath), "utf8");
 }
 
 async function handleSkillCommand(

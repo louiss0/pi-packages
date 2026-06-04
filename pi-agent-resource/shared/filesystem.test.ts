@@ -1,7 +1,7 @@
 import { getMemoryResourceFileSystem } from "./filesystem";
 
 describe("shared/filesystem", () => {
-  const memoryFileSystem = getMemoryResourceFileSystem();
+  const memoryFileSystem = getMemoryResourceFileSystem("/workspace");
 
   afterEach(() => {
     memoryFileSystem.reset();
@@ -10,10 +10,10 @@ describe("shared/filesystem", () => {
   it("uses memfs explicitly", async () => {
     const fileSystem = memoryFileSystem;
 
-    await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });
-    await fileSystem.writeFile("/workspace/.pi/agents/test.md", "hello");
+    await fileSystem.mkdir("/.pi/agents", { recursive: true });
+    await fileSystem.writeFile("/.pi/agents/test.md", "hello");
 
-    await expect(fileSystem.readFile("/workspace/.pi/agents/test.md")).resolves.toEqual({
+    await expect(fileSystem.readFile("/.pi/agents/test.md")).resolves.toEqual({
       data: "hello",
       success: true,
     });
@@ -21,10 +21,10 @@ describe("shared/filesystem", () => {
 
   it("can seed and clear the memory filesystem explicitly in tests", async () => {
     memoryFileSystem.seed({
-      "/workspace/.pi/prompts/test.md": "prompt",
+      ".pi/prompts/test.md": "prompt",
     });
 
-    await expect(memoryFileSystem.readFile("/workspace/.pi/prompts/test.md")).resolves.toEqual({
+    await expect(memoryFileSystem.readFile("/.pi/prompts/test.md")).resolves.toEqual({
       data: "prompt",
       success: true,
     });
@@ -32,7 +32,7 @@ describe("shared/filesystem", () => {
     memoryFileSystem.reset();
 
     await expect(
-      memoryFileSystem.readFile("/workspace/.pi/prompts/test.md"),
+      memoryFileSystem.readFile("/.pi/prompts/test.md"),
     ).resolves.toMatchObject({
       success: false,
     });
@@ -41,23 +41,23 @@ describe("shared/filesystem", () => {
   it("removes files and directories with explicit methods", async () => {
     const fileSystem = memoryFileSystem;
 
-    await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {
+    await fileSystem.mkdir("/.pi/agent/skills/test-skill", {
       recursive: true,
     });
-    await fileSystem.writeFile("/workspace/.pi/agent/skills/test-skill/SKILL.md", "skill");
-    await fileSystem.removeFile("/workspace/.pi/agent/skills/test-skill/SKILL.md");
+    await fileSystem.writeFile("/.pi/agent/skills/test-skill/SKILL.md", "skill");
+    await fileSystem.removeFile("/.pi/agent/skills/test-skill/SKILL.md");
 
     await expect(
-      fileSystem.readFile("/workspace/.pi/agent/skills/test-skill/SKILL.md"),
+      fileSystem.readFile("/.pi/agent/skills/test-skill/SKILL.md"),
     ).resolves.toMatchObject({
       success: false,
     });
 
-    await fileSystem.writeFile("/workspace/.pi/agent/skills/test-skill/SKILL.md", "skill");
-    await fileSystem.removeDirectory("/workspace/.pi/agent/skills/test-skill");
+    await fileSystem.writeFile("/.pi/agent/skills/test-skill/SKILL.md", "skill");
+    await fileSystem.removeDirectory("/.pi/agent/skills/test-skill");
 
     await expect(
-      fileSystem.readFile("/workspace/.pi/agent/skills/test-skill/SKILL.md"),
+      fileSystem.readFile("/.pi/agent/skills/test-skill/SKILL.md"),
     ).resolves.toMatchObject({
       success: false,
     });

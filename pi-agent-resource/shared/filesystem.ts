@@ -7,7 +7,7 @@ import {
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 import { fs as memoryFs, vol } from "memfs";
-import { join } from "node:path";
+import { isAbsolute, join, normalize, relative } from "node:path";
 
 export type ResourceDirectoryEntry = {
   name: string;
@@ -57,11 +57,27 @@ function getResourceError(error: unknown) {
   return new Error(String(error));
 }
 
+function resolveResourceRootPath(rootPath: string) {
+  return isAbsolute(rootPath) ? normalize(rootPath) : join(homedir(), rootPath);
+}
+
+export function resolveResourcePath(fileSystem: ResourceFileSystem, path: string) {
+  return join(fileSystem.rootPath, path);
+}
+
+export function getResourceRelativePath(fileSystem: ResourceFileSystem, path: string) {
+  if (!isAbsolute(path)) {
+    return path.replace(/^[\\/]+/, "");
+  }
+
+  return relative(fileSystem.rootPath, path);
+}
+
 export class NodeFileSystem implements ResourceFileSystem {
   #rootPath: string;
 
   constructor(rootPath: string) {
-    this.#rootPath = join(homedir(), rootPath);
+    this.#rootPath = resolveResourceRootPath(rootPath);
   }
 
   get rootPath() {
@@ -101,7 +117,7 @@ export class MemoryFileSystem implements ResourceFileSystem {
   #rootPath: string;
 
   constructor(rootPath: string) {
-    this.#rootPath = join(homedir(), rootPath);
+    this.#rootPath = resolveResourceRootPath(rootPath);
   }
 
   get rootPath(): string {

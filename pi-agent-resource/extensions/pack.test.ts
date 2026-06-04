@@ -23,7 +23,7 @@ function createTestContext(ctx: MockContext) {
 }
 
 const getMockCreatePackResourceSelector = (
-  choices: Array<"skills" | "prompts" | "agents">,
+  choices: ReadonlyArray<"skills" | "prompts" | "agents">,
 ): ReturnType<typeof getCreatePackResourceSelector> => {
   return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
     return {
@@ -102,17 +102,17 @@ describe("Pack", () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${fileSystem.rootPath}/${output}/${selectionChoices[0]}/example.md`,
+        `${output}/${selectionChoices[0]}/example.md`,
         examplePromptContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${fileSystem.rootPath}/${output}/${selectionChoices[1]}/example/SKILL.md`,
+        `${output}/${selectionChoices[1]}/example/SKILL.md`,
         exampleSkillContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${fileSystem.rootPath}/${output}/${selectionChoices[2]}/example.md`,
+        `${output}/${selectionChoices[2]}/example.md`,
         exampleAgentContent,
       );
     });
@@ -120,11 +120,11 @@ describe("Pack", () => {
     it("deletes a pack when delete is passed in", async () => {
       const output = "C#";
 
-      await fileSystem.mkdir(`${ROOT_PACK_FOLDER_PATH}${output}`, { recursive: true });
-      await fileSystem.writeFile(
-        `${ROOT_PACK_FOLDER_PATH}${output}/example.md`,
-        exampleAgentContent,
-      );
+      fileSystem.seed({
+        [`${output}/agents/example.md`]: exampleAgentContent,
+        [`${output}/skills/example/SKILL.md`]: exampleSkillContent,
+        [`${output}/prompts/example.md`]: examplePromptContent,
+      });
 
       const ctx = {
         ui: {
@@ -144,7 +144,7 @@ describe("Pack", () => {
         "What is the name of the pack you want to delete?",
       );
 
-      expect(removeDirectory).toHaveBeenCalledWith(`${ROOT_PACK_FOLDER_PATH}${output}`);
+      expect(removeDirectory).toHaveBeenCalledWith(output);
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,
