@@ -23,7 +23,7 @@ function createTestContext(ctx: MockContext) {
 }
 
 const getMockCreatePackResourceSelector = (
-  choices: ReadonlyArray<"skills" | "prompts" | "agents">,
+  choices: Array<"skills" | "prompts" | "agents">,
 ): ReturnType<typeof getCreatePackResourceSelector> => {
   return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
     return {
@@ -83,8 +83,9 @@ describe("Pack", () => {
         },
       } satisfies MockContext;
 
-      const mockCreatePackResourceSelector =
-        getMockCreatePackResourceSelector(selectionChoices);
+      const mockCreatePackResourceSelector = getMockCreatePackResourceSelector(
+        selectionChoices.slice(),
+      );
 
       await rootPackResourceReducer("create", {
         ctx: createTestContext(ctx),
@@ -120,7 +121,10 @@ describe("Pack", () => {
       const output = "C#";
 
       await fileSystem.mkdir(`${ROOT_PACK_FOLDER_PATH}${output}`, { recursive: true });
-      await fileSystem.writeFile(`${ROOT_PACK_FOLDER_PATH}${output}/example.md`, exampleAgentContent);
+      await fileSystem.writeFile(
+        `${ROOT_PACK_FOLDER_PATH}${output}/example.md`,
+        exampleAgentContent,
+      );
 
       const ctx = {
         ui: {
