@@ -32,6 +32,10 @@ describe("extensions/agent-manager", () => {
   const expectedLocalAgentPath = "/oracle.md";
   let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
 
+  function getStubResourceFileSystem() {
+    return memoryFileSystem;
+  }
+
   function createTheme() {
     return {
       fg: (_color: string, text: string) => text,
@@ -217,7 +221,7 @@ describe("extensions/agent-manager", () => {
       await handleCreate(
         { ui: { custom, notify } } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
@@ -243,7 +247,7 @@ describe("extensions/agent-manager", () => {
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
@@ -271,7 +275,7 @@ describe("extensions/agent-manager", () => {
       await handleCreate(
         { ui: { custom, notify } } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       expect(notify).toHaveBeenCalledWith(
@@ -289,7 +293,7 @@ describe("extensions/agent-manager", () => {
           ui: { custom: vi.fn().mockResolvedValueOnce(null), notify },
         } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       await expect(
@@ -313,7 +317,7 @@ describe("extensions/agent-manager", () => {
       await handleEdit(
         { ui: { notify, select, editor } } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
@@ -339,7 +343,7 @@ describe("extensions/agent-manager", () => {
       await handleEdit(
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
@@ -367,7 +371,7 @@ describe("extensions/agent-manager", () => {
       await handleEdit(
         { ui: { notify, select, editor } } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       expect(notify).toHaveBeenCalledWith(
@@ -389,7 +393,7 @@ describe("extensions/agent-manager", () => {
       await handleDelete(
         { ui: { notify, select } } as never,
         "global",
-        () => memoryFileSystem,
+        getStubResourceFileSystem,
       );
 
       await expect(
@@ -412,7 +416,7 @@ describe("extensions/agent-manager", () => {
       await handleDelete(
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       await expect(

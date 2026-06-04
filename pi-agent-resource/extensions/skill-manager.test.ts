@@ -314,7 +314,7 @@ describe("skill manager handlers", () => {
     const custom = vi.fn().mockResolvedValueOnce(null);
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+    await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
     expectFormFactory(custom, 0, "Create Skill");
     expect(custom).toHaveBeenCalledTimes(1);
@@ -329,7 +329,7 @@ describe("skill manager handlers", () => {
     });
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+    await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
     expectFormFactory(custom, 0, "Create Skill");
     const content = await memoryFileSystem.readFile(skillPath);
@@ -353,7 +353,7 @@ describe("skill manager handlers", () => {
     await handleCreate(
       { cwd: localCwd, ui: { custom, notify } } as never,
       "local",
-      () => localFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     const content = await localFileSystem.readFile(localSkillPath);
@@ -381,7 +381,7 @@ describe("skill manager handlers", () => {
       });
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+    await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
     expectFormFactory(custom, 0, "Create Skill");
     expectFormFactory(custom, 1, "Skill Details");
@@ -404,7 +404,7 @@ describe("skill manager handlers", () => {
       .mockResolvedValueOnce(null);
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+    await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
     const content = await memoryFileSystem.readFile(skillPath);
     expect(content).toMatchObject({
@@ -432,7 +432,7 @@ describe("skill manager handlers", () => {
         },
       } as never,
       "global",
-      () => memoryFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     const content = await memoryFileSystem.readFile(skillPath);
@@ -457,7 +457,7 @@ describe("skill manager handlers", () => {
       { ui: { custom, notify }, reload } as never,
       undefined,
       "global",
-      () => memoryFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     expectEditorOverlayFactory(custom, 1);
@@ -490,7 +490,7 @@ describe("skill manager handlers", () => {
       { ui: { custom, notify }, reload } as never,
       "external",
       "global",
-      () => memoryFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     expect(spawn).toHaveBeenCalledWith(
@@ -518,7 +518,7 @@ describe("skill manager handlers", () => {
       } as never,
       undefined,
       "global",
-      () => memoryFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     expect(notify).toHaveBeenCalledWith("Skill edit cancelled", "info");
@@ -531,7 +531,7 @@ describe("skill manager handlers", () => {
     const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
     const notify = vi.fn();
 
-    await handleDelete({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+    await handleDelete({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
     await expect(memoryFileSystem.readFile(skillPath)).resolves.toMatchObject({
       success: false,
@@ -552,7 +552,7 @@ describe("skill manager handlers", () => {
     await handleDelete(
       { cwd: localCwd, ui: { custom, notify } } as never,
       "local",
-      () => localFileSystem,
+      getMemoryResourceFileSystem,
     );
 
     await expect(localFileSystem.readFile(localSkillPath)).resolves.toMatchObject({

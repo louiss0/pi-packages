@@ -159,7 +159,7 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom, notify } } as never, "global", () => memoryFileSystem);
+      await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
@@ -190,7 +190,7 @@ describe("extensions/prompt-manager", () => {
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
@@ -212,7 +212,7 @@ describe("extensions/prompt-manager", () => {
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
       const notify = vi.fn();
 
-      await handleEdit({ ui: { notify, select, editor } } as never, "global", () => memoryFileSystem);
+      await handleEdit({ ui: { notify, select, editor } } as never, "global", getMemoryResourceFileSystem);
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
@@ -236,7 +236,7 @@ describe("extensions/prompt-manager", () => {
       await handleEdit(
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
@@ -258,7 +258,7 @@ describe("extensions/prompt-manager", () => {
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
 
-      await handleDelete({ ui: { notify, select } } as never, "global", () => memoryFileSystem);
+      await handleDelete({ ui: { notify, select } } as never, "global", getMemoryResourceFileSystem);
 
       await expect(memoryFileSystem.readFile(expectedPromptPath)).resolves.toMatchObject({
         success: false,
@@ -277,7 +277,7 @@ describe("extensions/prompt-manager", () => {
       await handleDelete(
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
-        () => localFileSystem,
+        getMemoryResourceFileSystem,
       );
 
       await expect(localFileSystem.readFile(expectedLocalPromptPath)).resolves.toMatchObject({
