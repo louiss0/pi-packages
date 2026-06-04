@@ -166,6 +166,54 @@ export function getCreatePackResourceSelector() {
 
 type PackCommand = (typeof packCommands.options)[number];
 
+const examplePromptContent = `---
+        name: example
+        description: This is an example pack
+
+        ---
+        `;
+
+const exampleSkillContent = `---
+        name: example
+        description: This is an example pack
+
+        ---
+        `;
+
+const exampleAgentContent = `---
+        name: example
+        description: This is an example pack
+        tools:
+        model:
+        ---
+        `;
+
+async function writePackExampleResources(
+  fileSystem: ResourceFileSystem,
+  packName: string,
+  resources: ReadonlyArray<string>,
+) {
+  for (const resource of resources) {
+    const resourcePath = `${ROOT_PACK_FOLDER_PATH}${packName}/${resource}`;
+    await fileSystem.mkdir(resourcePath, { recursive: true });
+
+    if (resource === `${PROMPT_COMMAND}s`) {
+      await fileSystem.writeFile(`${resourcePath}/example.md`, examplePromptContent);
+      continue;
+    }
+
+    if (resource === `${SKILL_COMMAND}s`) {
+      await fileSystem.mkdir(`${resourcePath}/example`, { recursive: true });
+      await fileSystem.writeFile(`${resourcePath}/example/SKILL.md`, exampleSkillContent);
+      continue;
+    }
+
+    if (resource === `${AGENT_COMMAND}s`) {
+      await fileSystem.writeFile(`${resourcePath}/example.md`, exampleAgentContent);
+    }
+  }
+}
+
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
@@ -177,8 +225,26 @@ export function rootPackResourceReducer(
   return (
     {
       [CREATE_COMMAND]: async () => {
+        const packName = await deps.ctx.ui.input(PACK_LABEL, "What is the name of your agent pack?");
+        const resources = await deps.ctx.ui.custom(deps.createPackResourceSelector);
+
+        if (!packName || !resources || resources.length === 0) {
+          return;
+        }
+
+        await deps.fileSystem.mkdir(`${ROOT_PACK_FOLDER_PATH}${packName}`, { recursive: true });
+        await writePackExampleResources(deps.fileSystem, packName, resources);
+        deps.ctx.ui.notify(`Pack created successfully with name '${packName}'`);
       },
-      [DELETE_COMMAND]: async () => {},
+      [DELETE_COMMAND]: async () => {
+        const packName = await deps.ctx.ui.input(PACK_LABEL, "What is the name of the pack you want to delete?");
+        if (!packName) {
+          return;
+        }
+
+        await deps.fileSystem.removeDirectory(`${ROOT_PACK_FOLDER_PATH}${packName}`);
+        deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
+      },
     } satisfies Record<PackCommand, () => Promise<void>>
   )[arg]();
 }

@@ -57,16 +57,26 @@ const mockCustomUIFactory = async <T>(
 
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
+  let writeFile: ReturnType<typeof vi.spyOn<MemoryFileSystem, "writeFile">>;
+  let removeDirectory: ReturnType<typeof vi.spyOn<MemoryFileSystem, "removeDirectory">>;
+
   beforeAll(() => {
     fileSystem = getMemoryResourceFileSystem();
   });
 
+  beforeEach(() => {
+    writeFile = vi.spyOn(fileSystem, "writeFile");
+    removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
+  });
+
   afterEach(() => {
+    writeFile.mockRestore();
+    removeDirectory.mockRestore();
     fileSystem.reset();
   });
 
   describe("Testing rootPackResourceReducer", () => {
-    it("creates a pack when create is passed in", () => {
+    it("creates a pack when create is passed in", async () => {
       const output = "front-end";
       const selectionChoices = ["prompts", "skills", "agents"] as const;
 
@@ -81,7 +91,7 @@ describe("Pack", () => {
       const mockCreatePackResourceSelector =
         getMockCreatePackResourceSelector(selectionChoices);
 
-      rootPackResourceReducer("create", {
+      await rootPackResourceReducer("create", {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
         fileSystem,
@@ -95,7 +105,7 @@ describe("Pack", () => {
 
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
-      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+      expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[0]}/example.md`,
         `---
         name: example
@@ -105,7 +115,7 @@ describe("Pack", () => {
         `,
       );
 
-      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+      expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[1]}/example/SKILL.md`,
         `---
         name: example
@@ -115,7 +125,7 @@ describe("Pack", () => {
         `,
       );
 
-      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+      expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[2]}/example.md`,
         `---
         name: example
@@ -127,7 +137,7 @@ describe("Pack", () => {
       );
     });
 
-    it("deletes a pack when delete is passed in", () => {
+    it("deletes a pack when delete is passed in", async () => {
       const output = "C#";
 
       const ctx = {
@@ -137,7 +147,7 @@ describe("Pack", () => {
         },
       };
 
-      rootPackResourceReducer("delete", {
+      await rootPackResourceReducer("delete", {
         createPackResourceSelector: getMockCreatePackResourceSelector([]),
         ctx: createTestContext(ctx),
         fileSystem,
@@ -148,9 +158,7 @@ describe("Pack", () => {
         "What is the name of the pack you want to delete?",
       );
 
-      expect(fileSystem.removeDirectory).toHaveBeenCalledWith(
-        `${ROOT_PACK_FOLDER_PATH}${output}`,
-      );
+      expect(removeDirectory).toHaveBeenCalledWith(`${ROOT_PACK_FOLDER_PATH}${output}`);
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,
