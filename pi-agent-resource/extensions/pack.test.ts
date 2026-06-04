@@ -22,21 +22,16 @@ function createTestContext(ctx: MockContext) {
   return ctx as unknown as ExtensionCommandContext;
 }
 
-const getMockCreatePackResourceSelector = (choices: ReadonlyArray<string>) => {
-  return vi.fn(
-    (
-      _tui: TUI,
-      _theme: Theme,
-      _: KeybindingsManager,
-      done: (result?: typeof choices) => void,
-    ) => {
-      return {
-        invalidate: vi.fn(),
-        handleInput: vi.fn(() => done(choices)),
-        render: vi.fn(),
-      };
-    },
-  ) satisfies ReturnType<typeof getCreatePackResourceSelector<typeof choices>>;
+const getMockCreatePackResourceSelector = (
+  choices: ReadonlyArray<"skills" | "prompts" | "agents">,
+): ReturnType<typeof getCreatePackResourceSelector> => {
+  return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
+    return {
+      invalidate: vi.fn(),
+      handleInput: vi.fn(() => done(choices)),
+      render: vi.fn(),
+    } satisfies Component;
+  };
 };
 
 const mockCustomUIFactory = async <T>(
@@ -60,8 +55,8 @@ const mockCustomUIFactory = async <T>(
 
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
-  let writeFile: ReturnType<typeof vi.spyOn<MemoryFileSystem, "writeFile">>;
-  let removeDirectory: ReturnType<typeof vi.spyOn<MemoryFileSystem, "removeDirectory">>;
+  let writeFile: ReturnType<typeof vi.spyOn>;
+  let removeDirectory: ReturnType<typeof vi.spyOn>;
 
   beforeAll(() => {
     fileSystem = getMemoryResourceFileSystem();
