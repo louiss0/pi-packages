@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
+import { getNodeResourceFileSystem, ResourceFileSystem } from "../shared/filesystem";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -34,6 +35,8 @@ type PackResourceCommand = (typeof packResourceCommands.options)[number];
 
 type PackResourceHandlers = Record<PackResourceCommand, () => Promise<void>>;
 
+export const ROOT_PACK_FOLDER_PATH = "~/.pi/packs/";
+
 export default function (pi: ExtensionAPI) {
   pi.registerCommand(ROOT_PACK_COMMAND, {
     description: "Manage resource packs",
@@ -61,6 +64,7 @@ export default function (pi: ExtensionAPI) {
           [SKILL_COMMAND, PROMPT_COMMAND, AGENT_COMMAND].map((command) => `${command}s`),
         ),
         ctx,
+        fileSystem: getNodeResourceFileSystem(),
       });
     },
   });
@@ -162,8 +166,9 @@ type PackCommand = (typeof packCommands.options)[number];
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
-    createPackResourceSelector?: ReturnType<typeof getCreatePackResourceSelector>;
+    createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
     ctx: ExtensionCommandContext;
+    fileSystem: ResourceFileSystem;
   },
 ) {
   return (

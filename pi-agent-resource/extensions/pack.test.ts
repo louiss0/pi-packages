@@ -4,7 +4,12 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
-import { getCreatePackResourceSelector, rootPackResourceReducer } from "./pack";
+import { getMemoryResourceFileSystem, MemoryFileSystem } from "../shared/filesystem";
+import {
+  getCreatePackResourceSelector,
+  ROOT_PACK_FOLDER_PATH,
+  rootPackResourceReducer,
+} from "./pack";
 
 type MockContext =
   | Partial<ExtensionCommandContext>
@@ -51,6 +56,15 @@ const mockCustomUIFactory = async <T>(
 };
 
 describe("Pack", () => {
+  let fileSystem: MemoryFileSystem;
+  beforeAll(() => {
+    fileSystem = getMemoryResourceFileSystem();
+  });
+
+  afterEach(() => {
+    fileSystem.reset();
+  });
+
   describe("Testing rootPackResourceReducer", () => {
     it("creates a pack when create is passed in", () => {
       const output = "front-end";
@@ -70,6 +84,7 @@ describe("Pack", () => {
       rootPackResourceReducer("create", {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
+        fileSystem,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
@@ -79,6 +94,37 @@ describe("Pack", () => {
       );
 
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
+
+      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[0]}/example.md`,
+        `---
+        name: example
+        description: This is an example pack
+
+        ---
+        `,
+      );
+
+      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[1]}/example/SKILL.md`,
+        `---
+        name: example
+        description: This is an example pack
+
+        ---
+        `,
+      );
+
+      expect(fileSystem.writeFile).toHaveBeenCalledWith(
+        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[2]}/example.md`,
+        `---
+        name: example
+        description: This is an example pack
+        tools:
+        model:
+        ---
+        `,
+      );
     });
 
     it("deletes a pack when delete is passed in", () => {
@@ -90,11 +136,20 @@ describe("Pack", () => {
           notify: vi.fn(),
         },
       };
-      rootPackResourceReducer("delete", { ctx: createTestContext(ctx) });
+
+      rootPackResourceReducer("delete", {
+        createPackResourceSelector: getMockCreatePackResourceSelector([]),
+        ctx: createTestContext(ctx),
+        fileSystem,
+      });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
         "pack",
         "What is the name of the pack you want to delete?",
+      );
+
+      expect(fileSystem.removeDirectory).toHaveBeenCalledWith(
+        `${ROOT_PACK_FOLDER_PATH}${output}`,
       );
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
