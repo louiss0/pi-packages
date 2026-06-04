@@ -7,6 +7,7 @@ import {
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 import { getNodeResourceFileSystem, ResourceFileSystem } from "../shared/filesystem";
+import { MultiSelect } from "@code-fixer-23/pi-form-components";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -60,9 +61,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       await rootPackResourceReducer(result.output, {
-        createPackResourceSelector: getCreatePackResourceSelector(
-          [SKILL_COMMAND, PROMPT_COMMAND, AGENT_COMMAND].map((command) => `${command}s`),
-        ),
+        createPackResourceSelector: getCreatePackResourceSelector(),
         ctx,
         fileSystem: getNodeResourceFileSystem(),
       });
@@ -142,23 +141,27 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-export function getCreatePackResourceSelector<T extends ReadonlyArray<string>>(choices: T) {
+export function getCreatePackResourceSelector() {
+  const resources = [`${SKILL_COMMAND}s`, `${PROMPT_COMMAND}s`, `${AGENT_COMMAND}s`] as const;
   return (
     tui: TUI,
     theme: Theme,
     _: KeybindingsManager,
-    done: (result?: T) => void,
-  ): Component => ({
-    invalidate() {
-      tui.requestRender();
-    },
-    handleInput() {
-      done(choices);
-    },
-    render() {
-      return [];
-    },
-  });
+    done: (result: Array<(typeof resources)[number]> | null) => void,
+  ): Component =>
+    new MultiSelect(
+      {
+        title: "What resources do you want to pack?",
+        items: resources.map((resource) => ({
+          value: resource,
+          label: `${PACK_LABEL}:${resource}`,
+          description: `Make a ${resource.charAt(0).toUpperCase() + resource.slice(1)}s in ${PACK_LABEL}`,
+        })),
+      },
+      tui,
+      theme,
+      done,
+    );
 }
 
 type PackCommand = (typeof packCommands.options)[number];
@@ -173,7 +176,8 @@ export function rootPackResourceReducer(
 ) {
   return (
     {
-      [CREATE_COMMAND]: async () => {},
+      [CREATE_COMMAND]: async () => {
+      },
       [DELETE_COMMAND]: async () => {},
     } satisfies Record<PackCommand, () => Promise<void>>
   )[arg]();
