@@ -6,6 +6,9 @@ import {
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { getMemoryResourceFileSystem, MemoryFileSystem } from "../shared/filesystem";
 import {
+  exampleAgentContent,
+  examplePromptContent,
+  exampleSkillContent,
   getCreatePackResourceSelector,
   ROOT_PACK_FOLDER_PATH,
   rootPackResourceReducer,
@@ -62,16 +65,13 @@ describe("Pack", () => {
 
   beforeAll(() => {
     fileSystem = getMemoryResourceFileSystem();
-  });
-
-  beforeEach(() => {
     writeFile = vi.spyOn(fileSystem, "writeFile");
     removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
   });
 
   afterEach(() => {
-    writeFile.mockRestore();
-    removeDirectory.mockRestore();
+    writeFile.mockClear();
+    removeDirectory.mockClear();
     fileSystem.reset();
   });
 
@@ -107,38 +107,25 @@ describe("Pack", () => {
 
       expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[0]}/example.md`,
-        `---
-        name: example
-        description: This is an example pack
-
-        ---
-        `,
+        examplePromptContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[1]}/example/SKILL.md`,
-        `---
-        name: example
-        description: This is an example pack
-
-        ---
-        `,
+        exampleSkillContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
         `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[2]}/example.md`,
-        `---
-        name: example
-        description: This is an example pack
-        tools:
-        model:
-        ---
-        `,
+        exampleAgentContent,
       );
     });
 
     it("deletes a pack when delete is passed in", async () => {
       const output = "C#";
+
+      await fileSystem.mkdir(`${ROOT_PACK_FOLDER_PATH}${output}`, { recursive: true });
+      await fileSystem.writeFile(`${ROOT_PACK_FOLDER_PATH}${output}/example.md`, exampleAgentContent);
 
       const ctx = {
         ui: {

@@ -166,21 +166,21 @@ export function getCreatePackResourceSelector() {
 
 type PackCommand = (typeof packCommands.options)[number];
 
-const examplePromptContent = `---
+export const examplePromptContent = `---
         name: example
         description: This is an example pack
 
         ---
         `;
 
-const exampleSkillContent = `---
+export const exampleSkillContent = `---
         name: example
         description: This is an example pack
 
         ---
         `;
 
-const exampleAgentContent = `---
+export const exampleAgentContent = `---
         name: example
         description: This is an example pack
         tools:
@@ -237,6 +237,12 @@ export function rootPackResourceReducer(
         deps.ctx.ui.notify(`Pack created successfully with name '${packName}'`);
       },
       [DELETE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(ROOT_PACK_FOLDER_PATH);
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
         const packName = await deps.ctx.ui.input(PACK_LABEL, "What is the name of the pack you want to delete?");
         if (!packName) {
           return;
