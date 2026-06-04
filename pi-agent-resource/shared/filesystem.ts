@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import {
   mkdir as nodeMkdir,
   readdir as nodeReaddir,
@@ -6,6 +7,7 @@ import {
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 import { fs as memoryFs, vol } from "memfs";
+import { join } from "node:path";
 
 export type ResourceDirectoryEntry = {
   name: string;
@@ -23,6 +25,7 @@ export type ResourceResult<T> =
     };
 
 export interface ResourceFileSystem {
+  rootPath: string;
   mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>>;
   readDirectoryNames(path: string): Promise<ResourceResult<string[]>>;
   readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>>;
@@ -55,44 +58,74 @@ function getResourceError(error: unknown) {
 }
 
 export class NodeFileSystem implements ResourceFileSystem {
+  #rootPath: string;
+
+  constructor(rootPath: string) {
+    this.#rootPath = join(homedir(), rootPath);
+  }
+
+  get rootPath() {
+    return this.#rootPath;
+  }
+
   mkdir(path: string, options: { recursive: true }) {
-    return getResourceResult(() => nodeMkdir(path, options));
+    return getResourceResult(() => nodeMkdir(join(path), options));
   }
   readDirectoryNames(path: string) {
-    return getResourceResult(() => nodeReaddir(path));
+    return getResourceResult(() => nodeReaddir(join(this.#rootPath, path)));
   }
   readDirectoryEntries(path: string) {
-    return getResourceResult(() => nodeReaddir(path, { withFileTypes: true }));
+    return getResourceResult(() =>
+      nodeReaddir(join(this.#rootPath, path), { withFileTypes: true }),
+    );
   }
   readFile(path: string): Promise<ResourceResult<string>> {
-    return getResourceResult(() => nodeReadFile(path, "utf8"));
+    return getResourceResult(() => nodeReadFile(join(this.#rootPath, path), "utf8"));
   }
   removeDirectory(path: string) {
-    return getResourceResult(() => nodeRm(path, { force: true, recursive: true }));
+    return getResourceResult(() =>
+      nodeRm(join(this.#rootPath, path), { force: true, recursive: true }),
+    );
   }
   removeFile(path: string) {
-    return getResourceResult(() => nodeRm(path, { force: true }));
+    return getResourceResult(() => nodeRm(join(this.#rootPath, path), { force: true }));
   }
   writeFile(path: string, content: string) {
-    return getResourceResult(() => nodeWriteFile(path, content, { encoding: "utf-8" }));
+    return getResourceResult(() =>
+      nodeWriteFile(join(this.#rootPath, path), content, { encoding: "utf-8" }),
+    );
   }
 }
 
 export class MemoryFileSystem implements ResourceFileSystem {
+  #rootPath: string;
+
+  constructor(rootPath: string) {
+    this.#rootPath = join(homedir(), rootPath);
+  }
+
+  get rootPath(): string {
+    return this.#rootPath;
+  }
+
   reset() {
     vol.reset();
   }
 
   seed(filesByPath: Record<string, string>) {
-    vol.fromJSON(filesByPath, "/");
+    vol.fromJSON(filesByPath, this.rootPath);
   }
 
   mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>> {
-    return getResourceResult(() => memoryFs.promises.mkdir(path, options));
+    return getResourceResult(() =>
+      memoryFs.promises.mkdir(join(this.#rootPath, path), options),
+    );
   }
   readDirectoryNames(path: string): Promise<ResourceResult<string[]>> {
     return getResourceResult(async () => {
-      const names = await memoryFs.promises.readdir(path, { encoding: "utf8" });
+      const names = await memoryFs.promises.readdir(join(this.#rootPath, path), {
+        encoding: "utf8",
+      });
 
       return names.map((name) => {
         if (typeof name === "string") {
@@ -105,7 +138,9 @@ export class MemoryFileSystem implements ResourceFileSystem {
   }
   readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>> {
     return getResourceResult(async () => {
-      const entries = await memoryFs.promises.readdir(path, { withFileTypes: true });
+      const entries = await memoryFs.promises.readdir(join(this.#rootPath, path), {
+        withFileTypes: true,
+      });
       const directoryEntries: ResourceDirectoryEntry[] = [];
 
       return entries.reduce((directoryEntries, entry) => {
@@ -124,7 +159,9 @@ export class MemoryFileSystem implements ResourceFileSystem {
   }
   readFile(path: string): Promise<ResourceResult<string>> {
     return getResourceResult(async () => {
-      const content = await memoryFs.promises.readFile(path, { encoding: "utf8" });
+      const content = await memoryFs.promises.readFile(join(this.#rootPath, path), {
+        encoding: "utf8",
+      });
 
       if (typeof content === "string") {
         return content;
@@ -135,23 +172,25 @@ export class MemoryFileSystem implements ResourceFileSystem {
   }
   removeDirectory(path: string): Promise<ResourceResult<void>> {
     return getResourceResult(() =>
-      memoryFs.promises.rm(path, { force: true, recursive: true }),
+      memoryFs.promises.rm(join(this.#rootPath, path), { force: true, recursive: true }),
     );
   }
   removeFile(path: string): Promise<ResourceResult<void>> {
-    return getResourceResult(() => memoryFs.promises.rm(path, { force: true }));
+    return getResourceResult(() =>
+      memoryFs.promises.rm(join(this.#rootPath, path), { force: true }),
+    );
   }
   writeFile(path: string, content: string): Promise<ResourceResult<void>> {
     return getResourceResult(() =>
-      memoryFs.promises.writeFile(path, content, { encoding: "utf8" }),
+      memoryFs.promises.writeFile(join(this.#rootPath, path), content, { encoding: "utf8" }),
     );
   }
 }
 
-export function getNodeResourceFileSystem() {
-  return new NodeFileSystem();
+export function getNodeResourceFileSystem(rootPath: string) {
+  return new NodeFileSystem(rootPath);
 }
 
-export function getMemoryResourceFileSystem() {
-  return new MemoryFileSystem();
+export function getMemoryResourceFileSystem(rootPath: string) {
+  return new MemoryFileSystem(rootPath);
 }
