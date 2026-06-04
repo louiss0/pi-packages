@@ -59,7 +59,7 @@ describe("Pack", () => {
   let removeDirectory: ReturnType<typeof vi.spyOn>;
 
   beforeAll(() => {
-    fileSystem = getMemoryResourceFileSystem();
+    fileSystem = getMemoryResourceFileSystem(ROOT_PACK_FOLDER_PATH);
     writeFile = vi.spyOn(fileSystem, "writeFile");
     removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
   });
@@ -102,17 +102,17 @@ describe("Pack", () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[0]}/example.md`,
+        `${fileSystem.rootPath}/${output}/${selectionChoices[0]}/example.md`,
         examplePromptContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[1]}/example/SKILL.md`,
+        `${fileSystem.rootPath}/${output}/${selectionChoices[1]}/example/SKILL.md`,
         exampleSkillContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${ROOT_PACK_FOLDER_PATH}${output}/${selectionChoices[2]}/example.md`,
+        `${fileSystem.rootPath}/${output}/${selectionChoices[2]}/example.md`,
         exampleAgentContent,
       );
     });
