@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
-import { MemoryFileSystem } from "../shared/filesystem";
+import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
@@ -38,21 +38,11 @@ import registerSkillManager, {
 
 describe("skill manager handlers", () => {
   const localCwd = "/workspace";
-  const expectedSkillPath = join(
-    "/test-home",
-    ".pi",
-    "agent",
-    "skills",
-    "test-skill",
-    "SKILL.md",
-  );
-  const skillPath = expectedSkillPath;
-  const expectedLocalSkillPath = join(localCwd, ".pi", "skills", "test-skill", "SKILL.md");
-  const localSkillPath = expectedLocalSkillPath;
-  const expectedSkillDirectory = dirname(expectedSkillPath);
-  const expectedLocalSkillDirectory = dirname(expectedLocalSkillPath);
-  const expectedSkillRootPath = join("/test-home", ".pi", "agent", "skills");
-  const expectedLocalSkillRootPath = join(localCwd, ".pi", "skills");
+  const testPathResolver = new PathResolver(localCwd, "/test-home");
+  const skillPath = testPathResolver.resolveGlobalSkillPath("test-skill/SKILL.md");
+  const localSkillPath = testPathResolver.resolveLocalSkillPath("test-skill/SKILL.md");
+  const skillDirectory = dirname(skillPath);
+  const localSkillDirectory = dirname(localSkillPath);
   let memoryFileSystem: MemoryFileSystem;
   let pathResolver: ResourcePathResolver;
 
@@ -66,8 +56,8 @@ describe("skill manager handlers", () => {
       resolvePackSkillPath: vi.fn(),
       resolvePackAgentPath: vi.fn(),
       resolvePackPromptPath: vi.fn(),
-      resolveGlobalSkillPath: vi.fn((path = "") => join(expectedSkillRootPath, path)),
-      resolveLocalSkillPath: vi.fn((path = "") => join(expectedLocalSkillRootPath, path)),
+      resolveGlobalSkillPath: vi.fn((path) => testPathResolver.resolveGlobalSkillPath(path)),
+      resolveLocalSkillPath: vi.fn((path) => testPathResolver.resolveLocalSkillPath(path)),
       resolveGlobalAgentPath: vi.fn(),
       resolveLocalAgentPath: vi.fn(),
       resolveGlobalPromptPath: vi.fn(),
@@ -373,7 +363,7 @@ describe("skill manager handlers", () => {
     });
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith("test-skill");
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
   });
 
   it("handleCreate writes a local skill when the local scope is requested", async () => {
@@ -401,7 +391,7 @@ describe("skill manager handlers", () => {
     expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith("test-skill");
     expect(pathResolver.resolveGlobalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
-      `Skill created successfully: ${expectedLocalSkillPath}`,
+      `Skill created successfully: ${localSkillPath}`,
     );
   });
 
@@ -434,7 +424,7 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("allowed-tools: 'read, write'"),
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
   });
 
   it("handleCreate creates the skill when the optional form is dismissed", async () => {
@@ -460,7 +450,7 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
   });
 
   it("handleCreate overwrites an existing skill", async () => {
@@ -491,14 +481,14 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("Useful skill description"),
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
+    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
   });
 
   it("handleEdit uses an 80% overlay editor by default", async () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
-    const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
+    const custom = vi.fn().mockResolvedValueOnce(skillPath);
     custom.mockResolvedValueOnce("updated skill content");
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
@@ -535,7 +525,7 @@ describe("skill manager handlers", () => {
         }
       },
     } as never);
-    const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
+    const custom = vi.fn().mockResolvedValueOnce(skillPath);
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
 
@@ -549,7 +539,7 @@ describe("skill manager handlers", () => {
 
     expect(spawn).toHaveBeenCalledWith(
       "code",
-      ["--wait", "+set ft=markdown", expectedSkillPath],
+      ["--wait", "+set ft=markdown", skillPath],
       expect.objectContaining({ shell: false }),
     );
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
@@ -585,7 +575,7 @@ describe("skill manager handlers", () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
-    const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
+    const custom = vi.fn().mockResolvedValueOnce(skillPath);
     const notify = vi.fn();
 
     await handleDelete(
@@ -601,7 +591,7 @@ describe("skill manager handlers", () => {
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
-      `Skill deleted successfully: ${expectedSkillDirectory}`,
+      `Skill deleted successfully: ${skillDirectory}`,
     );
   });
 
@@ -610,7 +600,7 @@ describe("skill manager handlers", () => {
     localFileSystem.seed({
       [localSkillPath]: "existing local skill content",
     });
-    const custom = vi.fn().mockResolvedValueOnce(expectedLocalSkillPath);
+    const custom = vi.fn().mockResolvedValueOnce(localSkillPath);
     const notify = vi.fn();
 
     await handleDelete(
@@ -626,7 +616,7 @@ describe("skill manager handlers", () => {
     expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveGlobalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
-      `Skill deleted successfully: ${expectedLocalSkillDirectory}`,
+      `Skill deleted successfully: ${localSkillDirectory}`,
     );
   });
 });
