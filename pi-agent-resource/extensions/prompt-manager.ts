@@ -24,8 +24,8 @@ import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import {
   getPathResolver,
   NodeFileSystem,
-  type PathResolver,
   type ResourceFileSystem,
+  type ResourcePathResolver,
 } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
@@ -78,7 +78,7 @@ type PromptChoice = {
 };
 
 type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
-type GetPathResolver = (cwd?: string) => PathResolver;
+type GetPathResolver = (cwd?: string) => ResourcePathResolver;
 
 export function parsePromptFormValues(values: PromptFields) {
   return parseObjectErrors(PromptFieldsSchema, values);
@@ -354,7 +354,7 @@ async function pickPrompt(
   title: string,
   scope: PromptScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const choices = await listPromptChoices(scope, fileSystem, pathResolver);
 
@@ -378,7 +378,7 @@ async function pickPrompt(
 async function listPromptChoices(
   scope: PromptScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const choices: PromptChoice[] = [];
   const promptRootPath =

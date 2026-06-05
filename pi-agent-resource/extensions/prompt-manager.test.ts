@@ -3,6 +3,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import { MemoryFileSystem } from "../shared/filesystem";
+import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
@@ -44,7 +45,29 @@ describe("extensions/prompt-manager", () => {
     "prompts",
     "create-react-component.md",
   );
+  const expectedPromptRootPath = join("/test-home", ".pi", "agent", "prompts");
+  const expectedLocalPromptRootPath = join(localCwd, ".pi", "prompts");
   let memoryFileSystem: MemoryFileSystem;
+  let pathResolver: ResourcePathResolver;
+
+  function getStubPathResolver() {
+    return pathResolver;
+  }
+
+  function createPathResolverMock() {
+    return {
+      resolvePackPath: vi.fn(),
+      resolvePackSkillPath: vi.fn(),
+      resolvePackAgentPath: vi.fn(),
+      resolvePackPromptPath: vi.fn(),
+      resolveGlobalSkillPath: vi.fn(),
+      resolveLocalSkillPath: vi.fn(),
+      resolveGlobalAgentPath: vi.fn(),
+      resolveLocalAgentPath: vi.fn(),
+      resolveGlobalPromptPath: vi.fn((path = "") => join(expectedPromptRootPath, path)),
+      resolveLocalPromptPath: vi.fn((path = "") => join(expectedLocalPromptRootPath, path)),
+    } satisfies ResourcePathResolver;
+  }
 
   function createTheme() {
     return {
@@ -66,6 +89,7 @@ describe("extensions/prompt-manager", () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     memoryFileSystem = new MemoryFileSystem();
+    pathResolver = createPathResolverMock();
     resetDevelopmentExtensionNotice();
   });
 
@@ -170,7 +194,12 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+      await handleCreate(
+        { ui: { custom, notify } } as never,
+        "global",
+        () => new MemoryFileSystem(),
+        getStubPathResolver,
+      );
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
@@ -182,6 +211,11 @@ describe("extensions/prompt-manager", () => {
         data: expect.stringContaining("Write the component template here"),
         success: true,
       });
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveLocalPromptPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Prompt created");
     });
 
@@ -202,6 +236,7 @@ describe("extensions/prompt-manager", () => {
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
@@ -210,6 +245,11 @@ describe("extensions/prompt-manager", () => {
         data: expect.stringContaining("Write the component template here"),
         success: true,
       });
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveGlobalPromptPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Prompt created");
     });
   });
@@ -223,11 +263,21 @@ describe("extensions/prompt-manager", () => {
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
       const notify = vi.fn();
 
-      await handleEdit({ ui: { notify, select, editor } } as never, "global", () => new MemoryFileSystem());
+      await handleEdit(
+        { ui: { notify, select, editor } } as never,
+        "global",
+        () => new MemoryFileSystem(),
+        getStubPathResolver,
+      );
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
       expect(select).toHaveBeenCalledWith("Edit Prompt", ["global: create-react-component"]);
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveLocalPromptPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated prompt content",
         success: true,
@@ -248,11 +298,17 @@ describe("extensions/prompt-manager", () => {
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
 
       expect(select).toHaveBeenCalledWith("Edit Prompt", ["local: create-react-component"]);
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveGlobalPromptPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated local prompt content",
         success: true,
@@ -269,11 +325,21 @@ describe("extensions/prompt-manager", () => {
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
 
-      await handleDelete({ ui: { notify, select } } as never, "global", () => new MemoryFileSystem());
+      await handleDelete(
+        { ui: { notify, select } } as never,
+        "global",
+        () => new MemoryFileSystem(),
+        getStubPathResolver,
+      );
 
       await expect(memoryFileSystem.readFile(expectedPromptPath)).resolves.toMatchObject({
         success: false,
       });
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveLocalPromptPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Prompt deleted");
     });
 
@@ -289,11 +355,17 @@ describe("extensions/prompt-manager", () => {
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       await expect(localFileSystem.readFile(expectedLocalPromptPath)).resolves.toMatchObject({
         success: false,
       });
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
+        "create-react-component.md",
+      );
+      expect(pathResolver.resolveGlobalPromptPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Prompt deleted");
     });
   });
