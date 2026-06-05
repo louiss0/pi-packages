@@ -3,6 +3,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import { MemoryFileSystem } from "../shared/filesystem";
+import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
@@ -50,7 +51,29 @@ describe("skill manager handlers", () => {
   const localSkillPath = expectedLocalSkillPath;
   const expectedSkillDirectory = dirname(expectedSkillPath);
   const expectedLocalSkillDirectory = dirname(expectedLocalSkillPath);
+  const expectedSkillRootPath = join("/test-home", ".pi", "agent", "skills");
+  const expectedLocalSkillRootPath = join(localCwd, ".pi", "skills");
   let memoryFileSystem: MemoryFileSystem;
+  let pathResolver: ResourcePathResolver;
+
+  function getStubPathResolver() {
+    return pathResolver;
+  }
+
+  function createPathResolverMock() {
+    return {
+      resolvePackPath: vi.fn(),
+      resolvePackSkillPath: vi.fn(),
+      resolvePackAgentPath: vi.fn(),
+      resolvePackPromptPath: vi.fn(),
+      resolveGlobalSkillPath: vi.fn((path = "") => join(expectedSkillRootPath, path)),
+      resolveLocalSkillPath: vi.fn((path = "") => join(expectedLocalSkillRootPath, path)),
+      resolveGlobalAgentPath: vi.fn(),
+      resolveLocalAgentPath: vi.fn(),
+      resolveGlobalPromptPath: vi.fn(),
+      resolveLocalPromptPath: vi.fn(),
+    } satisfies ResourcePathResolver;
+  }
 
   function createTheme() {
     return {
@@ -103,6 +126,7 @@ describe("skill manager handlers", () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     memoryFileSystem = new MemoryFileSystem();
+    pathResolver = createPathResolverMock();
     resetDevelopmentExtensionNotice();
   });
 
@@ -314,7 +338,12 @@ describe("skill manager handlers", () => {
     const custom = vi.fn().mockResolvedValueOnce(null);
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+    await handleCreate(
+      { ui: { custom, notify } } as never,
+      "global",
+      () => new MemoryFileSystem(),
+      getStubPathResolver,
+    );
 
     expectFormFactory(custom, 0, "Create Skill");
     expect(custom).toHaveBeenCalledTimes(1);
@@ -329,7 +358,12 @@ describe("skill manager handlers", () => {
     });
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+    await handleCreate(
+      { ui: { custom, notify } } as never,
+      "global",
+      () => new MemoryFileSystem(),
+      getStubPathResolver,
+    );
 
     expectFormFactory(custom, 0, "Create Skill");
     const content = await memoryFileSystem.readFile(skillPath);
@@ -337,6 +371,8 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
+    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith("test-skill");
+    expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${expectedSkillPath}`);
   });
 
@@ -354,6 +390,7 @@ describe("skill manager handlers", () => {
       { cwd: localCwd, ui: { custom, notify } } as never,
       "local",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     const content = await localFileSystem.readFile(localSkillPath);
@@ -361,6 +398,8 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
+    expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith("test-skill");
+    expect(pathResolver.resolveGlobalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
       `Skill created successfully: ${expectedLocalSkillPath}`,
     );
@@ -381,7 +420,12 @@ describe("skill manager handlers", () => {
       });
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+    await handleCreate(
+      { ui: { custom, notify } } as never,
+      "global",
+      () => new MemoryFileSystem(),
+      getStubPathResolver,
+    );
 
     expectFormFactory(custom, 0, "Create Skill");
     expectFormFactory(custom, 1, "Skill Details");
@@ -404,7 +448,12 @@ describe("skill manager handlers", () => {
       .mockResolvedValueOnce(null);
     const notify = vi.fn();
 
-    await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+    await handleCreate(
+      { ui: { custom, notify } } as never,
+      "global",
+      () => new MemoryFileSystem(),
+      getStubPathResolver,
+    );
 
     const content = await memoryFileSystem.readFile(skillPath);
     expect(content).toMatchObject({
@@ -433,6 +482,7 @@ describe("skill manager handlers", () => {
       } as never,
       "global",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     const content = await memoryFileSystem.readFile(skillPath);
@@ -458,10 +508,13 @@ describe("skill manager handlers", () => {
       undefined,
       "global",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     expectEditorOverlayFactory(custom, 1);
     expect(spawn).not.toHaveBeenCalled();
+    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
+    expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(await memoryFileSystem.readFile(skillPath)).toEqual({
       data: "updated skill content",
       success: true,
@@ -491,6 +544,7 @@ describe("skill manager handlers", () => {
       "external",
       "global",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     expect(spawn).toHaveBeenCalledWith(
@@ -498,6 +552,8 @@ describe("skill manager handlers", () => {
       ["--wait", "+set ft=markdown", expectedSkillPath],
       expect.objectContaining({ shell: false }),
     );
+    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
+    expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith("Skill updated. Reloading skills...", "info");
   });
@@ -519,6 +575,7 @@ describe("skill manager handlers", () => {
       undefined,
       "global",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     expect(notify).toHaveBeenCalledWith("Skill edit cancelled", "info");
@@ -531,11 +588,18 @@ describe("skill manager handlers", () => {
     const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
     const notify = vi.fn();
 
-    await handleDelete({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
+    await handleDelete(
+      { ui: { custom, notify } } as never,
+      "global",
+      () => new MemoryFileSystem(),
+      getStubPathResolver,
+    );
 
     await expect(memoryFileSystem.readFile(skillPath)).resolves.toMatchObject({
       success: false,
     });
+    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
+    expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
       `Skill deleted successfully: ${expectedSkillDirectory}`,
     );
@@ -553,11 +617,14 @@ describe("skill manager handlers", () => {
       { cwd: localCwd, ui: { custom, notify } } as never,
       "local",
       () => new MemoryFileSystem(),
+      getStubPathResolver,
     );
 
     await expect(localFileSystem.readFile(localSkillPath)).resolves.toMatchObject({
       success: false,
     });
+    expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith();
+    expect(pathResolver.resolveGlobalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
       `Skill deleted successfully: ${expectedLocalSkillDirectory}`,
     );

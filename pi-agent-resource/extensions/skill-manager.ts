@@ -34,8 +34,8 @@ import {
 import {
   getPathResolver,
   NodeFileSystem,
-  type PathResolver,
   type ResourceFileSystem,
+  type ResourcePathResolver,
 } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
@@ -103,7 +103,7 @@ type SkillFrontmatterFields = RequiredAgentSkillFields & OptionalAgentSkillFormF
 type SkillEditorMode = "external";
 type SkillScope = "global" | "local";
 type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
-type GetPathResolver = (cwd?: string) => PathResolver;
+type GetPathResolver = (cwd?: string) => ResourcePathResolver;
 
 class SkillEditorOverlay extends Container implements Focusable {
   #editor: Editor;
@@ -430,7 +430,7 @@ async function readProjectEditorConfig(
 async function createSkillFile(
   fields: SkillFrontmatterFields,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
   scope: SkillScope,
 ) {
   const skillDirectory =
@@ -521,7 +521,7 @@ async function pickSkillPath(
   title: string,
   scope: SkillScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const skillNames = await listSkillNames(scope, fileSystem, pathResolver);
 
@@ -573,7 +573,7 @@ async function pickSkillPath(
 async function listSkillNames(
   scope: SkillScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const entriesResult = await fileSystem.readDirectoryEntries(
     scope === "local"
