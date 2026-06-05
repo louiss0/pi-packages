@@ -8,6 +8,7 @@ import {
   MemoryFileSystem,
   PathResolver,
 } from "../shared/filesystem";
+import type { ResourcePathResolver } from "../shared/filesystem";
 import {
   exampleAgentContent,
   examplePromptContent,
@@ -48,6 +49,7 @@ const mockCustomUIFactory = async <T>(
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
   let pathResolver: PathResolver;
+  let pathResolverMock: ResourcePathResolver;
   let writeFile: ReturnType<typeof vi.spyOn>;
   let removeDirectory: ReturnType<typeof vi.spyOn>;
 
@@ -56,6 +58,27 @@ describe("Pack", () => {
     pathResolver = new PathResolver("/workspace", "/test-home");
     writeFile = vi.spyOn(fileSystem, "writeFile");
     removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
+  });
+
+  beforeEach(() => {
+    pathResolverMock = {
+      resolvePackPath: vi.fn((path) => pathResolver.resolvePackPath(path)),
+      resolvePackSkillPath: vi.fn((packName, path) =>
+        pathResolver.resolvePackSkillPath(packName, path),
+      ),
+      resolvePackAgentPath: vi.fn((packName, path) =>
+        pathResolver.resolvePackAgentPath(packName, path),
+      ),
+      resolvePackPromptPath: vi.fn((packName, path) =>
+        pathResolver.resolvePackPromptPath(packName, path),
+      ),
+      resolveGlobalSkillPath: vi.fn(),
+      resolveLocalSkillPath: vi.fn(),
+      resolveGlobalAgentPath: vi.fn(),
+      resolveLocalAgentPath: vi.fn(),
+      resolveGlobalPromptPath: vi.fn(),
+      resolveLocalPromptPath: vi.fn(),
+    } satisfies ResourcePathResolver;
   });
 
   afterEach(() => {
@@ -96,7 +119,7 @@ describe("Pack", () => {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
         fileSystem,
-        pathResolver,
+        pathResolver: pathResolverMock,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
@@ -111,15 +134,35 @@ describe("Pack", () => {
         pathResolver.resolvePackPromptPath(output, "example.md"),
         examplePromptContent,
       );
+      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
+      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output);
+      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(
+        output,
+        "example.md",
+      );
 
       expect(writeFile).toHaveBeenCalledWith(
         pathResolver.resolvePackSkillPath(output, "example/SKILL.md"),
         exampleSkillContent,
       );
+      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output);
+      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(
+        output,
+        "example",
+      );
+      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(
+        output,
+        "example/SKILL.md",
+      );
 
       expect(writeFile).toHaveBeenCalledWith(
         pathResolver.resolvePackAgentPath(output, "example.md"),
         exampleAgentContent,
+      );
+      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output);
+      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(
+        output,
+        "example.md",
       );
     });
 
@@ -134,6 +177,7 @@ describe("Pack", () => {
         [pathResolver.resolvePackPromptPath(output, "example.md")]:
           examplePromptContent,
       });
+      vi.mocked(pathResolverMock.resolvePackPath).mockClear();
 
       const ctx = {
         ui: {
@@ -146,7 +190,7 @@ describe("Pack", () => {
         createPackResourceSelector: getMockCreatePackResourceSelector([]),
         ctx: createTestContext(ctx),
         fileSystem,
-        pathResolver,
+        pathResolver: pathResolverMock,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
@@ -157,6 +201,8 @@ describe("Pack", () => {
       expect(removeDirectory).toHaveBeenCalledWith(
         pathResolver.resolvePackPath(output),
       );
+      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith();
+      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,

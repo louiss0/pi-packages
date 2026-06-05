@@ -10,8 +10,8 @@ import { picklist, safeParse, summarize } from "valibot";
 import {
   getPathResolver,
   NodeFileSystem,
-  type PathResolver,
   type ResourceFileSystem,
+  type ResourcePathResolver,
 } from "../shared/filesystem";
 
 const PACK_LABEL = "pack";
@@ -210,7 +210,7 @@ export const exampleAgentContent = `---
 
 async function writePackExampleResources(
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
   packName: string,
   resources: ReadonlyArray<string>,
 ) {
@@ -257,7 +257,7 @@ export function rootPackResourceReducer(
     createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
-    pathResolver: PathResolver;
+    pathResolver: ResourcePathResolver;
   },
 ) {
   return (
