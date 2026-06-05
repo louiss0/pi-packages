@@ -4,10 +4,7 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
-import {
-  MemoryFileSystem,
-  PathResolver,
-} from "../shared/filesystem";
+import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import type { ResourcePathResolver } from "../shared/filesystem";
 import {
   exampleAgentContent,
@@ -135,21 +132,15 @@ describe("Pack", () => {
         examplePromptContent,
       );
       expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
-      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output);
-      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(
-        output,
-        "example.md",
-      );
+      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output, "example.md");
 
       expect(writeFile).toHaveBeenCalledWith(
         pathResolver.resolvePackSkillPath(output, "example/SKILL.md"),
         exampleSkillContent,
       );
-      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output);
-      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(
-        output,
-        "example",
-      );
+      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output, "example");
       expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(
         output,
         "example/SKILL.md",
@@ -159,23 +150,17 @@ describe("Pack", () => {
         pathResolver.resolvePackAgentPath(output, "example.md"),
         exampleAgentContent,
       );
-      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output);
-      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(
-        output,
-        "example.md",
-      );
+      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output, "example.md");
     });
 
     it("deletes a pack when delete is passed in", async () => {
       const output = "C#";
 
       fileSystem.seed({
-        [pathResolver.resolvePackAgentPath(output, "example.md")]:
-          exampleAgentContent,
-        [pathResolver.resolvePackSkillPath(output, "example/SKILL.md")]:
-          exampleSkillContent,
-        [pathResolver.resolvePackPromptPath(output, "example.md")]:
-          examplePromptContent,
+        [pathResolver.resolvePackAgentPath(output, "example.md")]: exampleAgentContent,
+        [pathResolver.resolvePackSkillPath(output, "example/SKILL.md")]: exampleSkillContent,
+        [pathResolver.resolvePackPromptPath(output, "example.md")]: examplePromptContent,
       });
       vi.mocked(pathResolverMock.resolvePackPath).mockClear();
 
@@ -198,9 +183,7 @@ describe("Pack", () => {
         "What is the name of the pack you want to delete?",
       );
 
-      expect(removeDirectory).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath(output),
-      );
+      expect(removeDirectory).toHaveBeenCalledWith(pathResolver.resolvePackPath(output));
       expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith();
       expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
 
@@ -226,8 +209,6 @@ describe("Pack", () => {
     );
 
     it("deletes a skill pack when delete is passed in", async () => {
-
-
       const packName = "C#";
 
       const folderNames = [
@@ -277,7 +258,7 @@ describe("Pack", () => {
       expect(ctx.ui.select).resolves.toEqual(packName);
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath(packName),
+        pathResolver.resolvePackPath(packName),
       );
 
       expect(getMockCreatePackSkillResourceSelector).toHaveBeenCalledWith(
@@ -285,7 +266,9 @@ describe("Pack", () => {
         packName,
         ["example"],
       );
-      expect(ctx.ui.custom).toHaveBeenCalledWith(getMockCreatePackSkillResourceSelector.mock.results[0].value);
+      expect(ctx.ui.custom).toHaveBeenCalledWith(
+        getMockCreatePackSkillResourceSelector.mock.results[0].value,
+      );
 
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 

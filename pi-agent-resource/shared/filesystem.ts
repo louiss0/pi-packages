@@ -64,15 +64,15 @@ export class PathResolver implements ResourcePathResolver {
     return this.#resolvePath(join(this.#homePath, ".pi", "packs"), path);
   }
 
-  resolvePackSkillPath(packName: string, path = "") {
+  resolvePackSkillPath(packName: string, path: string) {
     return this.#resolvePackResourcePath(packName, this.#skillFolder, path);
   }
 
-  resolvePackAgentPath(packName: string, path = "") {
+  resolvePackAgentPath(packName: string, path: string) {
     return this.#resolvePackResourcePath(packName, this.#agentFolder, path);
   }
 
-  resolvePackPromptPath(packName: string, path = "") {
+  resolvePackPromptPath(packName: string, path: string) {
     return this.#resolvePackResourcePath(packName, this.#promptFolder, path);
   }
 

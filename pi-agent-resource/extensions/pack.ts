@@ -216,7 +216,7 @@ async function writePackExampleResources(
 ) {
   for (const resource of resources) {
     if (resource === `${PROMPT_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName), {
+      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName, ""), {
         recursive: true,
       });
       await fileSystem.writeFile(
@@ -227,7 +227,7 @@ async function writePackExampleResources(
     }
 
     if (resource === `${SKILL_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackSkillPath(packName), {
+      await fileSystem.mkdir(pathResolver.resolvePackSkillPath(packName, ""), {
         recursive: true,
       });
       const skillPath = pathResolver.resolvePackSkillPath(packName, "example");
@@ -240,7 +240,7 @@ async function writePackExampleResources(
     }
 
     if (resource === `${AGENT_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName), {
+      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName, ""), {
         recursive: true,
       });
       await fileSystem.writeFile(
