@@ -1,11 +1,11 @@
-import { MultiSelect } from "@code-fixer-23/pi-form-components";
+import { MultiSelect, MultiSelectConfig } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
   type KeybindingsManager,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Component, TUI } from "@earendil-works/pi-tui";
+import { Component, SelectItem, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 import {
   getPathResolver,
@@ -163,25 +163,27 @@ export default function (pi: ExtensionAPI) {
 
 export function getCreatePackResourceSelector() {
   const resources = [`${SKILL_COMMAND}s`, `${PROMPT_COMMAND}s`, `${AGENT_COMMAND}s`] as const;
+  return getMultiSelectorFactory(
+    "What resources do you want to pack?",
+    resources.map((resource) => ({
+      value: resource,
+      label: `${PACK_LABEL}:${resource}`,
+      description: `Make a ${resource.charAt(0).toUpperCase() + resource.slice(1)} in ${PACK_LABEL}`,
+    })),
+  );
+}
+
+function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
+  title: string,
+  items: MultiSelectConfig<T>["items"],
+  options?: Omit<MultiSelectConfig<T>, "items" | "title">,
+) {
   return (
     tui: TUI,
     theme: Theme,
     _: KeybindingsManager,
-    done: (result: ReadonlyArray<(typeof resources)[number]> | null) => void,
-  ): Component =>
-    new MultiSelect(
-      {
-        title: "What resources do you want to pack?",
-        items: resources.map((resource) => ({
-          value: resource,
-          label: `${PACK_LABEL}:${resource}`,
-          description: `Make a ${resource.charAt(0).toUpperCase() + resource.slice(1)} in ${PACK_LABEL}`,
-        })),
-      },
-      tui,
-      theme,
-      done,
-    );
+    done: (result: Array<T[number]["value"]> | null) => void,
+  ): Component => new MultiSelect({ title, items, ...options }, tui, theme, done);
 }
 
 type PackCommand = (typeof packCommands.options)[number];
@@ -300,9 +302,7 @@ export function rootPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.removeDirectory(
-          deps.pathResolver.resolvePackPath(packName),
-        );
+        await deps.fileSystem.removeDirectory(deps.pathResolver.resolvePackPath(packName));
         deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
       },
     } satisfies Record<PackCommand, () => Promise<void>>
@@ -314,24 +314,13 @@ export function getSkillPackResourceSelector(
   packName: string,
   skills: string[],
 ) {
-  return (
-    tui: TUI,
-    theme: Theme,
-    _: KeybindingsManager,
-    done: (result: typeof skills | null) => void,
-  ): Component =>
-    new MultiSelect(
-      {
-        title,
-        items: skills.map((skill) => ({
-          value: skill,
-          label: `${packName}:${skill}`,
-        })),
-      },
-      tui,
-      theme,
-      done,
-    );
+  return getMultiSelectorFactory(
+    title,
+    skills.map((skill) => ({
+      value: skill,
+      label: `${packName}:${skill}`,
+    })),
+  );
 }
 
 export function skillPackResourceReducer(

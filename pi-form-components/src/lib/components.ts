@@ -14,14 +14,17 @@ import {
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 
-type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
+export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
   title: string;
   items: T;
   spacing?: number;
   itemChoiceStyle?: ItemChoiceStyle;
   styles?: {
     title?: PickerText;
-    item?: Record<"selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch", PickerText>;
+    item?: Record<
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      PickerText
+    >;
   };
 };
 export const itemChoiceStyle = ["checkbox", "radio", "dot", "diamond"] as const;
@@ -48,7 +51,10 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   #done: (value: Array<T[number]["value"]> | null) => void;
   #styles: {
     title: PickerText;
-    item: Record<"selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch", PickerText>;
+    item: Record<
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
+      PickerText
+    >;
   };
 
   readonly itemChoiceStyleRecord = Object.freeze({
