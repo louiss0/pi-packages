@@ -184,7 +184,6 @@ describe("Pack", () => {
       );
 
       expect(removeDirectory).toHaveBeenCalledWith(pathResolver.resolvePackPath(output));
-      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith();
       expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -192,7 +191,7 @@ describe("Pack", () => {
       );
     });
   });
-  describe.todo("Testing skillPackResourceReducer", () => {
+  describe("Testing skillPackResourceReducer", () => {
     const getMockCreatePackSkillResourceSelector = vi.fn(
       (
         _title: string,
@@ -208,7 +207,7 @@ describe("Pack", () => {
         },
     );
 
-    it("deletes a skill pack when delete is passed in", async () => {
+    it("deletes a skill in a pack when delete is passed in", async () => {
       const packName = "C#";
 
       const folderNames = [
