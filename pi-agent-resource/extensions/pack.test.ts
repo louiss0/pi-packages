@@ -10,8 +10,11 @@ import {
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
+  getSkillPackResourceSelector as getCreatePackSkillResourceSelector,
   ROOT_PACK_FOLDER_PATH,
   rootPackResourceReducer,
+  SKILL_COMMAND,
+  skillPackResourceReducer,
 } from "./pack";
 
 type MockContext =
@@ -21,18 +24,6 @@ type MockContext =
 function createTestContext(ctx: MockContext) {
   return ctx as unknown as ExtensionCommandContext;
 }
-
-const getMockCreatePackResourceSelector = (
-  choices: ReadonlyArray<"skills" | "prompts" | "agents">,
-): ReturnType<typeof getCreatePackResourceSelector> => {
-  return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
-    return {
-      invalidate: vi.fn(),
-      handleInput: vi.fn(() => done(choices)),
-      render: vi.fn(),
-    } satisfies Component;
-  };
-};
 
 const mockCustomUIFactory = async <T>(
   factory: (
@@ -71,6 +62,18 @@ describe("Pack", () => {
   });
 
   describe("Testing rootPackResourceReducer", () => {
+    const getMockCreatePackResourceSelector = (
+      choices: ReadonlyArray<"skills" | "prompts" | "agents">,
+    ): ReturnType<typeof getCreatePackResourceSelector> => {
+      return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
+        return {
+          invalidate: vi.fn(),
+          handleInput: vi.fn(() => done(choices)),
+          render: vi.fn(),
+        } satisfies Component;
+      };
+    };
+
     it("creates a pack when create is passed in", async () => {
       const output = "front-end";
       const selectionChoices = ["prompts", "skills", "agents"] as const;
@@ -83,9 +86,8 @@ describe("Pack", () => {
         },
       } satisfies MockContext;
 
-      const mockCreatePackResourceSelector = getMockCreatePackResourceSelector(
-        selectionChoices.slice(),
-      );
+      const mockCreatePackResourceSelector =
+        getMockCreatePackResourceSelector(selectionChoices);
 
       await rootPackResourceReducer("create", {
         ctx: createTestContext(ctx),
@@ -151,7 +153,88 @@ describe("Pack", () => {
       );
     });
   });
-  describe.todo("Testing skillPackResourceReducer", () => {});
+  describe.todo("Testing skillPackResourceReducer", () => {
+    const getMockCreatePackSkillResourceSelector = vi.fn(
+      (
+        _title: string,
+        _packName: string,
+        skills: string[],
+      ): ReturnType<typeof getCreatePackSkillResourceSelector> =>
+        (_tu, _th, _k, done) => {
+          return {
+            render: vi.fn(),
+            invalidate: vi.fn(),
+            handleInput: vi.fn(() => done(skills)),
+          };
+        },
+    );
+
+    it("deletes a skill pack when delete is passed in", async () => {
+
+
+      const packName = "C#";
+
+      const folderNames = [
+        "front-end",
+        "back-end",
+        "systems-programming",
+        "sentry",
+        "render",
+        `${packName}`,
+      ];
+
+      const skillSeedMap = folderNames.reduce((acc, dir) => {
+        acc.set(`${dir}/skills/example/SKILL.md`, exampleSkillContent);
+        return acc;
+      }, new Map<string, string>());
+
+      fileSystem.seed(Object.fromEntries(skillSeedMap));
+
+      const ctx = {
+        ui: {
+          custom: vi.fn(mockCustomUIFactory),
+          select: vi.fn().mockResolvedValue(packName),
+          notify: vi.fn(),
+        },
+      } satisfies MockContext;
+
+      await skillPackResourceReducer("delete", {
+        getSkillPackResourceSelector: getMockCreatePackSkillResourceSelector,
+        ctx: createTestContext(ctx),
+        fileSystem,
+      });
+
+      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(fileSystem.rootPath);
+
+      expect(readDirectoryNamesSpy).resolves.toEqual(folderNames);
+
+      expect(ctx.ui.select).toHaveBeenCalledWith(
+        "Which pack do you want to delete a skill from?",
+        folderNames,
+      );
+
+      expect(ctx.ui.select).resolves.toEqual(packName);
+
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+        `${fileSystem.rootPath}/${packName}/${SKILL_COMMAND}s`,
+      );
+
+      expect(getMockCreatePackSkillResourceSelector).toHaveBeenCalledWith(
+        "Which skill do you want to delete from the pack?",
+        packName,
+        ["example"],
+      );
+      expect(ctx.ui.custom).toHaveBeenCalledWith(getMockCreatePackSkillResourceSelector.mock.results[0].value);
+
+      const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
+
+      expect(removeDirectorySpy).toHaveBeenCalledWith(
+        `${fileSystem.rootPath}/${packName}/${SKILL_COMMAND}s/example`,
+      );
+
+  });
   describe.todo("Testing agentPackResourceReducer", () => {});
   describe.todo("Testing promptPackResourceReducer", () => {});
 });

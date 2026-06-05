@@ -261,9 +261,38 @@ export function rootPackResourceReducer(
   )[arg]();
 }
 
+export function getSkillPackResourceSelector(
+  title: string,
+  packName: string,
+  skills: string[],
+) {
+  return (
+    tui: TUI,
+    theme: Theme,
+    _: KeybindingsManager,
+    done: (result: typeof skills | null) => void,
+  ): Component =>
+    new MultiSelect(
+      {
+        title,
+        items: skills.map((skill) => ({
+          value: skill,
+          label: `${packName}:${skill}`,
+        })),
+      },
+      tui,
+      theme,
+      done,
+    );
+}
+
 export function skillPackResourceReducer(
   arg: PackResourceCommand,
-  ctx: ExtensionCommandContext,
+  deps: {
+    getSkillPackResourceSelector: typeof getSkillPackResourceSelector;
+    ctx: ExtensionCommandContext;
+    fileSystem: ResourceFileSystem;
+  },
 ) {
   return (
     {
