@@ -237,7 +237,9 @@ export async function handleCreate(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getSkillsDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
   const requiredValues = await ctx.ui.custom<
     (RequiredAgentSkillFields & { confirm: boolean }) | null
@@ -296,7 +298,9 @@ export async function handleEdit(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getSkillsDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
   const skillPath = await pickSkillPath(ctx, "Edit Skill", scope, fileSystem, pathResolver);
 
@@ -356,7 +360,9 @@ export async function handleDelete(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getSkillsDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
   const skillPath = await pickSkillPath(ctx, "Delete Skill", scope, fileSystem, pathResolver);
 
@@ -419,16 +425,6 @@ async function readProjectEditorConfig(
   }
 
   return { skillEditor: undefined };
-}
-
-function getSkillsDirectory(scope: SkillScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_SKILLS_DIRECTORY) : GLOBAL_SKILLS_DIRECTORY;
-}
-
-function getSkillRootPath(scope: SkillScope, pathResolver: PathResolver) {
-  return scope === "local"
-    ? pathResolver.resolveLocalSkillPath()
-    : pathResolver.resolveGlobalSkillPath();
 }
 
 async function createSkillFile(
@@ -580,7 +576,9 @@ async function listSkillNames(
   pathResolver: PathResolver,
 ) {
   const entriesResult = await fileSystem.readDirectoryEntries(
-    getSkillRootPath(scope, pathResolver),
+    scope === "local"
+      ? pathResolver.resolveLocalSkillPath()
+      : pathResolver.resolveGlobalSkillPath(),
   );
 
   if (!entriesResult.success) {
@@ -716,8 +714,9 @@ async function handleSkillCommand(
   }
 
   if (scope === "local") {
+    const cwd = ctx.cwd || process.cwd();
     ctx.ui.notify(
-      `Using local skills from ${getSkillsDirectory("local", ctx.cwd || process.cwd())}`,
+      `Using local skills from ${join(cwd, LOCAL_SKILLS_DIRECTORY)}`,
       "info",
     );
   }

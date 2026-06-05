@@ -122,8 +122,9 @@ async function handleAgentCommand(arg: string, ctx: ExtensionContext, scope: Age
   }
 
   if (scope === "local") {
+    const cwd = ctx.cwd || process.cwd();
     ctx.ui.notify(
-      `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
+      `Using local agents from ${join(cwd, LOCAL_AGENT_DIRECTORY)}`,
       "info",
     );
   }
@@ -157,19 +158,6 @@ export default (pi: ExtensionAPI) => {
   });
 };
 
-function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
-  return scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY;
-}
-
-function getAgentRootPath(
-  scope: AgentScope,
-  pathResolver: PathResolver,
-) {
-  return scope === "local"
-    ? pathResolver.resolveLocalAgentPath()
-    : pathResolver.resolveGlobalAgentPath();
-}
-
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
@@ -177,9 +165,14 @@ export async function handleCreate(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getAgentDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
-  const agentRootPath = getAgentRootPath(scope, pathResolver);
+  const agentRootPath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath()
+      : pathResolver.resolveGlobalAgentPath();
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -223,7 +216,9 @@ export async function handleEdit(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getAgentDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
   const agent = await pickAgent(ctx, "Edit Agent", scope, fileSystem, pathResolver);
 
@@ -261,7 +256,9 @@ export async function handleDelete(
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(getAgentDirectory(scope, cwd));
+  const fileSystem = getFileSystem(
+    scope === "local" ? join(cwd, LOCAL_AGENT_DIRECTORY) : GLOBAL_AGENT_DIRECTORY,
+  );
   const pathResolver = getResolver(cwd);
   const agent = await pickAgent(ctx, "Delete Agent", scope, fileSystem, pathResolver);
 
@@ -330,7 +327,10 @@ async function listAgentChoices(
   fileSystem: ResourceFileSystem,
   pathResolver: PathResolver,
 ) {
-  const agentRootPath = getAgentRootPath(scope, pathResolver);
+  const agentRootPath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath()
+      : pathResolver.resolveGlobalAgentPath();
   const namesResult = await fileSystem.readDirectoryNames(agentRootPath);
 
   if (!namesResult.success) {
