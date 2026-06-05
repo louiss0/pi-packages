@@ -5,7 +5,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
 import {
-  getMemoryResourceFileSystem,
   MemoryFileSystem,
   PathResolver,
 } from "../shared/filesystem";
@@ -53,7 +52,7 @@ describe("Pack", () => {
   let removeDirectory: ReturnType<typeof vi.spyOn>;
 
   beforeAll(() => {
-    fileSystem = getMemoryResourceFileSystem();
+    fileSystem = new MemoryFileSystem();
     pathResolver = new PathResolver("/workspace", "/test-home");
     writeFile = vi.spyOn(fileSystem, "writeFile");
     removeDirectory = vi.spyOn(fileSystem, "removeDirectory");

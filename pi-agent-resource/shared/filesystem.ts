@@ -226,14 +226,6 @@ export class MemoryFileSystem implements ResourceFileSystem {
   }
 }
 
-export function getNodeResourceFileSystem() {
-  return new NodeFileSystem();
-}
-
-export function getMemoryResourceFileSystem() {
-  return new MemoryFileSystem();
-}
-
 export function getPathResolver(cwd = process.cwd()) {
   return new PathResolver(cwd);
 }

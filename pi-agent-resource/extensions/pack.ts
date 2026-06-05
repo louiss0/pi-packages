@@ -8,8 +8,8 @@ import {
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 import {
-  getNodeResourceFileSystem,
   getPathResolver,
+  NodeFileSystem,
   type PathResolver,
   type ResourceFileSystem,
 } from "../shared/filesystem";
@@ -72,7 +72,7 @@ export default function (pi: ExtensionAPI) {
       await rootPackResourceReducer(result.output, {
         createPackResourceSelector: getCreatePackResourceSelector(),
         ctx,
-        fileSystem: getNodeResourceFileSystem(),
+        fileSystem: new NodeFileSystem(),
         pathResolver: getPathResolver(ctx.cwd || process.cwd()),
       });
     },
@@ -101,7 +101,7 @@ export default function (pi: ExtensionAPI) {
       await skillPackResourceReducer(result.output, {
         getSkillPackResourceSelector,
         ctx,
-        fileSystem: getNodeResourceFileSystem(),
+        fileSystem: new NodeFileSystem(),
       });
     },
   });
@@ -128,7 +128,7 @@ export default function (pi: ExtensionAPI) {
 
       await agentPackResourceReducer(result.output, {
         ctx,
-        fileSystem: getNodeResourceFileSystem(),
+        fileSystem: new NodeFileSystem(),
       });
     },
   });
@@ -155,7 +155,7 @@ export default function (pi: ExtensionAPI) {
 
       await promptPackResourceReducer(result.output, {
         ctx,
-        fileSystem: getNodeResourceFileSystem(),
+        fileSystem: new NodeFileSystem(),
       });
     },
   });

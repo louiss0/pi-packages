@@ -22,8 +22,8 @@ import {
 } from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 import {
-  getNodeResourceFileSystem,
   getPathResolver,
+  NodeFileSystem,
   type PathResolver,
   type ResourceFileSystem,
 } from "../shared/filesystem";
@@ -215,7 +215,7 @@ export default (pi: ExtensionAPI) => {
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
@@ -272,7 +272,7 @@ export async function handleCreate(
 export async function handleEdit(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
@@ -312,7 +312,7 @@ export async function handleEdit(
 export async function handleDelete(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();

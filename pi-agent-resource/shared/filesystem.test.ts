@@ -1,7 +1,7 @@
-import { getMemoryResourceFileSystem } from "./filesystem";
+import { MemoryFileSystem } from "./filesystem";
 
 describe("shared/filesystem", () => {
-  const memoryFileSystem = getMemoryResourceFileSystem();
+  const memoryFileSystem = new MemoryFileSystem();
 
   afterEach(() => {
     memoryFileSystem.reset();

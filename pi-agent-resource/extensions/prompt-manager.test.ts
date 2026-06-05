@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
-import { getMemoryResourceFileSystem } from "../shared/filesystem";
+import { MemoryFileSystem } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
@@ -44,7 +44,7 @@ describe("extensions/prompt-manager", () => {
     "prompts",
     "create-react-component.md",
   );
-  let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
+  let memoryFileSystem: MemoryFileSystem;
 
   function createTheme() {
     return {
@@ -65,7 +65,7 @@ describe("extensions/prompt-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem();
+    memoryFileSystem = new MemoryFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -170,7 +170,7 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      await handleCreate({ ui: { custom, notify } } as never, "global", getMemoryResourceFileSystem);
+      await handleCreate({ ui: { custom, notify } } as never, "global", () => new MemoryFileSystem());
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
@@ -196,12 +196,12 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
 
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
@@ -223,7 +223,7 @@ describe("extensions/prompt-manager", () => {
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
       const notify = vi.fn();
 
-      await handleEdit({ ui: { notify, select, editor } } as never, "global", getMemoryResourceFileSystem);
+      await handleEdit({ ui: { notify, select, editor } } as never, "global", () => new MemoryFileSystem());
 
       const content = await memoryFileSystem.readFile(expectedPromptPath);
 
@@ -236,7 +236,7 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("edits the selected local prompt", async () => {
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
@@ -247,7 +247,7 @@ describe("extensions/prompt-manager", () => {
       await handleEdit(
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       const content = await localFileSystem.readFile(expectedLocalPromptPath);
@@ -269,7 +269,7 @@ describe("extensions/prompt-manager", () => {
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
 
-      await handleDelete({ ui: { notify, select } } as never, "global", getMemoryResourceFileSystem);
+      await handleDelete({ ui: { notify, select } } as never, "global", () => new MemoryFileSystem());
 
       await expect(memoryFileSystem.readFile(expectedPromptPath)).resolves.toMatchObject({
         success: false,
@@ -278,7 +278,7 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("deletes the selected local prompt", async () => {
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
         [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
@@ -288,7 +288,7 @@ describe("extensions/prompt-manager", () => {
       await handleDelete(
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       await expect(localFileSystem.readFile(expectedLocalPromptPath)).resolves.toMatchObject({

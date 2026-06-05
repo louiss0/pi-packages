@@ -32,8 +32,8 @@ import {
   string,
 } from "valibot";
 import {
-  getNodeResourceFileSystem,
   getPathResolver,
+  NodeFileSystem,
   type PathResolver,
   type ResourceFileSystem,
 } from "../shared/filesystem";
@@ -233,7 +233,7 @@ export function parseSkillCommandArgument(argument: string) {
 export async function handleCreate(
   ctx: ExtensionCommandContext,
   scope: SkillScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
@@ -294,7 +294,7 @@ export async function handleEdit(
   ctx: ExtensionCommandContext,
   requestedEditMode?: SkillEditorMode,
   scope: SkillScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
@@ -356,7 +356,7 @@ export async function handleEdit(
 export async function handleDelete(
   ctx: ExtensionCommandContext,
   scope: SkillScope = "global",
-  getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
 ) {
   const cwd = ctx.cwd || process.cwd();
@@ -384,7 +384,7 @@ export async function handleDelete(
 async function resolveSkillEditMode(
   requestedEditMode?: SkillEditorMode,
   cwd = process.cwd(),
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  fileSystem: ResourceFileSystem = new NodeFileSystem(),
 ) {
   if (requestedEditMode) {
     return requestedEditMode;
@@ -396,7 +396,7 @@ async function resolveSkillEditMode(
 
 async function readProjectEditorConfig(
   cwd = process.cwd(),
-  fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
+  fileSystem: ResourceFileSystem = new NodeFileSystem(),
 ) {
   const configResult = await fileSystem.readFile(join(cwd, PROJECT_EDITOR_CONFIG_FILE));
 

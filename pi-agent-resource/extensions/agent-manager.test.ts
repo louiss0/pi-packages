@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { Form } from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import { getMemoryResourceFileSystem } from "../shared/filesystem";
+import { MemoryFileSystem } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
@@ -30,7 +30,7 @@ describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
   const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
   const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
-  let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
+  let memoryFileSystem: MemoryFileSystem;
 
   function getStubResourceFileSystem() {
     return memoryFileSystem;
@@ -55,7 +55,7 @@ describe("extensions/agent-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem();
+    memoryFileSystem = new MemoryFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -242,12 +242,12 @@ describe("extensions/agent-manager", () => {
       });
       const notify = vi.fn();
 
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
 
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath);
@@ -332,7 +332,7 @@ describe("extensions/agent-manager", () => {
     });
 
     it("edits the selected local agent", async () => {
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
         [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
@@ -343,7 +343,7 @@ describe("extensions/agent-manager", () => {
       await handleEdit(
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath);
@@ -406,7 +406,7 @@ describe("extensions/agent-manager", () => {
     });
 
     it("deletes the selected local agent", async () => {
-      const localFileSystem = getMemoryResourceFileSystem();
+      const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
         [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
@@ -416,7 +416,7 @@ describe("extensions/agent-manager", () => {
       await handleDelete(
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
-        getMemoryResourceFileSystem,
+        () => new MemoryFileSystem(),
       );
 
       await expect(
