@@ -7,7 +7,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
-import { getNodeResourceFileSystem, ResourceFileSystem } from "../shared/filesystem";
+import {
+  getNodeResourceFileSystem,
+  getPathResolver,
+  type PathResolver,
+  type ResourceFileSystem,
+} from "../shared/filesystem";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -67,7 +72,8 @@ export default function (pi: ExtensionAPI) {
       await rootPackResourceReducer(result.output, {
         createPackResourceSelector: getCreatePackResourceSelector(),
         ctx,
-        fileSystem: getNodeResourceFileSystem(ROOT_PACK_FOLDER_PATH),
+        fileSystem: getNodeResourceFileSystem(),
+        pathResolver: getPathResolver(ctx.cwd || process.cwd()),
       });
     },
   });
@@ -92,7 +98,11 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      await skillPackResourceReducer(result.output, ctx);
+      await skillPackResourceReducer(result.output, {
+        getSkillPackResourceSelector,
+        ctx,
+        fileSystem: getNodeResourceFileSystem(),
+      });
     },
   });
 
@@ -116,7 +126,10 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      await agentPackResourceReducer(result.output, ctx);
+      await agentPackResourceReducer(result.output, {
+        ctx,
+        fileSystem: getNodeResourceFileSystem(),
+      });
     },
   });
 
@@ -140,7 +153,10 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      await promptPackResourceReducer(result.output, ctx);
+      await promptPackResourceReducer(result.output, {
+        ctx,
+        fileSystem: getNodeResourceFileSystem(),
+      });
     },
   });
 }
@@ -194,26 +210,38 @@ export const exampleAgentContent = `---
 
 async function writePackExampleResources(
   fileSystem: ResourceFileSystem,
+  pathResolver: PathResolver,
+  packRootPath: string,
   packName: string,
   resources: ReadonlyArray<string>,
 ) {
   for (const resource of resources) {
-    const resourcePath = `${packName}/${resource}`;
+    const resourcePath = pathResolver.resolvePath(packRootPath, `${packName}/${resource}`);
     await fileSystem.mkdir(resourcePath, { recursive: true });
 
     if (resource === `${PROMPT_COMMAND}s`) {
-      await fileSystem.writeFile(`${resourcePath}/example.md`, examplePromptContent);
+      await fileSystem.writeFile(
+        pathResolver.resolvePath(resourcePath, "example.md"),
+        examplePromptContent,
+      );
       continue;
     }
 
     if (resource === `${SKILL_COMMAND}s`) {
-      await fileSystem.mkdir(`${resourcePath}/example`, { recursive: true });
-      await fileSystem.writeFile(`${resourcePath}/example/SKILL.md`, exampleSkillContent);
+      const skillPath = pathResolver.resolvePath(resourcePath, "example");
+      await fileSystem.mkdir(skillPath, { recursive: true });
+      await fileSystem.writeFile(
+        pathResolver.resolvePath(skillPath, "SKILL.md"),
+        exampleSkillContent,
+      );
       continue;
     }
 
     if (resource === `${AGENT_COMMAND}s`) {
-      await fileSystem.writeFile(`${resourcePath}/example.md`, exampleAgentContent);
+      await fileSystem.writeFile(
+        pathResolver.resolvePath(resourcePath, "example.md"),
+        exampleAgentContent,
+      );
     }
   }
 }
@@ -224,8 +252,11 @@ export function rootPackResourceReducer(
     createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
+    pathResolver: PathResolver;
   },
 ) {
+  const packRootPath = deps.pathResolver.packFolder;
+
   return (
     {
       [CREATE_COMMAND]: async () => {
@@ -239,12 +270,19 @@ export function rootPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(packName, { recursive: true });
-        await writePackExampleResources(deps.fileSystem, packName, resources);
+        const packPath = deps.pathResolver.resolvePath(packRootPath, packName);
+        await deps.fileSystem.mkdir(packPath, { recursive: true });
+        await writePackExampleResources(
+          deps.fileSystem,
+          deps.pathResolver,
+          packRootPath,
+          packName,
+          resources,
+        );
         deps.ctx.ui.notify(`Pack created successfully with name '${packName}'`);
       },
       [DELETE_COMMAND]: async () => {
-        const packNamesResult = await deps.fileSystem.readDirectoryNames("");
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(packRootPath);
         if (!packNamesResult.success || packNamesResult.data.length === 0) {
           deps.ctx.ui.notify("No packs found", "info");
           return;
@@ -258,7 +296,9 @@ export function rootPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.removeDirectory(packName);
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolvePath(packRootPath, packName),
+        );
         deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
       },
     } satisfies Record<PackCommand, () => Promise<void>>

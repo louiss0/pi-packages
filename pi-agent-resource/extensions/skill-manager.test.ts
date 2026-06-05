@@ -45,9 +45,9 @@ describe("skill manager handlers", () => {
     "test-skill",
     "SKILL.md",
   );
-  const skillPath = "/test-skill/SKILL.md";
+  const skillPath = expectedSkillPath;
   const expectedLocalSkillPath = join(localCwd, ".pi", "skills", "test-skill", "SKILL.md");
-  const localSkillPath = "/test-skill/SKILL.md";
+  const localSkillPath = expectedLocalSkillPath;
   const expectedSkillDirectory = dirname(expectedSkillPath);
   const expectedLocalSkillDirectory = dirname(expectedLocalSkillPath);
   let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
@@ -102,7 +102,7 @@ describe("skill manager handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem(join(".pi", "agent", "skills"));
+    memoryFileSystem = getMemoryResourceFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -348,7 +348,7 @@ describe("skill manager handlers", () => {
     });
     const notify = vi.fn();
 
-    const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "skills"));
+    const localFileSystem = getMemoryResourceFileSystem();
 
     await handleCreate(
       { cwd: localCwd, ui: { custom, notify } } as never,
@@ -416,7 +416,7 @@ describe("skill manager handlers", () => {
 
   it("handleCreate overwrites an existing skill", async () => {
     memoryFileSystem.seed({
-      [skillPath.slice(1)]: "existing skill content",
+      [skillPath]: "existing skill content",
     });
     const notify = vi.fn();
 
@@ -446,7 +446,7 @@ describe("skill manager handlers", () => {
 
   it("handleEdit uses an 80% overlay editor by default", async () => {
     memoryFileSystem.seed({
-      [skillPath.slice(1)]: "existing skill content",
+      [skillPath]: "existing skill content",
     });
     const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
     custom.mockResolvedValueOnce("updated skill content");
@@ -472,7 +472,7 @@ describe("skill manager handlers", () => {
 
   it("handleEdit uses the external editor without shell mode", async () => {
     memoryFileSystem.seed({
-      [skillPath.slice(1)]: "existing skill content",
+      [skillPath]: "existing skill content",
     });
     vi.stubEnv("VISUAL", 'code --wait +"set ft=markdown"');
     vi.mocked(spawn).mockReturnValueOnce({
@@ -504,7 +504,7 @@ describe("skill manager handlers", () => {
 
   it("handleEdit reports cancellation when no skill is selected", async () => {
     memoryFileSystem.seed({
-      [skillPath.slice(1)]: "existing skill content",
+      [skillPath]: "existing skill content",
     });
     const notify = vi.fn();
 
@@ -526,7 +526,7 @@ describe("skill manager handlers", () => {
 
   it("handleDelete removes the selected skill directory", async () => {
     memoryFileSystem.seed({
-      [skillPath.slice(1)]: "existing skill content",
+      [skillPath]: "existing skill content",
     });
     const custom = vi.fn().mockResolvedValueOnce(expectedSkillPath);
     const notify = vi.fn();
@@ -542,9 +542,9 @@ describe("skill manager handlers", () => {
   });
 
   it("handleDelete removes the selected local skill directory", async () => {
-    const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "skills"));
+    const localFileSystem = getMemoryResourceFileSystem();
     localFileSystem.seed({
-      [localSkillPath.slice(1)]: "existing local skill content",
+      [localSkillPath]: "existing local skill content",
     });
     const custom = vi.fn().mockResolvedValueOnce(expectedLocalSkillPath);
     const notify = vi.fn();

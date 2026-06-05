@@ -21,7 +21,12 @@ import {
   string,
 } from "valibot";
 import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
-import { getNodeResourceFileSystem, type ResourceFileSystem } from "../shared/filesystem";
+import {
+  getNodeResourceFileSystem,
+  getPathResolver,
+  type PathResolver,
+  type ResourceFileSystem,
+} from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
@@ -72,7 +77,8 @@ type PromptChoice = {
   label: string;
 };
 
-type GetResourceFileSystem = (rootPath: string) => ResourceFileSystem;
+type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
+type GetPathResolver = (cwd?: string) => PathResolver;
 
 export function parsePromptFormValues(values: PromptFields) {
   return parseObjectErrors(PromptFieldsSchema, values);
@@ -209,16 +215,22 @@ function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
   return scope === "local" ? join(cwd, LOCAL_PROMPT_DIRECTORY) : GLOBAL_PROMPT_DIRECTORY;
 }
 
+function getPromptRootPath(scope: PromptScope, pathResolver: PathResolver) {
+  return scope === "local"
+    ? pathResolver.getLocalResourcePath(pathResolver.promptFolder)
+    : pathResolver.getGlobalResourcePath(pathResolver.promptFolder);
+}
+
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
   getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getResolver: GetPathResolver = getPathResolver,
 ) {
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
-      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
-  );
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(getPromptDirectory(scope, cwd));
+  const pathResolver = getResolver(cwd);
+  const promptRootPath = getPromptRootPath(scope, pathResolver);
   const values = await ctx.ui.custom<PromptFields | null>(
     (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
     formOverlayOptions,
@@ -239,8 +251,8 @@ export async function handleCreate(
     return;
   }
 
-  const filePath = `/${values.name}.md`;
-  const directoryResult = await fileSystem.mkdir("", { recursive: true });
+  const filePath = pathResolver.resolvePath(promptRootPath, `${values.name}.md`);
+  const directoryResult = await fileSystem.mkdir(promptRootPath, { recursive: true });
   if (!directoryResult.success) {
     ctx.ui.notify(`Prompt creation failed: ${directoryResult.error.message}`, "error");
     return;
@@ -262,13 +274,12 @@ export async function handleEdit(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
   getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getResolver: GetPathResolver = getPathResolver,
 ) {
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
-      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
-  );
-  const prompt = await pickPrompt(ctx, "Edit Prompt", scope, fileSystem);
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(getPromptDirectory(scope, cwd));
+  const pathResolver = getResolver(cwd);
+  const prompt = await pickPrompt(ctx, "Edit Prompt", scope, fileSystem, pathResolver);
 
   if (!prompt) {
     ctx.ui.notify("Prompt editing cancelled", "info");
@@ -301,13 +312,12 @@ export async function handleDelete(
   ctx: ExtensionContext,
   scope: PromptScope = "global",
   getFileSystem: GetResourceFileSystem = getNodeResourceFileSystem,
+  getResolver: GetPathResolver = getPathResolver,
 ) {
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(ctx.cwd || process.cwd(), LOCAL_PROMPT_DIRECTORY)
-      : join(PI_DIRECTORY_NAME, AGENT_DIRECTORY_NAME, PROMPTS_DIRECTORY_NAME),
-  );
-  const prompt = await pickPrompt(ctx, "Delete Prompt", scope, fileSystem);
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(getPromptDirectory(scope, cwd));
+  const pathResolver = getResolver(cwd);
+  const prompt = await pickPrompt(ctx, "Delete Prompt", scope, fileSystem, pathResolver);
 
   if (!prompt) {
     ctx.ui.notify("Prompt deleting cancelled", "info");
@@ -341,8 +351,9 @@ async function pickPrompt(
   title: string,
   scope: PromptScope,
   fileSystem: ResourceFileSystem,
+  pathResolver: PathResolver,
 ) {
-  const choices = await listPromptChoices(scope, fileSystem);
+  const choices = await listPromptChoices(scope, fileSystem, pathResolver);
 
   if (choices.length === 0) {
     ctx.ui.notify("No prompts found", "info");
@@ -361,10 +372,15 @@ async function pickPrompt(
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listPromptChoices(scope: PromptScope, fileSystem: ResourceFileSystem) {
+async function listPromptChoices(
+  scope: PromptScope,
+  fileSystem: ResourceFileSystem,
+  pathResolver: PathResolver,
+) {
   const choices: PromptChoice[] = [];
+  const promptRootPath = getPromptRootPath(scope, pathResolver);
 
-  const entriesResult = await fileSystem.readDirectoryEntries("");
+  const entriesResult = await fileSystem.readDirectoryEntries(promptRootPath);
 
   if (!entriesResult.success) {
     return choices;
@@ -372,7 +388,7 @@ async function listPromptChoices(scope: PromptScope, fileSystem: ResourceFileSys
 
   choices.push(
     ...entriesResult.data.map((entry) => {
-      const entryPath = `/${entry.name}`;
+      const entryPath = pathResolver.resolvePath(promptRootPath, entry.name);
       const promptPath = entry.isDirectory() ? join(entryPath, "_index.md") : entryPath;
 
       return {

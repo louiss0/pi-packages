@@ -28,8 +28,8 @@ import registerAgentManager, {
 
 describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
-  const expectedAgentPath = "/oracle.md";
-  const expectedLocalAgentPath = "/oracle.md";
+  const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
+  const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
   let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
 
   function getStubResourceFileSystem() {
@@ -55,7 +55,7 @@ describe("extensions/agent-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem(join(".pi", "agent", "agents"));
+    memoryFileSystem = getMemoryResourceFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -242,7 +242,7 @@ describe("extensions/agent-manager", () => {
       });
       const notify = vi.fn();
 
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+      const localFileSystem = getMemoryResourceFileSystem();
 
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
@@ -308,7 +308,7 @@ describe("extensions/agent-manager", () => {
   describe("handleEdit", () => {
     it("edits the selected global agent", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
+        [expectedAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated agent content");
@@ -332,9 +332,9 @@ describe("extensions/agent-manager", () => {
     });
 
     it("edits the selected local agent", async () => {
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+      const localFileSystem = getMemoryResourceFileSystem();
       localFileSystem.seed({
-        [expectedLocalAgentPath.slice(1)]: "---\nname: oracle\n---\n",
+        [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated local agent content");
@@ -358,7 +358,7 @@ describe("extensions/agent-manager", () => {
 
     it("reports filesystem errors when agent editing fails", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
+        [expectedAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const editor = vi.fn().mockResolvedValueOnce("updated agent content");
@@ -385,7 +385,7 @@ describe("extensions/agent-manager", () => {
   describe("handleDelete", () => {
     it("deletes the selected global agent", async () => {
       memoryFileSystem.seed({
-        [expectedAgentPath.slice(1)]: "---\nname: oracle\n---\n",
+        [expectedAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
       const notify = vi.fn();
@@ -406,9 +406,9 @@ describe("extensions/agent-manager", () => {
     });
 
     it("deletes the selected local agent", async () => {
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "agents"));
+      const localFileSystem = getMemoryResourceFileSystem();
       localFileSystem.seed({
-        [expectedLocalAgentPath.slice(1)]: "---\nname: oracle\n---\n",
+        [expectedLocalAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
       const notify = vi.fn();

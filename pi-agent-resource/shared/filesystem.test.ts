@@ -1,7 +1,7 @@
 import { getMemoryResourceFileSystem } from "./filesystem";
 
 describe("shared/filesystem", () => {
-  const memoryFileSystem = getMemoryResourceFileSystem("/workspace");
+  const memoryFileSystem = getMemoryResourceFileSystem();
 
   afterEach(() => {
     memoryFileSystem.reset();
@@ -21,7 +21,7 @@ describe("shared/filesystem", () => {
 
   it("can seed and clear the memory filesystem explicitly in tests", async () => {
     memoryFileSystem.seed({
-      ".pi/prompts/test.md": "prompt",
+      "/.pi/prompts/test.md": "prompt",
     });
 
     await expect(memoryFileSystem.readFile("/.pi/prompts/test.md")).resolves.toEqual({

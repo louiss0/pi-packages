@@ -4,14 +4,17 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
-import { getMemoryResourceFileSystem, MemoryFileSystem } from "../shared/filesystem";
+import {
+  getMemoryResourceFileSystem,
+  MemoryFileSystem,
+  PathResolver,
+} from "../shared/filesystem";
 import {
   exampleAgentContent,
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
   getSkillPackResourceSelector as getCreatePackSkillResourceSelector,
-  ROOT_PACK_FOLDER_PATH,
   rootPackResourceReducer,
   SKILL_COMMAND,
   skillPackResourceReducer,
@@ -46,11 +49,13 @@ const mockCustomUIFactory = async <T>(
 
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
+  let pathResolver: PathResolver;
   let writeFile: ReturnType<typeof vi.spyOn>;
   let removeDirectory: ReturnType<typeof vi.spyOn>;
 
   beforeAll(() => {
-    fileSystem = getMemoryResourceFileSystem(ROOT_PACK_FOLDER_PATH);
+    fileSystem = getMemoryResourceFileSystem();
+    pathResolver = new PathResolver("/workspace", "/test-home");
     writeFile = vi.spyOn(fileSystem, "writeFile");
     removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
   });
@@ -93,6 +98,7 @@ describe("Pack", () => {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
         fileSystem,
+        pathResolver,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
@@ -104,17 +110,20 @@ describe("Pack", () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${output}/${selectionChoices[0]}/example.md`,
+        pathResolver.resolvePath(pathResolver.packFolder, `${output}/${selectionChoices[0]}/example.md`),
         examplePromptContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${output}/${selectionChoices[1]}/example/SKILL.md`,
+        pathResolver.resolvePath(
+          pathResolver.packFolder,
+          `${output}/${selectionChoices[1]}/example/SKILL.md`,
+        ),
         exampleSkillContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        `${output}/${selectionChoices[2]}/example.md`,
+        pathResolver.resolvePath(pathResolver.packFolder, `${output}/${selectionChoices[2]}/example.md`),
         exampleAgentContent,
       );
     });
@@ -123,9 +132,12 @@ describe("Pack", () => {
       const output = "C#";
 
       fileSystem.seed({
-        [`${output}/agents/example.md`]: exampleAgentContent,
-        [`${output}/skills/example/SKILL.md`]: exampleSkillContent,
-        [`${output}/prompts/example.md`]: examplePromptContent,
+        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/agents/example.md`)]:
+          exampleAgentContent,
+        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/skills/example/SKILL.md`)]:
+          exampleSkillContent,
+        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/prompts/example.md`)]:
+          examplePromptContent,
       });
 
       const ctx = {
@@ -139,6 +151,7 @@ describe("Pack", () => {
         createPackResourceSelector: getMockCreatePackResourceSelector([]),
         ctx: createTestContext(ctx),
         fileSystem,
+        pathResolver,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
@@ -146,7 +159,9 @@ describe("Pack", () => {
         "What is the name of the pack you want to delete?",
       );
 
-      expect(removeDirectory).toHaveBeenCalledWith(output);
+      expect(removeDirectory).toHaveBeenCalledWith(
+        pathResolver.resolvePath(pathResolver.packFolder, output),
+      );
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,
@@ -184,7 +199,10 @@ describe("Pack", () => {
       ];
 
       const skillSeedMap = folderNames.reduce((acc, dir) => {
-        acc.set(`${dir}/skills/example/SKILL.md`, exampleSkillContent);
+        acc.set(
+          pathResolver.resolvePath(pathResolver.packFolder, `${dir}/skills/example/SKILL.md`),
+          exampleSkillContent,
+        );
         return acc;
       }, new Map<string, string>());
 
@@ -206,7 +224,7 @@ describe("Pack", () => {
 
       const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
 
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(fileSystem.rootPath);
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.packFolder);
 
       expect(readDirectoryNamesSpy).resolves.toEqual(folderNames);
 
@@ -218,7 +236,7 @@ describe("Pack", () => {
       expect(ctx.ui.select).resolves.toEqual(packName);
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        `${fileSystem.rootPath}/${packName}/${SKILL_COMMAND}s`,
+        pathResolver.resolvePath(pathResolver.packFolder, `${packName}/${SKILL_COMMAND}s`),
       );
 
       expect(getMockCreatePackSkillResourceSelector).toHaveBeenCalledWith(
@@ -231,9 +249,12 @@ describe("Pack", () => {
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       expect(removeDirectorySpy).toHaveBeenCalledWith(
-        `${fileSystem.rootPath}/${packName}/${SKILL_COMMAND}s/example`,
+        pathResolver.resolvePath(
+          pathResolver.packFolder,
+          `${packName}/${SKILL_COMMAND}s/example`,
+        ),
       );
-
+    });
   });
   describe.todo("Testing agentPackResourceReducer", () => {});
   describe.todo("Testing promptPackResourceReducer", () => {});

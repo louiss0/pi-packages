@@ -31,8 +31,19 @@ import registerPromptManager, {
 
 describe("extensions/prompt-manager", () => {
   const localCwd = "/workspace";
-  const expectedPromptPath = "/create-react-component.md";
-  const expectedLocalPromptPath = "/create-react-component.md";
+  const expectedPromptPath = join(
+    "/test-home",
+    ".pi",
+    "agent",
+    "prompts",
+    "create-react-component.md",
+  );
+  const expectedLocalPromptPath = join(
+    localCwd,
+    ".pi",
+    "prompts",
+    "create-react-component.md",
+  );
   let memoryFileSystem: ReturnType<typeof getMemoryResourceFileSystem>;
 
   function createTheme() {
@@ -54,7 +65,7 @@ describe("extensions/prompt-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = getMemoryResourceFileSystem(join(".pi", "agent", "prompts"));
+    memoryFileSystem = getMemoryResourceFileSystem();
     resetDevelopmentExtensionNotice();
   });
 
@@ -185,7 +196,7 @@ describe("extensions/prompt-manager", () => {
         .mockResolvedValueOnce("Write the component template here");
       const notify = vi.fn();
 
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "prompts"));
+      const localFileSystem = getMemoryResourceFileSystem();
 
       await handleCreate(
         { cwd: localCwd, ui: { custom, notify } } as never,
@@ -206,7 +217,7 @@ describe("extensions/prompt-manager", () => {
   describe("handleEdit", () => {
     it("edits the selected global prompt", async () => {
       memoryFileSystem.seed({
-        [expectedPromptPath.slice(1)]: "---\nname: create-react-component\n---\n",
+        [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
@@ -225,9 +236,9 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("edits the selected local prompt", async () => {
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "prompts"));
+      const localFileSystem = getMemoryResourceFileSystem();
       localFileSystem.seed({
-        [expectedLocalPromptPath.slice(1)]: "---\nname: create-react-component\n---\n",
+        [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated local prompt content");
@@ -253,7 +264,7 @@ describe("extensions/prompt-manager", () => {
   describe("handleDelete", () => {
     it("deletes the selected global prompt", async () => {
       memoryFileSystem.seed({
-        [expectedPromptPath.slice(1)]: "---\nname: create-react-component\n---\n",
+        [expectedPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
@@ -267,9 +278,9 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("deletes the selected local prompt", async () => {
-      const localFileSystem = getMemoryResourceFileSystem(join(localCwd, ".pi", "prompts"));
+      const localFileSystem = getMemoryResourceFileSystem();
       localFileSystem.seed({
-        [expectedLocalPromptPath.slice(1)]: "---\nname: create-react-component\n---\n",
+        [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
       const notify = vi.fn();
