@@ -39,8 +39,8 @@ describe("extensions/prompt-manager", () => {
   const localPromptPath = testPathResolver.resolveLocalPromptPath(
     "create-react-component.md",
   );
-  let memoryFileSystem: MemoryFileSystem;
-  let pathResolver: ResourcePathResolver;
+  const memoryFileSystem = new MemoryFileSystem();
+  const pathResolver = createPathResolverMock();
 
   function getStubPathResolver() {
     return pathResolver;
@@ -80,8 +80,6 @@ describe("extensions/prompt-manager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    memoryFileSystem = new MemoryFileSystem();
-    pathResolver = createPathResolverMock();
     resetDevelopmentExtensionNotice();
   });
 
