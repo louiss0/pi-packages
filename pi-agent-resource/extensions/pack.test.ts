@@ -11,7 +11,7 @@ import {
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
-  getSkillPackResourceSelector as getCreatePackSkillResourceSelector,
+  getMultiSelectorFactory,
   rootPackResourceReducer,
   skillPackResourceReducer,
 } from "./pack";
@@ -40,8 +40,22 @@ const mockCustomUIFactory = async <T>(
 
   result.handleInput?.("data");
 
-  return value as never;
+  if (value === undefined) {
+    throw new Error("Custom UI factory did not call done()");
+  }
+
+  return value;
 };
+
+const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(() => {
+  return (_t, _theme, _keybindingsManager, done) => {
+    return {
+      handleInput: vi.fn((data) => done(data)),
+      render: vi.fn(),
+      invalidate: vi.fn(),
+    };
+  };
+});
 
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
@@ -192,21 +206,6 @@ describe("Pack", () => {
     });
   });
   describe("Testing skillPackResourceReducer", () => {
-    const getMockCreatePackSkillResourceSelector = vi.fn(
-      (
-        _title: string,
-        _packName: string,
-        skills: string[],
-      ): ReturnType<typeof getCreatePackSkillResourceSelector> =>
-        (_tu, _th, _k, done) => {
-          return {
-            render: vi.fn(),
-            invalidate: vi.fn(),
-            handleInput: vi.fn(() => done(skills)),
-          };
-        },
-    );
-
     function seedPacksWithResource(
       folderNames: string[],
       pathResolver: (path: string, filename: string) => string,
@@ -259,14 +258,14 @@ describe("Pack", () => {
 
         const ctx = {
           ui: {
-            custom: vi.fn(mockCustomUIFactory),
+            custom: vi.fn(),
             input: vi.fn().mockResolvedValue(randomSkill),
             notify: vi.fn(),
           },
         } satisfies MockContext;
 
         await skillPackResourceReducer("create", {
-          getSkillPackResourceSelector: getMockCreatePackSkillResourceSelector,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
           ctx: createTestContext(ctx),
           fileSystem,
         });
@@ -310,7 +309,7 @@ describe("Pack", () => {
       } satisfies MockContext;
 
       await skillPackResourceReducer("delete", {
-        getSkillPackResourceSelector: getMockCreatePackSkillResourceSelector,
+        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
         ctx: createTestContext(ctx),
         fileSystem,
       });
@@ -332,13 +331,11 @@ describe("Pack", () => {
         pathResolver.resolvePackPath(packName),
       );
 
-      expect(getMockCreatePackSkillResourceSelector).toHaveBeenCalledWith(
+      expect(mockGetMultiSelectorFactory).toHaveBeenCalledWith(
         "Which skill do you want to delete from the pack?",
-        packName,
-        ["example"],
       );
       expect(ctx.ui.custom).toHaveBeenCalledWith(
-        getMockCreatePackSkillResourceSelector.mock.results[0].value,
+        mockGetMultiSelectorFactory.mock.results[0].value,
       );
 
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");

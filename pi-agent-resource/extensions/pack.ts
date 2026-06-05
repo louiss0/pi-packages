@@ -99,7 +99,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       await skillPackResourceReducer(result.output, {
-        getSkillPackResourceSelector,
+        getMuiltiSelectorFactory: getMultiSelectorFactory,
         ctx,
         fileSystem: new NodeFileSystem(),
       });
@@ -173,7 +173,7 @@ export function getCreatePackResourceSelector() {
   );
 }
 
-function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
+export function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
   title: string,
   items: MultiSelectConfig<T>["items"],
   options?: Omit<MultiSelectConfig<T>, "items" | "title">,
@@ -309,24 +309,10 @@ export function rootPackResourceReducer(
   )[arg]();
 }
 
-export function getSkillPackResourceSelector(
-  title: string,
-  packName: string,
-  skills: string[],
-) {
-  return getMultiSelectorFactory(
-    title,
-    skills.map((skill) => ({
-      value: skill,
-      label: `${packName}:${skill}`,
-    })),
-  );
-}
-
 export function skillPackResourceReducer(
   arg: PackResourceCommand,
   deps: {
-    getSkillPackResourceSelector: typeof getSkillPackResourceSelector;
+    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
   },
