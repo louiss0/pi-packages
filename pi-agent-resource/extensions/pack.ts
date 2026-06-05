@@ -1,3 +1,4 @@
+import { MultiSelect } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
@@ -7,24 +8,27 @@ import {
 import { Component, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 import { getNodeResourceFileSystem, ResourceFileSystem } from "../shared/filesystem";
-import { MultiSelect } from "@code-fixer-23/pi-form-components";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
 
-const CREATE_COMMAND = "create";
-const EDIT_COMMAND = "edit";
-const DELETE_COMMAND = "delete";
-const packCommands = picklist([CREATE_COMMAND, DELETE_COMMAND]);
+export const CREATE_COMMAND = "create";
+export const EDIT_COMMAND = "edit";
+export const DELETE_COMMAND = "delete";
+export const packCommands = picklist([CREATE_COMMAND, DELETE_COMMAND]);
 
-const MOVE_IN_COMMAND = "move-in";
-const MOVE_OUT_COMMAND = "move-out";
-const MOVE_TO_COMMAND = "move-to";
-const packOrginaizationCommands = [MOVE_IN_COMMAND, MOVE_OUT_COMMAND, MOVE_TO_COMMAND] as const;
+export const MOVE_LOCAL_COMMAND = "move-local";
+export const MOVE_OUT_COMMAND = "move-out";
+export const MOVE_GLOBAL_COMMAND = "move-global";
+export const packOrginaizationCommands = [
+  MOVE_LOCAL_COMMAND,
+  MOVE_OUT_COMMAND,
+  MOVE_GLOBAL_COMMAND,
+] as const;
 
-const SKILL_COMMAND = "skill";
-const AGENT_COMMAND = "agent";
-const PROMPT_COMMAND = "prompt";
+export const SKILL_COMMAND = "skill";
+export const AGENT_COMMAND = "agent";
+export const PROMPT_COMMAND = "prompt";
 
 const packManagementCommands = [CREATE_COMMAND, EDIT_COMMAND, DELETE_COMMAND] as const;
 const packResourceCommands = picklist([
@@ -147,7 +151,7 @@ export function getCreatePackResourceSelector() {
     tui: TUI,
     theme: Theme,
     _: KeybindingsManager,
-    done: (result: Array<(typeof resources)[number]> | null) => void,
+    done: (result: ReadonlyArray<(typeof resources)[number]> | null) => void,
   ): Component =>
     new MultiSelect(
       {
@@ -298,9 +302,9 @@ export function skillPackResourceReducer(
     {
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
-      [MOVE_IN_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {},
       [MOVE_OUT_COMMAND]: async () => {},
-      [MOVE_TO_COMMAND]: async () => {},
+      [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
   )[arg]();
@@ -308,15 +312,15 @@ export function skillPackResourceReducer(
 
 export function agentPackResourceReducer(
   arg: PackResourceCommand,
-  ctx: ExtensionCommandContext,
+  deps: { ctx: ExtensionCommandContext; fileSystem: ResourceFileSystem },
 ) {
   return (
     {
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
-      [MOVE_IN_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {},
       [MOVE_OUT_COMMAND]: async () => {},
-      [MOVE_TO_COMMAND]: async () => {},
+      [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
   )[arg]();
@@ -324,15 +328,15 @@ export function agentPackResourceReducer(
 
 export function promptPackResourceReducer(
   arg: PackResourceCommand,
-  ctx: ExtensionCommandContext,
+  deps: { ctx: ExtensionCommandContext; fileSystem: ResourceFileSystem },
 ) {
   return (
     {
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
-      [MOVE_IN_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {},
       [MOVE_OUT_COMMAND]: async () => {},
-      [MOVE_TO_COMMAND]: async () => {},
+      [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
   )[arg]();
