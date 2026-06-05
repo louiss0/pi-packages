@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
-import { MemoryFileSystem } from "../shared/filesystem";
+import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
@@ -32,21 +32,13 @@ import registerPromptManager, {
 
 describe("extensions/prompt-manager", () => {
   const localCwd = "/workspace";
-  const expectedPromptPath = join(
-    "/test-home",
-    ".pi",
-    "agent",
-    "prompts",
+  const testPathResolver = new PathResolver(localCwd, "/test-home");
+  const promptPath = testPathResolver.resolveGlobalPromptPath(
     "create-react-component.md",
   );
-  const expectedLocalPromptPath = join(
-    localCwd,
-    ".pi",
-    "prompts",
+  const localPromptPath = testPathResolver.resolveLocalPromptPath(
     "create-react-component.md",
   );
-  const expectedPromptRootPath = join("/test-home", ".pi", "agent", "prompts");
-  const expectedLocalPromptRootPath = join(localCwd, ".pi", "prompts");
   let memoryFileSystem: MemoryFileSystem;
   let pathResolver: ResourcePathResolver;
 
@@ -64,8 +56,8 @@ describe("extensions/prompt-manager", () => {
       resolveLocalSkillPath: vi.fn(),
       resolveGlobalAgentPath: vi.fn(),
       resolveLocalAgentPath: vi.fn(),
-      resolveGlobalPromptPath: vi.fn((path = "") => join(expectedPromptRootPath, path)),
-      resolveLocalPromptPath: vi.fn((path = "") => join(expectedLocalPromptRootPath, path)),
+      resolveGlobalPromptPath: vi.fn((path) => testPathResolver.resolveGlobalPromptPath(path)),
+      resolveLocalPromptPath: vi.fn((path) => testPathResolver.resolveLocalPromptPath(path)),
     } satisfies ResourcePathResolver;
   }
 
@@ -201,7 +193,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      const content = await memoryFileSystem.readFile(expectedPromptPath);
+      const content = await memoryFileSystem.readFile(promptPath);
 
       expect(content).toMatchObject({
         data: expect.stringContaining("argument-hint: <name> [directory]"),
@@ -239,7 +231,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      const content = await localFileSystem.readFile(expectedLocalPromptPath);
+      const content = await localFileSystem.readFile(localPromptPath);
 
       expect(content).toMatchObject({
         data: expect.stringContaining("Write the component template here"),
@@ -257,7 +249,7 @@ describe("extensions/prompt-manager", () => {
   describe("handleEdit", () => {
     it("edits the selected global prompt", async () => {
       memoryFileSystem.seed({
-        [expectedPromptPath]: "---\nname: create-react-component\n---\n",
+        [promptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
@@ -270,7 +262,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      const content = await memoryFileSystem.readFile(expectedPromptPath);
+      const content = await memoryFileSystem.readFile(promptPath);
 
       expect(select).toHaveBeenCalledWith("Edit Prompt", ["global: create-react-component"]);
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
@@ -288,7 +280,7 @@ describe("extensions/prompt-manager", () => {
     it("edits the selected local prompt", async () => {
       const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
-        [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
+        [localPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated local prompt content");
@@ -301,7 +293,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      const content = await localFileSystem.readFile(expectedLocalPromptPath);
+      const content = await localFileSystem.readFile(localPromptPath);
 
       expect(select).toHaveBeenCalledWith("Edit Prompt", ["local: create-react-component"]);
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
@@ -320,7 +312,7 @@ describe("extensions/prompt-manager", () => {
   describe("handleDelete", () => {
     it("deletes the selected global prompt", async () => {
       memoryFileSystem.seed({
-        [expectedPromptPath]: "---\nname: create-react-component\n---\n",
+        [promptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
@@ -332,7 +324,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(memoryFileSystem.readFile(expectedPromptPath)).resolves.toMatchObject({
+      await expect(memoryFileSystem.readFile(promptPath)).resolves.toMatchObject({
         success: false,
       });
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
@@ -346,7 +338,7 @@ describe("extensions/prompt-manager", () => {
     it("deletes the selected local prompt", async () => {
       const localFileSystem = new MemoryFileSystem();
       localFileSystem.seed({
-        [expectedLocalPromptPath]: "---\nname: create-react-component\n---\n",
+        [localPromptPath]: "---\nname: create-react-component\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
       const notify = vi.fn();
@@ -358,7 +350,7 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(localFileSystem.readFile(expectedLocalPromptPath)).resolves.toMatchObject({
+      await expect(localFileSystem.readFile(localPromptPath)).resolves.toMatchObject({
         success: false,
       });
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
