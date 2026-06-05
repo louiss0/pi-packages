@@ -207,6 +207,78 @@ describe("Pack", () => {
         },
     );
 
+    function seedPacksWithResource(
+      folderNames: string[],
+      pathResolver: (path: string, filename: string) => string,
+      options: { filePath: string; content: string },
+    ): void {
+      const seedMap = folderNames.reduce((acc, dir) => {
+        acc.set(pathResolver(dir, options.filePath), options.content);
+        return acc;
+      }, new Map<string, string>());
+
+      return fileSystem.seed(Object.fromEntries(seedMap));
+    }
+
+    const skillIt = test
+      .extend("folders", () => [
+        "front-end",
+        "back-end",
+        "systems-programming",
+        "sentry",
+        "render",
+      ])
+      .extend("folder", ({ folders }) => folders[Math.floor(Math.random() * folders.length)])
+      .extend("randomSkill", () => {
+        const skills = [
+          "typescript",
+          "angular",
+          "golang",
+          "tanstack-query",
+          "react",
+          "vue",
+          "rust",
+          "python",
+          "nodejs",
+          "docker",
+          "kubernetes",
+          "graphql",
+          "postgresql",
+          "redis",
+        ];
+        return skills[Math.floor(Math.random() * skills.length)];
+      });
+
+    skillIt(
+      "creates a skill in a pack when create is passed in",
+      async ({ folders, randomSkill }) => {
+        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+          filePath: "example/SKILL.md",
+          content: exampleSkillContent,
+        });
+
+        const ctx = {
+          ui: {
+            custom: vi.fn(mockCustomUIFactory),
+            input: vi.fn().mockResolvedValue(randomSkill),
+            notify: vi.fn(),
+          },
+        } satisfies MockContext;
+
+        await skillPackResourceReducer("create", {
+          getSkillPackResourceSelector: getMockCreatePackSkillResourceSelector,
+          ctx: createTestContext(ctx),
+          fileSystem,
+        });
+
+        expect(ctx.ui.custom).toHaveBeenCalledWith();
+
+        expect(ctx.ui.input).toHaveBeenCalledWith(
+          "Which skill do you want to add to the pack?",
+        );
+      },
+    );
+
     it("deletes a skill in a pack when delete is passed in", async () => {
       const packName = "C#";
 
