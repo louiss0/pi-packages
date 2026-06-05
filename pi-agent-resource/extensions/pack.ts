@@ -182,7 +182,7 @@ function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
     tui: TUI,
     theme: Theme,
     _: KeybindingsManager,
-    done: (result: Array<T[number]["value"]> | null) => void,
+    done: (result: ReadonlyArray<T[number]["value"]> | null) => void,
   ): Component => new MultiSelect({ title, items, ...options }, tui, theme, done);
 }
 
