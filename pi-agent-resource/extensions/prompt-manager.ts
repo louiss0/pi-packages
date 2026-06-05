@@ -286,7 +286,7 @@ export async function handleEdit(
     return;
   }
 
-  const contentResult = await fileSystem.readFile(prompt.path, "utf8");
+  const contentResult = await fileSystem.readFile(prompt.path);
   if (!contentResult.success) {
     ctx.ui.notify(`Prompt edit failed: ${contentResult.error.message}`, "error");
     return;

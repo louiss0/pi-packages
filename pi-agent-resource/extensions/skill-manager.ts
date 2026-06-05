@@ -393,7 +393,7 @@ async function readProjectEditorConfig(
   cwd = process.cwd(),
   fileSystem: ResourceFileSystem = getNodeResourceFileSystem(),
 ) {
-  const configResult = await fileSystem.readFile(join(cwd, PROJECT_EDITOR_CONFIG_FILE), "utf8");
+  const configResult = await fileSystem.readFile(join(cwd, PROJECT_EDITOR_CONFIG_FILE));
 
   if (!configResult.success) {
     return { skillEditor: undefined };
@@ -683,7 +683,7 @@ function tokenizeCommandLine(commandLine: string) {
 }
 
 async function readSkillFile(filePath: string, fileSystem: ResourceFileSystem) {
-  return fileSystem.readFile(filePath, "utf8");
+  return fileSystem.readFile(filePath);
 }
 
 async function handleSkillCommand(

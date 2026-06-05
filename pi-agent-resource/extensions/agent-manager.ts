@@ -229,7 +229,7 @@ export async function handleEdit(
     return;
   }
 
-  const readResult = await fileSystem.readFile(agent.path, "utf8");
+  const readResult = await fileSystem.readFile(agent.path);
   if (!readResult.success) {
     ctx.ui.notify(getFileSystemErrorMessage("Agent edit failed", readResult.error), "error");
     return;

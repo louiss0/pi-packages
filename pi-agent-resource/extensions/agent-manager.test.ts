@@ -224,7 +224,7 @@ describe("extensions/agent-manager", () => {
         getStubResourceFileSystem,
       );
 
-      const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
+      const content = await memoryFileSystem.readFile(expectedAgentPath);
 
       expect(content).toMatchObject({
         data: expect.stringContaining("name: oracle"),
@@ -250,7 +250,7 @@ describe("extensions/agent-manager", () => {
         getMemoryResourceFileSystem,
       );
 
-      const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
+      const content = await localFileSystem.readFile(expectedLocalAgentPath);
 
       expect(content).toMatchObject({
         data: expect.stringContaining("name: oracle"),
@@ -297,7 +297,7 @@ describe("extensions/agent-manager", () => {
       );
 
       await expect(
-        memoryFileSystem.readFile(expectedAgentPath, "utf8"),
+        memoryFileSystem.readFile(expectedAgentPath),
       ).resolves.toMatchObject({
         success: false,
       });
@@ -320,7 +320,7 @@ describe("extensions/agent-manager", () => {
         getStubResourceFileSystem,
       );
 
-      const content = await memoryFileSystem.readFile(expectedAgentPath, "utf8");
+      const content = await memoryFileSystem.readFile(expectedAgentPath);
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
       expect(editor).toHaveBeenCalledWith("Edit Agent", "---\nname: oracle\n---\n");
@@ -346,7 +346,7 @@ describe("extensions/agent-manager", () => {
         getMemoryResourceFileSystem,
       );
 
-      const content = await localFileSystem.readFile(expectedLocalAgentPath, "utf8");
+      const content = await localFileSystem.readFile(expectedLocalAgentPath);
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
       expect(content).toEqual({
@@ -397,7 +397,7 @@ describe("extensions/agent-manager", () => {
       );
 
       await expect(
-        memoryFileSystem.readFile(expectedAgentPath, "utf8"),
+        memoryFileSystem.readFile(expectedAgentPath),
       ).resolves.toMatchObject({
         success: false,
       });
@@ -420,7 +420,7 @@ describe("extensions/agent-manager", () => {
       );
 
       await expect(
-        localFileSystem.readFile(expectedLocalAgentPath, "utf8"),
+        localFileSystem.readFile(expectedLocalAgentPath),
       ).resolves.toMatchObject({
         success: false,
       });

@@ -28,7 +28,7 @@ export interface ResourceFileSystem {
   mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>>;
   readDirectoryNames(path: string): Promise<ResourceResult<string[]>>;
   readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>>;
-  readFile(path: string, encoding: "utf8"): Promise<ResourceResult<string>>;
+  readFile(path: string): Promise<ResourceResult<string>>;
   removeDirectory(path: string): Promise<ResourceResult<void>>;
   removeFile(path: string): Promise<ResourceResult<void>>;
   writeFile(path: string, content: string): Promise<ResourceResult<void>>;
@@ -108,7 +108,7 @@ export class NodeFileSystem implements ResourceFileSystem {
   readDirectoryEntries(path: string) {
     return getResourceResult(() => nodeReaddir(path, { withFileTypes: true }));
   }
-  readFile(path: string, _encoding: "utf8" = "utf8"): Promise<ResourceResult<string>> {
+  readFile(path: string): Promise<ResourceResult<string>> {
     return getResourceResult(() => nodeReadFile(path, "utf8"));
   }
   removeDirectory(path: string) {
@@ -170,7 +170,7 @@ export class MemoryFileSystem implements ResourceFileSystem {
       }, directoryEntries);
     });
   }
-  readFile(path: string, _encoding: "utf8" = "utf8"): Promise<ResourceResult<string>> {
+  readFile(path: string): Promise<ResourceResult<string>> {
     return getResourceResult(async () => {
       const content = await memoryFs.promises.readFile(path, {
         encoding: "utf8",
