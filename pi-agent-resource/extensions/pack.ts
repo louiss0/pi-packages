@@ -215,30 +215,36 @@ async function writePackExampleResources(
   resources: ReadonlyArray<string>,
 ) {
   for (const resource of resources) {
-    const resourcePath = pathResolver.resolvePackPath(`${packName}/${resource}`);
-    await fileSystem.mkdir(resourcePath, { recursive: true });
-
     if (resource === `${PROMPT_COMMAND}s`) {
+      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName), {
+        recursive: true,
+      });
       await fileSystem.writeFile(
-        pathResolver.resolvePackPath(`${packName}/${resource}/example.md`),
+        pathResolver.resolvePackPromptPath(packName, "example.md"),
         examplePromptContent,
       );
       continue;
     }
 
     if (resource === `${SKILL_COMMAND}s`) {
-      const skillPath = pathResolver.resolvePackPath(`${packName}/${resource}/example`);
+      await fileSystem.mkdir(pathResolver.resolvePackSkillPath(packName), {
+        recursive: true,
+      });
+      const skillPath = pathResolver.resolvePackSkillPath(packName, "example");
       await fileSystem.mkdir(skillPath, { recursive: true });
       await fileSystem.writeFile(
-        pathResolver.resolvePackPath(`${packName}/${resource}/example/SKILL.md`),
+        pathResolver.resolvePackSkillPath(packName, "example/SKILL.md"),
         exampleSkillContent,
       );
       continue;
     }
 
     if (resource === `${AGENT_COMMAND}s`) {
+      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName), {
+        recursive: true,
+      });
       await fileSystem.writeFile(
-        pathResolver.resolvePackPath(`${packName}/${resource}/example.md`),
+        pathResolver.resolvePackAgentPath(packName, "example.md"),
         exampleAgentContent,
       );
     }

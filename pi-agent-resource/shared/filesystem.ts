@@ -51,6 +51,18 @@ export class PathResolver {
     return this.#resolvePath(join(this.#homePath, ".pi", "packs"), path);
   }
 
+  resolvePackSkillPath(packName: string, path = "") {
+    return this.#resolvePackResourcePath(packName, this.#skillFolder, path);
+  }
+
+  resolvePackAgentPath(packName: string, path = "") {
+    return this.#resolvePackResourcePath(packName, this.#agentFolder, path);
+  }
+
+  resolvePackPromptPath(packName: string, path = "") {
+    return this.#resolvePackResourcePath(packName, this.#promptFolder, path);
+  }
+
   resolveGlobalSkillPath(path = "") {
     return this.#resolveGlobalResourcePath(this.#skillFolder, path);
   }
@@ -81,6 +93,10 @@ export class PathResolver {
 
   #resolveLocalResourcePath(resourceFolder: string, path: string) {
     return this.#resolvePath(join(this.#cwd, ".pi", resourceFolder), path);
+  }
+
+  #resolvePackResourcePath(packName: string, resourceFolder: string, path: string) {
+    return this.#resolvePath(this.resolvePackPath(join(packName, resourceFolder)), path);
   }
 
   #resolvePath(rootPath: string, path: string) {
