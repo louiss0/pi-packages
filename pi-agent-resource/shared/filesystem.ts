@@ -34,7 +34,20 @@ export interface ResourceFileSystem {
   writeFile(path: string, content: string): Promise<ResourceResult<void>>;
 }
 
-export class PathResolver {
+export interface ResourcePathResolver {
+  resolvePackPath(path?: string): string;
+  resolvePackSkillPath(packName: string, path?: string): string;
+  resolvePackAgentPath(packName: string, path?: string): string;
+  resolvePackPromptPath(packName: string, path?: string): string;
+  resolveGlobalSkillPath(path?: string): string;
+  resolveLocalSkillPath(path?: string): string;
+  resolveGlobalAgentPath(path?: string): string;
+  resolveLocalAgentPath(path?: string): string;
+  resolveGlobalPromptPath(path?: string): string;
+  resolveLocalPromptPath(path?: string): string;
+}
+
+export class PathResolver implements ResourcePathResolver {
   #cwd: string;
   #homePath: string;
 
