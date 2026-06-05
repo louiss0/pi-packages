@@ -7,8 +7,8 @@ import { InferOutput, maxLength, minLength, object, pipe, regex, string } from "
 import {
   getPathResolver,
   NodeFileSystem,
-  type PathResolver,
   type ResourceFileSystem,
+  type ResourcePathResolver,
 } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
@@ -67,7 +67,7 @@ type AgentChoice = {
 };
 
 type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
-type GetPathResolver = (cwd?: string) => PathResolver;
+type GetPathResolver = (cwd?: string) => ResourcePathResolver;
 
 export function parseAgentFormValues(values: AgentFields) {
   return parseObjectErrors(AgentFieldsSchema, values);
@@ -301,7 +301,7 @@ async function pickAgent(
   title: string,
   scope: AgentScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const choices = await listAgentChoices(scope, fileSystem, pathResolver);
 
@@ -325,7 +325,7 @@ async function pickAgent(
 async function listAgentChoices(
   scope: AgentScope,
   fileSystem: ResourceFileSystem,
-  pathResolver: PathResolver,
+  pathResolver: ResourcePathResolver,
 ) {
   const agentRootPath =
     scope === "local"

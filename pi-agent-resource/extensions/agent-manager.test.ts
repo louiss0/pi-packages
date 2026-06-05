@@ -3,6 +3,7 @@ import { Form } from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { MemoryFileSystem } from "../shared/filesystem";
+import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
@@ -30,10 +31,32 @@ describe("extensions/agent-manager", () => {
   const localCwd = "/workspace";
   const expectedAgentPath = join("/test-home", ".pi", "agent", "agents", "oracle.md");
   const expectedLocalAgentPath = join(localCwd, ".pi", "agents", "oracle.md");
+  const expectedAgentRootPath = join("/test-home", ".pi", "agent", "agents");
+  const expectedLocalAgentRootPath = join(localCwd, ".pi", "agents");
   let memoryFileSystem: MemoryFileSystem;
+  let pathResolver: ResourcePathResolver;
 
   function getStubResourceFileSystem() {
     return memoryFileSystem;
+  }
+
+  function getStubPathResolver() {
+    return pathResolver;
+  }
+
+  function createPathResolverMock() {
+    return {
+      resolvePackPath: vi.fn(),
+      resolvePackSkillPath: vi.fn(),
+      resolvePackAgentPath: vi.fn(),
+      resolvePackPromptPath: vi.fn(),
+      resolveGlobalSkillPath: vi.fn(),
+      resolveLocalSkillPath: vi.fn(),
+      resolveGlobalAgentPath: vi.fn((path = "") => join(expectedAgentRootPath, path)),
+      resolveLocalAgentPath: vi.fn((path = "") => join(expectedLocalAgentRootPath, path)),
+      resolveGlobalPromptPath: vi.fn(),
+      resolveLocalPromptPath: vi.fn(),
+    } satisfies ResourcePathResolver;
   }
 
   function createTheme() {
@@ -56,6 +79,7 @@ describe("extensions/agent-manager", () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     memoryFileSystem = new MemoryFileSystem();
+    pathResolver = createPathResolverMock();
     resetDevelopmentExtensionNotice();
   });
 
@@ -222,6 +246,7 @@ describe("extensions/agent-manager", () => {
         { ui: { custom, notify } } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath);
@@ -230,6 +255,9 @@ describe("extensions/agent-manager", () => {
         data: expect.stringContaining("name: oracle"),
         success: true,
       });
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent created");
     });
 
@@ -248,6 +276,7 @@ describe("extensions/agent-manager", () => {
         { cwd: localCwd, ui: { custom, notify } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath);
@@ -256,6 +285,9 @@ describe("extensions/agent-manager", () => {
         data: expect.stringContaining("name: oracle"),
         success: true,
       });
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent created");
     });
 
@@ -276,6 +308,7 @@ describe("extensions/agent-manager", () => {
         { ui: { custom, notify } } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       expect(notify).toHaveBeenCalledWith(
@@ -294,6 +327,7 @@ describe("extensions/agent-manager", () => {
         } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       await expect(
@@ -318,12 +352,16 @@ describe("extensions/agent-manager", () => {
         { ui: { notify, select, editor } } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       const content = await memoryFileSystem.readFile(expectedAgentPath);
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
       expect(editor).toHaveBeenCalledWith("Edit Agent", "---\nname: oracle\n---\n");
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated agent content",
         success: true,
@@ -344,11 +382,15 @@ describe("extensions/agent-manager", () => {
         { cwd: localCwd, ui: { notify, select, editor } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       const content = await localFileSystem.readFile(expectedLocalAgentPath);
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated local agent content",
         success: true,
@@ -372,6 +414,7 @@ describe("extensions/agent-manager", () => {
         { ui: { notify, select, editor } } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       expect(notify).toHaveBeenCalledWith(
@@ -394,6 +437,7 @@ describe("extensions/agent-manager", () => {
         { ui: { notify, select } } as never,
         "global",
         getStubResourceFileSystem,
+        getStubPathResolver,
       );
 
       await expect(
@@ -402,6 +446,9 @@ describe("extensions/agent-manager", () => {
         success: false,
       });
       expect(select).toHaveBeenCalledWith("Delete Agent", ["global: oracle"]);
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
 
@@ -417,6 +464,7 @@ describe("extensions/agent-manager", () => {
         { cwd: localCwd, ui: { notify, select } } as never,
         "local",
         () => new MemoryFileSystem(),
+        getStubPathResolver,
       );
 
       await expect(
@@ -425,6 +473,9 @@ describe("extensions/agent-manager", () => {
         success: false,
       });
       expect(select).toHaveBeenCalledWith("Delete Agent", ["local: oracle"]);
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
   });
