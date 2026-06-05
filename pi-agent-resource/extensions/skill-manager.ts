@@ -239,7 +239,6 @@ export async function handleCreate(
   const cwd = ctx.cwd || process.cwd();
   const fileSystem = getFileSystem(getSkillsDirectory(scope, cwd));
   const pathResolver = getResolver(cwd);
-  const skillRootPath = getSkillRootPath(scope, pathResolver);
   const requiredValues = await ctx.ui.custom<
     (RequiredAgentSkillFields & { confirm: boolean }) | null
   >((tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done), formOverlayOptions);
@@ -275,7 +274,7 @@ export async function handleCreate(
       },
       fileSystem,
       pathResolver,
-      skillRootPath,
+      scope,
     );
 
     ctx.ui.notify(`Skill created successfully: ${filePath}`);
@@ -428,17 +427,20 @@ function getSkillsDirectory(scope: SkillScope, cwd = process.cwd()) {
 
 function getSkillRootPath(scope: SkillScope, pathResolver: PathResolver) {
   return scope === "local"
-    ? pathResolver.getLocalResourcePath(pathResolver.skillFolder)
-    : pathResolver.getGlobalResourcePath(pathResolver.skillFolder);
+    ? pathResolver.resolveLocalSkillPath()
+    : pathResolver.resolveGlobalSkillPath();
 }
 
 async function createSkillFile(
   fields: SkillFrontmatterFields,
   fileSystem: ResourceFileSystem,
   pathResolver: PathResolver,
-  skillRootPath: string,
+  scope: SkillScope,
 ) {
-  const skillDirectory = pathResolver.resolvePath(skillRootPath, fields.name);
+  const skillDirectory =
+    scope === "local"
+      ? pathResolver.resolveLocalSkillPath(fields.name)
+      : pathResolver.resolveGlobalSkillPath(fields.name);
   const skillPath = join(skillDirectory, SKILL_FILE_NAME);
   const directoryResult = await fileSystem.mkdir(skillDirectory, { recursive: true });
   if (!directoryResult.success) {
@@ -526,7 +528,6 @@ async function pickSkillPath(
   pathResolver: PathResolver,
 ) {
   const skillNames = await listSkillNames(scope, fileSystem, pathResolver);
-  const skillRootPath = getSkillRootPath(scope, pathResolver);
 
   if (skillNames.length === 0) {
     ctx.ui.notify("No skills found", "info");
@@ -548,7 +549,11 @@ async function pickSkillPath(
     });
 
     selectList.onSelect = (item) =>
-      done(pathResolver.resolvePath(skillRootPath, join(item.value, SKILL_FILE_NAME)));
+      done(
+        scope === "local"
+          ? pathResolver.resolveLocalSkillPath(join(item.value, SKILL_FILE_NAME))
+          : pathResolver.resolveGlobalSkillPath(join(item.value, SKILL_FILE_NAME)),
+      );
     selectList.onCancel = () => done(null);
 
     const container = new Container();

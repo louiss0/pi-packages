@@ -110,20 +110,19 @@ describe("Pack", () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
       expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePath(pathResolver.packFolder, `${output}/${selectionChoices[0]}/example.md`),
+        pathResolver.resolvePackPath(`${output}/${selectionChoices[0]}/example.md`),
         examplePromptContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePath(
-          pathResolver.packFolder,
+        pathResolver.resolvePackPath(
           `${output}/${selectionChoices[1]}/example/SKILL.md`,
         ),
         exampleSkillContent,
       );
 
       expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePath(pathResolver.packFolder, `${output}/${selectionChoices[2]}/example.md`),
+        pathResolver.resolvePackPath(`${output}/${selectionChoices[2]}/example.md`),
         exampleAgentContent,
       );
     });
@@ -132,11 +131,11 @@ describe("Pack", () => {
       const output = "C#";
 
       fileSystem.seed({
-        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/agents/example.md`)]:
+        [pathResolver.resolvePackPath(`${output}/agents/example.md`)]:
           exampleAgentContent,
-        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/skills/example/SKILL.md`)]:
+        [pathResolver.resolvePackPath(`${output}/skills/example/SKILL.md`)]:
           exampleSkillContent,
-        [pathResolver.resolvePath(pathResolver.packFolder, `${output}/prompts/example.md`)]:
+        [pathResolver.resolvePackPath(`${output}/prompts/example.md`)]:
           examplePromptContent,
       });
 
@@ -160,7 +159,7 @@ describe("Pack", () => {
       );
 
       expect(removeDirectory).toHaveBeenCalledWith(
-        pathResolver.resolvePath(pathResolver.packFolder, output),
+        pathResolver.resolvePackPath(output),
       );
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -200,7 +199,7 @@ describe("Pack", () => {
 
       const skillSeedMap = folderNames.reduce((acc, dir) => {
         acc.set(
-          pathResolver.resolvePath(pathResolver.packFolder, `${dir}/skills/example/SKILL.md`),
+          pathResolver.resolvePackPath(`${dir}/skills/example/SKILL.md`),
           exampleSkillContent,
         );
         return acc;
@@ -224,7 +223,7 @@ describe("Pack", () => {
 
       const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
 
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.packFolder);
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
 
       expect(readDirectoryNamesSpy).resolves.toEqual(folderNames);
 
@@ -236,7 +235,7 @@ describe("Pack", () => {
       expect(ctx.ui.select).resolves.toEqual(packName);
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePath(pathResolver.packFolder, `${packName}/${SKILL_COMMAND}s`),
+        pathResolver.resolvePackPath(`${packName}/${SKILL_COMMAND}s`),
       );
 
       expect(getMockCreatePackSkillResourceSelector).toHaveBeenCalledWith(
@@ -249,10 +248,7 @@ describe("Pack", () => {
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       expect(removeDirectorySpy).toHaveBeenCalledWith(
-        pathResolver.resolvePath(
-          pathResolver.packFolder,
-          `${packName}/${SKILL_COMMAND}s/example`,
-        ),
+        pathResolver.resolvePackPath(`${packName}/${SKILL_COMMAND}s/example`),
       );
     });
   });

@@ -217,8 +217,8 @@ function getPromptDirectory(scope: PromptScope, cwd = process.cwd()) {
 
 function getPromptRootPath(scope: PromptScope, pathResolver: PathResolver) {
   return scope === "local"
-    ? pathResolver.getLocalResourcePath(pathResolver.promptFolder)
-    : pathResolver.getGlobalResourcePath(pathResolver.promptFolder);
+    ? pathResolver.resolveLocalPromptPath()
+    : pathResolver.resolveGlobalPromptPath();
 }
 
 export async function handleCreate(
@@ -251,7 +251,10 @@ export async function handleCreate(
     return;
   }
 
-  const filePath = pathResolver.resolvePath(promptRootPath, `${values.name}.md`);
+  const filePath =
+    scope === "local"
+      ? pathResolver.resolveLocalPromptPath(`${values.name}.md`)
+      : pathResolver.resolveGlobalPromptPath(`${values.name}.md`);
   const directoryResult = await fileSystem.mkdir(promptRootPath, { recursive: true });
   if (!directoryResult.success) {
     ctx.ui.notify(`Prompt creation failed: ${directoryResult.error.message}`, "error");
@@ -388,7 +391,10 @@ async function listPromptChoices(
 
   choices.push(
     ...entriesResult.data.map((entry) => {
-      const entryPath = pathResolver.resolvePath(promptRootPath, entry.name);
+      const entryPath =
+        scope === "local"
+          ? pathResolver.resolveLocalPromptPath(entry.name)
+          : pathResolver.resolveGlobalPromptPath(entry.name);
       const promptPath = entry.isDirectory() ? join(entryPath, "_index.md") : entryPath;
 
       return {

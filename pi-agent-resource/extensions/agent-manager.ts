@@ -166,8 +166,8 @@ function getAgentRootPath(
   pathResolver: PathResolver,
 ) {
   return scope === "local"
-    ? pathResolver.getLocalResourcePath(pathResolver.agentFolder)
-    : pathResolver.getGlobalResourcePath(pathResolver.agentFolder);
+    ? pathResolver.resolveLocalAgentPath()
+    : pathResolver.resolveGlobalAgentPath();
 }
 
 export async function handleCreate(
@@ -190,7 +190,10 @@ export async function handleCreate(
     return;
   }
 
-  const filePath = pathResolver.resolvePath(agentRootPath, `${values.name}.md`);
+  const filePath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath(`${values.name}.md`)
+      : pathResolver.resolveGlobalAgentPath(`${values.name}.md`);
 
   const directoryResult = await fileSystem.mkdir(agentRootPath, { recursive: true });
   if (!directoryResult.success) {
@@ -335,7 +338,10 @@ async function listAgentChoices(
   }
 
   return namesResult.data.map((name) => ({
-    path: pathResolver.resolvePath(agentRootPath, name),
+    path:
+      scope === "local"
+        ? pathResolver.resolveLocalAgentPath(name)
+        : pathResolver.resolveGlobalAgentPath(name),
     label: `${scope}: ${basename(name, ".md")}`,
   })) satisfies AgentChoice[];
 }

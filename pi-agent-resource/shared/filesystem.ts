@@ -6,7 +6,7 @@ import {
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { fs as memoryFs, vol } from "memfs";
 
 export type ResourceDirectoryEntry = {
@@ -38,41 +38,53 @@ export class PathResolver {
   #cwd: string;
   #homePath: string;
 
-  readonly skillFolder = "skills";
-  readonly agentFolder = "agents";
-  readonly promptFolder = "prompts";
+  #skillFolder = "skills";
+  #agentFolder = "agents";
+  #promptFolder = "prompts";
 
   constructor(cwd = process.cwd(), homePath = homedir()) {
     this.#cwd = cwd;
     this.#homePath = homePath;
   }
 
-  get packFolder() {
-    return join(this.#homePath, ".pi", "packs");
+  resolvePackPath(path = "") {
+    return this.#resolvePath(join(this.#homePath, ".pi", "packs"), path);
   }
 
-  getGlobalResourcePath(resourceFolder: string) {
-    return this.resolveGlobalPath(resourceFolder);
+  resolveGlobalSkillPath(path = "") {
+    return this.#resolveGlobalResourcePath(this.#skillFolder, path);
   }
 
-  getLocalResourcePath(resourceFolder: string) {
-    return this.resolveLocalPath(resourceFolder);
+  resolveLocalSkillPath(path = "") {
+    return this.#resolveLocalResourcePath(this.#skillFolder, path);
   }
 
-  resolveGlobalPath(path: string): string {
-    return join(this.#homePath, ".pi", "agent", path);
+  resolveGlobalAgentPath(path = "") {
+    return this.#resolveGlobalResourcePath(this.#agentFolder, path);
   }
 
-  resolveLocalPath(path: string): string {
-    return join(this.#cwd, ".pi", path);
+  resolveLocalAgentPath(path = "") {
+    return this.#resolveLocalResourcePath(this.#agentFolder, path);
   }
 
-  resolvePath(rootPath: string, path: string) {
+  resolveGlobalPromptPath(path = "") {
+    return this.#resolveGlobalResourcePath(this.#promptFolder, path);
+  }
+
+  resolveLocalPromptPath(path = "") {
+    return this.#resolveLocalResourcePath(this.#promptFolder, path);
+  }
+
+  #resolveGlobalResourcePath(resourceFolder: string, path: string) {
+    return this.#resolvePath(join(this.#homePath, ".pi", "agent", resourceFolder), path);
+  }
+
+  #resolveLocalResourcePath(resourceFolder: string, path: string) {
+    return this.#resolvePath(join(this.#cwd, ".pi", resourceFolder), path);
+  }
+
+  #resolvePath(rootPath: string, path: string) {
     return join(rootPath, path);
-  }
-
-  getRelativePath(rootPath: string, path: string) {
-    return relative(rootPath, path);
   }
 }
 

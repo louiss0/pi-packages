@@ -211,27 +211,26 @@ export const exampleAgentContent = `---
 async function writePackExampleResources(
   fileSystem: ResourceFileSystem,
   pathResolver: PathResolver,
-  packRootPath: string,
   packName: string,
   resources: ReadonlyArray<string>,
 ) {
   for (const resource of resources) {
-    const resourcePath = pathResolver.resolvePath(packRootPath, `${packName}/${resource}`);
+    const resourcePath = pathResolver.resolvePackPath(`${packName}/${resource}`);
     await fileSystem.mkdir(resourcePath, { recursive: true });
 
     if (resource === `${PROMPT_COMMAND}s`) {
       await fileSystem.writeFile(
-        pathResolver.resolvePath(resourcePath, "example.md"),
+        pathResolver.resolvePackPath(`${packName}/${resource}/example.md`),
         examplePromptContent,
       );
       continue;
     }
 
     if (resource === `${SKILL_COMMAND}s`) {
-      const skillPath = pathResolver.resolvePath(resourcePath, "example");
+      const skillPath = pathResolver.resolvePackPath(`${packName}/${resource}/example`);
       await fileSystem.mkdir(skillPath, { recursive: true });
       await fileSystem.writeFile(
-        pathResolver.resolvePath(skillPath, "SKILL.md"),
+        pathResolver.resolvePackPath(`${packName}/${resource}/example/SKILL.md`),
         exampleSkillContent,
       );
       continue;
@@ -239,7 +238,7 @@ async function writePackExampleResources(
 
     if (resource === `${AGENT_COMMAND}s`) {
       await fileSystem.writeFile(
-        pathResolver.resolvePath(resourcePath, "example.md"),
+        pathResolver.resolvePackPath(`${packName}/${resource}/example.md`),
         exampleAgentContent,
       );
     }
@@ -255,8 +254,6 @@ export function rootPackResourceReducer(
     pathResolver: PathResolver;
   },
 ) {
-  const packRootPath = deps.pathResolver.packFolder;
-
   return (
     {
       [CREATE_COMMAND]: async () => {
@@ -270,19 +267,20 @@ export function rootPackResourceReducer(
           return;
         }
 
-        const packPath = deps.pathResolver.resolvePath(packRootPath, packName);
+        const packPath = deps.pathResolver.resolvePackPath(packName);
         await deps.fileSystem.mkdir(packPath, { recursive: true });
         await writePackExampleResources(
           deps.fileSystem,
           deps.pathResolver,
-          packRootPath,
           packName,
           resources,
         );
         deps.ctx.ui.notify(`Pack created successfully with name '${packName}'`);
       },
       [DELETE_COMMAND]: async () => {
-        const packNamesResult = await deps.fileSystem.readDirectoryNames(packRootPath);
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
         if (!packNamesResult.success || packNamesResult.data.length === 0) {
           deps.ctx.ui.notify("No packs found", "info");
           return;
@@ -297,7 +295,7 @@ export function rootPackResourceReducer(
         }
 
         await deps.fileSystem.removeDirectory(
-          deps.pathResolver.resolvePath(packRootPath, packName),
+          deps.pathResolver.resolvePackPath(packName),
         );
         deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
       },
