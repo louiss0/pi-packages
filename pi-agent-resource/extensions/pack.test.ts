@@ -4,8 +4,7 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
-import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
-import type { ResourcePathResolver } from "../shared/filesystem";
+import { MemoryFileSystem, PathResolver, ResourcePathResolver } from "../shared/filesystem";
 import {
   exampleAgentContent,
   examplePromptContent,
@@ -57,34 +56,36 @@ const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(() => 
   };
 });
 
+function createPathResolver() {
+  const pathResolver = new PathResolver("/workspace", "/test-home");
+
+  return {
+    resolvePackPath: vi.fn(pathResolver.resolvePackPath),
+    resolvePackSkillPath: vi.fn((packName, path) =>
+      pathResolver.resolvePackSkillPath(packName, path),
+    ),
+    resolvePackAgentPath: vi.fn((packName, path) =>
+      pathResolver.resolvePackAgentPath(packName, path),
+    ),
+    resolvePackPromptPath: vi.fn((packName, path) =>
+      pathResolver.resolvePackPromptPath(packName, path),
+    ),
+    resolveGlobalSkillPath: vi.fn(pathResolver.resolveGlobalSkillPath),
+    resolveLocalSkillPath: vi.fn(pathResolver.resolveLocalSkillPath),
+    resolveGlobalAgentPath: vi.fn(pathResolver.resolveGlobalAgentPath),
+    resolveLocalAgentPath: vi.fn(pathResolver.resolveLocalAgentPath),
+    resolveGlobalPromptPath: vi.fn(pathResolver.resolveGlobalPromptPath),
+    resolveLocalPromptPath: vi.fn(pathResolver.resolveLocalPromptPath),
+  } satisfies ResourcePathResolver;
+}
+
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
-  let pathResolver: PathResolver;
-  let pathResolverMock: ResourcePathResolver;
+  let pathResolver: ReturnType<typeof createPathResolver>;
+
   beforeAll(() => {
     fileSystem = new MemoryFileSystem();
-    pathResolver = new PathResolver("/workspace", "/test-home");
-  });
-
-  beforeEach(() => {
-    pathResolverMock = {
-      resolvePackPath: vi.fn((path) => pathResolver.resolvePackPath(path)),
-      resolvePackSkillPath: vi.fn((packName, path) =>
-        pathResolver.resolvePackSkillPath(packName, path),
-      ),
-      resolvePackAgentPath: vi.fn((packName, path) =>
-        pathResolver.resolvePackAgentPath(packName, path),
-      ),
-      resolvePackPromptPath: vi.fn((packName, path) =>
-        pathResolver.resolvePackPromptPath(packName, path),
-      ),
-      resolveGlobalSkillPath: vi.fn(),
-      resolveLocalSkillPath: vi.fn(),
-      resolveGlobalAgentPath: vi.fn(),
-      resolveLocalAgentPath: vi.fn(),
-      resolveGlobalPromptPath: vi.fn(),
-      resolveLocalPromptPath: vi.fn(),
-    } satisfies ResourcePathResolver;
+    pathResolver = createPathResolver();
   });
 
   afterEach(() => {
@@ -124,7 +125,7 @@ describe("Pack", () => {
         ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
         fileSystem,
-        pathResolver: pathResolverMock,
+        pathResolver,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
@@ -140,17 +141,17 @@ describe("Pack", () => {
         pathResolver.resolvePackPromptPath(output, "example.md"),
         examplePromptContent,
       );
-      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
-      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolverMock.resolvePackPromptPath).toHaveBeenCalledWith(output, "example.md");
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(output);
+      expect(pathResolver.resolvePackPromptPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolver.resolvePackPromptPath).toHaveBeenCalledWith(output, "example.md");
 
       expect(writeFile).toHaveBeenCalledWith(
         pathResolver.resolvePackSkillPath(output, "example/SKILL.md"),
         exampleSkillContent,
       );
-      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(output, "example");
-      expect(pathResolverMock.resolvePackSkillPath).toHaveBeenCalledWith(
+      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(output, "example");
+      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
         output,
         "example/SKILL.md",
       );
@@ -159,8 +160,8 @@ describe("Pack", () => {
         pathResolver.resolvePackAgentPath(output, "example.md"),
         exampleAgentContent,
       );
-      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolverMock.resolvePackAgentPath).toHaveBeenCalledWith(output, "example.md");
+      expect(pathResolver.resolvePackAgentPath).toHaveBeenCalledWith(output, "");
+      expect(pathResolver.resolvePackAgentPath).toHaveBeenCalledWith(output, "example.md");
     });
 
     it("deletes a pack when delete is passed in", async () => {
@@ -171,7 +172,7 @@ describe("Pack", () => {
         [pathResolver.resolvePackSkillPath(output, "example/SKILL.md")]: exampleSkillContent,
         [pathResolver.resolvePackPromptPath(output, "example.md")]: examplePromptContent,
       });
-      vi.mocked(pathResolverMock.resolvePackPath).mockClear();
+      vi.mocked(pathResolver.resolvePackPath).mockClear();
 
       const ctx = {
         ui: {
@@ -184,7 +185,7 @@ describe("Pack", () => {
         createPackResourceSelector: getMockCreatePackResourceSelector([]),
         ctx: createTestContext(ctx),
         fileSystem,
-        pathResolver: pathResolverMock,
+        pathResolver: pathResolver,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
@@ -194,7 +195,7 @@ describe("Pack", () => {
       const removeDirectory = vi.spyOn(fileSystem, "writeFile");
 
       expect(removeDirectory).toHaveBeenCalledWith(pathResolver.resolvePackPath(output));
-      expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(output);
 
       expect(ctx.ui.notify).toHaveBeenCalledWith(
         `Pack deleted successfully with name '${output}'`,
@@ -267,6 +268,7 @@ describe("Pack", () => {
 
       await skillPackResourceReducer("create", {
         getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        pathResolver,
         ctx: createTestContext(ctx),
         fileSystem,
       });
@@ -274,7 +276,9 @@ describe("Pack", () => {
       const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
       const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPath.mock.results[0].value,
+      );
 
       await expect(readDirectoryNamesSpy).resolves.toEqual(folders);
 
@@ -341,6 +345,7 @@ describe("Pack", () => {
 
       await skillPackResourceReducer("delete", {
         getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        pathResolver,
         ctx: createTestContext(ctx),
         fileSystem,
       });

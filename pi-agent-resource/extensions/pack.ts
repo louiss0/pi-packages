@@ -315,6 +315,7 @@ export function skillPackResourceReducer(
     getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
+    pathResolver: ResourcePathResolver;
   },
 ) {
   return (
