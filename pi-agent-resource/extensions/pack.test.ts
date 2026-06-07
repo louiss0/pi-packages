@@ -386,32 +386,20 @@ describe("Pack", () => {
       await expect(mockOpenExternalEditor).resolves.toBeUndefined();
     });
 
-    it("deletes a skill in a pack when delete is passed in", async () => {
-      const packName = "C#";
-
-      const folderNames = [
-        "front-end",
-        "back-end",
-        "systems-programming",
-        "sentry",
-        "render",
-        `${packName}`,
-      ];
-
-      const skillSeedMap = folderNames.reduce((acc, dir) => {
-        acc.set(
-          pathResolver.resolvePackSkillPath(dir, "example/SKILL.md"),
-          exampleSkillContent,
-        );
-        return acc;
-      }, new Map<string, string>());
-
-      fileSystem.seed(Object.fromEntries(skillSeedMap));
+    test("deletes a skill in a pack when delete is passed in", async ({
+      folders,
+      randomFolder,
+      randomSkill,
+    }) => {
+      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+        filePath: `${randomSkill}/SKILL.md`,
+        content: exampleSkillContent,
+      });
 
       const ctx = {
         ui: {
           custom: vi.fn(mockCustomUIFactory),
-          select: vi.fn().mockResolvedValue(packName),
+          select: vi.fn().mockResolvedValue(randomFolder),
           notify: vi.fn(),
         },
       } satisfies MockContext;
@@ -429,17 +417,17 @@ describe("Pack", () => {
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
 
-      expect(readDirectoryNamesSpy).resolves.toEqual(folderNames);
+      expect(readDirectoryNamesSpy).resolves.toEqual(folders);
 
       expect(ctx.ui.select).toHaveBeenCalledWith(
         "Which pack do you want to delete a skill from?",
-        folderNames,
+        folders,
       );
 
-      expect(ctx.ui.select).resolves.toEqual(packName);
+      expect(ctx.ui.select).resolves.toEqual(randomFolder);
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath(packName),
+        pathResolver.resolvePackPath(randomFolder),
       );
 
       expect(mockGetMultiSelectorFactory).toHaveBeenCalledWith(
@@ -452,7 +440,7 @@ describe("Pack", () => {
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       expect(removeDirectorySpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath(packName, "example"),
+        pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
       );
     });
   });
