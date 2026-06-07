@@ -276,7 +276,7 @@ describe("Pack", () => {
 
       expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
 
-      expect(readDirectoryNamesSpy).resolves.toEqual(folders);
+      await expect(readDirectoryNamesSpy).resolves.toEqual(folders);
 
       ctx.ui.select.mockResolvedValue(randomFolder);
 
@@ -289,16 +289,20 @@ describe("Pack", () => {
 
       expect(ctx.ui.input).toHaveBeenCalledWith("Which skill do you want to add to the pack?");
 
-      expect(ctx.ui.input).resolves.toBe(randomSkill);
+      await expect(ctx.ui.input).resolves.toBe(randomSkill);
 
       expect(writeFileSpy).toHaveBeenCalledWith(
         pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
         exampleSkillContent,
       );
 
+      await expect(writeFileSpy).resolves.toBe(undefined);
+
       const result = await fileSystem.readDirectoryNames(
         pathResolver.resolvePackSkillPath(randomFolder, ""),
       );
+
+      expect(ctx.ui.notify).toHaveBeenCalledWith();
 
       if (result.success) {
         expect(result.data).toContain(randomSkill);
