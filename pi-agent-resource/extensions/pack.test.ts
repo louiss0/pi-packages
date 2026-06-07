@@ -61,14 +61,9 @@ describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
   let pathResolver: PathResolver;
   let pathResolverMock: ResourcePathResolver;
-  let writeFile: ReturnType<typeof vi.spyOn>;
-  let removeDirectory: ReturnType<typeof vi.spyOn>;
-
   beforeAll(() => {
     fileSystem = new MemoryFileSystem();
     pathResolver = new PathResolver("/workspace", "/test-home");
-    writeFile = vi.spyOn(fileSystem, "writeFile");
-    removeDirectory = vi.spyOn(fileSystem, "removeDirectory");
   });
 
   beforeEach(() => {
@@ -93,8 +88,7 @@ describe("Pack", () => {
   });
 
   afterEach(() => {
-    writeFile.mockClear();
-    removeDirectory.mockClear();
+    vi.resetAllMocks();
     fileSystem.reset();
   });
 
@@ -139,6 +133,7 @@ describe("Pack", () => {
         `Pack created successfully with name '${output}'`,
       );
 
+      const writeFile = vi.spyOn(fileSystem, "writeFile");
       expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
 
       expect(writeFile).toHaveBeenCalledWith(
@@ -196,6 +191,7 @@ describe("Pack", () => {
         "pack",
         "What is the name of the pack you want to delete?",
       );
+      const removeDirectory = vi.spyOn(fileSystem, "writeFile");
 
       expect(removeDirectory).toHaveBeenCalledWith(pathResolver.resolvePackPath(output));
       expect(pathResolverMock.resolvePackPath).toHaveBeenCalledWith(output);
@@ -219,7 +215,7 @@ describe("Pack", () => {
       return fileSystem.seed(Object.fromEntries(seedMap));
     }
 
-    const skillIt = test
+    const test = it
       .extend("folders", () => [
         "front-end",
         "back-end",
@@ -227,7 +223,10 @@ describe("Pack", () => {
         "sentry",
         "render",
       ])
-      .extend("folder", ({ folders }) => folders[Math.floor(Math.random() * folders.length)])
+      .extend(
+        "randomFolder",
+        ({ folders }) => folders[Math.floor(Math.random() * folders.length)],
+      )
       .extend("randomSkill", () => {
         const skills = [
           "typescript",
@@ -248,35 +247,63 @@ describe("Pack", () => {
         return skills[Math.floor(Math.random() * skills.length)];
       });
 
-    skillIt(
-      "creates a skill in a pack when create is passed in",
-      async ({ folders, randomSkill }) => {
-        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-          filePath: "example/SKILL.md",
-          content: exampleSkillContent,
-        });
+    test("creates a skill in a pack when create is passed in", async ({
+      folders,
+      randomSkill,
+      randomFolder,
+    }) => {
+      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+        filePath: "example/SKILL.md",
+        content: exampleSkillContent,
+      });
 
-        const ctx = {
-          ui: {
-            custom: vi.fn(),
-            input: vi.fn().mockResolvedValue(randomSkill),
-            notify: vi.fn(),
-          },
-        } satisfies MockContext;
+      const ctx = {
+        ui: {
+          select: vi.fn<ExtensionCommandContext["ui"]["select"]>(),
+          input: vi.fn<ExtensionCommandContext["ui"]["input"]>(),
+          notify: vi.fn<ExtensionCommandContext["ui"]["notify"]>(),
+        },
+      } satisfies MockContext;
 
-        await skillPackResourceReducer("create", {
-          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-          ctx: createTestContext(ctx),
-          fileSystem,
-        });
+      await skillPackResourceReducer("create", {
+        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        ctx: createTestContext(ctx),
+        fileSystem,
+      });
 
-        expect(ctx.ui.custom).toHaveBeenCalledWith();
+      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+      const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
-        expect(ctx.ui.input).toHaveBeenCalledWith(
-          "Which skill do you want to add to the pack?",
-        );
-      },
-    );
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
+
+      expect(readDirectoryNamesSpy).resolves.toEqual(folders);
+
+      ctx.ui.select.mockResolvedValue(randomFolder);
+
+      expect(ctx.ui.select).toHaveBeenCalledWith(
+        "What pack do you want to add the skill to?",
+        folders.map((folder) => `${folder} pack`),
+      );
+
+      ctx.ui.input.mockResolvedValue(randomSkill);
+
+      expect(ctx.ui.input).toHaveBeenCalledWith("Which skill do you want to add to the pack?");
+
+      expect(ctx.ui.input).resolves.toBe(randomSkill);
+
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
+        exampleSkillContent,
+      );
+
+      const result = await fileSystem.readDirectoryNames(
+        pathResolver.resolvePackSkillPath(randomFolder, ""),
+      );
+
+      if (result.success) {
+        expect(result.data).toContain(randomSkill);
+      }
+    });
 
     it("deletes a skill in a pack when delete is passed in", async () => {
       const packName = "C#";
