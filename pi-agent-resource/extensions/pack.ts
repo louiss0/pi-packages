@@ -13,6 +13,7 @@ import {
   type ResourceFileSystem,
   type ResourcePathResolver,
 } from "../shared/filesystem";
+import { spawn } from "node:child_process";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -46,6 +47,41 @@ type PackResourceCommand = (typeof packResourceCommands.options)[number];
 type PackResourceHandlers = Record<PackResourceCommand, () => Promise<void>>;
 
 export const ROOT_PACK_FOLDER_PATH = ".pi/packs/";
+
+class ExternalEditorError extends Error {
+  constructor(message: string, cause?: Error) {
+    super(message);
+    this.name = "ExternalEditorError";
+    this.cause = cause;
+  }
+}
+
+export async function openExternalEditor(filePath: string) {
+  const { EDITOR } = process.env;
+
+  if (!EDITOR) {
+    return new ExternalEditorError("No external editor set");
+  }
+
+  const result = await new Promise<number | ExternalEditorError>((resolve, reject) => {
+    const [cmd, ...args] = EDITOR.split(" ");
+    const child = spawn(cmd, [...args, filePath]);
+
+    child.on("error", (err) =>
+      reject(new ExternalEditorError("Failed to use external editor", err)),
+    );
+    child.on("close", (value) =>
+      !value
+        ? reject(new ExternalEditorError("Something went wrong while closing"))
+        : resolve(value),
+    );
+  });
+
+  if (result instanceof ExternalEditorError) {
+    return result;
+  }
+  return undefined;
+}
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand(ROOT_PACK_COMMAND, {
@@ -101,6 +137,8 @@ export default function (pi: ExtensionAPI) {
       await skillPackResourceReducer(result.output, {
         getMuiltiSelectorFactory: getMultiSelectorFactory,
         ctx,
+        openExternalEditor,
+        pathResolver: getPathResolver(ctx.cwd),
         fileSystem: new NodeFileSystem(),
       });
     },
@@ -316,6 +354,7 @@ export function skillPackResourceReducer(
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
+    openExternalEditor: typeof openExternalEditor;
   },
 ) {
   return (

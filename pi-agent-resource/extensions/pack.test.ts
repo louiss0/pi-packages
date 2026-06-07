@@ -11,6 +11,7 @@ import {
   exampleSkillContent,
   getCreatePackResourceSelector,
   getMultiSelectorFactory,
+  openExternalEditor,
   rootPackResourceReducer,
   skillPackResourceReducer,
 } from "./pack";
@@ -78,6 +79,8 @@ function createPathResolver() {
     resolveLocalPromptPath: vi.fn(pathResolver.resolveLocalPromptPath),
   } satisfies ResourcePathResolver;
 }
+
+const mockOpenExternalEditor = vi.fn<typeof openExternalEditor>();
 
 describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
@@ -269,6 +272,7 @@ describe("Pack", () => {
       await skillPackResourceReducer("create", {
         getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
         pathResolver,
+        openExternalEditor: mockOpenExternalEditor,
         ctx: createTestContext(ctx),
         fileSystem,
       });
@@ -313,6 +317,75 @@ describe("Pack", () => {
       }
     });
 
+    test("allows the user to edit a skill when the edit command is passed in", async ({
+      folders,
+      randomFolder,
+    }) => {
+      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+        filePath: "example/SKILL.md",
+        content: exampleSkillContent,
+      });
+
+      const ctx = {
+        ui: {
+          select: vi.fn<ExtensionCommandContext["ui"]["select"]>(),
+          editor: vi.fn<ExtensionCommandContext["ui"]["editor"]>(),
+          notify: vi.fn<ExtensionCommandContext["ui"]["notify"]>(),
+        },
+      } satisfies MockContext;
+
+      await skillPackResourceReducer("edit", {
+        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        openExternalEditor: mockOpenExternalEditor,
+        pathResolver,
+        ctx: createTestContext(ctx),
+        fileSystem,
+      });
+
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
+
+      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPath.mock.results[0].value,
+      );
+
+      await expect(readDirectoryNamesSpy).resolves.toEqual(folders);
+
+      ctx.ui.select.mockResolvedValue(randomFolder);
+
+      expect(ctx.ui.select).toHaveBeenCalledWith(
+        "What pack has the skill you want to edit?",
+        folders.map((folder) => folder),
+      );
+
+      await expect(ctx.ui.select).resolves.toBe(randomFolder);
+
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(randomFolder);
+
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPath.mock.results[0].value,
+      );
+
+      await expect(readDirectoryNamesSpy).resolves.toEqual(["example"]);
+
+      ctx.ui.select.mockResolvedValue("example");
+
+      expect(ctx.ui.select).toHaveBeenCalledWith("What skill do you want to edit?", [
+        "example",
+      ]);
+
+      await expect(ctx.ui.select).resolves.toBe("example");
+
+      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith("example/SKILL.md");
+
+      expect(mockOpenExternalEditor).toHaveBeenCalledWith(
+        pathResolver.resolvePackSkillPath.mock.results[0].value,
+      );
+
+      await expect(mockOpenExternalEditor).resolves.toBeUndefined();
+    });
+
     it("deletes a skill in a pack when delete is passed in", async () => {
       const packName = "C#";
 
@@ -346,6 +419,8 @@ describe("Pack", () => {
       await skillPackResourceReducer("delete", {
         getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
         pathResolver,
+        openExternalEditor: mockOpenExternalEditor,
+
         ctx: createTestContext(ctx),
         fileSystem,
       });
