@@ -1,8 +1,5 @@
 import { spawn } from "node:child_process";
-import {
-  MultiSelect,
-  MultiSelectConfig,
-} from "@code-fixer-23/pi-form-components";
+import { MultiSelect, MultiSelectConfig } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
@@ -43,11 +40,7 @@ export const SKILL_COMMAND = "skill";
 export const AGENT_COMMAND = "agent";
 export const PROMPT_COMMAND = "prompt";
 
-const packManagementCommands = [
-  CREATE_COMMAND,
-  EDIT_COMMAND,
-  DELETE_COMMAND,
-] as const;
+const packManagementCommands = [CREATE_COMMAND, EDIT_COMMAND, DELETE_COMMAND] as const;
 const packResourceCommands = picklist([
   ...packOrginaizationCommands,
   ...packManagementCommands,
@@ -74,23 +67,19 @@ export async function openExternalEditor(filePath: string) {
     return new ExternalEditorError("No external editor set");
   }
 
-  const result = await new Promise<number | ExternalEditorError>(
-    (resolve, reject) => {
-      const [cmd, ...args] = EDITOR.split(" ");
-      const child = spawn(cmd, [...args, filePath]);
+  const result = await new Promise<number | ExternalEditorError>((resolve, reject) => {
+    const [cmd, ...args] = EDITOR.split(" ");
+    const child = spawn(cmd, [...args, filePath]);
 
-      child.on("error", (err) =>
-        reject(new ExternalEditorError("Failed to use external editor", err)),
-      );
-      child.on("close", (value) =>
-        !value
-          ? reject(
-              new ExternalEditorError("Something went wrong while closing"),
-            )
-          : resolve(value),
-      );
-    },
-  );
+    child.on("error", (err) =>
+      reject(new ExternalEditorError("Failed to use external editor", err)),
+    );
+    child.on("close", (value) =>
+      !value
+        ? reject(new ExternalEditorError("Something went wrong while closing"))
+        : resolve(value),
+    );
+  });
 
   if (result instanceof ExternalEditorError) {
     return result;
@@ -105,8 +94,7 @@ export default function (pi: ExtensionAPI) {
       return packCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PACK_LABEL}:${value}`,
@@ -136,8 +124,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${SKILL_COMMAND}:${value}`,
@@ -152,7 +139,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       await skillPackResourceReducer(result.output, {
-        getMuiltiSelectorFactory: getMultiSelectorFactory,
+        getMultiSelectorFactory: getMultiSelectorFactory,
         ctx,
         openExternalEditor,
         pathResolver: getPathResolver(ctx.cwd),
@@ -167,8 +154,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${AGENT_COMMAND}:${value}`,
@@ -183,7 +169,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       await agentPackResourceReducer(result.output, {
-        getMuiltiSelectorFactory: getMultiSelectorFactory,
+        getMultiSelectorFactory: getMultiSelectorFactory,
         ctx,
         openExternalEditor,
         pathResolver: getPathResolver(ctx.cwd),
@@ -198,8 +184,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PROMPT_COMMAND}:${value}`,
@@ -214,7 +199,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       await promptPackResourceReducer(result.output, {
-        getMuiltiSelectorFactory: getMultiSelectorFactory,
+        getMultiSelectorFactory: getMultiSelectorFactory,
         ctx,
         openExternalEditor,
         pathResolver: getPathResolver(ctx.cwd),
@@ -225,11 +210,7 @@ export default function (pi: ExtensionAPI) {
 }
 
 export function getCreatePackResourceSelector() {
-  const resources = [
-    `${SKILL_COMMAND}s`,
-    `${PROMPT_COMMAND}s`,
-    `${AGENT_COMMAND}s`,
-  ] as const;
+  const resources = [`${SKILL_COMMAND}s`, `${PROMPT_COMMAND}s`, `${AGENT_COMMAND}s`] as const;
   return getMultiSelectorFactory(
     "What resources do you want to pack?",
     resources.map((resource) => ({
@@ -250,8 +231,7 @@ export function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
     theme: Theme,
     _: KeybindingsManager,
     done: (result: ReadonlyArray<T[number]["value"]> | null) => void,
-  ): Component =>
-    new MultiSelect({ title, items, ...options }, tui, theme, done);
+  ): Component => new MultiSelect({ title, items, ...options }, tui, theme, done);
 }
 
 type PackCommand = (typeof packCommands.options)[number];
@@ -324,9 +304,7 @@ async function writePackExampleResources(
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
-    createPackResourceSelector: ReturnType<
-      typeof getCreatePackResourceSelector
-    >;
+    createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -339,9 +317,7 @@ export function rootPackResourceReducer(
           PACK_LABEL,
           "What is the name of your agent pack?",
         );
-        const resources = await deps.ctx.ui.custom(
-          deps.createPackResourceSelector,
-        );
+        const resources = await deps.ctx.ui.custom(deps.createPackResourceSelector);
 
         if (!packName || !resources || resources.length === 0) {
           return;
@@ -374,9 +350,7 @@ export function rootPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.removeDirectory(
-          deps.pathResolver.resolvePackPath(packName),
-        );
+        await deps.fileSystem.removeDirectory(deps.pathResolver.resolvePackPath(packName));
         deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
       },
     } satisfies Record<PackCommand, () => Promise<void>>
@@ -386,7 +360,7 @@ export function rootPackResourceReducer(
 export function skillPackResourceReducer(
   arg: PackResourceCommand,
   deps: {
-    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    getMultiSelectorFactory: typeof getMultiSelectorFactory;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -422,16 +396,10 @@ export function skillPackResourceReducer(
           return;
         }
 
-        const skillPath = deps.pathResolver.resolvePackSkillPath(
-          packName,
-          skillName,
-        );
+        const skillPath = deps.pathResolver.resolvePackSkillPath(packName, skillName);
         await deps.fileSystem.mkdir(skillPath, { recursive: true });
         await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+          deps.pathResolver.resolvePackSkillPath(packName, `${skillName}/SKILL.md`),
           exampleSkillContent,
         );
         deps.ctx.ui.notify(`skill created in pack '${packName}'`);
@@ -474,10 +442,7 @@ export function skillPackResourceReducer(
         }
 
         await deps.openExternalEditor(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+          deps.pathResolver.resolvePackSkillPath(packName, `${skillName}/SKILL.md`),
         );
       },
       [MOVE_LOCAL_COMMAND]: async () => {
@@ -528,10 +493,9 @@ export function skillPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolveLocalSkillPath(skillName),
-          { recursive: true },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveLocalSkillPath(skillName), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolveLocalSkillPath(`${skillName}/SKILL.md`),
           contentResult.data,
@@ -577,9 +541,7 @@ export function skillPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalSkillPath(
-          `${skillName}/SKILL.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalSkillPath(`${skillName}/SKILL.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -592,10 +554,7 @@ export function skillPackResourceReducer(
           { recursive: true },
         );
         await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+          deps.pathResolver.resolvePackSkillPath(packName, `${skillName}/SKILL.md`),
           contentResult.data,
         );
         await deps.fileSystem.removeDirectory(
@@ -639,9 +598,7 @@ export function skillPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalSkillPath(
-          `${skillName}/SKILL.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalSkillPath(`${skillName}/SKILL.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -654,10 +611,7 @@ export function skillPackResourceReducer(
           { recursive: true },
         );
         await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+          deps.pathResolver.resolvePackSkillPath(packName, `${skillName}/SKILL.md`),
           contentResult.data,
         );
         await deps.fileSystem.removeDirectory(
@@ -712,10 +666,9 @@ export function skillPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolveGlobalSkillPath(skillName),
-          { recursive: true },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveGlobalSkillPath(skillName), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolveGlobalSkillPath(`${skillName}/SKILL.md`),
           contentResult.data,
@@ -773,7 +726,7 @@ export function skillPackResourceReducer(
 export function agentPackResourceReducer(
   arg: PackResourceCommand,
   deps: {
-    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    getMultiSelectorFactory: typeof getMultiSelectorFactory;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -809,12 +762,9 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackAgentPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackAgentPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
           exampleAgentContent,
@@ -899,10 +849,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolvePackAgentPath(
-          packName,
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -956,9 +903,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalAgentPath(
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -966,12 +911,9 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackAgentPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackAgentPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
           contentResult.data,
@@ -1015,9 +957,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalAgentPath(
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalAgentPath(`${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1025,12 +965,9 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackAgentPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackAgentPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
           contentResult.data,
@@ -1074,10 +1011,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolvePackAgentPath(
-          packName,
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1085,12 +1019,9 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolveGlobalAgentPath(),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveGlobalAgentPath(), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`),
           contentResult.data,
@@ -1146,7 +1077,7 @@ export function agentPackResourceReducer(
 export function promptPackResourceReducer(
   arg: PackResourceCommand,
   deps: {
-    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    getMultiSelectorFactory: typeof getMultiSelectorFactory;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -1182,12 +1113,9 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackPromptPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackPromptPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
           examplePromptContent,
@@ -1283,12 +1211,9 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolveLocalPromptPath(),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveLocalPromptPath(), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`),
           contentResult.data,
@@ -1332,9 +1257,7 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalPromptPath(
-          `${promptName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1342,12 +1265,9 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackPromptPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackPromptPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
           contentResult.data,
@@ -1391,9 +1311,7 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalPromptPath(
-          `${promptName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1401,12 +1319,9 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolvePackPromptPath(packName, ""),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolvePackPromptPath(packName, ""), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
           contentResult.data,
@@ -1461,12 +1376,9 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
-          deps.pathResolver.resolveGlobalPromptPath(),
-          {
-            recursive: true,
-          },
-        );
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveGlobalPromptPath(), {
+          recursive: true,
+        });
         await deps.fileSystem.writeFile(
           deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`),
           contentResult.data,
