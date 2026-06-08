@@ -292,6 +292,7 @@ export class Picker<T extends string> implements Component {
   #itemLimit: number;
   #lazyLoadStep: number;
   #selectList: SelectList | null = null;
+  #selectedIndex = 0;
   #selectedValue: T | null = null;
   #styles: NonNullable<PickerOptions<T>["styles"]> & {
     item: Record<
@@ -373,8 +374,22 @@ export class Picker<T extends string> implements Component {
     const nextFilter = this.#Filter.updateFilter(this.#Filter.value, data);
     if (nextFilter !== this.#Filter.value) {
       this.#Filter.value = nextFilter;
+      this.#selectedIndex = 0;
+      this.#selectedValue = null;
       this.#syncSelectList();
       this.#syncFilter();
+      this.tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.up)) {
+      this.#moveSelection(-1);
+      this.tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.down)) {
+      this.#moveSelection(1);
       this.tui.requestRender();
       return;
     }
@@ -439,15 +454,10 @@ export class Picker<T extends string> implements Component {
     const nextSelectList = this.#createSelectList(items);
 
     nextSelectList.setFilter(this.#Filter.value);
+    nextSelectList.setSelectedIndex(this.#selectedIndex);
 
-    if (this.#selectedValue !== null) {
-      const selectedIndex = items.findIndex(
-        (item) => item.value === this.#selectedValue,
-      );
-      if (selectedIndex >= 0) {
-        nextSelectList.setSelectedIndex(selectedIndex);
-      }
-    }
+    const selectedItem = nextSelectList.getSelectedItem();
+    this.#selectedValue = (selectedItem?.value as T | undefined) ?? null;
 
     if (this.#selectList !== null) {
       this.#listContainer.removeChild(this.#selectList);
@@ -455,6 +465,21 @@ export class Picker<T extends string> implements Component {
 
     this.#selectList = nextSelectList;
     this.#listContainer.addChild(nextSelectList);
+  }
+
+  #moveSelection(direction: -1 | 1) {
+    const visibleItems = this.#getVisibleItems();
+
+    if (visibleItems.length === 0) {
+      return;
+    }
+
+    this.#selectedIndex =
+      (this.#selectedIndex + direction + visibleItems.length) %
+      visibleItems.length;
+    this.#selectedValue = visibleItems[this.#selectedIndex] ?? null;
+    this.#maybeLoadMore(this.#selectedValue as T);
+    this.#syncSelectList();
   }
 
   #maybeLoadMore(selectedValue: T) {
@@ -475,9 +500,7 @@ export class Picker<T extends string> implements Component {
       this.#items.length,
       this.#visibleCount + this.#lazyLoadStep,
     );
-    this.#syncSelectList();
     this.#syncFilter();
-    this.tui.requestRender();
   }
 
   #Filter = new (class {
