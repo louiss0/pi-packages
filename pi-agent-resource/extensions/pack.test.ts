@@ -18,6 +18,11 @@ import {
   skillPackResourceReducer,
 } from "./pack";
 import {
+  renderAgentFrontmatter,
+  renderPromptMarkdown,
+  renderSkillMarkdown,
+} from "../shared/resource-components";
+import {
   MemoryFileSystem,
   PathResolver,
   type ResourcePathResolver,
@@ -61,15 +66,17 @@ const mockCustomUIFactory = async <T>(
   return value;
 };
 
-const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(() => {
-  return (_tui, _theme, _keybindingsManager, done) => {
-    return {
-      handleInput: vi.fn((data) => done(data)),
-      invalidate: vi.fn(),
-      render: vi.fn(),
+const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(
+  () => {
+    return (_tui, _theme, _keybindingsManager, done) => {
+      return {
+        handleInput: vi.fn((data) => done(data)),
+        invalidate: vi.fn(),
+        render: vi.fn(),
+      };
     };
-  };
-});
+  },
+);
 
 function createPathResolver() {
   const pathResolver = new PathResolver("/workspace", "/test-home");
@@ -85,12 +92,24 @@ function createPathResolver() {
     resolvePackPromptPath: vi.fn((packName, path) =>
       pathResolver.resolvePackPromptPath(packName, path),
     ),
-    resolveGlobalSkillPath: vi.fn((path) => pathResolver.resolveGlobalSkillPath(path)),
-    resolveLocalSkillPath: vi.fn((path) => pathResolver.resolveLocalSkillPath(path)),
-    resolveGlobalAgentPath: vi.fn((path) => pathResolver.resolveGlobalAgentPath(path)),
-    resolveLocalAgentPath: vi.fn((path) => pathResolver.resolveLocalAgentPath(path)),
-    resolveGlobalPromptPath: vi.fn((path) => pathResolver.resolveGlobalPromptPath(path)),
-    resolveLocalPromptPath: vi.fn((path) => pathResolver.resolveLocalPromptPath(path)),
+    resolveGlobalSkillPath: vi.fn((path) =>
+      pathResolver.resolveGlobalSkillPath(path),
+    ),
+    resolveLocalSkillPath: vi.fn((path) =>
+      pathResolver.resolveLocalSkillPath(path),
+    ),
+    resolveGlobalAgentPath: vi.fn((path) =>
+      pathResolver.resolveGlobalAgentPath(path),
+    ),
+    resolveLocalAgentPath: vi.fn((path) =>
+      pathResolver.resolveLocalAgentPath(path),
+    ),
+    resolveGlobalPromptPath: vi.fn((path) =>
+      pathResolver.resolveGlobalPromptPath(path),
+    ),
+    resolveLocalPromptPath: vi.fn((path) =>
+      pathResolver.resolveLocalPromptPath(path),
+    ),
   } satisfies ResourcePathResolver;
 }
 
@@ -136,7 +155,8 @@ describe("Pack", () => {
         },
       } satisfies MockContext;
 
-      const mockCreatePackResourceSelector = getMockCreatePackResourceSelector(resourceChoices);
+      const mockCreatePackResourceSelector =
+        getMockCreatePackResourceSelector(resourceChoices);
 
       await rootPackResourceReducer("create", {
         createPackResourceSelector: mockCreatePackResourceSelector,
@@ -145,8 +165,13 @@ describe("Pack", () => {
         pathResolver,
       });
 
-      expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
-      expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
+      expect(ctx.ui.input).toHaveBeenCalledWith(
+        "pack",
+        "What is the name of your agent pack?",
+      );
+      expect(ctx.ui.custom).toHaveBeenCalledWith(
+        mockCreatePackResourceSelector,
+      );
       expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(packName);
       expect(writeFileSpy).toHaveBeenCalledWith(
         pathResolver.resolvePackPromptPath(packName, "example.md"),
@@ -165,19 +190,24 @@ describe("Pack", () => {
       );
     });
 
-    it("deletes a pack when delete is passed in", async () => {
-      const packName = "csharp";
+    it("deletes selected packs when delete is passed in", async () => {
+      const packNames = ["csharp", "systems"];
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       fileSystem.seed({
-        [pathResolver.resolvePackAgentPath(packName, "example.md")]: exampleAgentContent,
-        [pathResolver.resolvePackPromptPath(packName, "example.md")]: examplePromptContent,
-        [pathResolver.resolvePackSkillPath(packName, "example/SKILL.md")]: exampleSkillContent,
+        [pathResolver.resolvePackAgentPath(packNames[0], "example.md")]:
+          exampleAgentContent,
+        [pathResolver.resolvePackPromptPath(packNames[0], "example.md")]:
+          examplePromptContent,
+        [pathResolver.resolvePackSkillPath(packNames[0], "example/SKILL.md")]:
+          exampleSkillContent,
+        [pathResolver.resolvePackAgentPath(packNames[1], "example.md")]:
+          exampleAgentContent,
       });
 
       const ctx = {
         ui: {
-          input: vi.fn().mockResolvedValue(packName),
+          custom: vi.fn().mockResolvedValue([packNames[0]]),
           notify: vi.fn(),
         },
       } satisfies MockContext;
@@ -189,14 +219,14 @@ describe("Pack", () => {
         pathResolver,
       });
 
-      expect(ctx.ui.input).toHaveBeenCalledWith(
-        "pack",
-        "What is the name of the pack you want to delete?",
+      expect(ctx.ui.custom).toHaveBeenCalledWith(expect.any(Function));
+      expect(removeDirectorySpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPath(packNames[0]),
       );
-      expect(removeDirectorySpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(packName));
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
-        `Pack deleted successfully with name '${packName}'`,
+      expect(removeDirectorySpy).not.toHaveBeenCalledWith(
+        pathResolver.resolvePackPath(packNames[1]),
       );
+      expect(ctx.ui.notify).toHaveBeenCalledWith("Deleted 1 pack(s)");
     });
   });
 
@@ -231,16 +261,29 @@ describe("Pack", () => {
     getResourcePath: (packName: string, resourceName: string) => string,
     content: string,
   ) {
-    const seedMap = folderNames.reduce<Record<string, string>>((filesByPath, folderName) => {
-      filesByPath[getResourcePath(folderName, "example")] = content;
-      return filesByPath;
-    }, {});
+    const seedMap = folderNames.reduce<Record<string, string>>(
+      (filesByPath, folderName) => {
+        filesByPath[getResourcePath(folderName, "example")] = content;
+        return filesByPath;
+      },
+      {},
+    );
 
     fileSystem.seed(seedMap);
   }
 
   function definePackResourceReducerSuite(config: {
+    buildCreateUi: (
+      resourceName: string,
+    ) => Partial<ExtensionCommandContext["ui"]>;
     exampleContent: string;
+    expectCreateUi: (
+      ui: Partial<ExtensionCommandContext["ui"]>,
+      folders: string[],
+      packName: string,
+      resourceName: string,
+    ) => void;
+    getCreateContent: (resourceName: string) => string;
     getCreateFilePath: (packName: string, resourceName: string) => string;
     getDeletePath: (packName: string, resourceName: string) => string;
     getEditFilePath: (packName: string, resourceName: string) => string;
@@ -261,16 +304,23 @@ describe("Pack", () => {
         randomFolder,
         randomResourceName,
       }) => {
-        seedPacksWithResource(folders, config.getEditFilePath, config.exampleContent);
+        seedPacksWithResource(
+          folders,
+          config.getEditFilePath,
+          config.exampleContent,
+        );
 
-        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
         const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
         const ctx = {
           ui: {
-            input: vi.fn().mockResolvedValue(randomResourceName),
             notify: vi.fn(),
             select: vi.fn().mockResolvedValue(randomFolder),
+            ...config.buildCreateUi(randomResourceName),
           },
         } satisfies MockContext;
 
@@ -282,26 +332,33 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(""),
+        );
         expect(ctx.ui.select).toHaveBeenCalledWith(
           `What pack do you want to add the ${config.kind} to?`,
           folders,
         );
-        expect(ctx.ui.input).toHaveBeenCalledWith(
-          `Which ${config.kind} do you want to add to the pack?`,
+        config.expectCreateUi(
+          ctx.ui,
+          folders,
+          randomFolder,
+          randomResourceName,
         );
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
-          config.exampleContent,
+          config.getCreateContent(randomResourceName),
         );
         expect(ctx.ui.notify).toHaveBeenCalledWith(
           `${config.kind} created in pack '${randomFolder}'`,
         );
 
         await expect(
-          fileSystem.readFile(config.getEditFilePath(randomFolder, randomResourceName)),
+          fileSystem.readFile(
+            config.getEditFilePath(randomFolder, randomResourceName),
+          ),
         ).resolves.toMatchObject({
-          data: config.exampleContent,
+          data: config.getCreateContent(randomResourceName),
           success: true,
         });
       });
@@ -310,9 +367,16 @@ describe("Pack", () => {
         folders,
         randomFolder,
       }) => {
-        seedPacksWithResource(folders, config.getEditFilePath, config.exampleContent);
+        seedPacksWithResource(
+          folders,
+          config.getEditFilePath,
+          config.exampleContent,
+        );
 
-        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
 
         const ctx = {
           ui: {
@@ -332,7 +396,9 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(""),
+        );
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
           `What pack has the ${config.kind} you want to edit?`,
@@ -365,7 +431,10 @@ describe("Pack", () => {
           ),
         );
 
-        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
         const removeResourceSpy = config.isDirectoryResource
           ? vi.spyOn(fileSystem, "removeDirectory")
           : vi.spyOn(fileSystem, "removeFile");
@@ -388,7 +457,9 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(""),
+        );
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
           `Which pack do you want to delete a ${config.kind} from?`,
@@ -415,7 +486,8 @@ describe("Pack", () => {
         randomResourceName,
       }) => {
         fileSystem.seed({
-          [config.getEditFilePath(randomFolder, randomResourceName)]: config.exampleContent,
+          [config.getEditFilePath(randomFolder, randomResourceName)]:
+            config.exampleContent,
         });
 
         const ctx = {
@@ -469,7 +541,8 @@ describe("Pack", () => {
         randomResourceName,
       }) => {
         fileSystem.seed({
-          [config.getEditFilePath(randomFolder, randomResourceName)]: config.exampleContent,
+          [config.getEditFilePath(randomFolder, randomResourceName)]:
+            config.exampleContent,
         });
 
         const ctx = {
@@ -524,7 +597,8 @@ describe("Pack", () => {
       }) => {
         fileSystem.seed({
           [config.getLocalFilePath(randomResourceName)]: config.exampleContent,
-          [config.getEditFilePath(randomFolder, "example")]: config.exampleContent,
+          [config.getEditFilePath(randomFolder, "example")]:
+            config.exampleContent,
         });
 
         const ctx = {
@@ -561,7 +635,9 @@ describe("Pack", () => {
           `Which local ${config.kind} would you like to move?`,
           [randomResourceName],
         );
-        expect(readFileSpy).toHaveBeenCalledWith(config.getLocalFilePath(randomResourceName));
+        expect(readFileSpy).toHaveBeenCalledWith(
+          config.getLocalFilePath(randomResourceName),
+        );
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
           config.exampleContent,
@@ -577,7 +653,8 @@ describe("Pack", () => {
       }) => {
         fileSystem.seed({
           [config.getGlobalFilePath(randomResourceName)]: config.exampleContent,
-          [config.getEditFilePath(randomFolder, "example")]: config.exampleContent,
+          [config.getEditFilePath(randomFolder, "example")]:
+            config.exampleContent,
         });
 
         const ctx = {
@@ -614,7 +691,9 @@ describe("Pack", () => {
           `Which global ${config.kind} would you like to move?`,
           [randomResourceName],
         );
-        expect(readFileSpy).toHaveBeenCalledWith(config.getGlobalFilePath(randomResourceName));
+        expect(readFileSpy).toHaveBeenCalledWith(
+          config.getGlobalFilePath(randomResourceName),
+        );
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
           config.exampleContent,
@@ -627,29 +706,68 @@ describe("Pack", () => {
   }
 
   definePackResourceReducerSuite({
+    buildCreateUi: (resourceName) => ({
+      custom: vi.fn().mockResolvedValueOnce({
+        name: resourceName,
+        description: "Useful skill description",
+        confirm: false,
+      }),
+    }),
     exampleContent: exampleSkillContent,
+    expectCreateUi: (ui) => {
+      expect(ui.custom).toHaveBeenCalledTimes(1);
+    },
+    getCreateContent: (resourceName) =>
+      renderSkillMarkdown({
+        name: resourceName,
+        description: "Useful skill description",
+        license: "",
+        compatibility: "",
+        allowedTools: "",
+      }),
     getCreateFilePath: (packName, resourceName) =>
       pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
     getDeletePath: (packName, resourceName) =>
       pathResolver.resolvePackSkillPath(packName, resourceName),
     getEditFilePath: (packName, resourceName) =>
       pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
-    getGlobalDeletePath: (resourceName) => pathResolver.resolveGlobalSkillPath(resourceName),
+    getGlobalDeletePath: (resourceName) =>
+      pathResolver.resolveGlobalSkillPath(resourceName),
     getGlobalFilePath: (resourceName) =>
       pathResolver.resolveGlobalSkillPath(`${resourceName}/SKILL.md`),
     getGlobalRootPath: () => pathResolver.resolveGlobalSkillPath(""),
-    getLocalDeletePath: (resourceName) => pathResolver.resolveLocalSkillPath(resourceName),
+    getLocalDeletePath: (resourceName) =>
+      pathResolver.resolveLocalSkillPath(resourceName),
     getLocalFilePath: (resourceName) =>
       pathResolver.resolveLocalSkillPath(`${resourceName}/SKILL.md`),
     getLocalRootPath: () => pathResolver.resolveLocalSkillPath(""),
-    getPackResourcePath: (packName) => pathResolver.resolvePackSkillPath(packName, ""),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackSkillPath(packName, ""),
     isDirectoryResource: true,
     kind: "skill",
     reducer: skillPackResourceReducer,
   });
 
   definePackResourceReducerSuite({
+    buildCreateUi: (resourceName) => ({
+      custom: vi.fn().mockResolvedValueOnce({
+        name: resourceName,
+        description: "made for careful research and deep code review work",
+        tools: "read,write,bash",
+        model: "claude",
+      }),
+    }),
     exampleContent: exampleAgentContent,
+    expectCreateUi: (ui) => {
+      expect(ui.custom).toHaveBeenCalledTimes(1);
+    },
+    getCreateContent: (resourceName) =>
+      renderAgentFrontmatter({
+        name: resourceName,
+        description: "made for careful research and deep code review work",
+        tools: "read,write,bash",
+        model: "claude",
+      }),
     getCreateFilePath: (packName, resourceName) =>
       pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
     getDeletePath: (packName, resourceName) =>
@@ -666,14 +784,39 @@ describe("Pack", () => {
     getLocalFilePath: (resourceName) =>
       pathResolver.resolveLocalAgentPath(`${resourceName}.md`),
     getLocalRootPath: () => pathResolver.resolveLocalAgentPath(""),
-    getPackResourcePath: (packName) => pathResolver.resolvePackAgentPath(packName, ""),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackAgentPath(packName, ""),
     isDirectoryResource: false,
     kind: "agent",
     reducer: agentPackResourceReducer,
   });
 
   definePackResourceReducerSuite({
+    buildCreateUi: (resourceName) => ({
+      custom: vi
+        .fn()
+        .mockResolvedValueOnce({
+          name: resourceName,
+          description:
+            "This prompt creates a React component with full file output",
+          "argument-hint": "<name> [directory]",
+        })
+        .mockResolvedValueOnce("Write the component template here"),
+    }),
     exampleContent: examplePromptContent,
+    expectCreateUi: (ui) => {
+      expect(ui.custom).toHaveBeenCalledTimes(2);
+    },
+    getCreateContent: (resourceName) =>
+      renderPromptMarkdown(
+        {
+          name: resourceName,
+          description:
+            "This prompt creates a React component with full file output",
+          "argument-hint": "<name> [directory]",
+        },
+        "Write the component template here",
+      ),
     getCreateFilePath: (packName, resourceName) =>
       pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
     getDeletePath: (packName, resourceName) =>
@@ -690,7 +833,8 @@ describe("Pack", () => {
     getLocalFilePath: (resourceName) =>
       pathResolver.resolveLocalPromptPath(`${resourceName}.md`),
     getLocalRootPath: () => pathResolver.resolveLocalPromptPath(""),
-    getPackResourcePath: (packName) => pathResolver.resolvePackPromptPath(packName, ""),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackPromptPath(packName, ""),
     isDirectoryResource: false,
     kind: "prompt",
     reducer: promptPackResourceReducer,
