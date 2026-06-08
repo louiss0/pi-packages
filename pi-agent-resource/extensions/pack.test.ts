@@ -142,16 +142,38 @@ describe("Pack", () => {
       };
     };
 
-    it("creates a pack when create is passed in", async () => {
+    it("creates a pack with pre-filled resources when create is passed in", async () => {
       const packName = "front-end";
       const resourceChoices = ["prompts", "skills", "agents"] as const;
       const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
       const ctx = {
         ui: {
-          custom: vi.fn(mockCustomUIFactory),
+          custom: vi
+            .fn()
+            .mockImplementationOnce(mockCustomUIFactory)
+            .mockResolvedValueOnce({
+              name: "ship-release",
+              description:
+                "This prompt creates release messaging with full file output",
+              "argument-hint": "<version>",
+            })
+            .mockResolvedValueOnce("Write the release template here")
+            .mockResolvedValueOnce({
+              name: "release-skill",
+              description: "Useful skill description",
+              confirm: false,
+            })
+            .mockResolvedValueOnce({
+              name: "release-agent",
+              description:
+                "made for careful research and deep code review work",
+              tools: "read,write,bash",
+              model: "claude",
+            }),
           input: vi.fn().mockResolvedValue(packName),
           notify: vi.fn(),
+          select: vi.fn().mockResolvedValue("yes"),
         },
       } satisfies MockContext;
 
@@ -169,10 +191,75 @@ describe("Pack", () => {
         "pack",
         "What is the name of your agent pack?",
       );
-      expect(ctx.ui.custom).toHaveBeenCalledWith(
+      expect(ctx.ui.custom).toHaveBeenNthCalledWith(
+        1,
         mockCreatePackResourceSelector,
       );
+      expect(ctx.ui.select).toHaveBeenCalledWith(
+        "Do you want to pre-fill the selected pack resources?",
+        ["yes", "no"],
+      );
       expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(packName);
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPromptPath(packName, "ship-release.md"),
+        renderPromptMarkdown(
+          {
+            name: "ship-release",
+            description:
+              "This prompt creates release messaging with full file output",
+            "argument-hint": "<version>",
+          },
+          "Write the release template here",
+        ),
+      );
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackSkillPath(packName, "release-skill/SKILL.md"),
+        renderSkillMarkdown({
+          name: "release-skill",
+          description: "Useful skill description",
+          license: "",
+          compatibility: "",
+          allowedTools: "",
+        }),
+      );
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackAgentPath(packName, "release-agent.md"),
+        renderAgentFrontmatter({
+          name: "release-agent",
+          description: "made for careful research and deep code review work",
+          tools: "read,write,bash",
+          model: "claude",
+        }),
+      );
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        `Pack created successfully with name '${packName}'`,
+      );
+    });
+
+    it("creates example resources when the user chooses not to pre-fill", async () => {
+      const packName = "front-end";
+      const resourceChoices = ["prompts", "skills", "agents"] as const;
+      const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+
+      const ctx = {
+        ui: {
+          custom: vi.fn(mockCustomUIFactory),
+          input: vi.fn().mockResolvedValue(packName),
+          notify: vi.fn(),
+          select: vi.fn().mockResolvedValue("no"),
+        },
+      } satisfies MockContext;
+
+      const mockCreatePackResourceSelector =
+        getMockCreatePackResourceSelector(resourceChoices);
+
+      await rootPackResourceReducer("create", {
+        createPackResourceSelector: mockCreatePackResourceSelector,
+        ctx: createTestContext(ctx),
+        fileSystem,
+        pathResolver,
+      });
+
       expect(writeFileSpy).toHaveBeenCalledWith(
         pathResolver.resolvePackPromptPath(packName, "example.md"),
         examplePromptContent,
@@ -184,9 +271,6 @@ describe("Pack", () => {
       expect(writeFileSpy).toHaveBeenCalledWith(
         pathResolver.resolvePackAgentPath(packName, "example.md"),
         exampleAgentContent,
-      );
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
-        `Pack created successfully with name '${packName}'`,
       );
     });
 

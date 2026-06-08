@@ -293,49 +293,6 @@ export const exampleAgentContent = `---
         ---
         `;
 
-async function writePackExampleResources(
-  fileSystem: ResourceFileSystem,
-  pathResolver: ResourcePathResolver,
-  packName: string,
-  resources: ReadonlyArray<string>,
-) {
-  for (const resource of resources) {
-    if (resource === `${PROMPT_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName, ""), {
-        recursive: true,
-      });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackPromptPath(packName, "example.md"),
-        examplePromptContent,
-      );
-      continue;
-    }
-
-    if (resource === `${SKILL_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackSkillPath(packName, ""), {
-        recursive: true,
-      });
-      const skillPath = pathResolver.resolvePackSkillPath(packName, "example");
-      await fileSystem.mkdir(skillPath, { recursive: true });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackSkillPath(packName, "example/SKILL.md"),
-        exampleSkillContent,
-      );
-      continue;
-    }
-
-    if (resource === `${AGENT_COMMAND}s`) {
-      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName, ""), {
-        recursive: true,
-      });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackAgentPath(packName, "example.md"),
-        exampleAgentContent,
-      );
-    }
-  }
-}
-
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
@@ -362,14 +319,172 @@ export function rootPackResourceReducer(
           return;
         }
 
+        const shouldPrefillSelection = await deps.ctx.ui.select(
+          "Do you want to pre-fill the selected pack resources?",
+          ["yes", "no"],
+        );
+        const shouldPrefill = shouldPrefillSelection !== "no";
+
         const packPath = deps.pathResolver.resolvePackPath(packName);
         await deps.fileSystem.mkdir(packPath, { recursive: true });
-        await writePackExampleResources(
-          deps.fileSystem,
-          deps.pathResolver,
-          packName,
-          resources,
-        );
+
+        for (const resource of resources) {
+          if (resource === `${PROMPT_COMMAND}s`) {
+            await deps.fileSystem.mkdir(
+              deps.pathResolver.resolvePackPromptPath(packName, ""),
+              {
+                recursive: true,
+              },
+            );
+
+            if (!shouldPrefill) {
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackPromptPath(packName, "example.md"),
+                examplePromptContent,
+              );
+              continue;
+            }
+
+            const values = await deps.ctx.ui.custom<PromptFields | null>(
+              (tui, theme, _keyboard, done) =>
+                createPromptForm(tui, theme, done),
+              formOverlayOptions,
+            );
+
+            if (!values) {
+              continue;
+            }
+
+            const template = await deps.ctx.ui.custom<string | undefined>(
+              (tui, theme, _keyboard, done) =>
+                new PromptTemplateOverlay(tui, theme, done),
+              modalEditorOverlayOptions,
+            );
+
+            if (template === undefined) {
+              continue;
+            }
+
+            await deps.fileSystem.writeFile(
+              deps.pathResolver.resolvePackPromptPath(
+                packName,
+                `${values.name}.md`,
+              ),
+              renderPromptMarkdown(values, template),
+            );
+            continue;
+          }
+
+          if (resource === `${SKILL_COMMAND}s`) {
+            await deps.fileSystem.mkdir(
+              deps.pathResolver.resolvePackSkillPath(packName, ""),
+              {
+                recursive: true,
+              },
+            );
+
+            if (!shouldPrefill) {
+              const skillPath = deps.pathResolver.resolvePackSkillPath(
+                packName,
+                "example",
+              );
+              await deps.fileSystem.mkdir(skillPath, { recursive: true });
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackSkillPath(
+                  packName,
+                  "example/SKILL.md",
+                ),
+                exampleSkillContent,
+              );
+              continue;
+            }
+
+            const requiredValues = await deps.ctx.ui.custom<
+              (RequiredSkillFields & { confirm: boolean }) | null
+            >(
+              (tui, theme, _kb, done) =>
+                createRequiredSkillForm(tui, theme, done),
+              formOverlayOptions,
+            );
+
+            if (!requiredValues) {
+              continue;
+            }
+
+            let optionalValues: OptionalSkillFields = {
+              license: "",
+              compatibility: "",
+              allowedTools: "",
+            };
+
+            if (requiredValues.confirm) {
+              const submittedOptionalValues =
+                await deps.ctx.ui.custom<OptionalSkillFields | null>(
+                  (tui, theme, _kb, done) =>
+                    createOptionalSkillForm(tui, theme, done),
+                  formOverlayOptions,
+                );
+
+              if (submittedOptionalValues) {
+                optionalValues = submittedOptionalValues;
+              }
+            }
+
+            const skillPath = deps.pathResolver.resolvePackSkillPath(
+              packName,
+              requiredValues.name,
+            );
+            await deps.fileSystem.mkdir(skillPath, { recursive: true });
+            await deps.fileSystem.writeFile(
+              deps.pathResolver.resolvePackSkillPath(
+                packName,
+                `${requiredValues.name}/SKILL.md`,
+              ),
+              renderSkillMarkdown({
+                name: requiredValues.name,
+                description: requiredValues.description,
+                ...optionalValues,
+              }),
+            );
+            continue;
+          }
+
+          if (resource === `${AGENT_COMMAND}s`) {
+            await deps.fileSystem.mkdir(
+              deps.pathResolver.resolvePackAgentPath(packName, ""),
+              {
+                recursive: true,
+              },
+            );
+
+            if (!shouldPrefill) {
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackAgentPath(packName, "example.md"),
+                exampleAgentContent,
+              );
+              continue;
+            }
+
+            const values = await deps.ctx.ui.custom<AgentFields | null>(
+              (tui, theme, _keyboard, done) =>
+                createAgentForm(tui, theme, done),
+              formOverlayOptions,
+            );
+
+            if (!values) {
+              continue;
+            }
+
+            await deps.fileSystem.writeFile(
+              deps.pathResolver.resolvePackAgentPath(
+                packName,
+                `${values.name}.md`,
+              ),
+              renderAgentFrontmatter(values),
+            );
+          }
+        }
+
         deps.ctx.ui.notify(`Pack created successfully with name '${packName}'`);
       },
       [DELETE_COMMAND]: async () => {
