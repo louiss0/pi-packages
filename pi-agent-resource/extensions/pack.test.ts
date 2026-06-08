@@ -443,6 +443,245 @@ describe("Pack", () => {
         pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
       );
     });
+
+    test.todo(
+      "moves skill in pack to the local folder",
+      async ({ folders, randomFolder, randomSkill }) => {
+        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+          filePath: `${randomSkill}/SKILL.md`,
+          content: exampleSkillContent,
+        });
+
+        const ctx = {
+          ui: {
+            select: vi.fn(),
+            notify: vi.fn(),
+            custom: vi.fn(mockCustomUIFactory),
+          },
+        } satisfies MockContext;
+
+        skillPackResourceReducer("move-local", {
+          ctx: createTestContext(ctx),
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+          fileSystem,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        });
+
+        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+
+        expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath.mock.results[0].value,
+        );
+
+        await expect(readDirectoryNamesSpy).resolves.toEqual({
+          success: true,
+          data: folders,
+        });
+
+        ctx.ui.select.mockResolvedValue(randomFolder);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          "Which pack would you like to move a skill",
+          readDirectoryNamesSpy.mock.results[0].value,
+        );
+
+        await expect(ctx.ui.select).resolves.toEqual(randomFolder);
+
+        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(randomFolder);
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+
+        ctx.ui.select.mockResolvedValue(randomSkill);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          "Which skill would you like to move?",
+          readDirectoryNamesSpy.mock.results[0].value,
+        );
+
+        await expect(ctx.ui.select).resolves.toEqual(randomSkill);
+
+        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
+          randomFolder,
+          `${randomSkill}/SKILL.md`,
+        );
+
+        const readFileSpy = vi.spyOn(fileSystem, "readFile");
+
+        expect(readFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+
+        await expect(readFileSpy).resolves.toEqual({
+          success: true,
+          data: expect.any(String),
+        });
+
+        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+
+        expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith(
+          `${randomSkill}/SKILL.md`,
+        );
+
+        expect(writeFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolveLocalSkillPath.mock.results[0].value,
+          readFileSpy.mock.results[0].value.data,
+        );
+
+        expect(writeFileSpy).resolves.toBeUndefined();
+
+        const removeFileSpy = vi.spyOn(fileSystem, "removeFile");
+
+        expect(removeFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+      },
+    );
+
+    test.todo(
+      "moves skill in pack to the global folder",
+      async ({ folders, randomFolder, randomSkill }) => {
+        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+          filePath: `${randomSkill}/SKILL.md`,
+          content: exampleSkillContent,
+        });
+
+        const ctx = {
+          ui: {
+            select: vi.fn(),
+            notify: vi.fn(),
+            custom: vi.fn(mockCustomUIFactory),
+          },
+        } satisfies MockContext;
+
+        skillPackResourceReducer("move-global", {
+          ctx: createTestContext(ctx),
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+          fileSystem,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+        });
+
+        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+
+        expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath.mock.results[0].value,
+        );
+
+        await expect(readDirectoryNamesSpy).resolves.toEqual({
+          success: true,
+          data: folders,
+        });
+
+        ctx.ui.select.mockResolvedValue(randomFolder);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          "Which pack would you like to move a skill",
+          readDirectoryNamesSpy.mock.results[0].value,
+        );
+
+        await expect(ctx.ui.select).resolves.toEqual(randomFolder);
+
+        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(randomFolder);
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+
+        ctx.ui.select.mockResolvedValue(randomSkill);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          "Which skill would you like to move?",
+          readDirectoryNamesSpy.mock.results[0].value,
+        );
+
+        await expect(ctx.ui.select).resolves.toEqual(randomSkill);
+
+        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
+          randomFolder,
+          `${randomSkill}/SKILL.md`,
+        );
+
+        const readFileSpy = vi.spyOn(fileSystem, "readFile");
+
+        expect(readFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+
+        await expect(readFileSpy).resolves.toEqual({
+          success: true,
+          data: expect.any(String),
+        });
+
+        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+
+        expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith(
+          `${randomSkill}/SKILL.md`,
+        );
+
+        expect(writeFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolveGlobalSkillPath.mock.results[0].value,
+          readFileSpy.mock.results[0].value.data,
+        );
+
+        expect(writeFileSpy).resolves.toBeUndefined();
+
+        const removeFileSpy = vi.spyOn(fileSystem, "removeFile");
+
+        expect(removeFileSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackSkillPath.mock.results[1].value,
+        );
+      },
+    );
+
+    test.todo("moves skill in local folder to a pack ", async ({folders, randomSkill, randomFolder}) => {
+
+      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
+        filePath: `${randomSkill}/SKILL.md`,
+        content: exampleSkillContent,
+      });
+
+      const ctx = {
+        ui: {
+          select: vi.fn(),
+          notify: vi.fn(),
+          custom: vi.fn(mockCustomUIFactory),
+        },
+      } satisfies MockContext;
+
+      skillPackResourceReducer("move-local-to-pack", {
+        ctx: createTestContext(ctx),
+        openExternalEditor: mockOpenExternalEditor,
+        pathResolver,
+        fileSystem,
+        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+      });
+
+      expect(pathResolver.resolveLocalSkillPath).toHa+99veBeenCalledWith('')
+
+      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
+
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
+
+      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPath.mock.results[0].value,
+      );
+
+      await expect(readDirectoryNamesSpy).resolves.toEqual({
+        success: true,
+        data: folders,
+      });
+
+
+
+    });
+    test.todo("moves skill in global folder to a pack ", () => {});
   });
   describe.todo("Testing agentPackResourceReducer", () => {});
   describe.todo("Testing promptPackResourceReducer", () => {});

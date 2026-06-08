@@ -24,12 +24,15 @@ export const DELETE_COMMAND = "delete";
 export const packCommands = picklist([CREATE_COMMAND, DELETE_COMMAND]);
 
 export const MOVE_LOCAL_COMMAND = "move-local";
-export const MOVE_OUT_COMMAND = "move-out";
 export const MOVE_GLOBAL_COMMAND = "move-global";
+export const MOVE_GLOBAL_TO_PACK_COMMAND = "move-global-to-pack";
+export const MOVE_LOCAL_TO_PACK_COMMAND = "move-local-to-pack";
+
 export const packOrginaizationCommands = [
   MOVE_LOCAL_COMMAND,
-  MOVE_OUT_COMMAND,
+  MOVE_LOCAL_TO_PACK_COMMAND,
   MOVE_GLOBAL_COMMAND,
+  MOVE_GLOBAL_TO_PACK_COMMAND,
 ] as const;
 
 export const SKILL_COMMAND = "skill";
@@ -362,7 +365,8 @@ export function skillPackResourceReducer(
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
       [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_OUT_COMMAND]: async () => {},
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
@@ -378,7 +382,8 @@ export function agentPackResourceReducer(
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
       [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_OUT_COMMAND]: async () => {},
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
@@ -394,7 +399,8 @@ export function promptPackResourceReducer(
       [CREATE_COMMAND]: async () => {},
       [EDIT_COMMAND]: async () => {},
       [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_OUT_COMMAND]: async () => {},
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_GLOBAL_COMMAND]: async () => {},
       [DELETE_COMMAND]: async () => {},
     } satisfies PackResourceHandlers
