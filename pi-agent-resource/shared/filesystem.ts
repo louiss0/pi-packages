@@ -25,9 +25,14 @@ export type ResourceResult<T> =
     };
 
 export interface ResourceFileSystem {
-  mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>>;
+  mkdir(
+    path: string,
+    options: { recursive: true },
+  ): Promise<ResourceResult<unknown>>;
   readDirectoryNames(path: string): Promise<ResourceResult<string[]>>;
-  readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>>;
+  readDirectoryEntries(
+    path: string,
+  ): Promise<ResourceResult<ResourceDirectoryEntry[]>>;
   readFile(path: string): Promise<ResourceResult<string>>;
   removeDirectory(path: string): Promise<ResourceResult<void>>;
   removeFile(path: string): Promise<ResourceResult<void>>;
@@ -101,15 +106,25 @@ export class PathResolver implements ResourcePathResolver {
   }
 
   #resolveGlobalResourcePath(resourceFolder: string, path: string) {
-    return this.#resolvePath(join(this.#homePath, ".pi", "agent", resourceFolder), path);
+    return this.#resolvePath(
+      join(this.#homePath, ".pi", "agent", resourceFolder),
+      path,
+    );
   }
 
   #resolveLocalResourcePath(resourceFolder: string, path: string) {
     return this.#resolvePath(join(this.#cwd, ".pi", resourceFolder), path);
   }
 
-  #resolvePackResourcePath(packName: string, resourceFolder: string, path: string) {
-    return this.#resolvePath(this.resolvePackPath(join(packName, resourceFolder)), path);
+  #resolvePackResourcePath(
+    packName: string,
+    resourceFolder: string,
+    path: string,
+  ) {
+    return this.#resolvePath(
+      this.resolvePackPath(join(packName, resourceFolder)),
+      path,
+    );
   }
 
   #resolvePath(rootPath: string, path: string) {
@@ -117,7 +132,9 @@ export class PathResolver implements ResourcePathResolver {
   }
 }
 
-async function getResourceResult<T>(action: () => Promise<T>): Promise<ResourceResult<T>> {
+async function getResourceResult<T>(
+  action: () => Promise<T>,
+): Promise<ResourceResult<T>> {
   try {
     return {
       data: await action(),
@@ -153,13 +170,17 @@ export class NodeFileSystem implements ResourceFileSystem {
     return getResourceResult(() => nodeReadFile(path, "utf8"));
   }
   removeDirectory(path: string) {
-    return getResourceResult(() => nodeRm(path, { force: true, recursive: true }));
+    return getResourceResult(() =>
+      nodeRm(path, { force: true, recursive: true }),
+    );
   }
   removeFile(path: string) {
     return getResourceResult(() => nodeRm(path, { force: true }));
   }
   writeFile(path: string, content: string) {
-    return getResourceResult(() => nodeWriteFile(path, content, { encoding: "utf-8" }));
+    return getResourceResult(() =>
+      nodeWriteFile(path, content, { encoding: "utf-8" }),
+    );
   }
 }
 
@@ -172,7 +193,10 @@ export class MemoryFileSystem implements ResourceFileSystem {
     vol.fromJSON(filesByPath);
   }
 
-  mkdir(path: string, options: { recursive: true }): Promise<ResourceResult<unknown>> {
+  mkdir(
+    path: string,
+    options: { recursive: true },
+  ): Promise<ResourceResult<unknown>> {
     return getResourceResult(() => memoryFs.promises.mkdir(path, options));
   }
   readDirectoryNames(path: string): Promise<ResourceResult<string[]>> {
@@ -190,7 +214,9 @@ export class MemoryFileSystem implements ResourceFileSystem {
       });
     });
   }
-  readDirectoryEntries(path: string): Promise<ResourceResult<ResourceDirectoryEntry[]>> {
+  readDirectoryEntries(
+    path: string,
+  ): Promise<ResourceResult<ResourceDirectoryEntry[]>> {
     return getResourceResult(async () => {
       const entries = await memoryFs.promises.readdir(path, {
         withFileTypes: true,

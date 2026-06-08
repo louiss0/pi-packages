@@ -1,11 +1,19 @@
 import { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Input, Key, matchesKey, Text, type TUI } from "@earendil-works/pi-tui";
+import {
+  Container,
+  Input,
+  Key,
+  matchesKey,
+  Text,
+  type TUI,
+} from "@earendil-works/pi-tui";
 import { vi } from "vitest";
 import { itemChoiceStyle, MultiSelect, Picker } from "./components";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  const module =
-    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
+  );
 
   return {
     ...module,
@@ -44,7 +52,13 @@ function createItems(count: number) {
   );
 }
 
-import { ConfirmationBox, Form, type FormField, LabelledInput, Parse } from "./components";
+import {
+  ConfirmationBox,
+  Form,
+  type FormField,
+  LabelledInput,
+  Parse,
+} from "./components";
 
 describe("shared/components", () => {
   function createTheme() {
@@ -149,7 +163,10 @@ describe("shared/components", () => {
           items: [
             { value: "GoT", label: "Game of Thrones" },
             { value: "pokemon", label: "Pokemon" },
-            { value: "orange-is-the-new-black", label: "Orange Is The New Black" },
+            {
+              value: "orange-is-the-new-black",
+              label: "Orange Is The New Black",
+            },
           ],
         },
         createTui(),
@@ -225,7 +242,9 @@ describe("shared/components", () => {
     });
 
     describe("rendering choice styles", () => {
-      it.for(itemChoiceStyle)("renders the unselected marker for %s", (style) => {
+      it.for(
+        itemChoiceStyle,
+      )("renders the unselected marker for %s", (style) => {
         const multiSelect = new MultiSelect(
           {
             title: "Ice cream",
@@ -274,14 +293,19 @@ describe("shared/components", () => {
       input.setError("Description is required");
       input.clearError();
 
-      expect(input.render(45).join("\n")).not.toContain("Description is required");
+      expect(input.render(45).join("\n")).not.toContain(
+        "Description is required",
+      );
     });
   });
 
   describe("ConfirmationBox", () => {
     it("renders unchecked by default", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
       const lines = checkbox.render(80).join("\n");
 
       expect(lines).toContain(`  ${theme.getFgAnsi("accent")} [ ]`);
@@ -299,7 +323,10 @@ describe("shared/components", () => {
 
     it("renders the focused prefix when focused", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.setFocused(true);
 
@@ -311,7 +338,10 @@ describe("shared/components", () => {
 
     it("toggles to confirmed when space is pressed", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.setFocused(true);
       checkbox.handleInput(Key.space);
@@ -324,7 +354,10 @@ describe("shared/components", () => {
 
     it("toggles back to unchecked when space is pressed twice", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.handleInput(Key.space);
       checkbox.handleInput(Key.space);
@@ -337,7 +370,10 @@ describe("shared/components", () => {
 
     it("confirms the box without toggling it back off", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
 
       checkbox.confirm();
       checkbox.confirm();
@@ -350,7 +386,10 @@ describe("shared/components", () => {
 
     it("the checkbox is colored", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Do you want to fill in the next fields?");
+      const checkbox = new ConfirmationBox(
+        theme,
+        "Do you want to fill in the next fields?",
+      );
       const lines = checkbox.render(45).join("\n");
 
       expect(lines).toContain(`${theme.getFgAnsi("accent")} [ ]`);
@@ -479,9 +518,13 @@ describe("shared/components", () => {
 
     it("renders the form with errors when submitted with invalid input", () => {
       const errorFields = { "field-1": "Name is required" };
-      const { form, done, parse } = createForm("Title", [new TestField("field-1")], {
-        parse: () => errorFields,
-      });
+      const { form, done, parse } = createForm(
+        "Title",
+        [new TestField("field-1")],
+        {
+          parse: () => errorFields,
+        },
+      );
 
       form.handleInput(Key.enter);
 

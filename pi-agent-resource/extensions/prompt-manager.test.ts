@@ -7,8 +7,9 @@ import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  const module =
-    await vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+  const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
+  );
 
   return {
     ...module,
@@ -56,8 +57,12 @@ describe("extensions/prompt-manager", () => {
       resolveLocalSkillPath: vi.fn(),
       resolveGlobalAgentPath: vi.fn(),
       resolveLocalAgentPath: vi.fn(),
-      resolveGlobalPromptPath: vi.fn((path) => testPathResolver.resolveGlobalPromptPath(path)),
-      resolveLocalPromptPath: vi.fn((path) => testPathResolver.resolveLocalPromptPath(path)),
+      resolveGlobalPromptPath: vi.fn((path) =>
+        testPathResolver.resolveGlobalPromptPath(path),
+      ),
+      resolveLocalPromptPath: vi.fn((path) =>
+        testPathResolver.resolveLocalPromptPath(path),
+      ),
     } satisfies ResourcePathResolver;
   }
 
@@ -178,7 +183,8 @@ describe("extensions/prompt-manager", () => {
         .fn()
         .mockResolvedValueOnce({
           name: "create-react-component",
-          description: "This prompt creates a React component with full file output",
+          description:
+            "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
         .mockResolvedValueOnce("Write the component template here");
@@ -214,7 +220,8 @@ describe("extensions/prompt-manager", () => {
         .fn()
         .mockResolvedValueOnce({
           name: "create-react-component",
-          description: "This prompt creates a React component with full file output",
+          description:
+            "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
         .mockResolvedValueOnce("Write the component template here");
@@ -249,7 +256,9 @@ describe("extensions/prompt-manager", () => {
       memoryFileSystem.seed({
         [promptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("global: create-react-component");
       const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
       const notify = vi.fn();
 
@@ -262,7 +271,9 @@ describe("extensions/prompt-manager", () => {
 
       const content = await memoryFileSystem.readFile(promptPath);
 
-      expect(select).toHaveBeenCalledWith("Edit Prompt", ["global: create-react-component"]);
+      expect(select).toHaveBeenCalledWith("Edit Prompt", [
+        "global: create-react-component",
+      ]);
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
@@ -280,8 +291,12 @@ describe("extensions/prompt-manager", () => {
       localFileSystem.seed({
         [localPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
-      const editor = vi.fn().mockResolvedValueOnce("updated local prompt content");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("local: create-react-component");
+      const editor = vi
+        .fn()
+        .mockResolvedValueOnce("updated local prompt content");
       const notify = vi.fn();
 
       await handleEdit(
@@ -293,7 +308,9 @@ describe("extensions/prompt-manager", () => {
 
       const content = await localFileSystem.readFile(localPromptPath);
 
-      expect(select).toHaveBeenCalledWith("Edit Prompt", ["local: create-react-component"]);
+      expect(select).toHaveBeenCalledWith("Edit Prompt", [
+        "local: create-react-component",
+      ]);
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
@@ -312,7 +329,9 @@ describe("extensions/prompt-manager", () => {
       memoryFileSystem.seed({
         [promptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("global: create-react-component");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("global: create-react-component");
       const notify = vi.fn();
 
       await handleDelete(
@@ -322,7 +341,9 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(memoryFileSystem.readFile(promptPath)).resolves.toMatchObject({
+      await expect(
+        memoryFileSystem.readFile(promptPath),
+      ).resolves.toMatchObject({
         success: false,
       });
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
@@ -338,7 +359,9 @@ describe("extensions/prompt-manager", () => {
       localFileSystem.seed({
         [localPromptPath]: "---\nname: create-react-component\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("local: create-react-component");
+      const select = vi
+        .fn()
+        .mockResolvedValueOnce("local: create-react-component");
       const notify = vi.fn();
 
       await handleDelete(
@@ -348,7 +371,9 @@ describe("extensions/prompt-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(localFileSystem.readFile(localPromptPath)).resolves.toMatchObject({
+      await expect(
+        localFileSystem.readFile(localPromptPath),
+      ).resolves.toMatchObject({
         success: false,
       });
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();

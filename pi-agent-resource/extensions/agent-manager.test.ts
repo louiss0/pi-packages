@@ -7,7 +7,9 @@ import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  return vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+  return vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
+  );
 });
 
 vi.mock("node:os", () => ({
@@ -51,8 +53,12 @@ describe("extensions/agent-manager", () => {
       resolvePackPromptPath: vi.fn(),
       resolveGlobalSkillPath: vi.fn(),
       resolveLocalSkillPath: vi.fn(),
-      resolveGlobalAgentPath: vi.fn((path) => testPathResolver.resolveGlobalAgentPath(path)),
-      resolveLocalAgentPath: vi.fn((path) => testPathResolver.resolveLocalAgentPath(path)),
+      resolveGlobalAgentPath: vi.fn((path) =>
+        testPathResolver.resolveGlobalAgentPath(path),
+      ),
+      resolveLocalAgentPath: vi.fn((path) =>
+        testPathResolver.resolveLocalAgentPath(path),
+      ),
       resolveGlobalPromptPath: vi.fn(),
       resolveLocalPromptPath: vi.fn(),
     } satisfies ResourcePathResolver;
@@ -180,7 +186,9 @@ describe("extensions/agent-manager", () => {
 
       const lines = form.render(100).join("\n");
 
-      expect(lines).toContain("Name must be lowercase letters, numbers, and dashes only");
+      expect(lines).toContain(
+        "Name must be lowercase letters, numbers, and dashes only",
+      );
       expect(lines).toContain("Description must be at least 35 characters");
       expect(lines).toContain("Tools must be a lowercase comma-separated list");
       expect(lines).toContain("Model must be at least 2 characters");
@@ -206,7 +214,9 @@ describe("extensions/agent-manager", () => {
       const lines = form.render(100).join("\n");
 
       expect(lines).not.toContain("Name is required");
-      expect(lines).not.toContain("Name must be lowercase letters, numbers, and dashes only");
+      expect(lines).not.toContain(
+        "Name must be lowercase letters, numbers, and dashes only",
+      );
       expect(lines).toContain("Description must be at least 35 characters");
       expect(lines).toContain("Tools are required");
       expect(lines).toContain("Model must be at least 2 characters");
@@ -255,7 +265,9 @@ describe("extensions/agent-manager", () => {
         success: true,
       });
       expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent created");
     });
@@ -285,7 +297,9 @@ describe("extensions/agent-manager", () => {
         success: true,
       });
       expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent created");
     });
@@ -329,11 +343,11 @@ describe("extensions/agent-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(
-        memoryFileSystem.readFile(agentPath),
-      ).resolves.toMatchObject({
-        success: false,
-      });
+      await expect(memoryFileSystem.readFile(agentPath)).resolves.toMatchObject(
+        {
+          success: false,
+        },
+      );
       expect(notify).toHaveBeenCalledWith("Agent creation cancelled", "info");
     });
   });
@@ -357,9 +371,14 @@ describe("extensions/agent-manager", () => {
       const content = await memoryFileSystem.readFile(agentPath);
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
-      expect(editor).toHaveBeenCalledWith("Edit Agent", "---\nname: oracle\n---\n");
+      expect(editor).toHaveBeenCalledWith(
+        "Edit Agent",
+        "---\nname: oracle\n---\n",
+      );
       expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated agent content",
@@ -374,7 +393,9 @@ describe("extensions/agent-manager", () => {
         [localAgentPath]: "---\nname: oracle\n---\n",
       });
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
-      const editor = vi.fn().mockResolvedValueOnce("updated local agent content");
+      const editor = vi
+        .fn()
+        .mockResolvedValueOnce("updated local agent content");
       const notify = vi.fn();
 
       await handleEdit(
@@ -388,7 +409,9 @@ describe("extensions/agent-manager", () => {
 
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
       expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(content).toEqual({
         data: "updated local agent content",
@@ -439,14 +462,16 @@ describe("extensions/agent-manager", () => {
         getStubPathResolver,
       );
 
-      await expect(
-        memoryFileSystem.readFile(agentPath),
-      ).resolves.toMatchObject({
-        success: false,
-      });
+      await expect(memoryFileSystem.readFile(agentPath)).resolves.toMatchObject(
+        {
+          success: false,
+        },
+      );
       expect(select).toHaveBeenCalledWith("Delete Agent", ["global: oracle"]);
       expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
@@ -473,7 +498,9 @@ describe("extensions/agent-manager", () => {
       });
       expect(select).toHaveBeenCalledWith("Delete Agent", ["local: oracle"]);
       expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith("oracle.md");
+      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
+        "oracle.md",
+      );
       expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
       expect(notify).toHaveBeenCalledWith("Agent deleted");
     });
