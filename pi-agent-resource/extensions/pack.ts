@@ -56,45 +56,6 @@ const packResourceCommands = picklist([
 type PackResourceCommand = (typeof packResourceCommands.options)[number];
 
 type PackResourceHandlers = Record<PackResourceCommand, () => Promise<void>>;
-type PackResourceKind =
-  | typeof SKILL_COMMAND
-  | typeof AGENT_COMMAND
-  | typeof PROMPT_COMMAND;
-
-type PackResourceReducerDeps = {
-  getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
-  ctx: ExtensionCommandContext;
-  fileSystem: ResourceFileSystem;
-  pathResolver: ResourcePathResolver;
-  openExternalEditor: typeof openExternalEditor;
-};
-
-type PackResourceConfig = {
-  createExampleResource: (
-    fileSystem: ResourceFileSystem,
-    pathResolver: ResourcePathResolver,
-    packName: string,
-    resourceName: string,
-  ) => Promise<void>;
-  exampleContent: string;
-  kind: PackResourceKind;
-  removeResource: (
-    fileSystem: ResourceFileSystem,
-    pathResolver: ResourcePathResolver,
-    packName: string,
-    resourceName: string,
-  ) => Promise<void>;
-  resolvePackResourceFilePath: (
-    pathResolver: ResourcePathResolver,
-    packName: string,
-    resourceName: string,
-  ) => string;
-  resolvePackResourcePath: (
-    pathResolver: ResourcePathResolver,
-    packName: string,
-  ) => string;
-  toResourceNames: (names: string[]) => string[];
-};
 
 export const ROOT_PACK_FOLDER_PATH = ".pi/packs/";
 
@@ -422,312 +383,433 @@ export function rootPackResourceReducer(
   )[arg]();
 }
 
-async function getPackNames(
-  fileSystem: ResourceFileSystem,
-  pathResolver: ResourcePathResolver,
-) {
-  const packNamesResult = await fileSystem.readDirectoryNames(
-    pathResolver.resolvePackPath(),
-  );
-
-  if (!packNamesResult.success) {
-    return [];
-  }
-
-  return packNamesResult.data;
-}
-
-async function getPackResourceNames(
-  fileSystem: ResourceFileSystem,
-  pathResolver: ResourcePathResolver,
-  config: PackResourceConfig,
-  packName: string,
-) {
-  const resourceNamesResult = await fileSystem.readDirectoryNames(
-    config.resolvePackResourcePath(pathResolver, packName),
-  );
-
-  if (!resourceNamesResult.success) {
-    return [];
-  }
-
-  return config.toResourceNames(resourceNamesResult.data);
-}
-
-async function handleCreatePackResource(
-  deps: PackResourceReducerDeps,
-  config: PackResourceConfig,
-) {
-  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
-
-  if (packNames.length === 0) {
-    deps.ctx.ui.notify("No packs found", "info");
-    return;
-  }
-
-  const resourceLabel = config.kind;
-  const packName = await deps.ctx.ui.select(
-    `What pack do you want to add the ${resourceLabel} to?`,
-    packNames,
-  );
-
-  if (!packName) {
-    return;
-  }
-
-  const resourceName = await deps.ctx.ui.input(
-    `Which ${resourceLabel} do you want to add to the pack?`,
-  );
-
-  if (!resourceName) {
-    return;
-  }
-
-  await config.createExampleResource(
-    deps.fileSystem,
-    deps.pathResolver,
-    packName,
-    resourceName,
-  );
-  deps.ctx.ui.notify(`${resourceLabel} created in pack '${packName}'`);
-}
-
-async function handleEditPackResource(
-  deps: PackResourceReducerDeps,
-  config: PackResourceConfig,
-) {
-  const resourceLabel = config.kind;
-  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
-
-  if (packNames.length === 0) {
-    deps.ctx.ui.notify("No packs found", "info");
-    return;
-  }
-
-  const packName = await deps.ctx.ui.select(
-    `What pack has the ${resourceLabel} you want to edit?`,
-    packNames,
-  );
-
-  if (!packName) {
-    return;
-  }
-
-  const resourceNames = await getPackResourceNames(
-    deps.fileSystem,
-    deps.pathResolver,
-    config,
-    packName,
-  );
-
-  if (resourceNames.length === 0) {
-    deps.ctx.ui.notify(`No ${resourceLabel}s found`, "info");
-    return;
-  }
-
-  const resourceName = await deps.ctx.ui.select(
-    `What ${resourceLabel} do you want to edit?`,
-    resourceNames,
-  );
-
-  if (!resourceName) {
-    return;
-  }
-
-  await deps.openExternalEditor(
-    config.resolvePackResourceFilePath(
-      deps.pathResolver,
-      packName,
-      resourceName,
-    ),
-  );
-}
-
-async function handleDeletePackResource(
-  deps: PackResourceReducerDeps,
-  config: PackResourceConfig,
-) {
-  const resourceLabel = config.kind;
-  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
-
-  if (packNames.length === 0) {
-    deps.ctx.ui.notify("No packs found", "info");
-    return;
-  }
-
-  const packName = await deps.ctx.ui.select(
-    `Which pack do you want to delete a ${resourceLabel} from?`,
-    packNames,
-  );
-
-  if (!packName) {
-    return;
-  }
-
-  const resourceNames = await getPackResourceNames(
-    deps.fileSystem,
-    deps.pathResolver,
-    config,
-    packName,
-  );
-
-  if (resourceNames.length === 0) {
-    deps.ctx.ui.notify(`No ${resourceLabel}s found`, "info");
-    return;
-  }
-
-  const resourceName = await deps.ctx.ui.select(
-    `Which ${resourceLabel} do you want to delete from the pack?`,
-    resourceNames,
-  );
-
-  if (!resourceName) {
-    return;
-  }
-
-  await config.removeResource(
-    deps.fileSystem,
-    deps.pathResolver,
-    packName,
-    resourceName,
-  );
-  deps.ctx.ui.notify(`${resourceLabel} deleted from pack '${packName}'`);
-}
-
-const packResourceConfigs = {
-  [SKILL_COMMAND]: {
-    createExampleResource: async (
-      fileSystem,
-      pathResolver,
-      packName,
-      resourceName,
-    ) => {
-      const skillPath = pathResolver.resolvePackSkillPath(
-        packName,
-        resourceName,
-      );
-
-      await fileSystem.mkdir(skillPath, { recursive: true });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
-        exampleSkillContent,
-      );
-    },
-    exampleContent: exampleSkillContent,
-    kind: SKILL_COMMAND,
-    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
-      fileSystem.removeDirectory(
-        pathResolver.resolvePackSkillPath(packName, resourceName),
-      ),
-    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
-      pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
-    resolvePackResourcePath: (pathResolver, packName) =>
-      pathResolver.resolvePackSkillPath(packName, ""),
-    toResourceNames: (names) => names,
-  },
-  [AGENT_COMMAND]: {
-    createExampleResource: async (
-      fileSystem,
-      pathResolver,
-      packName,
-      resourceName,
-    ) => {
-      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName, ""), {
-        recursive: true,
-      });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-        exampleAgentContent,
-      );
-    },
-    exampleContent: exampleAgentContent,
-    kind: AGENT_COMMAND,
-    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
-      fileSystem.removeFile(
-        pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-      ),
-    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
-      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-    resolvePackResourcePath: (pathResolver, packName) =>
-      pathResolver.resolvePackAgentPath(packName, ""),
-    toResourceNames: (names) => names.map((name) => name.replace(/\.md$/, "")),
-  },
-  [PROMPT_COMMAND]: {
-    createExampleResource: async (
-      fileSystem,
-      pathResolver,
-      packName,
-      resourceName,
-    ) => {
-      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName, ""), {
-        recursive: true,
-      });
-      await fileSystem.writeFile(
-        pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
-        examplePromptContent,
-      );
-    },
-    exampleContent: examplePromptContent,
-    kind: PROMPT_COMMAND,
-    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
-      fileSystem.removeFile(
-        pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
-      ),
-    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
-      pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
-    resolvePackResourcePath: (pathResolver, packName) =>
-      pathResolver.resolvePackPromptPath(packName, ""),
-    toResourceNames: (names) => names.map((name) => name.replace(/\.md$/, "")),
-  },
-} as const satisfies Record<PackResourceKind, PackResourceConfig>;
-
-function createPackResourceReducer(
+export function skillPackResourceReducer(
   arg: PackResourceCommand,
-  deps: PackResourceReducerDeps,
-  config: PackResourceConfig,
+  deps: {
+    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    ctx: ExtensionCommandContext;
+    fileSystem: ResourceFileSystem;
+    pathResolver: ResourcePathResolver;
+    openExternalEditor: typeof openExternalEditor;
+  },
 ) {
   return (
     {
-      [CREATE_COMMAND]: () => handleCreatePackResource(deps, config),
-      [EDIT_COMMAND]: () => handleEditPackResource(deps, config),
+      [CREATE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack do you want to add the skill to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.input(
+          "Which skill do you want to add to the pack?",
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        const skillPath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          skillName,
+        );
+        await deps.fileSystem.mkdir(skillPath, { recursive: true });
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackSkillPath(
+            packName,
+            `${skillName}/SKILL.md`,
+          ),
+          exampleSkillContent,
+        );
+        deps.ctx.ui.notify(`skill created in pack '${packName}'`);
+      },
+      [EDIT_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack has the skill you want to edit?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackSkillPath(packName, ""),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "What skill do you want to edit?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        await deps.openExternalEditor(
+          deps.pathResolver.resolvePackSkillPath(
+            packName,
+            `${skillName}/SKILL.md`,
+          ),
+        );
+      },
       [MOVE_LOCAL_COMMAND]: async () => {},
       [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_GLOBAL_COMMAND]: async () => {},
-      [DELETE_COMMAND]: () => handleDeletePackResource(deps, config),
+      [DELETE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack do you want to delete a skill from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackSkillPath(packName, ""),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "Which skill do you want to delete from the pack?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolvePackSkillPath(packName, skillName),
+        );
+        deps.ctx.ui.notify(`skill deleted from pack '${packName}'`);
+      },
     } satisfies PackResourceHandlers
   )[arg]();
 }
 
-export function skillPackResourceReducer(
-  arg: PackResourceCommand,
-  deps: PackResourceReducerDeps,
-) {
-  return createPackResourceReducer(
-    arg,
-    deps,
-    packResourceConfigs[SKILL_COMMAND],
-  );
-}
-
 export function agentPackResourceReducer(
   arg: PackResourceCommand,
-  deps: PackResourceReducerDeps,
+  deps: {
+    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    ctx: ExtensionCommandContext;
+    fileSystem: ResourceFileSystem;
+    pathResolver: ResourcePathResolver;
+    openExternalEditor: typeof openExternalEditor;
+  },
 ) {
-  return createPackResourceReducer(
-    arg,
-    deps,
-    packResourceConfigs[AGENT_COMMAND],
-  );
+  return (
+    {
+      [CREATE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack do you want to add the agent to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.input(
+          "Which agent do you want to add to the pack?",
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+          exampleAgentContent,
+        );
+        deps.ctx.ui.notify(`agent created in pack '${packName}'`);
+      },
+      [EDIT_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack has the agent you want to edit?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "What agent do you want to edit?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        await deps.openExternalEditor(
+          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+        );
+      },
+      [MOVE_LOCAL_COMMAND]: async () => {},
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_GLOBAL_COMMAND]: async () => {},
+      [DELETE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack do you want to delete a agent from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "Which agent do you want to delete from the pack?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        await deps.fileSystem.removeFile(
+          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+        );
+        deps.ctx.ui.notify(`agent deleted from pack '${packName}'`);
+      },
+    } satisfies PackResourceHandlers
+  )[arg]();
 }
 
 export function promptPackResourceReducer(
   arg: PackResourceCommand,
-  deps: PackResourceReducerDeps,
+  deps: {
+    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+    ctx: ExtensionCommandContext;
+    fileSystem: ResourceFileSystem;
+    pathResolver: ResourcePathResolver;
+    openExternalEditor: typeof openExternalEditor;
+  },
 ) {
-  return createPackResourceReducer(
-    arg,
-    deps,
-    packResourceConfigs[PROMPT_COMMAND],
-  );
+  return (
+    {
+      [CREATE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack do you want to add the prompt to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.input(
+          "Which prompt do you want to add to the pack?",
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+          examplePromptContent,
+        );
+        deps.ctx.ui.notify(`prompt created in pack '${packName}'`);
+      },
+      [EDIT_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "What pack has the prompt you want to edit?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "What prompt do you want to edit?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        await deps.openExternalEditor(
+          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+        );
+      },
+      [MOVE_LOCAL_COMMAND]: async () => {},
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
+      [MOVE_GLOBAL_COMMAND]: async () => {},
+      [DELETE_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack do you want to delete a prompt from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "Which prompt do you want to delete from the pack?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        await deps.fileSystem.removeFile(
+          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+        );
+        deps.ctx.ui.notify(`prompt deleted from pack '${packName}'`);
+      },
+    } satisfies PackResourceHandlers
+  )[arg]();
 }
