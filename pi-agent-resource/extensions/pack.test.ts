@@ -378,6 +378,27 @@ describe("Pack", () => {
     fileSystem.seed(seedMap);
   }
 
+  async function getReadDirectoryNamesData(
+    readDirectoryNamesSpy: {
+      mock: {
+        results: Array<{
+          value: Promise<{ data?: string[]; success: boolean }>;
+        }>;
+      };
+    },
+    callIndex = 0,
+  ) {
+    const result = await readDirectoryNamesSpy.mock.results[callIndex]?.value;
+
+    if (!result?.success) {
+      throw new Error(
+        `Expected readDirectoryNames call ${callIndex + 1} to succeed`,
+      );
+    }
+
+    return result.data;
+  }
+
   function definePackResourceReducerSuite(config: {
     buildCreateUi: (
       resourceName: string,
@@ -441,9 +462,14 @@ describe("Pack", () => {
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
           pathResolver.resolvePackPath(""),
         );
+
+        const availablePackNames = await getReadDirectoryNamesData(
+          readDirectoryNamesSpy,
+        );
+
         expect(ctx.ui.select).toHaveBeenCalledWith(
           `What pack do you want to add the ${config.kind} to?`,
-          folders,
+          availablePackNames,
         );
         config.expectCreateUi(
           ctx.ui,
@@ -558,10 +584,15 @@ describe("Pack", () => {
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
           pathResolver.resolvePackPath(""),
         );
+
+        const availablePackNames = await getReadDirectoryNamesData(
+          readDirectoryNamesSpy,
+        );
+
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
           `What pack has the ${config.kind} you want to edit?`,
-          folders,
+          availablePackNames,
         );
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
           config.getPackResourcePath(randomFolder),
@@ -619,10 +650,15 @@ describe("Pack", () => {
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
           pathResolver.resolvePackPath(""),
         );
+
+        const availablePackNames = await getReadDirectoryNamesData(
+          readDirectoryNamesSpy,
+        );
+
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
           `Which pack do you want to delete a ${config.kind} from?`,
-          folders,
+          availablePackNames,
         );
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
           config.getPackResourcePath(randomFolder),
