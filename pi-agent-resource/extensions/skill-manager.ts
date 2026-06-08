@@ -333,6 +333,13 @@ async function createSkillFile(
     throw directoryResult.error;
   }
 
+  const existingSkillResult = await fileSystem.readFile(skillPath);
+  if (existingSkillResult.success) {
+    throw Object.assign(new Error(`Skill already exists: ${fields.name}`), {
+      code: "EEXIST",
+    });
+  }
+
   const writeResult = await fileSystem.writeFile(
     skillPath,
     renderSkillMarkdown(fields),

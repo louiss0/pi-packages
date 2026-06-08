@@ -1,9 +1,16 @@
+import { EventEmitter } from "node:events";
 import type {
   ExtensionCommandContext,
   KeybindingsManager,
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
+
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn(),
+}));
+
+import { spawn } from "node:child_process";
 
 import {
   agentPackResourceReducer,
@@ -127,6 +134,21 @@ describe("Pack", () => {
   afterEach(() => {
     vi.resetAllMocks();
     fileSystem.reset();
+  });
+
+  describe("openExternalEditor", () => {
+    it("treats exit code 0 as success", async () => {
+      const child = new EventEmitter() as EventEmitter & {
+        on: (event: string, listener: (...args: unknown[]) => void) => unknown;
+      };
+      vi.mocked(spawn).mockReturnValue(child as never);
+      process.env.EDITOR = "test-editor";
+
+      const resultPromise = openExternalEditor("/tmp/test.md");
+      child.emit("close", 0);
+
+      await expect(resultPromise).resolves.toBeUndefined();
+    });
   });
 
   describe("Testing rootPackResourceReducer", () => {
@@ -830,6 +852,60 @@ describe("Pack", () => {
     isDirectoryResource: true,
     kind: "skill",
     reducer: skillPackResourceReducer,
+  });
+
+  test("does not delete the pack skill when writing the local copy fails", async ({
+    randomFolder,
+    randomResourceName,
+  }) => {
+    fileSystem.seed({
+      [pathResolver.resolvePackSkillPath(
+        randomFolder,
+        `${randomResourceName}/SKILL.md`,
+      )]: exampleSkillContent,
+    });
+
+    vi.spyOn(fileSystem, "writeFile").mockResolvedValueOnce({
+      error: new Error("disk full"),
+      success: false,
+    });
+    const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
+    const ctx = {
+      ui: {
+        notify: vi.fn(),
+        select: vi
+          .fn<ExtensionCommandContext["ui"]["select"]>()
+          .mockResolvedValueOnce(randomFolder)
+          .mockResolvedValueOnce(randomResourceName),
+      },
+    } satisfies MockContext;
+
+    await skillPackResourceReducer("move-local", {
+      ctx: createTestContext(ctx),
+      fileSystem,
+      getMultiSelectorFactory: mockGetMultiSelectorFactory,
+      openExternalEditor: mockOpenExternalEditor,
+      pathResolver,
+    });
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Could not write the local skill",
+      "error",
+    );
+    expect(removeDirectorySpy).not.toHaveBeenCalledWith(
+      pathResolver.resolvePackSkillPath(randomFolder, randomResourceName),
+    );
+    await expect(
+      fileSystem.readFile(
+        pathResolver.resolvePackSkillPath(
+          randomFolder,
+          `${randomResourceName}/SKILL.md`,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      data: exampleSkillContent,
+      success: true,
+    });
   });
 
   definePackResourceReducerSuite({

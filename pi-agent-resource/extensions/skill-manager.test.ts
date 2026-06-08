@@ -8,7 +8,9 @@ import { resetDevelopmentExtensionNotice } from "../shared/runtime";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
 vi.mock("@earendil-works/pi-tui", async () => {
-  return vi.importActual<typeof import("@earendil-works/pi-tui")>("@earendil-works/pi-tui");
+  return vi.importActual<typeof import("@earendil-works/pi-tui")>(
+    "@earendil-works/pi-tui",
+  );
 });
 
 vi.mock("node:os", () => ({
@@ -39,8 +41,12 @@ import registerSkillManager, {
 describe("skill manager handlers", () => {
   const localCwd = "/workspace";
   const testPathResolver = new PathResolver(localCwd, "/test-home");
-  const skillPath = testPathResolver.resolveGlobalSkillPath("test-skill/SKILL.md");
-  const localSkillPath = testPathResolver.resolveLocalSkillPath("test-skill/SKILL.md");
+  const skillPath = testPathResolver.resolveGlobalSkillPath(
+    "test-skill/SKILL.md",
+  );
+  const localSkillPath = testPathResolver.resolveLocalSkillPath(
+    "test-skill/SKILL.md",
+  );
   const skillDirectory = dirname(skillPath);
   const localSkillDirectory = dirname(localSkillPath);
   let memoryFileSystem: MemoryFileSystem;
@@ -56,8 +62,12 @@ describe("skill manager handlers", () => {
       resolvePackSkillPath: vi.fn(),
       resolvePackAgentPath: vi.fn(),
       resolvePackPromptPath: vi.fn(),
-      resolveGlobalSkillPath: vi.fn((path) => testPathResolver.resolveGlobalSkillPath(path)),
-      resolveLocalSkillPath: vi.fn((path) => testPathResolver.resolveLocalSkillPath(path)),
+      resolveGlobalSkillPath: vi.fn((path) =>
+        testPathResolver.resolveGlobalSkillPath(path),
+      ),
+      resolveLocalSkillPath: vi.fn((path) =>
+        testPathResolver.resolveLocalSkillPath(path),
+      ),
       resolveGlobalAgentPath: vi.fn(),
       resolveLocalAgentPath: vi.fn(),
       resolveGlobalPromptPath: vi.fn(),
@@ -87,27 +97,44 @@ describe("skill manager handlers", () => {
     title: string,
   ) {
     const [factory, options] = custom.mock.calls[callIndex] as [
-      (tui: TUI, theme: Theme, keyboard: unknown, done: (value: unknown) => void) => unknown,
+      (
+        tui: TUI,
+        theme: Theme,
+        keyboard: unknown,
+        done: (value: unknown) => void,
+      ) => unknown,
       unknown,
     ];
     const component = factory(createTui(), createTheme(), {}, vi.fn());
 
     expect(component).toBeInstanceOf(Form);
     expect(
-      (component as Form<Record<string, string | boolean>>).render(80).join("\n"),
+      (component as Form<Record<string, string | boolean>>)
+        .render(80)
+        .join("\n"),
     ).toContain(title);
     expect(options).toEqual(formOverlayOptions);
   }
 
-  function expectEditorOverlayFactory(custom: ReturnType<typeof vi.fn>, callIndex: number) {
+  function expectEditorOverlayFactory(
+    custom: ReturnType<typeof vi.fn>,
+    callIndex: number,
+  ) {
     const [factory, options] = custom.mock.calls[callIndex] as [
-      (tui: TUI, theme: Theme, keyboard: unknown, done: (value: unknown) => void) => unknown,
+      (
+        tui: TUI,
+        theme: Theme,
+        keyboard: unknown,
+        done: (value: unknown) => void,
+      ) => unknown,
       unknown,
     ];
     const component = factory(createTui(), createTheme(), {}, vi.fn());
 
     expect(
-      (component as { render: (width: number) => string[] }).render(80).join("\n"),
+      (component as { render: (width: number) => string[] })
+        .render(80)
+        .join("\n"),
     ).toContain("Edit Skill Markdown");
     expect(options).toEqual(modalEditorOverlayOptions);
   }
@@ -216,7 +243,9 @@ describe("skill manager handlers", () => {
 
       const lines = form.render(80).join("\n");
 
-      expect(lines).toContain("Must be lowercase alphanumeric with dashes only");
+      expect(lines).toContain(
+        "Must be lowercase alphanumeric with dashes only",
+      );
       expect(lines).toContain("Description is required");
     });
 
@@ -235,7 +264,9 @@ describe("skill manager handlers", () => {
       const lines = form.render(80).join("\n");
 
       expect(lines).not.toContain("Name is required");
-      expect(lines).not.toContain("Must be lowercase alphanumeric with dashes only");
+      expect(lines).not.toContain(
+        "Must be lowercase alphanumeric with dashes only",
+      );
       expect(lines).toContain("Description is required");
     });
   });
@@ -289,7 +320,9 @@ describe("skill manager handlers", () => {
       const lines = form.render(80).join("\n");
 
       expect(lines).not.toContain("License must be a valid path");
-      expect(lines).not.toContain("Compatibility must be 500 characters or fewer");
+      expect(lines).not.toContain(
+        "Compatibility must be 500 characters or fewer",
+      );
       expect(lines).toContain("Allowed tools must be a comma-separated list");
     });
   });
@@ -361,9 +394,13 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
-    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith("test-skill");
+    expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith(
+      "test-skill",
+    );
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${skillPath}`,
+    );
   });
 
   it("handleCreate writes a local skill when the local scope is requested", async () => {
@@ -388,7 +425,9 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
-    expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith("test-skill");
+    expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith(
+      "test-skill",
+    );
     expect(pathResolver.resolveGlobalSkillPath).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
       `Skill created successfully: ${localSkillPath}`,
@@ -424,7 +463,9 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("allowed-tools: 'read, write'"),
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${skillPath}`,
+    );
   });
 
   it("handleCreate creates the skill when the optional form is dismissed", async () => {
@@ -450,10 +491,12 @@ describe("skill manager handlers", () => {
       data: expect.stringContaining("# Test Skill"),
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      `Skill created successfully: ${skillPath}`,
+    );
   });
 
-  it("handleCreate overwrites an existing skill", async () => {
+  it("handleCreate preserves an existing skill", async () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
@@ -477,11 +520,14 @@ describe("skill manager handlers", () => {
 
     const content = await memoryFileSystem.readFile(skillPath);
 
-    expect(content).toMatchObject({
-      data: expect.stringContaining("Useful skill description"),
+    expect(content).toEqual({
+      data: "existing skill content",
       success: true,
     });
-    expect(notify).toHaveBeenCalledWith(`Skill created successfully: ${skillPath}`);
+    expect(notify).toHaveBeenCalledWith(
+      "Skill already exists: test-skill",
+      "error",
+    );
   });
 
   it("handleEdit uses an 80% overlay editor by default", async () => {
@@ -510,7 +556,10 @@ describe("skill manager handlers", () => {
       success: true,
     });
     expect(reload).toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith("Skill updated. Reloading skills...", "info");
+    expect(notify).toHaveBeenCalledWith(
+      "Skill updated. Reloading skills...",
+      "info",
+    );
   });
 
   it("handleEdit uses the external editor without shell mode", async () => {
@@ -545,7 +594,10 @@ describe("skill manager handlers", () => {
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith("Skill updated. Reloading skills...", "info");
+    expect(notify).toHaveBeenCalledWith(
+      "Skill updated. Reloading skills...",
+      "info",
+    );
   });
 
   it("handleEdit reports cancellation when no skill is selected", async () => {
@@ -610,7 +662,9 @@ describe("skill manager handlers", () => {
       getStubPathResolver,
     );
 
-    await expect(localFileSystem.readFile(localSkillPath)).resolves.toMatchObject({
+    await expect(
+      localFileSystem.readFile(localSkillPath),
+    ).resolves.toMatchObject({
       success: false,
     });
     expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith();
