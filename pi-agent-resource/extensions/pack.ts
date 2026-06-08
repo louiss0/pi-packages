@@ -480,10 +480,250 @@ export function skillPackResourceReducer(
           ),
         );
       },
-      [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_GLOBAL_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a skill from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackSkillPath(packName, ""),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "Which skill would you like to move?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          `${skillName}/SKILL.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the skill", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveLocalSkillPath(skillName),
+          { recursive: true },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveLocalSkillPath(`${skillName}/SKILL.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolvePackSkillPath(packName, skillName),
+        );
+      },
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a skill to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveGlobalSkillPath(),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No global skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "Which global skill would you like to move?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveGlobalSkillPath(
+          `${skillName}/SKILL.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the skill", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackSkillPath(packName, skillName),
+          { recursive: true },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackSkillPath(
+            packName,
+            `${skillName}/SKILL.md`,
+          ),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolveGlobalSkillPath(skillName),
+        );
+      },
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a skill to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveLocalSkillPath(),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No local skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "Which local skill would you like to move?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveLocalSkillPath(
+          `${skillName}/SKILL.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the skill", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackSkillPath(packName, skillName),
+          { recursive: true },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackSkillPath(
+            packName,
+            `${skillName}/SKILL.md`,
+          ),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolveLocalSkillPath(skillName),
+        );
+      },
+      [MOVE_GLOBAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a skill from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const skillNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackSkillPath(packName, ""),
+        );
+
+        if (!skillNamesResult.success || skillNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No skills found", "info");
+          return;
+        }
+
+        const skillName = await deps.ctx.ui.select(
+          "Which skill would you like to move?",
+          skillNamesResult.data,
+        );
+
+        if (!skillName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          `${skillName}/SKILL.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the skill", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveGlobalSkillPath(skillName),
+          { recursive: true },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveGlobalSkillPath(`${skillName}/SKILL.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolvePackSkillPath(packName, skillName),
+        );
+      },
       [DELETE_COMMAND]: async () => {
         const packNamesResult = await deps.fileSystem.readDirectoryNames(
           deps.pathResolver.resolvePackPath(),
@@ -622,10 +862,241 @@ export function agentPackResourceReducer(
           deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
         );
       },
-      [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_GLOBAL_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a agent from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "Which agent would you like to move?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(
+          packName,
+          `${agentName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the agent", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(deps.pathResolver.resolveLocalAgentPath(), {
+          recursive: true,
+        });
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveLocalAgentPath(`${agentName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a agent to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveGlobalAgentPath(),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No global agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "Which global agent would you like to move?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveGlobalAgentPath(
+          `${agentName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the agent", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a agent to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveLocalAgentPath(),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No local agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "Which local agent would you like to move?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveLocalAgentPath(
+          `${agentName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the agent", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_GLOBAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a agent from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const agentNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackAgentPath(packName, ""),
+        );
+
+        if (!agentNamesResult.success || agentNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No agents found", "info");
+          return;
+        }
+
+        const agentName = await deps.ctx.ui.select(
+          "Which agent would you like to move?",
+          agentNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!agentName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(
+          packName,
+          `${agentName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the agent", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveGlobalAgentPath(),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
       [DELETE_COMMAND]: async () => {
         const packNamesResult = await deps.fileSystem.readDirectoryNames(
           deps.pathResolver.resolvePackPath(),
@@ -764,10 +1235,244 @@ export function promptPackResourceReducer(
           deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
         );
       },
-      [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_GLOBAL_COMMAND]: async () => {},
+      [MOVE_LOCAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a prompt from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "Which prompt would you like to move?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackPromptPath(
+          packName,
+          `${promptName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the prompt", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveLocalPromptPath(),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a prompt to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveGlobalPromptPath(),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No global prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "Which global prompt would you like to move?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveGlobalPromptPath(
+          `${promptName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the prompt", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a prompt to?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolveLocalPromptPath(),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No local prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "Which local prompt would you like to move?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolveLocalPromptPath(
+          `${promptName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the prompt", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
+      [MOVE_GLOBAL_COMMAND]: async () => {
+        const packNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPath(),
+        );
+
+        if (!packNamesResult.success || packNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No packs found", "info");
+          return;
+        }
+
+        const packName = await deps.ctx.ui.select(
+          "Which pack would you like to move a prompt from?",
+          packNamesResult.data,
+        );
+
+        if (!packName) {
+          return;
+        }
+
+        const promptNamesResult = await deps.fileSystem.readDirectoryNames(
+          deps.pathResolver.resolvePackPromptPath(packName, ""),
+        );
+
+        if (!promptNamesResult.success || promptNamesResult.data.length === 0) {
+          deps.ctx.ui.notify("No prompts found", "info");
+          return;
+        }
+
+        const promptName = await deps.ctx.ui.select(
+          "Which prompt would you like to move?",
+          promptNamesResult.data.map((name) => name.replace(/\.md$/, "")),
+        );
+
+        if (!promptName) {
+          return;
+        }
+
+        const sourcePath = deps.pathResolver.resolvePackPromptPath(
+          packName,
+          `${promptName}.md`,
+        );
+        const contentResult = await deps.fileSystem.readFile(sourcePath);
+
+        if (!contentResult.success) {
+          deps.ctx.ui.notify("Could not read the prompt", "error");
+          return;
+        }
+
+        await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveGlobalPromptPath(),
+          {
+            recursive: true,
+          },
+        );
+        await deps.fileSystem.writeFile(
+          deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`),
+          contentResult.data,
+        );
+        await deps.fileSystem.removeFile(sourcePath);
+      },
       [DELETE_COMMAND]: async () => {
         const packNamesResult = await deps.fileSystem.readDirectoryNames(
           deps.pathResolver.resolvePackPath(),
