@@ -318,7 +318,7 @@ describe("Pack", () => {
         });
 
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(),
+          pathResolver.resolvePackPath(""),
         );
         expect(ctx.ui.select).toHaveBeenCalledWith(
           `What pack do you want to add the ${config.kind} to?`,
@@ -379,7 +379,7 @@ describe("Pack", () => {
         });
 
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(),
+          pathResolver.resolvePackPath(""),
         );
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
@@ -440,7 +440,7 @@ describe("Pack", () => {
         });
 
         expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(),
+          pathResolver.resolvePackPath(""),
         );
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
@@ -464,7 +464,6 @@ describe("Pack", () => {
       });
 
       test(`moves a ${config.kind} from a pack to the local folder`, async ({
-        folders,
         randomFolder,
         randomResourceName,
       }) => {
@@ -520,7 +519,6 @@ describe("Pack", () => {
       });
 
       test(`moves a ${config.kind} from a pack to the global folder`, async ({
-        folders,
         randomFolder,
         randomResourceName,
       }) => {
