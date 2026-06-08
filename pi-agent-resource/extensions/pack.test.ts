@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+
 import type {
   ExtensionCommandContext,
   KeybindingsManager,
@@ -33,6 +34,7 @@ import {
   MemoryFileSystem,
   PathResolver,
   type ResourcePathResolver,
+  type ResourceResult,
 } from "../shared/filesystem";
 
 type MockContext =
@@ -382,7 +384,7 @@ describe("Pack", () => {
     readDirectoryNamesSpy: {
       mock: {
         results: Array<{
-          value: Promise<{ data?: string[]; success: boolean }>;
+          value?: Promise<ResourceResult<string[]>>;
         }>;
       };
     },
