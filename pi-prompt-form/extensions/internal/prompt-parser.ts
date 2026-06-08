@@ -16,7 +16,7 @@ type FrontmatterData = {
   "argument-hint"?: unknown;
 };
 
-type Argument = { name: string; required: boolean; position: number };
+export type Argument = { name: string; required: boolean; position: number };
 
 export class InvalidArgumentHintError extends Error {
   constructor(message: string) {
@@ -29,7 +29,8 @@ export function parseTemplate(markdown: string): ParsedTemplate {
   const file = matter(markdown);
   const { content, data } = file;
   const { ["argument-hint"]: argumentHintValue } = data as FrontmatterData;
-  const argumentHint = typeof argumentHintValue === "string" ? argumentHintValue : "";
+  const argumentHint =
+    typeof argumentHintValue === "string" ? argumentHintValue : "";
 
   return {
     argumentHint,
@@ -63,7 +64,9 @@ export function parseArgumentHint(
       const [, name] = requiredMatch;
 
       if (!name) {
-        return new InvalidArgumentHintError(`Invalid argument hint: ${argumentHint}`);
+        return new InvalidArgumentHintError(
+          `Invalid argument hint: ${argumentHint}`,
+        );
       }
 
       parsedArguments.push({
@@ -81,7 +84,9 @@ export function parseArgumentHint(
       const [, name] = optionalMatch;
 
       if (!name) {
-        return new InvalidArgumentHintError(`Invalid argument hint: ${argumentHint}`);
+        return new InvalidArgumentHintError(
+          `Invalid argument hint: ${argumentHint}`,
+        );
       }
 
       foundOptionalArgument = true;
@@ -94,13 +99,15 @@ export function parseArgumentHint(
       continue;
     }
 
-    return new InvalidArgumentHintError(`Invalid argument hint: ${argumentHint}`);
+    return new InvalidArgumentHintError(
+      `Invalid argument hint: ${argumentHint}`,
+    );
   }
 
   return parsedArguments;
 }
 
-type Placeholder =
+export type Placeholder =
   | { kind: "single"; position: number }
   | { kind: "slice"; start: number; end: number }
   | { kind: "named"; name: "ARGUMENTS" }
@@ -113,7 +120,8 @@ export class InvalidPlaceholderError extends Error {
   }
 }
 
-const PLACEHOLDER_PATTERN = /\{@:([0-9]+)(?::([0-9]+))?\}|\$ARGUMENTS|\$@|\$([0-9]+)/g;
+const PLACEHOLDER_PATTERN =
+  /\{@:([0-9]+)(?::([0-9]+))?\}|\$ARGUMENTS|\$@|\$([0-9]+)/g;
 
 export function parsePlaceholders(
   markdownContent: string,
@@ -163,7 +171,9 @@ export function parsePlaceholders(
     }
   }
 
-  const hasRestPlaceholder = placeholders.some((placeholder) => placeholder.kind === "rest");
+  const hasRestPlaceholder = placeholders.some(
+    (placeholder) => placeholder.kind === "rest",
+  );
   const hasNamedArgumentsPlaceholder = placeholders.some(
     (placeholder) => placeholder.kind === "named",
   );

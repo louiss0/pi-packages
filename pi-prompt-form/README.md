@@ -19,7 +19,7 @@ This package contains a single extension in `extensions/index.ts`. Its job is to
 
 #### Prompt-aware input interception
 
-The workflow starts when the user submits input. The extension responds to PI's `input` event, checks whether the text begins with `/`, and resolves the slash command against PI's registered prompt commands with `getCommands()`. Once the command is confirmed to be prompt-backed, it reads the prompt file from `sourceInfo.path`, extracts the frontmatter and body with `@code-fixer-23/pi-prompt-parser`, and decides whether the prompt should continue normally or switch into guided form entry.
+The workflow starts when the user submits input. The extension responds to PI's `input` event, checks whether the text begins with `/`, and resolves the slash command against PI's registered prompt commands with `getCommands()`. Once the command is confirmed to be prompt-backed, it reads the prompt file from `sourceInfo.path`, extracts the frontmatter and body with its own internal prompt parser, and decides whether the prompt should continue normally or switch into guided form entry.
 
 This event chain matters because the extension does not replace PI's prompt system. Instead, it coordinates with the existing prompt lifecycle early enough to improve input quality before prompt expansion happens.
 
@@ -57,4 +57,4 @@ pnpm nx test pi-prompt-form
 pnpm nx lint pi-prompt-form
 ```
 
-The package depends on `@code-fixer-23/pi-prompt-parser` for prompt metadata and placeholder parsing, `@code-fixer-23/pi-form-components` for the terminal form UI, and Valibot for form validation.
+The package uses its own internal prompt parser for prompt metadata and placeholder parsing, `@code-fixer-23/pi-form-components` for the terminal form UI, and Valibot for form validation.

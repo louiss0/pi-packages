@@ -3,21 +3,20 @@ import { basename, join } from "node:path";
 import type {
   ExtensionAPI,
   ExtensionContext,
-  Theme,
 } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+
 import {
-  InferOutput,
-  maxLength,
-  minLength,
-  object,
-  pipe,
-  regex,
-  string,
-} from "valibot";
-import { Form, LabelledInput } from "@code-fixer-23/pi-form-components";
-import { getResourceFileSystem } from "../shared/filesystem";
-import { parseObjectErrors } from "../shared/parse";
+  getPathResolver,
+  NodeFileSystem,
+  type ResourceFileSystem,
+  type ResourcePathResolver,
+} from "../shared/filesystem";
+import {
+  createAgentForm,
+  type AgentFields,
+  parseAgentFormValues,
+  renderAgentFrontmatter,
+} from "../shared/resource-components";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
   getFilterSubcommandArgumentCompletionFromStringUsingSubLabel,
@@ -41,50 +40,16 @@ export const LOCAL_AGENT_DIRECTORY = join(
   PI_DIRECTORY_NAME,
   AGENTS_DIRECTORY_NAME,
 );
-const agentNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const lowerCommaSeparatedToolsPattern = /^[a-z0-9:-]+(?:\s*,\s*[a-z0-9:-]+)*$/;
-
-const AgentFieldsSchema = object({
-  name: pipe(
-    string(),
-    minLength(1, "Name is required"),
-    maxLength(48, "Name must be 48 characters or fewer"),
-    regex(
-      agentNamePattern,
-      "Name must be lowercase letters, numbers, and dashes only",
-    ),
-  ),
-  description: pipe(
-    string(),
-    minLength(35, "Description must be at least 35 characters"),
-    maxLength(1024, "Description must be 1024 characters or fewer"),
-  ),
-  tools: pipe(
-    string(),
-    minLength(1, "Tools are required"),
-    regex(
-      lowerCommaSeparatedToolsPattern,
-      "Tools must be a lowercase comma-separated list",
-    ),
-  ),
-  model: pipe(
-    string(),
-    minLength(2, "Model must be at least 2 characters"),
-    maxLength(128, "Model must be 128 characters or fewer"),
-    regex(/^[a-z0-9:-]+$/, "Model must be lowercase"),
-  ),
-});
-
-type AgentFields = InferOutput<typeof AgentFieldsSchema>;
 type AgentScope = "global" | "local";
 type AgentChoice = {
   path: string;
   label: string;
 };
 
-export function parseAgentFormValues(values: AgentFields) {
-  return parseObjectErrors(AgentFieldsSchema, values);
-}
+type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
+type GetPathResolver = (cwd?: string) => ResourcePathResolver;
+
+export { createAgentForm, parseAgentFormValues };
 
 export function parseAgentCommandArgument(argument: string) {
   const subcommandResult = SubCommands.parse(argument.trim());
@@ -102,30 +67,6 @@ export function parseAgentCommandArgument(argument: string) {
   };
 }
 
-export function createAgentForm(
-  tui: TUI,
-  theme: Theme,
-  done: (value: AgentFields | null) => void,
-) {
-  return new Form<AgentFields>(
-    {
-      title: "Create Agent",
-      fields: [
-        new LabelledInput("name", theme),
-        new LabelledInput("description", theme),
-        new LabelledInput("tools", theme),
-        new LabelledInput("model", theme),
-      ],
-      parse: parseAgentFormValues,
-      footer:
-        "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
-      spacing: 1,
-    },
-    tui,
-    done,
-  );
-}
-
 async function handleAgentCommand(
   arg: string,
   ctx: ExtensionContext,
@@ -139,8 +80,9 @@ async function handleAgentCommand(
   }
 
   if (scope === "local") {
+    const cwd = ctx.cwd || process.cwd();
     ctx.ui.notify(
-      `Using local agents from ${getAgentDirectory("local", ctx.cwd || process.cwd())}`,
+      `Using local agents from ${join(cwd, LOCAL_AGENT_DIRECTORY)}`,
       "info",
     );
   }
@@ -174,16 +116,23 @@ export default (pi: ExtensionAPI) => {
   });
 };
 
-function getAgentDirectory(scope: AgentScope, cwd = process.cwd()) {
-  return scope === "local"
-    ? join(cwd, LOCAL_AGENT_DIRECTORY)
-    : GLOBAL_AGENT_DIRECTORY;
-}
-
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
+  getResolver: GetPathResolver = getPathResolver,
 ) {
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(cwd, LOCAL_AGENT_DIRECTORY)
+      : GLOBAL_AGENT_DIRECTORY,
+  );
+  const pathResolver = getResolver(cwd);
+  const agentRootPath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath()
+      : pathResolver.resolveGlobalAgentPath();
   const values = await ctx.ui.custom<AgentFields | null>(
     (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
     formOverlayOptions,
@@ -194,68 +143,145 @@ export async function handleCreate(
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
-  const agentDirectory = getAgentDirectory(scope, ctx.cwd || process.cwd());
-  const filePath = join(agentDirectory, `${values.name}.md`);
-  await fileSystem.mkdir(agentDirectory, { recursive: true });
-  await fileSystem.writeFile(filePath, renderFrontmatter(values), "utf8");
+  const filePath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath(`${values.name}.md`)
+      : pathResolver.resolveGlobalAgentPath(`${values.name}.md`);
+
+  const directoryResult = await fileSystem.mkdir(agentRootPath, {
+    recursive: true,
+  });
+  if (!directoryResult.success) {
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent creation failed", directoryResult.error),
+      "error",
+    );
+    return;
+  }
+
+  const writeResult = await fileSystem.writeFile(
+    filePath,
+    renderAgentFrontmatter(values),
+  );
+  if (!writeResult.success) {
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent creation failed", writeResult.error),
+      "error",
+    );
+    return;
+  }
+
   ctx.ui.notify("Agent created");
 }
 
 export async function handleEdit(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
+  getResolver: GetPathResolver = getPathResolver,
 ) {
-  const agent = await pickAgent(ctx, "Edit Agent", scope);
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(cwd, LOCAL_AGENT_DIRECTORY)
+      : GLOBAL_AGENT_DIRECTORY,
+  );
+  const pathResolver = getResolver(cwd);
+  const agent = await pickAgent(
+    ctx,
+    "Edit Agent",
+    scope,
+    fileSystem,
+    pathResolver,
+  );
 
   if (!agent) {
     ctx.ui.notify("Agent editing cancelled", "info");
     return;
   }
 
-  const fileSystem = getResourceFileSystem();
-  const content = await fileSystem.readFile(agent.path, "utf8");
-  const editedContent = await ctx.ui.editor("Edit Agent", content);
+  const readResult = await fileSystem.readFile(agent.path);
+  if (!readResult.success) {
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent edit failed", readResult.error),
+      "error",
+    );
+    return;
+  }
+
+  const editedContent = await ctx.ui.editor("Edit Agent", readResult.data);
 
   if (editedContent === undefined) {
     ctx.ui.notify("Agent editing cancelled", "info");
     return;
   }
 
-  await fileSystem.writeFile(agent.path, editedContent, "utf8");
+  const writeResult = await fileSystem.writeFile(agent.path, editedContent);
+  if (!writeResult.success) {
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent edit failed", writeResult.error),
+      "error",
+    );
+    return;
+  }
+
   ctx.ui.notify("Agent edited");
 }
 
 export async function handleDelete(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
+  getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
+  getResolver: GetPathResolver = getPathResolver,
 ) {
-  const agent = await pickAgent(ctx, "Delete Agent", scope);
+  const cwd = ctx.cwd || process.cwd();
+  const fileSystem = getFileSystem(
+    scope === "local"
+      ? join(cwd, LOCAL_AGENT_DIRECTORY)
+      : GLOBAL_AGENT_DIRECTORY,
+  );
+  const pathResolver = getResolver(cwd);
+  const agent = await pickAgent(
+    ctx,
+    "Delete Agent",
+    scope,
+    fileSystem,
+    pathResolver,
+  );
 
   if (!agent) {
     ctx.ui.notify("Agent deleting cancelled", "info");
     return;
   }
 
-  await getResourceFileSystem().removeFile(agent.path);
+  const deleteResult = await fileSystem.removeFile(agent.path);
+  if (!deleteResult.success) {
+    ctx.ui.notify(
+      getFileSystemErrorMessage("Agent delete failed", deleteResult.error),
+      "error",
+    );
+    return;
+  }
+
   ctx.ui.notify("Agent deleted");
 }
 
-function renderFrontmatter(values: AgentFields) {
-  return [
-    "---",
-    ...Object.entries(values).map(([key, value]) => `${key}: ${value}`),
-    "---",
-    "",
-  ].join("\n");
+function getFileSystemErrorMessage(action: string, error: unknown) {
+  if (error instanceof Error) {
+    return `${action}: ${error.message}`;
+  }
+
+  return action;
 }
 
 async function pickAgent(
   ctx: ExtensionContext,
   title: string,
   scope: AgentScope,
+  fileSystem: ResourceFileSystem,
+  pathResolver: ResourcePathResolver,
 ) {
-  const choices = await listAgentChoices(scope, ctx.cwd || process.cwd());
+  const choices = await listAgentChoices(scope, fileSystem, pathResolver);
 
   if (choices.length === 0) {
     ctx.ui.notify("No agents found", "info");
@@ -274,16 +300,26 @@ async function pickAgent(
   return choices.find((choice) => choice.label === selectedLabel) ?? null;
 }
 
-async function listAgentChoices(scope: AgentScope, cwd: string) {
-  try {
-    const directory = getAgentDirectory(scope, cwd);
-    const names = await getResourceFileSystem().readDirectoryNames(directory);
+async function listAgentChoices(
+  scope: AgentScope,
+  fileSystem: ResourceFileSystem,
+  pathResolver: ResourcePathResolver,
+) {
+  const agentRootPath =
+    scope === "local"
+      ? pathResolver.resolveLocalAgentPath()
+      : pathResolver.resolveGlobalAgentPath();
+  const namesResult = await fileSystem.readDirectoryNames(agentRootPath);
 
-    return names.map((name) => ({
-      path: join(directory, name),
-      label: `${scope}: ${basename(name, ".md")}`,
-    })) satisfies AgentChoice[];
-  } catch {
+  if (!namesResult.success) {
     return [];
   }
+
+  return namesResult.data.map((name) => ({
+    path:
+      scope === "local"
+        ? pathResolver.resolveLocalAgentPath(name)
+        : pathResolver.resolveGlobalAgentPath(name),
+    label: `${scope}: ${basename(name, ".md")}`,
+  })) satisfies AgentChoice[];
 }

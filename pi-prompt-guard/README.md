@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/louiss0/pi-packages/ci.yml?branch=main)](https://github.com/louiss0/pi-packages/actions)
 
-`pi-prompt-guard` adds a validation layer in front of PI prompt execution. It intercepts slash-command prompt usage, resolves matching prompt files through PI's command registry, parses the prompt definition with `@code-fixer-23/pi-prompt-parser`, and blocks invalid input before the agent starts. This helps catch malformed prompt templates, missing required arguments, mismatched positional placeholders, and quoting mistakes early, so prompt-driven workflows fail fast with actionable feedback instead of producing confusing agent behavior later in the turn.
+`pi-prompt-guard` adds a validation layer in front of PI prompt execution. It intercepts slash-command prompt usage, resolves matching prompt files through PI's command registry, parses the prompt definition with its own internal prompt parser, and blocks invalid input before the agent starts. This helps catch malformed prompt templates, missing required arguments, mismatched positional placeholders, and quoting mistakes early, so prompt-driven workflows fail fast with actionable feedback instead of producing confusing agent behavior later in the turn.
 
 
 This package is meant to run as a PI extension and depends on the PI extension runtime.
@@ -118,4 +118,4 @@ pnpm nx test pi-prompt-guard
 pnpm nx check pi-prompt-guard
 ```
 
-The extension depends on `@code-fixer-23/pi-prompt-parser`, so prompt parsing behavior is shared rather than reimplemented locally.
+The extension keeps prompt parsing local so the published package does not depend on a private workspace parser package.

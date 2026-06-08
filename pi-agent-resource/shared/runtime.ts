@@ -5,7 +5,7 @@ function getDevelopmentNotice(extensionName: string) {
 }
 
 export function isDevelopmentExtensionRuntime() {
-  return process.env.PI_RESOURCE_DEV === "1";
+  return import.meta.env.MODE === "development";
 }
 
 export function notifyWhenUsingDevelopmentExtension(

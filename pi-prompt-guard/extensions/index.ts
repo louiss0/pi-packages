@@ -1,13 +1,14 @@
 import {
-  parseArgumentHint,
-  parsePlaceholders,
-  parseTemplate,
-} from "@code-fixer-23/pi-prompt-parser";
-import {
   type ExtensionAPI,
   type ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import { readFile } from "node:fs/promises";
+
+import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "./internal/prompt-parser";
 
 export default function (pi: ExtensionAPI) {
   let widgetHost: PiPromptGuardWidgetHost;

@@ -1,5 +1,6 @@
 import {
   DynamicBorder,
+  Theme,
   type ThemeColor,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -13,10 +14,233 @@ import {
   SelectList,
   Spacer,
   Text,
+  TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 
-type PickerText = Exclude<
+export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
+  title: string;
+  items: T;
+  spacing?: number;
+  itemChoiceStyle?: ItemChoiceStyle;
+  styles?: {
+    title?: PickerText;
+    item?: Record<
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
+      PickerText
+    >;
+  };
+};
+export const itemChoiceStyle = ["checkbox", "radio", "dot", "diamond"] as const;
+
+type ItemChoiceStyle = (typeof itemChoiceStyle)[number];
+
+type ItemStyle = {
+  selected: string;
+  unselected: string;
+};
+
+export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
+  extends Container
+  implements Component
+{
+  #items: T;
+  // MultiSelect owns checked state here. SelectList is only used to render
+  // item rows, so MultiSelect also owns the highlighted index.
+  #selectedValues: Array<T[number]["value"]> = [];
+  #selectedIndex = 0;
+  #selectList: SelectList;
+  #tui: TUI;
+  #theme: Theme;
+  #done: (value: Array<T[number]["value"]> | null) => void;
+  #styles: {
+    title: PickerText;
+    item: Record<
+      | "selectedPrefix"
+      | "selectedText"
+      | "description"
+      | "scrollInfo"
+      | "noMatch",
+      PickerText
+    >;
+  };
+
+  readonly itemChoiceStyleRecord = Object.freeze({
+    checkbox: {
+      selected: "[x]",
+      unselected: "[ ]",
+    },
+    radio: {
+      selected: "(*)",
+      unselected: "( )",
+    },
+    dot: {
+      selected: "●",
+      unselected: "○",
+    },
+    diamond: {
+      selected: "◆",
+      unselected: "◇",
+    },
+  } satisfies Record<ItemChoiceStyle, ItemStyle>);
+
+  #itemStyle: ItemStyle;
+
+  constructor(
+    config: MultiSelectConfig<T>,
+    tui: TUI,
+    theme: Theme,
+    done: (value: Array<T[number]["value"]> | null) => void,
+  ) {
+    super();
+    this.#items = config.items;
+    this.#tui = tui;
+    this.#theme = theme;
+    this.#done = done;
+
+    const { title, spacing = 1, itemChoiceStyle = "checkbox", styles } = config;
+
+    this.#itemStyle = this.itemChoiceStyleRecord[itemChoiceStyle];
+    this.#styles = {
+      title: styles?.title ?? "accent",
+      item: {
+        selectedPrefix: styles?.item?.selectedPrefix ?? "accent",
+        selectedText: styles?.item?.selectedText ?? "accent",
+        description: styles?.item?.description ?? "muted",
+        scrollInfo: styles?.item?.scrollInfo ?? "dim",
+        noMatch: styles?.item?.noMatch ?? "warning",
+      },
+    };
+
+    this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title))));
+
+    const listSpacing = Math.max(0, Math.round(spacing));
+    if (listSpacing > 0) {
+      this.addChild(new Spacer(listSpacing));
+    }
+
+    this.#selectList = this.#createSelectList();
+    this.addChild(this.#selectList);
+  }
+
+  handleInput(data: string): void {
+    if (matchesKey(data, Key.space)) {
+      this.#toggleSelectedItem();
+      this.#tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.up)) {
+      this.#moveSelection(-1);
+      this.#tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.down)) {
+      this.#moveSelection(1);
+      this.#tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.escape)) {
+      this.#done(null);
+      return;
+    }
+
+    if (matchesKey(data, Key.enter)) {
+      this.#done(this.#selectedValues);
+      return;
+    }
+  }
+
+  override invalidate(): void {
+    this.#selectedValues = [];
+    this.#selectedIndex = 0;
+    this.#syncSelectList();
+    this.#tui.requestRender();
+  }
+
+  #createSelectList() {
+    const selectList = new SelectList(
+      this.#getRenderedItems(),
+      this.#items.length,
+      {
+        selectedPrefix: (text) =>
+          this.#theme.fg(this.#styles.item.selectedPrefix, text),
+        selectedText: (text) =>
+          this.#theme.fg(this.#styles.item.selectedText, text),
+        description: (text) =>
+          this.#theme.fg(this.#styles.item.description, text),
+        scrollInfo: (text) =>
+          this.#theme.fg(this.#styles.item.scrollInfo, text),
+        noMatch: (text) => this.#theme.fg(this.#styles.item.noMatch, text),
+      },
+    );
+
+    selectList.onCancel = () => this.#done(null);
+
+    return selectList;
+  }
+
+  #getRenderedItems(): SelectItem[] {
+    return this.#items.map((item) => ({
+      ...item,
+      label: `${this.#getChoicePrefix(item.value as T[number]["value"])} ${item.label || item.value}`,
+    }));
+  }
+
+  #getChoicePrefix(value: T[number]["value"]) {
+    return this.#selectedValues.includes(value)
+      ? this.#itemStyle.selected
+      : this.#itemStyle.unselected;
+  }
+
+  #toggleSelectedItem() {
+    const selectedItem = this.#selectList.getSelectedItem();
+    if (selectedItem === null) {
+      return;
+    }
+
+    const toggledValue = selectedItem.value as T[number]["value"];
+    this.#selectedValues = this.#getNextSelectedValues(toggledValue);
+    this.#syncSelectList();
+  }
+
+  #getNextSelectedValues(toggledValue: T[number]["value"]) {
+    const selectedIndex = this.#selectedValues.indexOf(toggledValue);
+    if (selectedIndex >= 0) {
+      return this.#selectedValues.filter((value) => value !== toggledValue);
+    }
+
+    return [...this.#selectedValues, toggledValue];
+  }
+
+  #moveSelection(direction: 1 | -1) {
+    if (this.#items.length === 0) {
+      return;
+    }
+
+    this.#selectedIndex =
+      (this.#selectedIndex + direction + this.#items.length) %
+      this.#items.length;
+    this.#syncSelectList();
+  }
+
+  #syncSelectList() {
+    const nextSelectList = this.#createSelectList();
+    nextSelectList.setSelectedIndex(this.#selectedIndex);
+
+    this.removeChild(this.#selectList);
+    this.#selectList = nextSelectList;
+    this.addChild(this.#selectList);
+  }
+}
+
+export type PickerText = Exclude<
   ThemeColor,
   | `b${string}`
   | `t${string}`
@@ -68,6 +292,7 @@ export class Picker<T extends string> implements Component {
   #itemLimit: number;
   #lazyLoadStep: number;
   #selectList: SelectList | null = null;
+  #selectedIndex = 0;
   #selectedValue: T | null = null;
   #styles: NonNullable<PickerOptions<T>["styles"]> & {
     item: Record<
@@ -149,8 +374,22 @@ export class Picker<T extends string> implements Component {
     const nextFilter = this.#Filter.updateFilter(this.#Filter.value, data);
     if (nextFilter !== this.#Filter.value) {
       this.#Filter.value = nextFilter;
+      this.#selectedIndex = 0;
+      this.#selectedValue = null;
       this.#syncSelectList();
       this.#syncFilter();
+      this.tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.up)) {
+      this.#moveSelection(-1);
+      this.tui.requestRender();
+      return;
+    }
+
+    if (matchesKey(data, Key.down)) {
+      this.#moveSelection(1);
       this.tui.requestRender();
       return;
     }
@@ -215,15 +454,10 @@ export class Picker<T extends string> implements Component {
     const nextSelectList = this.#createSelectList(items);
 
     nextSelectList.setFilter(this.#Filter.value);
+    nextSelectList.setSelectedIndex(this.#selectedIndex);
 
-    if (this.#selectedValue !== null) {
-      const selectedIndex = items.findIndex(
-        (item) => item.value === this.#selectedValue,
-      );
-      if (selectedIndex >= 0) {
-        nextSelectList.setSelectedIndex(selectedIndex);
-      }
-    }
+    const selectedItem = nextSelectList.getSelectedItem();
+    this.#selectedValue = (selectedItem?.value as T | undefined) ?? null;
 
     if (this.#selectList !== null) {
       this.#listContainer.removeChild(this.#selectList);
@@ -231,6 +465,21 @@ export class Picker<T extends string> implements Component {
 
     this.#selectList = nextSelectList;
     this.#listContainer.addChild(nextSelectList);
+  }
+
+  #moveSelection(direction: -1 | 1) {
+    const visibleItems = this.#getVisibleItems();
+
+    if (visibleItems.length === 0) {
+      return;
+    }
+
+    this.#selectedIndex =
+      (this.#selectedIndex + direction + visibleItems.length) %
+      visibleItems.length;
+    this.#selectedValue = visibleItems[this.#selectedIndex] ?? null;
+    this.#maybeLoadMore(this.#selectedValue as T);
+    this.#syncSelectList();
   }
 
   #maybeLoadMore(selectedValue: T) {
@@ -251,9 +500,7 @@ export class Picker<T extends string> implements Component {
       this.#items.length,
       this.#visibleCount + this.#lazyLoadStep,
     );
-    this.#syncSelectList();
     this.#syncFilter();
-    this.tui.requestRender();
   }
 
   #Filter = new (class {

@@ -26,9 +26,6 @@
   "include": ["extensions/**/*.ts"],
   "references": [
     {
-      "path": "../internal/prompt-parser"
-    },
-    {
       "path": "../pi-form-components"
     }
   ]

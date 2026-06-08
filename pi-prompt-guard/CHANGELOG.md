@@ -1,3 +1,18 @@
+## 1.0.1 (2026-06-01)
+
+### 🩹 Fixes
+
+- **prompt-packages:** inline private parser code ([3a92b16](https://github.com/louiss0/pi-packages/commit/3a92b16))
+- **workspace:** align pi runtime dependency versions ([b99d8ef](https://github.com/louiss0/pi-packages/commit/b99d8ef))
+- **workspace:** enforce vitest tsconfig types ([3740977](https://github.com/louiss0/pi-packages/commit/3740977))
+- **workspace:** migrate biome config and format files ([d7155ac](https://github.com/louiss0/pi-packages/commit/d7155ac))
+- **workspace:** add MIT licenses and vitest globals ([9e811c3](https://github.com/louiss0/pi-packages/commit/9e811c3))
+- **prompt-commands:** ignore /skill with regex ([f7d6f6b](https://github.com/louiss0/pi-packages/commit/f7d6f6b))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 # 1.0.0 (2026-05-31)
 
 ### 🚀 Features

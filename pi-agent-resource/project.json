@@ -23,6 +23,13 @@
       "options": {
         "command": "node tools/validate-package-metadata.mjs {projectRoot}"
       }
+    },
+    "make-extension": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx ./scripts/create-extension.ts",
+        "cwd": "{projectRoot}"
+      }
     }
   },
   "tags": ["npm:public", "project:extension", "status:supported"]

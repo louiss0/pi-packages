@@ -1,97 +1,97 @@
-import {
-  getResourceFileSystem,
-  resetResourceFileSystem,
-  seedMemoryResourceFileSystem,
-  useMemoryResourceFileSystem,
-} from "./filesystem";
-import { resetDevelopmentExtensionNotice } from "./runtime";
+import { join } from "node:path";
+
+import { MemoryFileSystem, PathResolver } from "./filesystem";
 
 describe("shared/filesystem", () => {
-  beforeEach(() => {
-    vi.unstubAllEnvs();
-    resetDevelopmentExtensionNotice();
-    resetResourceFileSystem();
-  });
+  const memoryFileSystem = new MemoryFileSystem();
 
   afterEach(() => {
-    resetResourceFileSystem();
+    memoryFileSystem.reset();
   });
 
-  it("uses memfs when development mode is enabled", async () => {
-    vi.stubEnv("PI_RESOURCE_DEV", "1");
-    const fileSystem = getResourceFileSystem();
+  it("uses memfs explicitly", async () => {
+    const fileSystem = memoryFileSystem;
 
-    await fileSystem.mkdir("/workspace/.pi/agents", { recursive: true });
-    await fileSystem.writeFile(
-      "/workspace/.pi/agents/test.md",
-      "hello",
-      "utf8",
-    );
+    await fileSystem.mkdir("/.pi/agents", { recursive: true });
+    await fileSystem.writeFile("/.pi/agents/test.md", "hello");
 
-    await expect(
-      fileSystem.readFile("/workspace/.pi/agents/test.md", "utf8"),
-    ).resolves.toBe("hello");
+    await expect(fileSystem.readFile("/.pi/agents/test.md")).resolves.toEqual({
+      data: "hello",
+      success: true,
+    });
   });
 
   it("can seed and clear the memory filesystem explicitly in tests", async () => {
-    useMemoryResourceFileSystem();
-    seedMemoryResourceFileSystem({
-      "/workspace/.pi/prompts/test.md": "prompt",
+    memoryFileSystem.seed({
+      "/.pi/prompts/test.md": "prompt",
     });
 
     await expect(
-      getResourceFileSystem().readFile(
-        "/workspace/.pi/prompts/test.md",
-        "utf8",
-      ),
-    ).resolves.toBe("prompt");
+      memoryFileSystem.readFile("/.pi/prompts/test.md"),
+    ).resolves.toEqual({
+      data: "prompt",
+      success: true,
+    });
 
-    resetResourceFileSystem();
-    useMemoryResourceFileSystem();
+    memoryFileSystem.reset();
 
     await expect(
-      getResourceFileSystem().readFile(
-        "/workspace/.pi/prompts/test.md",
-        "utf8",
-      ),
-    ).rejects.toThrow();
+      memoryFileSystem.readFile("/.pi/prompts/test.md"),
+    ).resolves.toMatchObject({
+      success: false,
+    });
   });
 
   it("removes files and directories with explicit methods", async () => {
-    useMemoryResourceFileSystem();
-    const fileSystem = getResourceFileSystem();
+    const fileSystem = memoryFileSystem;
 
-    await fileSystem.mkdir("/workspace/.pi/agent/skills/test-skill", {
+    await fileSystem.mkdir("/.pi/agent/skills/test-skill", {
       recursive: true,
     });
     await fileSystem.writeFile(
-      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+      "/.pi/agent/skills/test-skill/SKILL.md",
       "skill",
-      "utf8",
     );
-    await fileSystem.removeFile(
-      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
-    );
+    await fileSystem.removeFile("/.pi/agent/skills/test-skill/SKILL.md");
 
     await expect(
-      fileSystem.readFile(
-        "/workspace/.pi/agent/skills/test-skill/SKILL.md",
-        "utf8",
-      ),
-    ).rejects.toThrow();
+      fileSystem.readFile("/.pi/agent/skills/test-skill/SKILL.md"),
+    ).resolves.toMatchObject({
+      success: false,
+    });
 
     await fileSystem.writeFile(
-      "/workspace/.pi/agent/skills/test-skill/SKILL.md",
+      "/.pi/agent/skills/test-skill/SKILL.md",
       "skill",
-      "utf8",
     );
-    await fileSystem.removeDirectory("/workspace/.pi/agent/skills/test-skill");
+    await fileSystem.removeDirectory("/.pi/agent/skills/test-skill");
 
     await expect(
-      fileSystem.readFile(
-        "/workspace/.pi/agent/skills/test-skill/SKILL.md",
-        "utf8",
-      ),
-    ).rejects.toThrow();
+      fileSystem.readFile("/.pi/agent/skills/test-skill/SKILL.md"),
+    ).resolves.toMatchObject({
+      success: false,
+    });
+  });
+
+  it("resolves agent paths with the dedicated agents folders", () => {
+    const pathResolver = new PathResolver("/workspace", "/test-home");
+
+    expect(pathResolver.resolveLocalAgentPath()).toBe(
+      join("/workspace", ".pi", "agents"),
+    );
+    expect(pathResolver.resolveLocalAgentPath("oracle.md")).toBe(
+      join("/workspace", ".pi", "agents", "oracle.md"),
+    );
+
+    expect(pathResolver.resolveGlobalAgentPath()).toBe(
+      join("/test-home", ".pi", "agent", "agents"),
+    );
+    expect(pathResolver.resolveGlobalAgentPath("oracle.md")).toBe(
+      join("/test-home", ".pi", "agent", "agents", "oracle.md"),
+    );
+
+    expect(pathResolver.resolvePackAgentPath("team-pack", "oracle.md")).toBe(
+      join("/test-home", ".pi", "packs", "team-pack", "agents", "oracle.md"),
+    );
   });
 });
