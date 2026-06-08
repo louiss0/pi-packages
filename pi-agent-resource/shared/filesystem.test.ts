@@ -1,4 +1,6 @@
-import { MemoryFileSystem } from "./filesystem";
+import { join } from "node:path";
+
+import { MemoryFileSystem, PathResolver } from "./filesystem";
 
 describe("shared/filesystem", () => {
   const memoryFileSystem = new MemoryFileSystem();
@@ -24,7 +26,9 @@ describe("shared/filesystem", () => {
       "/.pi/prompts/test.md": "prompt",
     });
 
-    await expect(memoryFileSystem.readFile("/.pi/prompts/test.md")).resolves.toEqual({
+    await expect(
+      memoryFileSystem.readFile("/.pi/prompts/test.md"),
+    ).resolves.toEqual({
       data: "prompt",
       success: true,
     });
@@ -44,7 +48,10 @@ describe("shared/filesystem", () => {
     await fileSystem.mkdir("/.pi/agent/skills/test-skill", {
       recursive: true,
     });
-    await fileSystem.writeFile("/.pi/agent/skills/test-skill/SKILL.md", "skill");
+    await fileSystem.writeFile(
+      "/.pi/agent/skills/test-skill/SKILL.md",
+      "skill",
+    );
     await fileSystem.removeFile("/.pi/agent/skills/test-skill/SKILL.md");
 
     await expect(
@@ -53,7 +60,10 @@ describe("shared/filesystem", () => {
       success: false,
     });
 
-    await fileSystem.writeFile("/.pi/agent/skills/test-skill/SKILL.md", "skill");
+    await fileSystem.writeFile(
+      "/.pi/agent/skills/test-skill/SKILL.md",
+      "skill",
+    );
     await fileSystem.removeDirectory("/.pi/agent/skills/test-skill");
 
     await expect(
@@ -61,5 +71,27 @@ describe("shared/filesystem", () => {
     ).resolves.toMatchObject({
       success: false,
     });
+  });
+
+  it("resolves agent paths with the dedicated agents folders", () => {
+    const pathResolver = new PathResolver("/workspace", "/test-home");
+
+    expect(pathResolver.resolveLocalAgentPath()).toBe(
+      join("/workspace", ".pi", "agents"),
+    );
+    expect(pathResolver.resolveLocalAgentPath("oracle.md")).toBe(
+      join("/workspace", ".pi", "agents", "oracle.md"),
+    );
+
+    expect(pathResolver.resolveGlobalAgentPath()).toBe(
+      join("/test-home", ".pi", "agent", "agents"),
+    );
+    expect(pathResolver.resolveGlobalAgentPath("oracle.md")).toBe(
+      join("/test-home", ".pi", "agent", "agents", "oracle.md"),
+    );
+
+    expect(pathResolver.resolvePackAgentPath("team-pack", "oracle.md")).toBe(
+      join("/test-home", ".pi", "packs", "team-pack", "agents", "oracle.md"),
+    );
   });
 });
