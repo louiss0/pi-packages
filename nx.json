@@ -60,7 +60,8 @@
       }
     },
     "releaseTag": {
-      "pattern": "{projectName}@{version}"
+      "pattern": "{projectName}@{version}",
+      "checkAllBranchesWhen": ["main"]
     },
     "version": {
       "conventionalCommits": true,
