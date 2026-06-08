@@ -1,4 +1,8 @@
-import { MultiSelect, MultiSelectConfig } from "@code-fixer-23/pi-form-components";
+import { spawn } from "node:child_process";
+import {
+  MultiSelect,
+  MultiSelectConfig,
+} from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
@@ -7,13 +11,13 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Component, SelectItem, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
+
 import {
   getPathResolver,
   NodeFileSystem,
   type ResourceFileSystem,
   type ResourcePathResolver,
 } from "../shared/filesystem";
-import { spawn } from "node:child_process";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -39,7 +43,11 @@ export const SKILL_COMMAND = "skill";
 export const AGENT_COMMAND = "agent";
 export const PROMPT_COMMAND = "prompt";
 
-const packManagementCommands = [CREATE_COMMAND, EDIT_COMMAND, DELETE_COMMAND] as const;
+const packManagementCommands = [
+  CREATE_COMMAND,
+  EDIT_COMMAND,
+  DELETE_COMMAND,
+] as const;
 const packResourceCommands = picklist([
   ...packOrginaizationCommands,
   ...packManagementCommands,
@@ -48,6 +56,45 @@ const packResourceCommands = picklist([
 type PackResourceCommand = (typeof packResourceCommands.options)[number];
 
 type PackResourceHandlers = Record<PackResourceCommand, () => Promise<void>>;
+type PackResourceKind =
+  | typeof SKILL_COMMAND
+  | typeof AGENT_COMMAND
+  | typeof PROMPT_COMMAND;
+
+type PackResourceReducerDeps = {
+  getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
+  ctx: ExtensionCommandContext;
+  fileSystem: ResourceFileSystem;
+  pathResolver: ResourcePathResolver;
+  openExternalEditor: typeof openExternalEditor;
+};
+
+type PackResourceConfig = {
+  createExampleResource: (
+    fileSystem: ResourceFileSystem,
+    pathResolver: ResourcePathResolver,
+    packName: string,
+    resourceName: string,
+  ) => Promise<void>;
+  exampleContent: string;
+  kind: PackResourceKind;
+  removeResource: (
+    fileSystem: ResourceFileSystem,
+    pathResolver: ResourcePathResolver,
+    packName: string,
+    resourceName: string,
+  ) => Promise<void>;
+  resolvePackResourceFilePath: (
+    pathResolver: ResourcePathResolver,
+    packName: string,
+    resourceName: string,
+  ) => string;
+  resolvePackResourcePath: (
+    pathResolver: ResourcePathResolver,
+    packName: string,
+  ) => string;
+  toResourceNames: (names: string[]) => string[];
+};
 
 export const ROOT_PACK_FOLDER_PATH = ".pi/packs/";
 
@@ -66,19 +113,23 @@ export async function openExternalEditor(filePath: string) {
     return new ExternalEditorError("No external editor set");
   }
 
-  const result = await new Promise<number | ExternalEditorError>((resolve, reject) => {
-    const [cmd, ...args] = EDITOR.split(" ");
-    const child = spawn(cmd, [...args, filePath]);
+  const result = await new Promise<number | ExternalEditorError>(
+    (resolve, reject) => {
+      const [cmd, ...args] = EDITOR.split(" ");
+      const child = spawn(cmd, [...args, filePath]);
 
-    child.on("error", (err) =>
-      reject(new ExternalEditorError("Failed to use external editor", err)),
-    );
-    child.on("close", (value) =>
-      !value
-        ? reject(new ExternalEditorError("Something went wrong while closing"))
-        : resolve(value),
-    );
-  });
+      child.on("error", (err) =>
+        reject(new ExternalEditorError("Failed to use external editor", err)),
+      );
+      child.on("close", (value) =>
+        !value
+          ? reject(
+              new ExternalEditorError("Something went wrong while closing"),
+            )
+          : resolve(value),
+      );
+    },
+  );
 
   if (result instanceof ExternalEditorError) {
     return result;
@@ -93,7 +144,8 @@ export default function (pi: ExtensionAPI) {
       return packCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue =
+            value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PACK_LABEL}:${value}`,
@@ -123,7 +175,8 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue =
+            value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${SKILL_COMMAND}:${value}`,
@@ -153,7 +206,8 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue =
+            value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${AGENT_COMMAND}:${value}`,
@@ -168,7 +222,10 @@ export default function (pi: ExtensionAPI) {
       }
 
       await agentPackResourceReducer(result.output, {
+        getMuiltiSelectorFactory: getMultiSelectorFactory,
         ctx,
+        openExternalEditor,
+        pathResolver: getPathResolver(ctx.cwd),
         fileSystem: new NodeFileSystem(),
       });
     },
@@ -180,7 +237,8 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue =
+            value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PROMPT_COMMAND}:${value}`,
@@ -195,7 +253,10 @@ export default function (pi: ExtensionAPI) {
       }
 
       await promptPackResourceReducer(result.output, {
+        getMuiltiSelectorFactory: getMultiSelectorFactory,
         ctx,
+        openExternalEditor,
+        pathResolver: getPathResolver(ctx.cwd),
         fileSystem: new NodeFileSystem(),
       });
     },
@@ -203,7 +264,11 @@ export default function (pi: ExtensionAPI) {
 }
 
 export function getCreatePackResourceSelector() {
-  const resources = [`${SKILL_COMMAND}s`, `${PROMPT_COMMAND}s`, `${AGENT_COMMAND}s`] as const;
+  const resources = [
+    `${SKILL_COMMAND}s`,
+    `${PROMPT_COMMAND}s`,
+    `${AGENT_COMMAND}s`,
+  ] as const;
   return getMultiSelectorFactory(
     "What resources do you want to pack?",
     resources.map((resource) => ({
@@ -224,7 +289,8 @@ export function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
     theme: Theme,
     _: KeybindingsManager,
     done: (result: ReadonlyArray<T[number]["value"]> | null) => void,
-  ): Component => new MultiSelect({ title, items, ...options }, tui, theme, done);
+  ): Component =>
+    new MultiSelect({ title, items, ...options }, tui, theme, done);
 }
 
 type PackCommand = (typeof packCommands.options)[number];
@@ -297,7 +363,9 @@ async function writePackExampleResources(
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
-    createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
+    createPackResourceSelector: ReturnType<
+      typeof getCreatePackResourceSelector
+    >;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -310,7 +378,9 @@ export function rootPackResourceReducer(
           PACK_LABEL,
           "What is the name of your agent pack?",
         );
-        const resources = await deps.ctx.ui.custom(deps.createPackResourceSelector);
+        const resources = await deps.ctx.ui.custom(
+          deps.createPackResourceSelector,
+        );
 
         if (!packName || !resources || resources.length === 0) {
           return;
@@ -343,66 +413,321 @@ export function rootPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.removeDirectory(deps.pathResolver.resolvePackPath(packName));
+        await deps.fileSystem.removeDirectory(
+          deps.pathResolver.resolvePackPath(packName),
+        );
         deps.ctx.ui.notify(`Pack deleted successfully with name '${packName}'`);
       },
     } satisfies Record<PackCommand, () => Promise<void>>
   )[arg]();
 }
 
-export function skillPackResourceReducer(
-  arg: PackResourceCommand,
-  deps: {
-    getMuiltiSelectorFactory: typeof getMultiSelectorFactory;
-    ctx: ExtensionCommandContext;
-    fileSystem: ResourceFileSystem;
-    pathResolver: ResourcePathResolver;
-    openExternalEditor: typeof openExternalEditor;
+async function getPackNames(
+  fileSystem: ResourceFileSystem,
+  pathResolver: ResourcePathResolver,
+) {
+  const packNamesResult = await fileSystem.readDirectoryNames(
+    pathResolver.resolvePackPath(),
+  );
+
+  if (!packNamesResult.success) {
+    return [];
+  }
+
+  return packNamesResult.data;
+}
+
+async function getPackResourceNames(
+  fileSystem: ResourceFileSystem,
+  pathResolver: ResourcePathResolver,
+  config: PackResourceConfig,
+  packName: string,
+) {
+  const resourceNamesResult = await fileSystem.readDirectoryNames(
+    config.resolvePackResourcePath(pathResolver, packName),
+  );
+
+  if (!resourceNamesResult.success) {
+    return [];
+  }
+
+  return config.toResourceNames(resourceNamesResult.data);
+}
+
+async function handleCreatePackResource(
+  deps: PackResourceReducerDeps,
+  config: PackResourceConfig,
+) {
+  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
+
+  if (packNames.length === 0) {
+    deps.ctx.ui.notify("No packs found", "info");
+    return;
+  }
+
+  const resourceLabel = config.kind;
+  const packName = await deps.ctx.ui.select(
+    `What pack do you want to add the ${resourceLabel} to?`,
+    packNames,
+  );
+
+  if (!packName) {
+    return;
+  }
+
+  const resourceName = await deps.ctx.ui.input(
+    `Which ${resourceLabel} do you want to add to the pack?`,
+  );
+
+  if (!resourceName) {
+    return;
+  }
+
+  await config.createExampleResource(
+    deps.fileSystem,
+    deps.pathResolver,
+    packName,
+    resourceName,
+  );
+  deps.ctx.ui.notify(`${resourceLabel} created in pack '${packName}'`);
+}
+
+async function handleEditPackResource(
+  deps: PackResourceReducerDeps,
+  config: PackResourceConfig,
+) {
+  const resourceLabel = config.kind;
+  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
+
+  if (packNames.length === 0) {
+    deps.ctx.ui.notify("No packs found", "info");
+    return;
+  }
+
+  const packName = await deps.ctx.ui.select(
+    `What pack has the ${resourceLabel} you want to edit?`,
+    packNames,
+  );
+
+  if (!packName) {
+    return;
+  }
+
+  const resourceNames = await getPackResourceNames(
+    deps.fileSystem,
+    deps.pathResolver,
+    config,
+    packName,
+  );
+
+  if (resourceNames.length === 0) {
+    deps.ctx.ui.notify(`No ${resourceLabel}s found`, "info");
+    return;
+  }
+
+  const resourceName = await deps.ctx.ui.select(
+    `What ${resourceLabel} do you want to edit?`,
+    resourceNames,
+  );
+
+  if (!resourceName) {
+    return;
+  }
+
+  await deps.openExternalEditor(
+    config.resolvePackResourceFilePath(
+      deps.pathResolver,
+      packName,
+      resourceName,
+    ),
+  );
+}
+
+async function handleDeletePackResource(
+  deps: PackResourceReducerDeps,
+  config: PackResourceConfig,
+) {
+  const resourceLabel = config.kind;
+  const packNames = await getPackNames(deps.fileSystem, deps.pathResolver);
+
+  if (packNames.length === 0) {
+    deps.ctx.ui.notify("No packs found", "info");
+    return;
+  }
+
+  const packName = await deps.ctx.ui.select(
+    `Which pack do you want to delete a ${resourceLabel} from?`,
+    packNames,
+  );
+
+  if (!packName) {
+    return;
+  }
+
+  const resourceNames = await getPackResourceNames(
+    deps.fileSystem,
+    deps.pathResolver,
+    config,
+    packName,
+  );
+
+  if (resourceNames.length === 0) {
+    deps.ctx.ui.notify(`No ${resourceLabel}s found`, "info");
+    return;
+  }
+
+  const resourceName = await deps.ctx.ui.select(
+    `Which ${resourceLabel} do you want to delete from the pack?`,
+    resourceNames,
+  );
+
+  if (!resourceName) {
+    return;
+  }
+
+  await config.removeResource(
+    deps.fileSystem,
+    deps.pathResolver,
+    packName,
+    resourceName,
+  );
+  deps.ctx.ui.notify(`${resourceLabel} deleted from pack '${packName}'`);
+}
+
+const packResourceConfigs = {
+  [SKILL_COMMAND]: {
+    createExampleResource: async (
+      fileSystem,
+      pathResolver,
+      packName,
+      resourceName,
+    ) => {
+      const skillPath = pathResolver.resolvePackSkillPath(
+        packName,
+        resourceName,
+      );
+
+      await fileSystem.mkdir(skillPath, { recursive: true });
+      await fileSystem.writeFile(
+        pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
+        exampleSkillContent,
+      );
+    },
+    exampleContent: exampleSkillContent,
+    kind: SKILL_COMMAND,
+    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
+      fileSystem.removeDirectory(
+        pathResolver.resolvePackSkillPath(packName, resourceName),
+      ),
+    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
+      pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
+    resolvePackResourcePath: (pathResolver, packName) =>
+      pathResolver.resolvePackSkillPath(packName, ""),
+    toResourceNames: (names) => names,
   },
+  [AGENT_COMMAND]: {
+    createExampleResource: async (
+      fileSystem,
+      pathResolver,
+      packName,
+      resourceName,
+    ) => {
+      await fileSystem.mkdir(pathResolver.resolvePackAgentPath(packName, ""), {
+        recursive: true,
+      });
+      await fileSystem.writeFile(
+        pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+        exampleAgentContent,
+      );
+    },
+    exampleContent: exampleAgentContent,
+    kind: AGENT_COMMAND,
+    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
+      fileSystem.removeFile(
+        pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+      ),
+    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
+      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+    resolvePackResourcePath: (pathResolver, packName) =>
+      pathResolver.resolvePackAgentPath(packName, ""),
+    toResourceNames: (names) => names.map((name) => name.replace(/\.md$/, "")),
+  },
+  [PROMPT_COMMAND]: {
+    createExampleResource: async (
+      fileSystem,
+      pathResolver,
+      packName,
+      resourceName,
+    ) => {
+      await fileSystem.mkdir(pathResolver.resolvePackPromptPath(packName, ""), {
+        recursive: true,
+      });
+      await fileSystem.writeFile(
+        pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+        examplePromptContent,
+      );
+    },
+    exampleContent: examplePromptContent,
+    kind: PROMPT_COMMAND,
+    removeResource: (fileSystem, pathResolver, packName, resourceName) =>
+      fileSystem.removeFile(
+        pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+      ),
+    resolvePackResourceFilePath: (pathResolver, packName, resourceName) =>
+      pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+    resolvePackResourcePath: (pathResolver, packName) =>
+      pathResolver.resolvePackPromptPath(packName, ""),
+    toResourceNames: (names) => names.map((name) => name.replace(/\.md$/, "")),
+  },
+} as const satisfies Record<PackResourceKind, PackResourceConfig>;
+
+function createPackResourceReducer(
+  arg: PackResourceCommand,
+  deps: PackResourceReducerDeps,
+  config: PackResourceConfig,
 ) {
   return (
     {
-      [CREATE_COMMAND]: async () => {},
-      [EDIT_COMMAND]: async () => {},
+      [CREATE_COMMAND]: () => handleCreatePackResource(deps, config),
+      [EDIT_COMMAND]: () => handleEditPackResource(deps, config),
       [MOVE_LOCAL_COMMAND]: async () => {},
       [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
       [MOVE_GLOBAL_COMMAND]: async () => {},
-      [DELETE_COMMAND]: async () => {},
+      [DELETE_COMMAND]: () => handleDeletePackResource(deps, config),
     } satisfies PackResourceHandlers
   )[arg]();
+}
+
+export function skillPackResourceReducer(
+  arg: PackResourceCommand,
+  deps: PackResourceReducerDeps,
+) {
+  return createPackResourceReducer(
+    arg,
+    deps,
+    packResourceConfigs[SKILL_COMMAND],
+  );
 }
 
 export function agentPackResourceReducer(
   arg: PackResourceCommand,
-  deps: { ctx: ExtensionCommandContext; fileSystem: ResourceFileSystem },
+  deps: PackResourceReducerDeps,
 ) {
-  return (
-    {
-      [CREATE_COMMAND]: async () => {},
-      [EDIT_COMMAND]: async () => {},
-      [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_GLOBAL_COMMAND]: async () => {},
-      [DELETE_COMMAND]: async () => {},
-    } satisfies PackResourceHandlers
-  )[arg]();
+  return createPackResourceReducer(
+    arg,
+    deps,
+    packResourceConfigs[AGENT_COMMAND],
+  );
 }
 
 export function promptPackResourceReducer(
   arg: PackResourceCommand,
-  deps: { ctx: ExtensionCommandContext; fileSystem: ResourceFileSystem },
+  deps: PackResourceReducerDeps,
 ) {
-  return (
-    {
-      [CREATE_COMMAND]: async () => {},
-      [EDIT_COMMAND]: async () => {},
-      [MOVE_LOCAL_COMMAND]: async () => {},
-      [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {},
-      [MOVE_GLOBAL_COMMAND]: async () => {},
-      [DELETE_COMMAND]: async () => {},
-    } satisfies PackResourceHandlers
-  )[arg]();
+  return createPackResourceReducer(
+    arg,
+    deps,
+    packResourceConfigs[PROMPT_COMMAND],
+  );
 }

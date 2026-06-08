@@ -1,24 +1,33 @@
-import {
-  type ExtensionCommandContext,
-  type KeybindingsManager,
-  type Theme,
+import type {
+  ExtensionCommandContext,
+  KeybindingsManager,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
-import { MemoryFileSystem, PathResolver, ResourcePathResolver } from "../shared/filesystem";
+
 import {
+  agentPackResourceReducer,
   exampleAgentContent,
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
   getMultiSelectorFactory,
   openExternalEditor,
+  promptPackResourceReducer,
   rootPackResourceReducer,
   skillPackResourceReducer,
 } from "./pack";
+import {
+  MemoryFileSystem,
+  PathResolver,
+  type ResourcePathResolver,
+} from "../shared/filesystem";
 
 type MockContext =
   | Partial<ExtensionCommandContext>
   | { ui: Partial<ExtensionCommandContext["ui"]> };
+
+type PackResourceReducer = typeof skillPackResourceReducer;
 
 function createTestContext(ctx: MockContext) {
   return ctx as unknown as ExtensionCommandContext;
@@ -34,9 +43,14 @@ const mockCustomUIFactory = async <T>(
 ) => {
   let value;
 
-  const result = await factory({} as TUI, {} as Theme, {} as KeybindingsManager, (result) => {
-    value = result;
-  });
+  const result = await factory(
+    {} as TUI,
+    {} as Theme,
+    {} as KeybindingsManager,
+    (nextValue) => {
+      value = nextValue;
+    },
+  );
 
   result.handleInput?.("data");
 
@@ -47,21 +61,23 @@ const mockCustomUIFactory = async <T>(
   return value;
 };
 
-const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(() => {
-  return (_t, _theme, _keybindingsManager, done) => {
-    return {
-      handleInput: vi.fn((data) => done(data)),
-      render: vi.fn(),
-      invalidate: vi.fn(),
+const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(
+  () => {
+    return (_tui, _theme, _keybindingsManager, done) => {
+      return {
+        handleInput: vi.fn((data) => done(data)),
+        invalidate: vi.fn(),
+        render: vi.fn(),
+      };
     };
-  };
-});
+  },
+);
 
 function createPathResolver() {
   const pathResolver = new PathResolver("/workspace", "/test-home");
 
   return {
-    resolvePackPath: vi.fn(pathResolver.resolvePackPath),
+    resolvePackPath: vi.fn((path) => pathResolver.resolvePackPath(path)),
     resolvePackSkillPath: vi.fn((packName, path) =>
       pathResolver.resolvePackSkillPath(packName, path),
     ),
@@ -71,12 +87,24 @@ function createPathResolver() {
     resolvePackPromptPath: vi.fn((packName, path) =>
       pathResolver.resolvePackPromptPath(packName, path),
     ),
-    resolveGlobalSkillPath: vi.fn(pathResolver.resolveGlobalSkillPath),
-    resolveLocalSkillPath: vi.fn(pathResolver.resolveLocalSkillPath),
-    resolveGlobalAgentPath: vi.fn(pathResolver.resolveGlobalAgentPath),
-    resolveLocalAgentPath: vi.fn(pathResolver.resolveLocalAgentPath),
-    resolveGlobalPromptPath: vi.fn(pathResolver.resolveGlobalPromptPath),
-    resolveLocalPromptPath: vi.fn(pathResolver.resolveLocalPromptPath),
+    resolveGlobalSkillPath: vi.fn((path) =>
+      pathResolver.resolveGlobalSkillPath(path),
+    ),
+    resolveLocalSkillPath: vi.fn((path) =>
+      pathResolver.resolveLocalSkillPath(path),
+    ),
+    resolveGlobalAgentPath: vi.fn((path) =>
+      pathResolver.resolveGlobalAgentPath(path),
+    ),
+    resolveLocalAgentPath: vi.fn((path) =>
+      pathResolver.resolveLocalAgentPath(path),
+    ),
+    resolveGlobalPromptPath: vi.fn((path) =>
+      pathResolver.resolveGlobalPromptPath(path),
+    ),
+    resolveLocalPromptPath: vi.fn((path) =>
+      pathResolver.resolveLocalPromptPath(path),
+    ),
   } satisfies ResourcePathResolver;
 }
 
@@ -86,7 +114,7 @@ describe("Pack", () => {
   let fileSystem: MemoryFileSystem;
   let pathResolver: ReturnType<typeof createPathResolver>;
 
-  beforeAll(() => {
+  beforeEach(() => {
     fileSystem = new MemoryFileSystem();
     pathResolver = createPathResolver();
   });
@@ -102,587 +130,374 @@ describe("Pack", () => {
     ): ReturnType<typeof getCreatePackResourceSelector> => {
       return (_tui: TUI, _theme: Theme, _: KeybindingsManager, done) => {
         return {
-          invalidate: vi.fn(),
           handleInput: vi.fn(() => done(choices)),
+          invalidate: vi.fn(),
           render: vi.fn(),
         } satisfies Component;
       };
     };
 
     it("creates a pack when create is passed in", async () => {
-      const output = "front-end";
-      const selectionChoices = ["prompts", "skills", "agents"] as const;
+      const packName = "front-end";
+      const resourceChoices = ["prompts", "skills", "agents"] as const;
+      const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
       const ctx = {
         ui: {
-          input: vi.fn().mockResolvedValue(output),
-          notify: vi.fn(),
           custom: vi.fn(mockCustomUIFactory),
+          input: vi.fn().mockResolvedValue(packName),
+          notify: vi.fn(),
         },
       } satisfies MockContext;
 
       const mockCreatePackResourceSelector =
-        getMockCreatePackResourceSelector(selectionChoices);
+        getMockCreatePackResourceSelector(resourceChoices);
 
       await rootPackResourceReducer("create", {
-        ctx: createTestContext(ctx),
         createPackResourceSelector: mockCreatePackResourceSelector,
+        ctx: createTestContext(ctx),
         fileSystem,
         pathResolver,
       });
 
-      expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
-
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
-        `Pack created successfully with name '${output}'`,
+      expect(ctx.ui.input).toHaveBeenCalledWith(
+        "pack",
+        "What is the name of your agent pack?",
       );
-
-      const writeFile = vi.spyOn(fileSystem, "writeFile");
-      expect(ctx.ui.custom).toHaveBeenCalledWith(mockCreatePackResourceSelector);
-
-      expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePackPromptPath(output, "example.md"),
+      expect(ctx.ui.custom).toHaveBeenCalledWith(
+        mockCreatePackResourceSelector,
+      );
+      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(packName);
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPromptPath(packName, "example.md"),
         examplePromptContent,
       );
-      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(output);
-      expect(pathResolver.resolvePackPromptPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolver.resolvePackPromptPath).toHaveBeenCalledWith(output, "example.md");
-
-      expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath(output, "example/SKILL.md"),
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackSkillPath(packName, "example/SKILL.md"),
         exampleSkillContent,
       );
-      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(output, "example");
-      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
-        output,
-        "example/SKILL.md",
-      );
-
-      expect(writeFile).toHaveBeenCalledWith(
-        pathResolver.resolvePackAgentPath(output, "example.md"),
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackAgentPath(packName, "example.md"),
         exampleAgentContent,
       );
-      expect(pathResolver.resolvePackAgentPath).toHaveBeenCalledWith(output, "");
-      expect(pathResolver.resolvePackAgentPath).toHaveBeenCalledWith(output, "example.md");
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        `Pack created successfully with name '${packName}'`,
+      );
     });
 
     it("deletes a pack when delete is passed in", async () => {
-      const output = "C#";
+      const packName = "csharp";
+      const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       fileSystem.seed({
-        [pathResolver.resolvePackAgentPath(output, "example.md")]: exampleAgentContent,
-        [pathResolver.resolvePackSkillPath(output, "example/SKILL.md")]: exampleSkillContent,
-        [pathResolver.resolvePackPromptPath(output, "example.md")]: examplePromptContent,
+        [pathResolver.resolvePackAgentPath(packName, "example.md")]:
+          exampleAgentContent,
+        [pathResolver.resolvePackPromptPath(packName, "example.md")]:
+          examplePromptContent,
+        [pathResolver.resolvePackSkillPath(packName, "example/SKILL.md")]:
+          exampleSkillContent,
       });
-      vi.mocked(pathResolver.resolvePackPath).mockClear();
 
       const ctx = {
         ui: {
-          input: vi.fn(async () => output),
+          input: vi.fn().mockResolvedValue(packName),
           notify: vi.fn(),
         },
-      };
+      } satisfies MockContext;
 
       await rootPackResourceReducer("delete", {
         createPackResourceSelector: getMockCreatePackResourceSelector([]),
         ctx: createTestContext(ctx),
         fileSystem,
-        pathResolver: pathResolver,
+        pathResolver,
       });
 
       expect(ctx.ui.input).toHaveBeenCalledWith(
         "pack",
         "What is the name of the pack you want to delete?",
       );
-      const removeDirectory = vi.spyOn(fileSystem, "writeFile");
-
-      expect(removeDirectory).toHaveBeenCalledWith(pathResolver.resolvePackPath(output));
-      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(output);
-
-      expect(ctx.ui.notify).toHaveBeenCalledWith(
-        `Pack deleted successfully with name '${output}'`,
-      );
-    });
-  });
-  describe("Testing skillPackResourceReducer", () => {
-    function seedPacksWithResource(
-      folderNames: string[],
-      pathResolver: (path: string, filename: string) => string,
-      options: { filePath: string; content: string },
-    ): void {
-      const seedMap = folderNames.reduce((acc, dir) => {
-        acc.set(pathResolver(dir, options.filePath), options.content);
-        return acc;
-      }, new Map<string, string>());
-
-      return fileSystem.seed(Object.fromEntries(seedMap));
-    }
-
-    const test = it
-      .extend("folders", () => [
-        "front-end",
-        "back-end",
-        "systems-programming",
-        "sentry",
-        "render",
-      ])
-      .extend(
-        "randomFolder",
-        ({ folders }) => folders[Math.floor(Math.random() * folders.length)],
-      )
-      .extend("randomSkill", () => {
-        const skills = [
-          "typescript",
-          "angular",
-          "golang",
-          "tanstack-query",
-          "react",
-          "vue",
-          "rust",
-          "python",
-          "nodejs",
-          "docker",
-          "kubernetes",
-          "graphql",
-          "postgresql",
-          "redis",
-        ];
-        return skills[Math.floor(Math.random() * skills.length)];
-      });
-
-    test("creates a skill in a pack when create is passed in", async ({
-      folders,
-      randomSkill,
-      randomFolder,
-    }) => {
-      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-        filePath: "example/SKILL.md",
-        content: exampleSkillContent,
-      });
-
-      const ctx = {
-        ui: {
-          select: vi.fn<ExtensionCommandContext["ui"]["select"]>(),
-          input: vi.fn<ExtensionCommandContext["ui"]["input"]>(),
-          notify: vi.fn<ExtensionCommandContext["ui"]["notify"]>(),
-        },
-      } satisfies MockContext;
-
-      await skillPackResourceReducer("create", {
-        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-        pathResolver,
-        openExternalEditor: mockOpenExternalEditor,
-        ctx: createTestContext(ctx),
-        fileSystem,
-      });
-
-      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-      const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath.mock.results[0].value,
-      );
-
-      await expect(readDirectoryNamesSpy).resolves.toEqual(folders);
-
-      ctx.ui.select.mockResolvedValue(randomFolder);
-
-      expect(ctx.ui.select).toHaveBeenCalledWith(
-        "What pack do you want to add the skill to?",
-        folders.map((folder) => `${folder} pack`),
-      );
-
-      ctx.ui.input.mockResolvedValue(randomSkill);
-
-      expect(ctx.ui.input).toHaveBeenCalledWith("Which skill do you want to add to the pack?");
-
-      await expect(ctx.ui.input).resolves.toBe(randomSkill);
-
-      expect(writeFileSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
-        exampleSkillContent,
-      );
-
-      await expect(writeFileSpy).resolves.toBe(undefined);
-
-      const result = await fileSystem.readDirectoryNames(
-        pathResolver.resolvePackSkillPath(randomFolder, ""),
-      );
-
-      expect(ctx.ui.notify).toHaveBeenCalledWith();
-
-      if (result.success) {
-        expect(result.data).toContain(randomSkill);
-      }
-    });
-
-    test("allows the user to edit a skill when the edit command is passed in", async ({
-      folders,
-      randomFolder,
-    }) => {
-      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-        filePath: "example/SKILL.md",
-        content: exampleSkillContent,
-      });
-
-      const ctx = {
-        ui: {
-          select: vi.fn<ExtensionCommandContext["ui"]["select"]>(),
-          editor: vi.fn<ExtensionCommandContext["ui"]["editor"]>(),
-          notify: vi.fn<ExtensionCommandContext["ui"]["notify"]>(),
-        },
-      } satisfies MockContext;
-
-      await skillPackResourceReducer("edit", {
-        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-        openExternalEditor: mockOpenExternalEditor,
-        pathResolver,
-        ctx: createTestContext(ctx),
-        fileSystem,
-      });
-
-      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
-
-      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath.mock.results[0].value,
-      );
-
-      await expect(readDirectoryNamesSpy).resolves.toEqual(folders);
-
-      ctx.ui.select.mockResolvedValue(randomFolder);
-
-      expect(ctx.ui.select).toHaveBeenCalledWith(
-        "What pack has the skill you want to edit?",
-        folders.map((folder) => folder),
-      );
-
-      await expect(ctx.ui.select).resolves.toBe(randomFolder);
-
-      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(randomFolder);
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath.mock.results[0].value,
-      );
-
-      await expect(readDirectoryNamesSpy).resolves.toEqual(["example"]);
-
-      ctx.ui.select.mockResolvedValue("example");
-
-      expect(ctx.ui.select).toHaveBeenCalledWith("What skill do you want to edit?", [
-        "example",
-      ]);
-
-      await expect(ctx.ui.select).resolves.toBe("example");
-
-      expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith("example/SKILL.md");
-
-      expect(mockOpenExternalEditor).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath.mock.results[0].value,
-      );
-
-      await expect(mockOpenExternalEditor).resolves.toBeUndefined();
-    });
-
-    test("deletes a skill in a pack when delete is passed in", async ({
-      folders,
-      randomFolder,
-      randomSkill,
-    }) => {
-      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-        filePath: `${randomSkill}/SKILL.md`,
-        content: exampleSkillContent,
-      });
-
-      const ctx = {
-        ui: {
-          custom: vi.fn(mockCustomUIFactory),
-          select: vi.fn().mockResolvedValue(randomFolder),
-          notify: vi.fn(),
-        },
-      } satisfies MockContext;
-
-      await skillPackResourceReducer("delete", {
-        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-        pathResolver,
-        openExternalEditor: mockOpenExternalEditor,
-
-        ctx: createTestContext(ctx),
-        fileSystem,
-      });
-
-      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath());
-
-      expect(readDirectoryNamesSpy).resolves.toEqual(folders);
-
-      expect(ctx.ui.select).toHaveBeenCalledWith(
-        "Which pack do you want to delete a skill from?",
-        folders,
-      );
-
-      expect(ctx.ui.select).resolves.toEqual(randomFolder);
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath(randomFolder),
-      );
-
-      expect(mockGetMultiSelectorFactory).toHaveBeenCalledWith(
-        "Which skill do you want to delete from the pack?",
-      );
-      expect(ctx.ui.custom).toHaveBeenCalledWith(
-        mockGetMultiSelectorFactory.mock.results[0].value,
-      );
-
-      const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
-
       expect(removeDirectorySpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackSkillPath(randomFolder, randomSkill),
+        pathResolver.resolvePackPath(packName),
+      );
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        `Pack deleted successfully with name '${packName}'`,
       );
     });
-
-    test.todo(
-      "moves skill in pack to the local folder",
-      async ({ folders, randomFolder, randomSkill }) => {
-        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-          filePath: `${randomSkill}/SKILL.md`,
-          content: exampleSkillContent,
-        });
-
-        const ctx = {
-          ui: {
-            select: vi.fn(),
-            notify: vi.fn(),
-            custom: vi.fn(mockCustomUIFactory),
-          },
-        } satisfies MockContext;
-
-        skillPackResourceReducer("move-local", {
-          ctx: createTestContext(ctx),
-          openExternalEditor: mockOpenExternalEditor,
-          pathResolver,
-          fileSystem,
-          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-        });
-
-        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-
-        expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
-
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath.mock.results[0].value,
-        );
-
-        await expect(readDirectoryNamesSpy).resolves.toEqual({
-          success: true,
-          data: folders,
-        });
-
-        ctx.ui.select.mockResolvedValue(randomFolder);
-
-        expect(ctx.ui.select).toHaveBeenCalledWith(
-          "Which pack would you like to move a skill",
-          readDirectoryNamesSpy.mock.results[0].value,
-        );
-
-        await expect(ctx.ui.select).resolves.toEqual(randomFolder);
-
-        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(randomFolder);
-
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-
-        ctx.ui.select.mockResolvedValue(randomSkill);
-
-        expect(ctx.ui.select).toHaveBeenCalledWith(
-          "Which skill would you like to move?",
-          readDirectoryNamesSpy.mock.results[0].value,
-        );
-
-        await expect(ctx.ui.select).resolves.toEqual(randomSkill);
-
-        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
-          randomFolder,
-          `${randomSkill}/SKILL.md`,
-        );
-
-        const readFileSpy = vi.spyOn(fileSystem, "readFile");
-
-        expect(readFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-
-        await expect(readFileSpy).resolves.toEqual({
-          success: true,
-          data: expect.any(String),
-        });
-
-        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
-
-        expect(pathResolver.resolveLocalSkillPath).toHaveBeenCalledWith(
-          `${randomSkill}/SKILL.md`,
-        );
-
-        expect(writeFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolveLocalSkillPath.mock.results[0].value,
-          readFileSpy.mock.results[0].value.data,
-        );
-
-        expect(writeFileSpy).resolves.toBeUndefined();
-
-        const removeFileSpy = vi.spyOn(fileSystem, "removeFile");
-
-        expect(removeFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-      },
-    );
-
-    test.todo(
-      "moves skill in pack to the global folder",
-      async ({ folders, randomFolder, randomSkill }) => {
-        seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-          filePath: `${randomSkill}/SKILL.md`,
-          content: exampleSkillContent,
-        });
-
-        const ctx = {
-          ui: {
-            select: vi.fn(),
-            notify: vi.fn(),
-            custom: vi.fn(mockCustomUIFactory),
-          },
-        } satisfies MockContext;
-
-        skillPackResourceReducer("move-global", {
-          ctx: createTestContext(ctx),
-          openExternalEditor: mockOpenExternalEditor,
-          pathResolver,
-          fileSystem,
-          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-        });
-
-        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-
-        expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
-
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath.mock.results[0].value,
-        );
-
-        await expect(readDirectoryNamesSpy).resolves.toEqual({
-          success: true,
-          data: folders,
-        });
-
-        ctx.ui.select.mockResolvedValue(randomFolder);
-
-        expect(ctx.ui.select).toHaveBeenCalledWith(
-          "Which pack would you like to move a skill",
-          readDirectoryNamesSpy.mock.results[0].value,
-        );
-
-        await expect(ctx.ui.select).resolves.toEqual(randomFolder);
-
-        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(randomFolder);
-
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-
-        ctx.ui.select.mockResolvedValue(randomSkill);
-
-        expect(ctx.ui.select).toHaveBeenCalledWith(
-          "Which skill would you like to move?",
-          readDirectoryNamesSpy.mock.results[0].value,
-        );
-
-        await expect(ctx.ui.select).resolves.toEqual(randomSkill);
-
-        expect(pathResolver.resolvePackSkillPath).toHaveBeenCalledWith(
-          randomFolder,
-          `${randomSkill}/SKILL.md`,
-        );
-
-        const readFileSpy = vi.spyOn(fileSystem, "readFile");
-
-        expect(readFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-
-        await expect(readFileSpy).resolves.toEqual({
-          success: true,
-          data: expect.any(String),
-        });
-
-        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
-
-        expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith(
-          `${randomSkill}/SKILL.md`,
-        );
-
-        expect(writeFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolveGlobalSkillPath.mock.results[0].value,
-          readFileSpy.mock.results[0].value.data,
-        );
-
-        expect(writeFileSpy).resolves.toBeUndefined();
-
-        const removeFileSpy = vi.spyOn(fileSystem, "removeFile");
-
-        expect(removeFileSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackSkillPath.mock.results[1].value,
-        );
-      },
-    );
-
-    test.todo("moves skill in local folder to a pack ", async ({folders, randomSkill, randomFolder}) => {
-
-      seedPacksWithResource(folders, pathResolver.resolvePackSkillPath, {
-        filePath: `${randomSkill}/SKILL.md`,
-        content: exampleSkillContent,
-      });
-
-      const ctx = {
-        ui: {
-          select: vi.fn(),
-          notify: vi.fn(),
-          custom: vi.fn(mockCustomUIFactory),
-        },
-      } satisfies MockContext;
-
-      skillPackResourceReducer("move-local-to-pack", {
-        ctx: createTestContext(ctx),
-        openExternalEditor: mockOpenExternalEditor,
-        pathResolver,
-        fileSystem,
-        getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
-      });
-
-      expect(pathResolver.resolveLocalSkillPath).toHa+99veBeenCalledWith('')
-
-      const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
-
-      expect(pathResolver.resolvePackPath).toHaveBeenCalledWith("");
-
-      expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-        pathResolver.resolvePackPath.mock.results[0].value,
-      );
-
-      await expect(readDirectoryNamesSpy).resolves.toEqual({
-        success: true,
-        data: folders,
-      });
-
-
-
-    });
-    test.todo("moves skill in global folder to a pack ", () => {});
   });
-  describe.todo("Testing agentPackResourceReducer", () => {});
-  describe.todo("Testing promptPackResourceReducer", () => {});
+
+  const test = it
+    .extend("folders", () => [
+      "front-end",
+      "back-end",
+      "systems-programming",
+      "sentry",
+      "render",
+    ])
+    .extend(
+      "randomFolder",
+      ({ folders }) => folders[Math.floor(Math.random() * folders.length)],
+    )
+    .extend("randomResourceName", () => {
+      const resourceNames = [
+        "typescript",
+        "react",
+        "golang",
+        "graphql",
+        "docker",
+        "oracle",
+        "create-react-component",
+      ];
+
+      return resourceNames[Math.floor(Math.random() * resourceNames.length)];
+    });
+
+  function seedPacksWithResource(
+    folderNames: string[],
+    getResourcePath: (packName: string, resourceName: string) => string,
+    content: string,
+  ) {
+    const seedMap = folderNames.reduce<Record<string, string>>(
+      (filesByPath, folderName) => {
+        filesByPath[getResourcePath(folderName, "example")] = content;
+        return filesByPath;
+      },
+      {},
+    );
+
+    fileSystem.seed(seedMap);
+  }
+
+  function definePackResourceReducerSuite(config: {
+    exampleContent: string;
+    getCreateFilePath: (packName: string, resourceName: string) => string;
+    getDeletePath: (packName: string, resourceName: string) => string;
+    getEditFilePath: (packName: string, resourceName: string) => string;
+    getPackResourcePath: (packName: string) => string;
+    kind: "skill" | "agent" | "prompt";
+    reducer: PackResourceReducer;
+  }) {
+    describe(`Testing ${config.kind}PackResourceReducer`, () => {
+      test(`creates a ${config.kind} in a pack when create is passed in`, async ({
+        folders,
+        randomFolder,
+        randomResourceName,
+      }) => {
+        seedPacksWithResource(
+          folders,
+          config.getEditFilePath,
+          config.exampleContent,
+        );
+
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
+        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+
+        const ctx = {
+          ui: {
+            input: vi.fn().mockResolvedValue(randomResourceName),
+            notify: vi.fn(),
+            select: vi.fn().mockResolvedValue(randomFolder),
+          },
+        } satisfies MockContext;
+
+        await config.reducer("create", {
+          ctx: createTestContext(ctx),
+          fileSystem,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+        });
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(),
+        );
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          `What pack do you want to add the ${config.kind} to?`,
+          folders,
+        );
+        expect(ctx.ui.input).toHaveBeenCalledWith(
+          `Which ${config.kind} do you want to add to the pack?`,
+        );
+        expect(writeFileSpy).toHaveBeenCalledWith(
+          config.getCreateFilePath(randomFolder, randomResourceName),
+          config.exampleContent,
+        );
+        expect(ctx.ui.notify).toHaveBeenCalledWith(
+          `${config.kind} created in pack '${randomFolder}'`,
+        );
+
+        await expect(
+          fileSystem.readFile(
+            config.getEditFilePath(randomFolder, randomResourceName),
+          ),
+        ).resolves.toMatchObject({
+          data: config.exampleContent,
+          success: true,
+        });
+      });
+
+      test(`allows the user to edit a ${config.kind} when the edit command is passed in`, async ({
+        folders,
+        randomFolder,
+      }) => {
+        seedPacksWithResource(
+          folders,
+          config.getEditFilePath,
+          config.exampleContent,
+        );
+
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
+
+        const ctx = {
+          ui: {
+            notify: vi.fn(),
+            select: vi
+              .fn<ExtensionCommandContext["ui"]["select"]>()
+              .mockResolvedValueOnce(randomFolder)
+              .mockResolvedValueOnce("example"),
+          },
+        } satisfies MockContext;
+
+        await config.reducer("edit", {
+          ctx: createTestContext(ctx),
+          fileSystem,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+        });
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(),
+        );
+        expect(ctx.ui.select).toHaveBeenNthCalledWith(
+          1,
+          `What pack has the ${config.kind} you want to edit?`,
+          folders,
+        );
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          config.getPackResourcePath(randomFolder),
+        );
+        expect(ctx.ui.select).toHaveBeenNthCalledWith(
+          2,
+          `What ${config.kind} do you want to edit?`,
+          ["example"],
+        );
+        expect(mockOpenExternalEditor).toHaveBeenCalledWith(
+          config.getEditFilePath(randomFolder, "example"),
+        );
+      });
+
+      test(`deletes a ${config.kind} in a pack when delete is passed in`, async ({
+        folders,
+        randomFolder,
+        randomResourceName,
+      }) => {
+        fileSystem.seed(
+          Object.fromEntries(
+            folders.map((folderName) => [
+              config.getEditFilePath(folderName, randomResourceName),
+              config.exampleContent,
+            ]),
+          ),
+        );
+
+        const readDirectoryNamesSpy = vi.spyOn(
+          fileSystem,
+          "readDirectoryNames",
+        );
+        const removeResourceSpy =
+          config.kind === "skill"
+            ? vi.spyOn(fileSystem, "removeDirectory")
+            : vi.spyOn(fileSystem, "removeFile");
+
+        const ctx = {
+          ui: {
+            notify: vi.fn(),
+            select: vi
+              .fn<ExtensionCommandContext["ui"]["select"]>()
+              .mockResolvedValueOnce(randomFolder)
+              .mockResolvedValueOnce(randomResourceName),
+          },
+        } satisfies MockContext;
+
+        await config.reducer("delete", {
+          ctx: createTestContext(ctx),
+          fileSystem,
+          getMuiltiSelectorFactory: mockGetMultiSelectorFactory,
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+        });
+
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          pathResolver.resolvePackPath(),
+        );
+        expect(ctx.ui.select).toHaveBeenNthCalledWith(
+          1,
+          `Which pack do you want to delete a ${config.kind} from?`,
+          folders,
+        );
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
+          config.getPackResourcePath(randomFolder),
+        );
+        expect(ctx.ui.select).toHaveBeenNthCalledWith(
+          2,
+          `Which ${config.kind} do you want to delete from the pack?`,
+          [randomResourceName],
+        );
+        expect(removeResourceSpy).toHaveBeenCalledWith(
+          config.getDeletePath(randomFolder, randomResourceName),
+        );
+        expect(ctx.ui.notify).toHaveBeenCalledWith(
+          `${config.kind} deleted from pack '${randomFolder}'`,
+        );
+      });
+    });
+  }
+
+  definePackResourceReducerSuite({
+    exampleContent: exampleSkillContent,
+    getCreateFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
+    getDeletePath: (packName, resourceName) =>
+      pathResolver.resolvePackSkillPath(packName, resourceName),
+    getEditFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackSkillPath(packName, ""),
+    kind: "skill",
+    reducer: skillPackResourceReducer,
+  });
+
+  definePackResourceReducerSuite({
+    exampleContent: exampleAgentContent,
+    getCreateFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+    getDeletePath: (packName, resourceName) =>
+      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+    getEditFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackAgentPath(packName, ""),
+    kind: "agent",
+    reducer: agentPackResourceReducer,
+  });
+
+  definePackResourceReducerSuite({
+    exampleContent: examplePromptContent,
+    getCreateFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+    getDeletePath: (packName, resourceName) =>
+      pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+    getEditFilePath: (packName, resourceName) =>
+      pathResolver.resolvePackPromptPath(packName, `${resourceName}.md`),
+    getPackResourcePath: (packName) =>
+      pathResolver.resolvePackPromptPath(packName, ""),
+    kind: "prompt",
+    reducer: promptPackResourceReducer,
+  });
 });
