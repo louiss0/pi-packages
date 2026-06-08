@@ -469,6 +469,59 @@ describe("Pack", () => {
         });
       });
 
+      test(`does not overwrite an existing ${config.kind} in a pack`, async ({
+        folders,
+        randomFolder,
+        randomResourceName,
+      }) => {
+        fileSystem.seed({
+          [config.getCreateFilePath(randomFolder, randomResourceName)]:
+            "existing resource content",
+          ...Object.fromEntries(
+            folders
+              .filter((folderName) => folderName !== randomFolder)
+              .map((folderName) => [
+                config.getEditFilePath(folderName, "example"),
+                config.exampleContent,
+              ]),
+          ),
+        });
+
+        const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+        const ctx = {
+          ui: {
+            notify: vi.fn(),
+            select: vi.fn().mockResolvedValue(randomFolder),
+            ...config.buildCreateUi(randomResourceName),
+          },
+        } satisfies MockContext;
+
+        await config.reducer("create", {
+          ctx: createTestContext(ctx),
+          fileSystem,
+          getMultiSelectorFactory: mockGetMultiSelectorFactory,
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+        });
+
+        expect(writeFileSpy).not.toHaveBeenCalledWith(
+          config.getCreateFilePath(randomFolder, randomResourceName),
+          config.getCreateContent(randomResourceName),
+        );
+        expect(ctx.ui.notify).toHaveBeenCalledWith(
+          `This ${config.kind} already exists in pack '${randomFolder}'`,
+          "error",
+        );
+        await expect(
+          fileSystem.readFile(
+            config.getEditFilePath(randomFolder, randomResourceName),
+          ),
+        ).resolves.toEqual({
+          data: "existing resource content",
+          success: true,
+        });
+      });
+
       test(`allows the user to edit a ${config.kind} when the edit command is passed in`, async ({
         folders,
         randomFolder,
@@ -695,6 +748,55 @@ describe("Pack", () => {
         expect(removeResourceSpy).toHaveBeenCalledWith(
           config.getDeletePath(randomFolder, randomResourceName),
         );
+      });
+
+      test(`does not delete a ${config.kind} from a pack when the local destination exists`, async ({
+        randomFolder,
+        randomResourceName,
+      }) => {
+        fileSystem.seed({
+          [config.getEditFilePath(randomFolder, randomResourceName)]:
+            config.exampleContent,
+          [config.getLocalFilePath(randomResourceName)]:
+            "existing local resource",
+        });
+
+        const removeResourceSpy = config.isDirectoryResource
+          ? vi.spyOn(fileSystem, "removeDirectory")
+          : vi.spyOn(fileSystem, "removeFile");
+        const ctx = {
+          ui: {
+            notify: vi.fn(),
+            select: vi
+              .fn<ExtensionCommandContext["ui"]["select"]>()
+              .mockResolvedValueOnce(randomFolder)
+              .mockResolvedValueOnce(randomResourceName),
+          },
+        } satisfies MockContext;
+
+        await config.reducer("move-local", {
+          ctx: createTestContext(ctx),
+          fileSystem,
+          getMultiSelectorFactory: mockGetMultiSelectorFactory,
+          openExternalEditor: mockOpenExternalEditor,
+          pathResolver,
+        });
+
+        expect(ctx.ui.notify).toHaveBeenCalledWith(
+          `This local ${config.kind} already exists`,
+          "error",
+        );
+        expect(removeResourceSpy).not.toHaveBeenCalledWith(
+          config.getDeletePath(randomFolder, randomResourceName),
+        );
+        await expect(
+          fileSystem.readFile(
+            config.getEditFilePath(randomFolder, randomResourceName),
+          ),
+        ).resolves.toMatchObject({
+          data: config.exampleContent,
+          success: true,
+        });
       });
 
       test(`moves a local ${config.kind} into a pack`, async ({

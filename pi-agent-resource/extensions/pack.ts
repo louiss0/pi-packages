@@ -574,22 +574,48 @@ export function skillPackResourceReducer(
         }
 
         const skillName = requiredValues.name;
+        const skillFilePath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          `${skillName}/SKILL.md`,
+        );
+        const existingSkillResult =
+          await deps.fileSystem.readFile(skillFilePath);
+
+        if (existingSkillResult.success) {
+          deps.ctx.ui.notify(
+            `This skill already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
         const skillPath = deps.pathResolver.resolvePackSkillPath(
           packName,
           skillName,
         );
-        await deps.fileSystem.mkdir(skillPath, { recursive: true });
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+        const directoryResult = await deps.fileSystem.mkdir(skillPath, {
+          recursive: true,
+        });
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack skill", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          skillFilePath,
           renderSkillMarkdown({
             name: requiredValues.name,
             description: requiredValues.description,
             ...optionalValues,
           }),
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack skill", "error");
+          return;
+        }
+
         deps.ctx.ui.notify(`skill created in pack '${packName}'`);
       },
       [EDIT_COMMAND]: async () => {
@@ -684,6 +710,17 @@ export function skillPackResourceReducer(
           return;
         }
 
+        const destinationPath = deps.pathResolver.resolveLocalSkillPath(
+          `${skillName}/SKILL.md`,
+        );
+        const existingSkillResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingSkillResult.success) {
+          deps.ctx.ui.notify("This local skill already exists", "error");
+          return;
+        }
+
         const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolveLocalSkillPath(skillName),
           {
@@ -697,7 +734,7 @@ export function skillPackResourceReducer(
         }
 
         const writeResult = await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveLocalSkillPath(`${skillName}/SKILL.md`),
+          destinationPath,
           contentResult.data,
         );
 
@@ -757,17 +794,41 @@ export function skillPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          `${skillName}/SKILL.md`,
+        );
+        const existingSkillResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingSkillResult.success) {
+          deps.ctx.ui.notify(
+            `This skill already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackSkillPath(packName, skillName),
           { recursive: true },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack skill", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack skill", "error");
+          return;
+        }
+
         await deps.fileSystem.removeDirectory(
           deps.pathResolver.resolveGlobalSkillPath(skillName),
         );
@@ -819,17 +880,41 @@ export function skillPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackSkillPath(
+          packName,
+          `${skillName}/SKILL.md`,
+        );
+        const existingSkillResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingSkillResult.success) {
+          deps.ctx.ui.notify(
+            `This skill already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackSkillPath(packName, skillName),
           { recursive: true },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack skill", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack skill", "error");
+          return;
+        }
+
         await deps.fileSystem.removeDirectory(
           deps.pathResolver.resolveLocalSkillPath(skillName),
         );
@@ -882,16 +967,39 @@ export function skillPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolveGlobalSkillPath(
+          `${skillName}/SKILL.md`,
+        );
+        const existingSkillResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingSkillResult.success) {
+          deps.ctx.ui.notify("This global skill already exists", "error");
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolveGlobalSkillPath(skillName),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveGlobalSkillPath(`${skillName}/SKILL.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the global skill", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the global skill", "error");
+          return;
+        }
+
         await deps.fileSystem.removeDirectory(
           deps.pathResolver.resolvePackSkillPath(packName, skillName),
         );
@@ -983,16 +1091,43 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const agentFilePath = deps.pathResolver.resolvePackAgentPath(
+          packName,
+          `${values.name}.md`,
+        );
+        const existingAgentResult =
+          await deps.fileSystem.readFile(agentFilePath);
+
+        if (existingAgentResult.success) {
+          deps.ctx.ui.notify(
+            `This agent already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackAgentPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackAgentPath(packName, `${values.name}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack agent", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          agentFilePath,
           renderAgentFrontmatter(values),
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack agent", "error");
+          return;
+        }
+
         deps.ctx.ui.notify(`agent created in pack '${packName}'`);
       },
       [EDIT_COMMAND]: async () => {
@@ -1084,13 +1219,39 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(deps.pathResolver.resolveLocalAgentPath(), {
-          recursive: true,
-        });
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveLocalAgentPath(`${agentName}.md`),
+        const destinationPath = deps.pathResolver.resolveLocalAgentPath(
+          `${agentName}.md`,
+        );
+        const existingAgentResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingAgentResult.success) {
+          deps.ctx.ui.notify("This local agent already exists", "error");
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
+          deps.pathResolver.resolveLocalAgentPath(),
+          {
+            recursive: true,
+          },
+        );
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the local agent", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the local agent", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {
@@ -1140,16 +1301,43 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackAgentPath(
+          packName,
+          `${agentName}.md`,
+        );
+        const existingAgentResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingAgentResult.success) {
+          deps.ctx.ui.notify(
+            `This agent already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackAgentPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack agent", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack agent", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {
@@ -1199,16 +1387,43 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackAgentPath(
+          packName,
+          `${agentName}.md`,
+        );
+        const existingAgentResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingAgentResult.success) {
+          deps.ctx.ui.notify(
+            `This agent already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackAgentPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack agent", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack agent", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_GLOBAL_COMMAND]: async () => {
@@ -1259,16 +1474,39 @@ export function agentPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolveGlobalAgentPath(
+          `${agentName}.md`,
+        );
+        const existingAgentResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingAgentResult.success) {
+          deps.ctx.ui.notify("This global agent already exists", "error");
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolveGlobalAgentPath(),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the global agent", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the global agent", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [DELETE_COMMAND]: async () => {
@@ -1369,19 +1607,43 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const promptFilePath = deps.pathResolver.resolvePackPromptPath(
+          packName,
+          `${values.name}.md`,
+        );
+        const existingPromptResult =
+          await deps.fileSystem.readFile(promptFilePath);
+
+        if (existingPromptResult.success) {
+          deps.ctx.ui.notify(
+            `This prompt already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackPromptPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackPromptPath(
-            packName,
-            `${values.name}.md`,
-          ),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack prompt", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          promptFilePath,
           renderPromptMarkdown(values, template),
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack prompt", "error");
+          return;
+        }
+
         deps.ctx.ui.notify(`prompt created in pack '${packName}'`);
       },
       [EDIT_COMMAND]: async () => {
@@ -1473,16 +1735,39 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolveLocalPromptPath(
+          `${promptName}.md`,
+        );
+        const existingPromptResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingPromptResult.success) {
+          deps.ctx.ui.notify("This local prompt already exists", "error");
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolveLocalPromptPath(),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the local prompt", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the local prompt", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_GLOBAL_TO_PACK_COMMAND]: async () => {
@@ -1532,16 +1817,43 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackPromptPath(
+          packName,
+          `${promptName}.md`,
+        );
+        const existingPromptResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingPromptResult.success) {
+          deps.ctx.ui.notify(
+            `This prompt already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackPromptPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack prompt", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack prompt", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_LOCAL_TO_PACK_COMMAND]: async () => {
@@ -1591,16 +1903,43 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolvePackPromptPath(
+          packName,
+          `${promptName}.md`,
+        );
+        const existingPromptResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingPromptResult.success) {
+          deps.ctx.ui.notify(
+            `This prompt already exists in pack '${packName}'`,
+            "error",
+          );
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolvePackPromptPath(packName, ""),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the pack prompt", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the pack prompt", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [MOVE_GLOBAL_COMMAND]: async () => {
@@ -1651,16 +1990,39 @@ export function promptPackResourceReducer(
           return;
         }
 
-        await deps.fileSystem.mkdir(
+        const destinationPath = deps.pathResolver.resolveGlobalPromptPath(
+          `${promptName}.md`,
+        );
+        const existingPromptResult =
+          await deps.fileSystem.readFile(destinationPath);
+
+        if (existingPromptResult.success) {
+          deps.ctx.ui.notify("This global prompt already exists", "error");
+          return;
+        }
+
+        const directoryResult = await deps.fileSystem.mkdir(
           deps.pathResolver.resolveGlobalPromptPath(),
           {
             recursive: true,
           },
         );
-        await deps.fileSystem.writeFile(
-          deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`),
+
+        if (!directoryResult.success) {
+          deps.ctx.ui.notify("Could not create the global prompt", "error");
+          return;
+        }
+
+        const writeResult = await deps.fileSystem.writeFile(
+          destinationPath,
           contentResult.data,
         );
+
+        if (!writeResult.success) {
+          deps.ctx.ui.notify("Could not write the global prompt", "error");
+          return;
+        }
+
         await deps.fileSystem.removeFile(sourcePath);
       },
       [DELETE_COMMAND]: async () => {
