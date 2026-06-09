@@ -1,5 +1,5 @@
 packages:
-  - "pi-form-components"
+  - "bundled/*"
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
   - "internal/*"
@@ -7,9 +7,9 @@ packages:
   - "pi-prompt-form"
   - "pi-prompt-guard"
 allowBuilds:
-  '@biomejs/biome': true
-  '@google/genai': true
-  '@swc/core': true
+  "@biomejs/biome": true
+  "@google/genai": true
+  "@swc/core": true
   esbuild: true
   koffi: true
   nx: true
