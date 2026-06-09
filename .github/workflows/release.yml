@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write
+  id-token: read
 
 jobs:
   release:
@@ -39,8 +39,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -58,5 +56,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: |
           pnpm exec nx release --yes
