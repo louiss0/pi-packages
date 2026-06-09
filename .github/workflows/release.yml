@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  id-token: read
+  contents: read
+  id-token: write
 
 jobs:
   release:
