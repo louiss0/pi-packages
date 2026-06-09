@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const packageRoot = process.argv[2];
@@ -13,7 +13,6 @@ if (!packageRoot || !bundledPackageRoot) {
 
 const packageJsonPath = path.join(packageRoot, "package.json");
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
-const resolvedPackageRoot = path.resolve(packageRoot);
 const resolvedBundledPackageRoot = path.resolve(bundledPackageRoot);
 const packageEntries = ["main", "module", "types", "exports", "bin", "pi"];
 
@@ -67,15 +66,7 @@ for (const packageEntry of packageEntries) {
   }
 }
 
-if (resolvedPackageRoot !== resolvedBundledPackageRoot) {
-  await rm(resolvedBundledPackageRoot, { force: true, recursive: true });
-  await mkdir(resolvedBundledPackageRoot, { recursive: true });
-  await cp(path.join(resolvedPackageRoot, "dist"), resolvedBundledPackageRoot, {
-    recursive: true,
-  });
-} else {
-  await mkdir(resolvedBundledPackageRoot, { recursive: true });
-}
+await mkdir(resolvedBundledPackageRoot, { recursive: true });
 await writeFile(
   path.join(resolvedBundledPackageRoot, "package.json"),
   `${JSON.stringify(packageJson, null, 2)}\n`,
