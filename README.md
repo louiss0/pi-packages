@@ -57,6 +57,12 @@ pnpm nx g @code-fixer-23/pi-generators:extension my-package --no-interactive
 pnpm nx g @code-fixer-23/pi-generators:package my-package --no-interactive
 ```
 
+Generated shared packages publish from `bundled/<project-name>`. Their production build artifacts are written directly into that bundled package root, not into a nested `dist/` folder. The generated `prepare-production-package` target uses:
+
+```sh
+node ../tools/prepare-bundled-package.mjs . ../bundled/<project-name>
+```
+
 ### Add prompts or skills too
 
 Both generators always include `extensions` and can also add `prompts` or `skills`.
