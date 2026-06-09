@@ -1,3 +1,17 @@
+## 1.1.1 (2026-06-09)
+
+### 🚀 Features
+
+- **pi-agent-resource:** expand pack resource flows and shared resource UI ([#3](https://github.com/louiss0/pi-packages/pull/3))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 2.0.2
+
+### ❤️ Thank You
+
+- shelton louis @louiss0
+
 ## 1.1.0 (2026-06-01)
 
 ### 🚀 Features

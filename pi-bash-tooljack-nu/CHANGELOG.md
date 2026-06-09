@@ -1,3 +1,20 @@
+## 1.1.2 (2026-06-09)
+
+### 🩹 Fixes
+
+- **workspace:** enforce vitest tsconfig types ([3740977](https://github.com/louiss0/pi-packages/commit/3740977))
+- **workspace:** migrate biome config and format files ([d7155ac](https://github.com/louiss0/pi-packages/commit/d7155ac))
+- **workspace:** add MIT licenses and vitest globals ([9e811c3](https://github.com/louiss0/pi-packages/commit/9e811c3))
+- **packages:** correct raw asset URLs ([5ce9a25](https://github.com/louiss0/pi-packages/commit/5ce9a25))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 2.0.2
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.1 (2026-05-28)
 
 ### 🩹 Fixes

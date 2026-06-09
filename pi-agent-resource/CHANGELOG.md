@@ -1,3 +1,26 @@
+## 3.1.0 (2026-06-09)
+
+### 🚀 Features
+
+- **pi-agent-resource:** expand pack resource flows and shared resource UI ([#3](https://github.com/louiss0/pi-packages/pull/3))
+
+### 🩹 Fixes
+
+- **pi-agent-resource:** relax pack test spy typing ([a62b0fa](https://github.com/louiss0/pi-packages/commit/a62b0fa))
+- **workspace:** align pi runtime dependency versions ([b99d8ef](https://github.com/louiss0/pi-packages/commit/b99d8ef))
+- **workspace:** migrate biome config and format files ([d7155ac](https://github.com/louiss0/pi-packages/commit/d7155ac))
+- **workspace:** add MIT licenses and vitest globals ([9e811c3](https://github.com/louiss0/pi-packages/commit/9e811c3))
+- **packages:** correct raw asset URLs ([5ce9a25](https://github.com/louiss0/pi-packages/commit/5ce9a25))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 2.0.2
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+- shelton louis @louiss0
+
 ## 3.0.2 (2026-05-28)
 
 ### 🩹 Fixes

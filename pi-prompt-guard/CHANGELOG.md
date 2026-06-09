@@ -1,3 +1,13 @@
+## 1.0.2 (2026-06-09)
+
+### 🚀 Features
+
+- **pi-agent-resource:** expand pack resource flows and shared resource UI ([#3](https://github.com/louiss0/pi-packages/pull/3))
+
+### ❤️ Thank You
+
+- shelton louis @louiss0
+
 ## 1.0.1 (2026-06-01)
 
 ### 🩹 Fixes
