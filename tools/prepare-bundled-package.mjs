@@ -2,18 +2,18 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const packageRoot = process.argv[2];
-const bundledPackageRoot = process.argv[3];
+const packageDistRoot = process.argv[3];
 
-if (!packageRoot || !bundledPackageRoot) {
+if (!packageRoot || !packageDistRoot) {
   console.error(
-    "Usage: node tools/prepare-bundled-package.mjs <package-root> <destination>",
+    "Usage: node tools/prepare-bundled-package.mjs <package-root> <dist-root>",
   );
   process.exit(1);
 }
 
 const packageJsonPath = path.join(packageRoot, "package.json");
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
-const resolvedBundledPackageRoot = path.resolve(bundledPackageRoot);
+const resolvedPackageDistRoot = path.resolve(packageDistRoot);
 const packageEntries = ["main", "module", "types", "exports", "bin", "pi"];
 
 function getBuildPath(sourcePath, entryKey) {
@@ -66,8 +66,8 @@ for (const packageEntry of packageEntries) {
   }
 }
 
-await mkdir(resolvedBundledPackageRoot, { recursive: true });
+await mkdir(resolvedPackageDistRoot, { recursive: true });
 await writeFile(
-  path.join(resolvedBundledPackageRoot, "package.json"),
+  path.join(resolvedPackageDistRoot, "package.json"),
   `${JSON.stringify(packageJson, null, 2)}\n`,
 );

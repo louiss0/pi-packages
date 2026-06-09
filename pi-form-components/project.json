@@ -30,7 +30,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "node ../tools/prepare-bundled-package.mjs . ../bundled/pi-form-components",
+        "command": "node ../tools/prepare-bundled-package.mjs . ./dist",
         "cwd": "{projectRoot}"
       }
     },
@@ -38,7 +38,7 @@
       "executor": "@nx/js:release-publish",
       "dependsOn": ["prepare-production-package"],
       "options": {
-        "packageRoot": "bundled/pi-form-components"
+        "packageRoot": "pi-form-components/dist"
       }
     },
     "test": {

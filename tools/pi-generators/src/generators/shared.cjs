@@ -195,7 +195,7 @@ function getPackageTargets(projectRoot) {
       executor: "nx:run-commands",
       dependsOn: ["build"],
       options: {
-        command: `node ../tools/prepare-bundled-package.mjs . ../bundled/${projectRoot}`,
+        command: "node ../tools/prepare-bundled-package.mjs . ./dist",
         cwd: "{projectRoot}",
       },
     },
@@ -203,7 +203,7 @@ function getPackageTargets(projectRoot) {
       executor: "@nx/js:release-publish",
       dependsOn: ["prepare-production-package"],
       options: {
-        packageRoot: `bundled/${projectRoot}`,
+        packageRoot: `${projectRoot}/dist`,
       },
     },
   };
@@ -406,34 +406,6 @@ function ensureVitestTsConfigTypes(tree, filePath) {
   writeJson(tree, filePath, tsconfig);
 }
 
-function ensureBundledPackageOutput(tree, projectRoot, projectKind) {
-  if (projectKind !== "package") {
-    return;
-  }
-
-  const viteConfigPath = `${projectRoot}/vite.lib.config.ts`;
-
-  if (!tree.exists(viteConfigPath)) {
-    return;
-  }
-
-  const content = tree.read(viteConfigPath, "utf8");
-
-  if (!content) {
-    return;
-  }
-
-  const bundledOutputRoot = `../bundled/${projectRoot}`;
-  const nextContent = content.replaceAll(
-    'outDir: "dist"',
-    `outDir: "${bundledOutputRoot}"`,
-  );
-
-  if (nextContent !== content) {
-    tree.write(viteConfigPath, nextContent);
-  }
-}
-
 function visitFiles(tree, root, callback) {
   for (const entry of tree.children(root)) {
     const entryPath = `${root}/${entry}`;
@@ -487,7 +459,6 @@ async function createPiPackageGenerator(tree, options, projectKind) {
     ensureVitestGlobals(tree, options.name);
     normalizeVitestImports(tree, options.name);
   }
-  ensureBundledPackageOutput(tree, options.name, projectKind);
   writeProjectJson(tree, options.name, projectKind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);

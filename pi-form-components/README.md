@@ -288,7 +288,7 @@ pnpm nx run pi-form-components:metadata
 pnpm nx run pi-form-components:build
 ```
 
-Production build artifacts are emitted directly into `bundled/pi-form-components` so the bundled package root contains `index.js`, `index.d.ts`, and `package.json` without a nested `dist/` folder.
+Production build artifacts are emitted into `dist/`. The `prepare-production-package` target writes the publishable `package.json` into that same folder so `dist/` contains `index.js`, `index.d.ts`, and `package.json`.
 
 ```sh
 pnpm nx run pi-form-components:prepare-production-package
