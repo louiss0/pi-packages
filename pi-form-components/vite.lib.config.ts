@@ -13,9 +13,9 @@ export default defineConfig({
       formats: ["es"],
       fileName: () => "index.js",
     },
-    outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
+    outDir: "../bundled/pi-form-components",
     rollupOptions: {
       external: ["@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"],
     },
@@ -23,7 +23,7 @@ export default defineConfig({
   plugins: [
     dts({
       entryRoot: "src",
-      outDir: "dist",
+      outDir: "../bundled/pi-form-components",
       insertTypesEntry: true,
       rollupTypes: false,
       tsconfigPath: path.resolve(packageRoot, "tsconfig.lib.json"),

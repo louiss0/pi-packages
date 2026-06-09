@@ -2,12 +2,11 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const packageRoot = process.argv[2];
-const bundledRoot = process.argv[3];
-const buildFolderName = process.argv[4] ?? "dist";
+const bundledPackageRoot = process.argv[3];
 
-if (!packageRoot || !bundledRoot) {
+if (!packageRoot || !bundledPackageRoot) {
   console.error(
-    "Usage: node tools/prepare-bundled-package.mjs <package-root> <bundled-root> [build-folder-name]",
+    "Usage: node tools/prepare-bundled-package.mjs <package-root> <destination>",
   );
   process.exit(1);
 }
@@ -15,10 +14,7 @@ if (!packageRoot || !bundledRoot) {
 const packageJsonPath = path.join(packageRoot, "package.json");
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
 const resolvedPackageRoot = path.resolve(packageRoot);
-const bundledPackageRoot = path.join(
-  bundledRoot,
-  path.basename(resolvedPackageRoot),
-);
+const resolvedBundledPackageRoot = path.resolve(bundledPackageRoot);
 const packageEntries = ["main", "module", "types", "exports", "bin", "pi"];
 
 function getBuildPath(sourcePath, entryKey) {
@@ -35,14 +31,11 @@ function getProductionPath(value, entryKey) {
   }
 
   if (value.startsWith("./src/")) {
-    return getBuildPath(
-      value.replace("./src/", `./${buildFolderName}/`),
-      entryKey,
-    );
+    return getBuildPath(value.replace("./src/", "./"), entryKey);
   }
 
   if (value.startsWith("src/")) {
-    return getBuildPath(value.replace("src/", `${buildFolderName}/`), entryKey);
+    return getBuildPath(value.replace("src/", ""), entryKey);
   }
 
   return value;
@@ -74,14 +67,16 @@ for (const packageEntry of packageEntries) {
   }
 }
 
-await rm(bundledPackageRoot, { force: true, recursive: true });
-await mkdir(bundledPackageRoot, { recursive: true });
-await cp(
-  path.join(packageRoot, buildFolderName),
-  path.join(bundledPackageRoot, buildFolderName),
-  { recursive: true },
-);
+if (resolvedPackageRoot !== resolvedBundledPackageRoot) {
+  await rm(resolvedBundledPackageRoot, { force: true, recursive: true });
+  await mkdir(resolvedBundledPackageRoot, { recursive: true });
+  await cp(path.join(resolvedPackageRoot, "dist"), resolvedBundledPackageRoot, {
+    recursive: true,
+  });
+} else {
+  await mkdir(resolvedBundledPackageRoot, { recursive: true });
+}
 await writeFile(
-  path.join(bundledPackageRoot, "package.json"),
+  path.join(resolvedBundledPackageRoot, "package.json"),
   `${JSON.stringify(packageJson, null, 2)}\n`,
 );

@@ -195,7 +195,7 @@ function getPackageTargets(projectRoot) {
       executor: "nx:run-commands",
       dependsOn: ["build"],
       options: {
-        command: "node ../tools/prepare-bundled-package.mjs . ../bundled dist",
+        command: `node ../tools/prepare-bundled-package.mjs . ../bundled/${projectRoot}`,
         cwd: "{projectRoot}",
       },
     },
