@@ -533,7 +533,7 @@ describe("shared/components", () => {
     }
 
     it("renders the form with errors when submitted with invalid input", () => {
-      const errorFields = { "field-1": "Name is required" };
+      const errorFields = { "field-1": ["Name is required"] };
       const { form, done, parse } = createForm(
         "Title",
         [new TestField("field-1")],
@@ -548,8 +548,10 @@ describe("shared/components", () => {
       expect(done).not.toHaveBeenCalled();
 
       const lines = form.render(45).join("\n");
-      for (const value of Object.values(errorFields)) {
-        expect(lines.includes(value)).toBeTruthy();
+      for (const messages of Object.values(errorFields)) {
+        for (const message of messages) {
+          expect(lines.includes(message)).toBeTruthy();
+        }
       }
     });
 
@@ -613,14 +615,14 @@ describe("shared/components", () => {
       const secondField = new TestField("field-2");
       const { form } = createForm("Title", [firstField, secondField], {
         parse: (values) => {
-          const errors: Record<string, string> = {};
+          const errors: Record<string, string[]> = {};
 
           if (values["field-1"] === "") {
-            errors["field-1"] = "Field 1 is required";
+            errors["field-1"] = ["Field 1 is required"];
           }
 
           if (values["field-2"] === "") {
-            errors["field-2"] = "Field 2 is required";
+            errors["field-2"] = ["Field 2 is required"];
           }
 
           return Object.keys(errors).length > 0 ? errors : undefined;

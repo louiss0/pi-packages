@@ -679,7 +679,7 @@ export type FormField = FormComponent;
 
 export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
   | {
-      [key in keyof T]?: string;
+      [key in keyof T]?: string[];
     }
   | undefined;
 
@@ -842,7 +842,7 @@ export class Form<T extends Record<string, string | number | boolean>>
       const error = parsed?.[field.name];
 
       if (error !== undefined) {
-        field.setError([error]);
+        field.setError(error);
         return;
       }
 

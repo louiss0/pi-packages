@@ -323,7 +323,7 @@ function parsePromptArgumentValues(
     return undefined;
   }
 
-  const errors = new Map<string, string>();
+  const errors = new Map<string, string[]>();
 
   for (const issue of result.issues as Array<
     BaseIssue<unknown> | StringIssue
@@ -334,14 +334,11 @@ function parsePromptArgumentValues(
       continue;
     }
 
-    const currentError = errors.get(key);
-    errors.set(
-      key,
-      currentError ? `${currentError}\n${issue.message}` : issue.message,
-    );
+    const currentError = errors.get(key) ?? [];
+    errors.set(key, [...currentError, issue.message]);
   }
 
-  return Object.fromEntries(errors.entries()) as Record<string, string>;
+  return Object.fromEntries(errors.entries()) as Record<string, string[]>;
 }
 
 type MaybeCollectExtraValueOptions = {

@@ -10,7 +10,7 @@ export const parseObjectErrors = <T extends Record<string, unknown>>(
     return undefined;
   }
 
-  const errors = new Map<string, string>();
+  const errors = new Map<string, string[]>();
 
   for (const issue of result.issues) {
     const key = issue.path?.[0].key;
@@ -19,15 +19,12 @@ export const parseObjectErrors = <T extends Record<string, unknown>>(
       continue;
     }
 
-    const currentError = errors.get(key);
-    errors.set(
-      key,
-      currentError ? `${currentError}\n${issue.message}` : issue.message,
-    );
+    const currentError = errors.get(key) ?? [];
+    errors.set(key, [...currentError, issue.message]);
   }
 
   return Object.fromEntries(errors.entries()) as Record<
     keyof typeof values,
-    string
+    string[]
   >;
 };
