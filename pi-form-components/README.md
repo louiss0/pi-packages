@@ -288,7 +288,7 @@ pnpm nx run pi-form-components:metadata
 pnpm nx run pi-form-components:build
 ```
 
-Production build artifacts are emitted into `dist/`. The `prepare-production-package` target writes the publishable `package.json` into that same folder so `dist/` contains `index.js`, `index.d.ts`, and `package.json`.
+Production build artifacts are emitted into `bundled/pi-form-components` with a Vite library build. Static publish files such as `README.md` live in `public/` and are copied into the bundled output. The `prepare-production-package` target writes the publishable `package.json` into that same bundled folder.
 
 ```sh
 pnpm nx run pi-form-components:prepare-production-package

@@ -157,6 +157,11 @@ function updatePackageJson(tree, projectRoot, projectKind) {
     delete packageJson.devDependencies.tsx;
   }
 
+  if (projectKind === "package") {
+    delete packageJson.devDependencies?.vite;
+    delete packageJson.devDependencies?.["vite-plugin-dts"];
+  }
+
   if (projectKind === "extension") {
     const keywords = new Set(packageJson.keywords ?? []);
     keywords.add("pi-package");
@@ -191,11 +196,19 @@ function getTestTarget(runner) {
 
 function getPackageTargets(projectRoot) {
   return {
+    build: {
+      executor: "nx:run-commands",
+      dependsOn: ["^build"],
+      options: {
+        command: `rm -rf ../bundled/${projectRoot} && pnpm exec vite build --config vite.lib.config.ts && pnpm exec tsc -p tsconfig.lib.json --emitDeclarationOnly --outDir ../bundled/${projectRoot}`,
+        cwd: "{projectRoot}",
+      },
+    },
     "prepare-production-package": {
       executor: "nx:run-commands",
       dependsOn: ["build"],
       options: {
-        command: "node ../tools/prepare-bundled-package.mjs . ./dist",
+        command: `node ../tools/prepare-bundled-package.mjs . ../bundled/${projectRoot}`,
         cwd: "{projectRoot}",
       },
     },
@@ -203,7 +216,7 @@ function getPackageTargets(projectRoot) {
       executor: "@nx/js:release-publish",
       dependsOn: ["prepare-production-package"],
       options: {
-        packageRoot: `${projectRoot}/dist`,
+        packageRoot: `bundled/${projectRoot}`,
       },
     },
   };
@@ -406,6 +419,29 @@ function ensureVitestTsConfigTypes(tree, filePath) {
   writeJson(tree, filePath, tsconfig);
 }
 
+function configureBundledPackageBuild(tree, projectRoot, projectKind) {
+  if (projectKind !== "package") {
+    return;
+  }
+
+  const tsupConfigPath = `${projectRoot}/tsup.config.ts`;
+  const readmePath = `${projectRoot}/README.md`;
+  const readme = tree.read(readmePath, "utf8");
+
+  tree.write(
+    `${projectRoot}/vite.lib.config.ts`,
+    `import { defineConfig } from "vite";\n\nexport default defineConfig({\n  build: {\n    emptyOutDir: true,\n    lib: {\n      entry: "src/index.ts",\n      fileName: () => "index.js",\n      formats: ["es"],\n    },\n    outDir: "../bundled/${projectRoot}",\n    rollupOptions: {\n      external: [\n        "@earendil-works/pi-coding-agent",\n        "@earendil-works/pi-tui",\n      ],\n    },\n    sourcemap: true,\n  },\n  publicDir: "public",\n});\n`,
+  );
+
+  if (tree.exists(tsupConfigPath)) {
+    tree.delete(tsupConfigPath);
+  }
+
+  if (readme) {
+    tree.write(`${projectRoot}/public/README.md`, readme);
+  }
+}
+
 function visitFiles(tree, root, callback) {
   for (const entry of tree.children(root)) {
     const entryPath = `${root}/${entry}`;
@@ -459,6 +495,7 @@ async function createPiPackageGenerator(tree, options, projectKind) {
     ensureVitestGlobals(tree, options.name);
     normalizeVitestImports(tree, options.name);
   }
+  configureBundledPackageBuild(tree, options.name, projectKind);
   writeProjectJson(tree, options.name, projectKind, options.runner ?? "vitest");
   updatePnpmWorkspace(tree, options.name);
   updateTsConfigReferences(tree, options.name);

@@ -1,7 +1,10 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
@@ -51,17 +54,23 @@
     },
     "groups": {
       "extensions": {
-        "projects": ["tag:project:extension"],
+        "projects": [
+          "tag:project:extension"
+        ],
         "projectsRelationship": "independent"
       },
       "packages": {
-        "projects": ["tag:project:package"],
+        "projects": [
+          "tag:project:package"
+        ],
         "projectsRelationship": "independent"
       }
     },
     "releaseTag": {
       "pattern": "{projectName}@{version}",
-      "checkAllBranchesWhen": ["main"]
+      "checkAllBranchesWhen": [
+        "main"
+      ]
     },
     "version": {
       "conventionalCommits": true,
@@ -71,7 +80,27 @@
   },
   "targetDefaults": {
     "test": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": [
+        "^typecheck"
+      ]
+    },
+    "@nx/esbuild:esbuild": {
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "json": "{workspaceRoot}/tsconfig.json",
+          "fields": [
+            "extends",
+            "files",
+            "include"
+          ]
+        }
+      ]
     }
   },
   "analytics": true
