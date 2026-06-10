@@ -13,7 +13,10 @@
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
   "files": [
-    "dist"
+    "*.js",
+    "*.d.ts",
+    "*.map",
+    "README.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -38,8 +41,6 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
-    "vite": "^8.0.0",
-    "vite-plugin-dts": "^4.5.4",
     "vitest": "^4.1.4"
   }
 }

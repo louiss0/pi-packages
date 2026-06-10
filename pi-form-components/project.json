@@ -3,6 +3,7 @@
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
   "root": "pi-form-components",
+  "tags": ["npm:public", "scope:shared", "project:package", "status:supported"],
   "targets": {
     "check": {
       "executor": "nx:run-commands",
@@ -19,26 +20,45 @@
       }
     },
     "build": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["^build"],
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
       "options": {
-        "command": "pnpm exec vite build --config vite.lib.config.ts",
-        "cwd": "{projectRoot}"
+        "main": "pi-form-components/src/index.ts",
+        "outputPath": "bundled/pi-form-components",
+        "outputFileName": "index.js",
+        "tsConfig": "pi-form-components/tsconfig.lib.json",
+        "platform": "node",
+        "format": ["esm"],
+        "assets": [
+          {
+            "input": "pi-form-components/public",
+            "glob": "README.md",
+            "output": "/"
+          }
+        ]
+      },
+      "configurations": {
+        "development": {
+          "minify": false
+        },
+        "production": {
+          "minify": true
+        }
       }
     },
     "prepare-production-package": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "node ../tools/prepare-bundled-package.mjs . ./dist",
-        "cwd": "{projectRoot}"
+        "command": "node tools/prepare-bundled-package.mjs pi-form-components bundled/pi-form-components"
       }
     },
     "nx-release-publish": {
       "executor": "@nx/js:release-publish",
       "dependsOn": ["prepare-production-package"],
       "options": {
-        "packageRoot": "pi-form-components/dist"
+        "packageRoot": "bundled/pi-form-components"
       }
     },
     "test": {
@@ -53,6 +73,5 @@
         "command": "node tools/validate-package-metadata.mjs {projectRoot}"
       }
     }
-  },
-  "tags": ["npm:public", "scope:shared", "project:package", "status:supported"]
+  }
 }

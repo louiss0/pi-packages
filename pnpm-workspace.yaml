@@ -2,6 +2,7 @@ packages:
   - "bundled/*"
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
+  - "pi-form-components"
   - "tools/pi-generators"
   - "pi-prompt-form"
   - "pi-prompt-guard"
