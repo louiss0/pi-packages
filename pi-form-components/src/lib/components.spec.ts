@@ -283,7 +283,7 @@ describe("shared/components", () => {
       input.handleInput("e");
       input.handleInput("s");
       input.handleInput("t");
-      input.setError("Name is required", "Must be lowercase");
+      input.setError(["Name is required", "Must be lowercase"]);
 
       const lines = input.render(45).join("\n");
 
@@ -296,7 +296,7 @@ describe("shared/components", () => {
     it("clears error messages", () => {
       const input = new LabelledInput("description", createTheme());
 
-      input.setError("Description is required");
+      input.setError(["Description is required"]);
       input.clearError();
 
       expect(input.render(45).join("\n")).not.toContain(
@@ -431,8 +431,8 @@ describe("shared/components", () => {
         this.addChild(this.#errorText);
       }
 
-      setError(error: string) {
-        this.#errorText.setText(error);
+      setError(messages: string[]) {
+        this.#errorText.setText(messages.join("\n"));
       }
 
       clearError() {
@@ -491,8 +491,8 @@ describe("shared/components", () => {
         }
       }
 
-      setError(error: string) {
-        this.#errorText.setText(error);
+      setError(messages: string[]) {
+        this.#errorText.setText(messages.join("\n"));
       }
 
       clearError() {

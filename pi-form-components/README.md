@@ -130,7 +130,7 @@ Example:
 ```ts
 const packageName = new LabelledInput("packageName", theme);
 packageName.setFocused(true);
-packageName.setError("Name must be lowercase");
+packageName.setError(["Name must be lowercase"]);
 ```
 
 ### ConfirmationBox

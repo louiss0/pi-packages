@@ -16,7 +16,7 @@ import {
 
 export interface FormComponent extends Component {
   setFocused(focused: boolean): void;
-  setError(...messages: string[]): void;
+  setError(messages: string[]): void;
   clearError(): void;
   handleInput(data: string): void;
   readonly name: string;
@@ -175,7 +175,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     this.#tui.requestRender();
   }
 
-  setError(...messages: string[]) {
+  setError(messages: string[]) {
     this.#errorText.setText(
       messages.map((message) => this.#theme.fg("error", message)).join("\n"),
     );
@@ -386,7 +386,7 @@ export class Picker<T extends string> implements FormComponent {
     this.#container.invalidate();
   }
 
-  setError(...messages: string[]) {
+  setError(messages: string[]) {
     this.#errorText.setText(
       messages.map((message) => this.theme.fg("error", message)).join("\n"),
     );
@@ -574,7 +574,7 @@ export class LabelledInput extends Container implements FormComponent {
     this.#errorText.invalidate();
   }
 
-  setError(...messages: string[]) {
+  setError(messages: string[]) {
     this.#errorText.setText(
       messages.map((message) => this.#theme.fg("error", message)).join("\n"),
     );
@@ -633,9 +633,9 @@ export class ConfirmationBox extends Container implements FormComponent {
     return this.#name;
   }
 
-  setError(...error: string[]) {
+  setError(messages: string[]) {
     this.#errorText.setText(
-      error.map((message) => this.#theme.fg("error", message)).join("\n"),
+      messages.map((message) => this.#theme.fg("error", message)).join("\n"),
     );
   }
 
@@ -842,7 +842,7 @@ export class Form<T extends Record<string, string | number | boolean>>
       const error = parsed?.[field.name];
 
       if (error !== undefined) {
-        field.setError(error);
+        field.setError([error]);
         return;
       }
 
