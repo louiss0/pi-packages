@@ -1,3 +1,17 @@
+# 3.0.0 (2026-06-10)
+
+### 🚀 Features
+
+- ⚠️  **pi-form-components:** standardize form component APIs ([dbf21e2](https://github.com/louiss0/pi-packages/commit/dbf21e2))
+
+### ⚠️  Breaking Changes
+
+- **pi-form-components:** standardize form component APIs  ([dbf21e2](https://github.com/louiss0/pi-packages/commit/dbf21e2))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 2.0.2 (2026-06-09)
 
 ### 🚀 Features
