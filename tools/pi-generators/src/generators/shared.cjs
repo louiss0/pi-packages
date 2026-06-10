@@ -160,6 +160,13 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   if (projectKind === "package") {
     delete packageJson.devDependencies?.vite;
     delete packageJson.devDependencies?.["vite-plugin-dts"];
+    packageJson.files = [
+      "*.js",
+      "*.map",
+      "README.md",
+      "src/**/*.d.ts",
+      "src/**/*.d.ts.map",
+    ];
   }
 
   if (projectKind === "extension") {
@@ -197,24 +204,37 @@ function getTestTarget(runner) {
 function getPackageTargets(projectRoot) {
   return {
     build: {
-      executor: "nx:run-commands",
-      dependsOn: ["^build"],
+      executor: "@nx/esbuild:esbuild",
+      outputs: ["{options.outputPath}"],
+      defaultConfiguration: "production",
       options: {
-        command: `rm -rf ../bundled/${projectRoot} && pnpm exec vite build --config vite.lib.config.ts && pnpm exec tsc -p tsconfig.lib.json --emitDeclarationOnly --outDir ../bundled/${projectRoot}`,
-        cwd: "{projectRoot}",
+        main: `${projectRoot}/src/index.ts`,
+        outputPath: `bundled/${projectRoot}`,
+        outputFileName: "index.js",
+        tsConfig: `${projectRoot}/tsconfig.lib.json`,
+        platform: "node",
+        format: ["esm"],
+        esbuildConfig: "tools/esbuild/package-json-plugin.cjs",
+        assets: [
+          {
+            input: `${projectRoot}/public`,
+            glob: "README.md",
+            output: "/",
+          },
+        ],
       },
-    },
-    "prepare-production-package": {
-      executor: "nx:run-commands",
-      dependsOn: ["build"],
-      options: {
-        command: `node ../tools/prepare-bundled-package.mjs . ../bundled/${projectRoot}`,
-        cwd: "{projectRoot}",
+      configurations: {
+        development: {
+          minify: false,
+        },
+        production: {
+          minify: true,
+        },
       },
     },
     "nx-release-publish": {
       executor: "@nx/js:release-publish",
-      dependsOn: ["prepare-production-package"],
+      dependsOn: ["build"],
       options: {
         packageRoot: `bundled/${projectRoot}`,
       },
@@ -424,14 +444,14 @@ function configureBundledPackageBuild(tree, projectRoot, projectKind) {
     return;
   }
 
+  const viteConfigPath = `${projectRoot}/vite.lib.config.ts`;
   const tsupConfigPath = `${projectRoot}/tsup.config.ts`;
   const readmePath = `${projectRoot}/README.md`;
   const readme = tree.read(readmePath, "utf8");
 
-  tree.write(
-    `${projectRoot}/vite.lib.config.ts`,
-    `import { defineConfig } from "vite";\n\nexport default defineConfig({\n  build: {\n    emptyOutDir: true,\n    lib: {\n      entry: "src/index.ts",\n      fileName: () => "index.js",\n      formats: ["es"],\n    },\n    outDir: "../bundled/${projectRoot}",\n    rollupOptions: {\n      external: [\n        "@earendil-works/pi-coding-agent",\n        "@earendil-works/pi-tui",\n      ],\n    },\n    sourcemap: true,\n  },\n  publicDir: "public",\n});\n`,
-  );
+  if (tree.exists(viteConfigPath)) {
+    tree.delete(viteConfigPath);
+  }
 
   if (tree.exists(tsupConfigPath)) {
     tree.delete(tsupConfigPath);

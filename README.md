@@ -57,11 +57,7 @@ pnpm nx g @code-fixer-23/pi-generators:extension my-package --no-interactive
 pnpm nx g @code-fixer-23/pi-generators:package my-package --no-interactive
 ```
 
-Generated shared packages publish from `bundled/<project-name>`. Their Vite library build writes production artifacts into that bundled package root, and `prepare-production-package` writes the publishable `package.json` there. Static publish files such as `README.md` should live in `public/` so Vite copies them into the bundled output.
-
-```sh
-node ../tools/prepare-bundled-package.mjs . ../bundled/<project-name>
-```
+Generated shared packages publish from `bundled/<project-name>`. Their Nx esbuild build writes production artifacts into that bundled package root, copies explicit static assets from `public/`, and uses `tools/esbuild/package-json-plugin.cjs` via `esbuildConfig` to write the publishable `package.json` into the bundled output.
 
 ### Add prompts or skills too
 

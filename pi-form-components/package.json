@@ -14,9 +14,10 @@
   },
   "files": [
     "*.js",
-    "*.d.ts",
     "*.map",
-    "README.md"
+    "README.md",
+    "src/**/*.d.ts",
+    "src/**/*.d.ts.map"
   ],
   "publishConfig": {
     "access": "public"

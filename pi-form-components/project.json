@@ -30,6 +30,7 @@
         "tsConfig": "pi-form-components/tsconfig.lib.json",
         "platform": "node",
         "format": ["esm"],
+        "esbuildConfig": "tools/esbuild/package-json-plugin.cjs",
         "assets": [
           {
             "input": "pi-form-components/public",
@@ -47,16 +48,9 @@
         }
       }
     },
-    "prepare-production-package": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["build"],
-      "options": {
-        "command": "node tools/prepare-bundled-package.mjs pi-form-components bundled/pi-form-components"
-      }
-    },
     "nx-release-publish": {
       "executor": "@nx/js:release-publish",
-      "dependsOn": ["prepare-production-package"],
+      "dependsOn": ["build"],
       "options": {
         "packageRoot": "bundled/pi-form-components"
       }
