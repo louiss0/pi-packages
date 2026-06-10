@@ -85,6 +85,7 @@ describe("shared/components", () => {
   describe("MultiSelect", () => {
     it("renders items using SelectList-style highlighting", () => {
       const multiSelect = new MultiSelect(
+        "fruits",
         {
           title: "What fruits do you like?",
           items: [
@@ -101,16 +102,16 @@ describe("shared/components", () => {
       const lines = multiSelect.render(80);
       const contentLines = getRenderedContentLines(lines);
 
-      expect(lines[1]).toContain("What fruits do you like?");
-      expect(lines[2]?.trim()).toBe("");
-      expect(contentLines[1]).toContain("[ ] Apple");
-      expect(contentLines[2]).toContain("[ ] Banana");
-      expect(contentLines[3]).toContain("[ ] Orange");
-      expect(contentLines[2]).toContain("Sweet");
+      expect(lines.join("\n")).toContain("What fruits do you like?");
+      expect(contentLines[2]).toContain("[ ] Apple");
+      expect(contentLines[3]).toContain("[ ] Banana");
+      expect(contentLines[4]).toContain("[ ] Orange");
+      expect(contentLines[3]).toContain("Sweet");
     });
 
     it("toggles the highlighted item when the user presses space", () => {
       const multiSelect = new MultiSelect(
+        "fruits",
         {
           title: "What fruits do you like?",
           items: [
@@ -134,6 +135,7 @@ describe("shared/components", () => {
 
     it("changes focus when the user presses down once", () => {
       const multiSelect = new MultiSelect(
+        "fruits",
         {
           title: "What fruits do you like?",
           items: [
@@ -150,14 +152,15 @@ describe("shared/components", () => {
       multiSelect.handleInput(Key.down);
 
       const lines = getRenderedContentLines(multiSelect.render(80));
-      expect(lines[0]).toContain("What fruits do you like?");
-      expect(lines[1]).toContain("[ ] Apple");
-      expect(lines[2]).toContain("[ ] Banana");
-      expect(lines[3]).toContain("[ ] Orange");
+      expect(lines.join("\n")).toContain("What fruits do you like?");
+      expect(lines[2]).toContain("[ ] Apple");
+      expect(lines[3]).toContain("[ ] Banana");
+      expect(lines[4]).toContain("[ ] Orange");
     });
 
     it("changes focus when the user presses down twice then up once", () => {
       const multiSelect = new MultiSelect(
+        "shows",
         {
           title: "What shows are you into?",
           items: [
@@ -179,14 +182,15 @@ describe("shared/components", () => {
       multiSelect.handleInput(Key.up);
 
       const lines = getRenderedContentLines(multiSelect.render(80));
-      expect(lines[0]).toContain("What shows are you into?");
-      expect(lines[1]).toContain("[ ] Game of Thrones");
-      expect(lines[2]).toContain("[ ] Pokemon");
-      expect(lines[3]).toContain("[ ] Orange Is The New Black");
+      expect(lines.join("\n")).toContain("What shows are you into?");
+      expect(lines[2]).toContain("[ ] Game of Thrones");
+      expect(lines[3]).toContain("[ ] Pokemon");
+      expect(lines[4]).toContain("[ ] Orange Is The New Black");
     });
 
     it("allows selecting multiple items while preserving item descriptions", () => {
       const multiSelect = new MultiSelect(
+        "iceCream",
         {
           title: "What ice cream do you like?",
           items: [
@@ -209,17 +213,18 @@ describe("shared/components", () => {
       multiSelect.handleInput(Key.space);
 
       const lines = getRenderedContentLines(multiSelect.render(80));
-      expect(lines[0]).toContain("What ice cream do you like?");
-      expect(lines[1]).toContain("[x] Strawberry");
-      expect(lines[2]).toContain("[x] Vanilla");
-      expect(lines[3]).toContain("[ ] Caramel");
-      expect(lines[4]).toContain("[x] Banana");
-      expect(lines[4]).toContain("Fruit");
+      expect(lines.join("\n")).toContain("What ice cream do you like?");
+      expect(lines[2]).toContain("[x] Strawberry");
+      expect(lines[3]).toContain("[x] Vanilla");
+      expect(lines[4]).toContain("[ ] Caramel");
+      expect(lines[5]).toContain("[x] Banana");
+      expect(lines[5]).toContain("Fruit");
     });
 
     it("submits the selected values in toggle order", () => {
       const done = vi.fn();
       const multiSelect = new MultiSelect(
+        "fruits",
         {
           title: "What fruits do you like?",
           items: [
@@ -246,6 +251,7 @@ describe("shared/components", () => {
         itemChoiceStyle,
       )("renders the unselected marker for %s", (style) => {
         const multiSelect = new MultiSelect(
+          "iceCream",
           {
             title: "Ice cream",
             items: [
@@ -303,6 +309,7 @@ describe("shared/components", () => {
     it("renders unchecked by default", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -314,7 +321,11 @@ describe("shared/components", () => {
 
     it("accepts the display message as the second parameter", () => {
       const theme = createTheme();
-      const checkbox = new ConfirmationBox(theme, "Use advanced options?");
+      const checkbox = new ConfirmationBox(
+        "confirm",
+        theme,
+        "Use advanced options?",
+      );
       const lines = checkbox.render(80).join("\n");
 
       expect(lines).toContain(" Use advanced options?");
@@ -324,6 +335,7 @@ describe("shared/components", () => {
     it("renders the focused prefix when focused", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -339,6 +351,7 @@ describe("shared/components", () => {
     it("toggles to confirmed when space is pressed", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -355,6 +368,7 @@ describe("shared/components", () => {
     it("toggles back to unchecked when space is pressed twice", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -371,6 +385,7 @@ describe("shared/components", () => {
     it("confirms the box without toggling it back off", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -387,6 +402,7 @@ describe("shared/components", () => {
     it("the checkbox is colored", () => {
       const theme = createTheme();
       const checkbox = new ConfirmationBox(
+        "confirm",
         theme,
         "Do you want to fill in the next fields?",
       );
@@ -772,6 +788,7 @@ describe("Picker", () => {
   it("loads more items when selection reaches the bottom of the loaded window", () => {
     const tui = createTui();
     const picker = new Picker(
+      "commands",
       {
         title: "Commands",
         items: createItems(20),
@@ -798,6 +815,7 @@ describe("Picker", () => {
 
   it("filters across all items, not only the loaded window", () => {
     const picker = new Picker(
+      "commands",
       {
         title: "Commands",
         items: createItems(20),

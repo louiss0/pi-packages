@@ -266,7 +266,7 @@ export function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
     _: KeybindingsManager,
     done: (result: ReadonlyArray<T[number]["value"]> | null) => void,
   ): Component =>
-    new MultiSelect({ title, items, ...options }, tui, theme, done);
+    new MultiSelect(title, { title, items, ...options }, tui, theme, done);
 }
 
 type PackCommand = (typeof packCommands.options)[number];

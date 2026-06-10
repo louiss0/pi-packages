@@ -19,7 +19,7 @@ import {
 } from "@earendil-works/pi-tui";
 
 export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
-  title: string;
+  title?: string;
   items: T;
   spacing?: number;
   itemChoiceStyle?: ItemChoiceStyle;
@@ -49,6 +49,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   implements Component
 {
   #items: T;
+  #name: string;
   // MultiSelect owns checked state here. SelectList is only used to render
   // item rows, so MultiSelect also owns the highlighted index.
   #selectedValues: Array<T[number]["value"]> = [];
@@ -57,6 +58,8 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   #tui: TUI;
   #theme: Theme;
   #done: (value: Array<T[number]["value"]> | null) => void;
+  #labelText: Text;
+  #errorText = new Text("");
   #styles: {
     title: PickerText;
     item: Record<
@@ -91,18 +94,26 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   #itemStyle: ItemStyle;
 
   constructor(
+    name: string,
     config: MultiSelectConfig<T>,
     tui: TUI,
     theme: Theme,
     done: (value: Array<T[number]["value"]> | null) => void,
   ) {
     super();
+    this.#name = name;
     this.#items = config.items;
     this.#tui = tui;
     this.#theme = theme;
     this.#done = done;
+    this.#labelText = new Text(name);
 
-    const { title, spacing = 1, itemChoiceStyle = "checkbox", styles } = config;
+    const {
+      title = name,
+      spacing = 1,
+      itemChoiceStyle = "checkbox",
+      styles,
+    } = config;
 
     this.#itemStyle = this.itemChoiceStyleRecord[itemChoiceStyle];
     this.#styles = {
@@ -116,7 +127,11 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
       },
     };
 
-    this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title))));
+    this.addChild(this.#labelText);
+
+    if (title !== name) {
+      this.addChild(new Text(theme.fg(this.#styles.title, theme.bold(title))));
+    }
 
     const listSpacing = Math.max(0, Math.round(spacing));
     if (listSpacing > 0) {
@@ -125,6 +140,8 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 
     this.#selectList = this.#createSelectList();
     this.addChild(this.#selectList);
+    this.addChild(this.#errorText);
+    this.addChild(new Spacer(1));
   }
 
   handleInput(data: string): void {
@@ -160,8 +177,33 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   override invalidate(): void {
     this.#selectedValues = [];
     this.#selectedIndex = 0;
+    this.#labelText.invalidate();
+    this.#errorText.invalidate();
     this.#syncSelectList();
     this.#tui.requestRender();
+  }
+
+  setError(...messages: string[]) {
+    this.#errorText.setText(
+      messages.map((message) => this.#theme.fg("error", message)).join("\n"),
+    );
+  }
+
+  clearError() {
+    this.#errorText.setText("");
+  }
+
+  setFocused(focused: boolean) {
+    this.setSelected(focused);
+  }
+
+  setSelected(selected: boolean) {
+    const prefix = selected ? "› " : "  ";
+    this.#labelText.setText(this.#theme.fg("accent", `${prefix}${this.#name}`));
+  }
+
+  get name() {
+    return this.#name;
   }
 
   #createSelectList() {
@@ -266,7 +308,7 @@ export interface FormTui {
 type PickerOptions<T extends string> = {
   items: Array<T>;
   itemLimit: number;
-  title: string;
+  title?: string;
   helpText?: string;
   lazyLoadStep?: number;
   styles?: {
@@ -288,12 +330,15 @@ export class Picker<T extends string> implements Component {
   readonly #container = new Container();
   readonly #filterLabel = new Text();
   readonly #listContainer = new Container();
+  readonly #labelText: Text;
+  readonly #errorText = new Text("");
   #items: Array<T>;
   #itemLimit: number;
   #lazyLoadStep: number;
   #selectList: SelectList | null = null;
   #selectedIndex = 0;
   #selectedValue: T | null = null;
+  #name: string;
   #styles: NonNullable<PickerOptions<T>["styles"]> & {
     item: Record<
       | "selectedPrefix"
@@ -307,13 +352,17 @@ export class Picker<T extends string> implements Component {
   #visibleCount: number;
 
   constructor(
+    name: string,
     config: PickerOptions<T>,
     private readonly theme: PickerTheme,
     private readonly tui: FormTui,
     private readonly done: (value: T | null) => void,
   ) {
+    this.#name = name;
+    this.#labelText = new Text(name);
+
     const { items, itemLimit, lazyLoadStep, title, helpText, styles } = {
-      title: config.title,
+      title: config.title ?? name,
       items: config.items,
       itemLimit: config.itemLimit,
       lazyLoadStep: config.lazyLoadStep ?? config.itemLimit,
@@ -340,13 +389,16 @@ export class Picker<T extends string> implements Component {
     this.#styles = styles;
     this.#visibleCount = Math.min(items.length, itemLimit);
 
+    this.#container.addChild(this.#labelText);
     this.#container.addChild(
       new DynamicBorder((text) => this.theme.fg(styles.border, text)),
     );
 
-    this.#container.addChild(
-      new Text(this.theme.fg(styles.title, this.theme.bold(title))),
-    );
+    if (title !== name) {
+      this.#container.addChild(
+        new Text(this.theme.fg(styles.title, this.theme.bold(title))),
+      );
+    }
 
     this.#container.addChild(this.#filterLabel);
     this.#container.addChild(this.#listContainer);
@@ -357,6 +409,8 @@ export class Picker<T extends string> implements Component {
     this.#container.addChild(
       new DynamicBorder((text) => this.theme.fg(styles.border, text)),
     );
+    this.#container.addChild(this.#errorText);
+    this.#container.addChild(new Spacer(1));
 
     this.#syncSelectList();
     this.#syncFilter();
@@ -367,7 +421,32 @@ export class Picker<T extends string> implements Component {
   }
 
   invalidate() {
+    this.#labelText.invalidate();
+    this.#errorText.invalidate();
     this.#container.invalidate();
+  }
+
+  setError(...messages: string[]) {
+    this.#errorText.setText(
+      messages.map((message) => this.theme.fg("error", message)).join("\n"),
+    );
+  }
+
+  clearError() {
+    this.#errorText.setText("");
+  }
+
+  setFocused(focused: boolean) {
+    this.setSelected(focused);
+  }
+
+  setSelected(selected: boolean) {
+    const prefix = selected ? "› " : "  ";
+    this.#labelText.setText(this.theme.fg("accent", `${prefix}${this.#name}`));
+  }
+
+  get name() {
+    return this.#name;
   }
 
   handleInput(data: string) {
@@ -591,7 +670,7 @@ export class ConfirmationBox extends Container implements Component {
   #message: string;
   #theme: FormTheme;
   #errorText = new Text("");
-  constructor(theme: FormTheme, message: string, name = "confirm") {
+  constructor(name: string, theme: FormTheme, message: string) {
     super();
     this.#name = name;
     this.#message = message;

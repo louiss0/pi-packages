@@ -281,7 +281,11 @@ export function createRequiredSkillForm(
       fields: [
         new LabelledInput("name", theme),
         new LabelledInput("description", theme),
-        new ConfirmationBox(theme, "Do you want to fill in the next fields?"),
+        new ConfirmationBox(
+          "confirm",
+          theme,
+          "Do you want to fill in the next fields?",
+        ),
       ],
       parse: (values) =>
         parseRequiredSkillFormValues({

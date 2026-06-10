@@ -86,7 +86,7 @@ const form = new Form(
     title: "Create Package",
     fields: [
       new LabelledInput("name", theme),
-      new ConfirmationBox(theme, "Publish immediately?", "publishNow"),
+      new ConfirmationBox("publishNow", theme, "Publish immediately?"),
     ],
     parse(values) {
       if (values.name === "") {
@@ -139,9 +139,9 @@ packageName.setError("Name must be lowercase");
 
 Arguments:
 
+- `string:name` becomes the submitted key and field label identity
 - `Theme:theme` colors the checkbox and validation output
 - `string:message` renders the confirmation prompt beside the checkbox
-- `string:name` optionally overrides the submitted key and defaults to `confirm`
 
 Illustration:
 
@@ -153,9 +153,9 @@ Example:
 
 ```ts
 const includePrompts = new ConfirmationBox(
+  "includePrompts",
   theme,
   "Include starter prompts?",
-  "includePrompts",
 );
 ```
 
@@ -167,6 +167,7 @@ The selection flow starts with a limited visible window, then expands lazily as 
 
 Arguments:
 
+- `string:name` becomes the picker field identity and label
 - `object:config` defines the picker behavior
   - `string[]:items` provides the selectable values
   - `number:itemLimit` sets the visible list size
@@ -195,6 +196,7 @@ Example:
 
 ```ts
 const picker = new Picker(
+  "commands",
   {
     title: "Commands",
     items: ["form.create", "form.validate", "form.preview"],
@@ -242,7 +244,7 @@ if (!validateType(value, "string")) {
 import { ConfirmationBox, Form, LabelledInput } from "@code-fixer-23/pi-form-components";
 
 const name = new LabelledInput("name", theme);
-const confirm = new ConfirmationBox(theme, "Publish immediately?", "publishNow");
+const confirm = new ConfirmationBox("publishNow", theme, "Publish immediately?");
 
 const form = new Form(
   {
