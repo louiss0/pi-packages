@@ -1,8 +1,5 @@
 import { spawn } from "node:child_process";
-import {
-  MultiSelect,
-  MultiSelectConfig,
-} from "@code-fixer-23/pi-form-components";
+import { MultiSelect, MultiSelectConfig } from "@code-fixer-23/pi-form-components";
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
@@ -58,11 +55,7 @@ export const SKILL_COMMAND = "skill";
 export const AGENT_COMMAND = "agent";
 export const PROMPT_COMMAND = "prompt";
 
-const packManagementCommands = [
-  CREATE_COMMAND,
-  EDIT_COMMAND,
-  DELETE_COMMAND,
-] as const;
+const packManagementCommands = [CREATE_COMMAND, EDIT_COMMAND, DELETE_COMMAND] as const;
 const packResourceCommands = picklist([
   ...packOrginaizationCommands,
   ...packManagementCommands,
@@ -89,23 +82,19 @@ export async function openExternalEditor(filePath: string) {
     return new ExternalEditorError("No external editor set");
   }
 
-  const result = await new Promise<number | ExternalEditorError>(
-    (resolve, reject) => {
-      const [cmd, ...args] = EDITOR.split(" ");
-      const child = spawn(cmd, [...args, filePath]);
+  const result = await new Promise<number | ExternalEditorError>((resolve, reject) => {
+    const [cmd, ...args] = EDITOR.split(" ");
+    const child = spawn(cmd, [...args, filePath]);
 
-      child.on("error", (err) =>
-        reject(new ExternalEditorError("Failed to use external editor", err)),
-      );
-      child.on("close", (value) =>
-        value === 0
-          ? resolve(value)
-          : reject(
-              new ExternalEditorError("Something went wrong while closing"),
-            ),
-      );
-    },
-  );
+    child.on("error", (err) =>
+      reject(new ExternalEditorError("Failed to use external editor", err)),
+    );
+    child.on("close", (value) =>
+      value === 0
+        ? resolve(value)
+        : reject(new ExternalEditorError("Something went wrong while closing")),
+    );
+  });
 
   if (result instanceof ExternalEditorError) {
     return result;
@@ -113,15 +102,40 @@ export async function openExternalEditor(filePath: string) {
   return undefined;
 }
 
+const LOAD_PACK_FLAG = "resource:load-pack";
 export default function (pi: ExtensionAPI) {
+  pi.registerFlag(LOAD_PACK_FLAG, {
+    type: "string",
+    description: "Load a pack using the it's name only",
+  });
+
+  pi.on("resources_discover", (event, ctx) => {
+    if (event.reason === "reload") {
+      return;
+    }
+    const loadPack = pi.getFlag(LOAD_PACK_FLAG);
+
+    const pathResolver = getPathResolver();
+
+    if (typeof loadPack !== "string") {
+      return;
+    }
+
+    ctx.ui.notify(`Loading pack ${loadPack}`);
+
+    return {
+      promptPaths: [pathResolver.resolvePackPromptPath(loadPack, "")],
+      skillPaths: [pathResolver.resolvePackSkillPath(loadPack, "")],
+    };
+  });
+
   pi.registerCommand(ROOT_PACK_COMMAND, {
     description: "Manage resource packs",
     getArgumentCompletions: (argumentPrefix) => {
       return packCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PACK_LABEL}:${value}`,
@@ -151,8 +165,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${SKILL_COMMAND}:${value}`,
@@ -182,8 +195,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${AGENT_COMMAND}:${value}`,
@@ -213,8 +225,7 @@ export default function (pi: ExtensionAPI) {
       return packResourceCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
-          const capitalizedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
+          const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
           return {
             value,
             label: `${PROMPT_COMMAND}:${value}`,
@@ -240,11 +251,7 @@ export default function (pi: ExtensionAPI) {
 }
 
 export function getCreatePackResourceSelector() {
-  const resources = [
-    `${SKILL_COMMAND}s`,
-    `${PROMPT_COMMAND}s`,
-    `${AGENT_COMMAND}s`,
-  ] as const;
+  const resources = [`${SKILL_COMMAND}s`, `${PROMPT_COMMAND}s`, `${AGENT_COMMAND}s`] as const;
   return getMultiSelectorFactory(
     "What resources do you want to pack?",
     resources.map((resource) => ({
@@ -265,8 +272,7 @@ export function getMultiSelectorFactory<T extends ReadonlyArray<SelectItem>>(
     theme: Theme,
     _: KeybindingsManager,
     done: (result: ReadonlyArray<T[number]["value"]> | null) => void,
-  ): Component =>
-    new MultiSelect(title, { title, items, ...options }, tui, theme, done);
+  ): Component => new MultiSelect(title, { title, items, ...options }, tui, theme, done);
 }
 
 type PackCommand = (typeof packCommands.options)[number];
@@ -283,9 +289,7 @@ export const exampleAgentContent =
 export function rootPackResourceReducer(
   arg: PackCommand,
   deps: {
-    createPackResourceSelector: ReturnType<
-      typeof getCreatePackResourceSelector
-    >;
+    createPackResourceSelector: ReturnType<typeof getCreatePackResourceSelector>;
     ctx: ExtensionCommandContext;
     fileSystem: ResourceFileSystem;
     pathResolver: ResourcePathResolver;
@@ -298,9 +302,7 @@ export function rootPackResourceReducer(
           PACK_LABEL,
           "What is the name of your agent pack?",
         );
-        const resources = await deps.ctx.ui.custom(
-          deps.createPackResourceSelector,
-        );
+        const resources = await deps.ctx.ui.custom(deps.createPackResourceSelector);
 
         if (!packName || !resources || resources.length === 0) {
           return;
@@ -317,12 +319,9 @@ export function rootPackResourceReducer(
 
         for (const resource of resources) {
           if (resource === `${PROMPT_COMMAND}s`) {
-            await deps.fileSystem.mkdir(
-              deps.pathResolver.resolvePackPromptPath(packName, ""),
-              {
-                recursive: true,
-              },
-            );
+            await deps.fileSystem.mkdir(deps.pathResolver.resolvePackPromptPath(packName, ""), {
+              recursive: true,
+            });
 
             if (!shouldPrefill) {
               await deps.fileSystem.writeFile(
@@ -333,8 +332,7 @@ export function rootPackResourceReducer(
             }
 
             const values = await deps.ctx.ui.custom<PromptFields | null>(
-              (tui, theme, _keyboard, done) =>
-                createPromptForm(tui, theme, done),
+              (tui, theme, _keyboard, done) => createPromptForm(tui, theme, done),
               formOverlayOptions,
             );
 
@@ -343,8 +341,7 @@ export function rootPackResourceReducer(
             }
 
             const template = await deps.ctx.ui.custom<string | undefined>(
-              (tui, theme, _keyboard, done) =>
-                new PromptTemplateOverlay(tui, theme, done),
+              (tui, theme, _keyboard, done) => new PromptTemplateOverlay(tui, theme, done),
               modalEditorOverlayOptions,
             );
 
@@ -353,34 +350,22 @@ export function rootPackResourceReducer(
             }
 
             await deps.fileSystem.writeFile(
-              deps.pathResolver.resolvePackPromptPath(
-                packName,
-                `${values.name}.md`,
-              ),
+              deps.pathResolver.resolvePackPromptPath(packName, `${values.name}.md`),
               renderPromptMarkdown(values, template),
             );
             continue;
           }
 
           if (resource === `${SKILL_COMMAND}s`) {
-            await deps.fileSystem.mkdir(
-              deps.pathResolver.resolvePackSkillPath(packName, ""),
-              {
-                recursive: true,
-              },
-            );
+            await deps.fileSystem.mkdir(deps.pathResolver.resolvePackSkillPath(packName, ""), {
+              recursive: true,
+            });
 
             if (!shouldPrefill) {
-              const skillPath = deps.pathResolver.resolvePackSkillPath(
-                packName,
-                "example",
-              );
+              const skillPath = deps.pathResolver.resolvePackSkillPath(packName, "example");
               await deps.fileSystem.mkdir(skillPath, { recursive: true });
               await deps.fileSystem.writeFile(
-                deps.pathResolver.resolvePackSkillPath(
-                  packName,
-                  "example/SKILL.md",
-                ),
+                deps.pathResolver.resolvePackSkillPath(packName, "example/SKILL.md"),
                 exampleSkillContent,
               );
               continue;
@@ -389,8 +374,7 @@ export function rootPackResourceReducer(
             const requiredValues = await deps.ctx.ui.custom<
               (RequiredSkillFields & { confirm: boolean }) | null
             >(
-              (tui, theme, _kb, done) =>
-                createRequiredSkillForm(tui, theme, done),
+              (tui, theme, _kb, done) => createRequiredSkillForm(tui, theme, done),
               formOverlayOptions,
             );
 
@@ -407,8 +391,7 @@ export function rootPackResourceReducer(
             if (requiredValues.confirm) {
               const submittedOptionalValues =
                 await deps.ctx.ui.custom<OptionalSkillFields | null>(
-                  (tui, theme, _kb, done) =>
-                    createOptionalSkillForm(tui, theme, done),
+                  (tui, theme, _kb, done) => createOptionalSkillForm(tui, theme, done),
                   formOverlayOptions,
                 );
 
@@ -437,12 +420,9 @@ export function rootPackResourceReducer(
           }
 
           if (resource === `${AGENT_COMMAND}s`) {
-            await deps.fileSystem.mkdir(
-              deps.pathResolver.resolvePackAgentPath(packName, ""),
-              {
-                recursive: true,
-              },
-            );
+            await deps.fileSystem.mkdir(deps.pathResolver.resolvePackAgentPath(packName, ""), {
+              recursive: true,
+            });
 
             if (!shouldPrefill) {
               await deps.fileSystem.writeFile(
@@ -453,8 +433,7 @@ export function rootPackResourceReducer(
             }
 
             const values = await deps.ctx.ui.custom<AgentFields | null>(
-              (tui, theme, _keyboard, done) =>
-                createAgentForm(tui, theme, done),
+              (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
               formOverlayOptions,
             );
 
@@ -463,10 +442,7 @@ export function rootPackResourceReducer(
             }
 
             await deps.fileSystem.writeFile(
-              deps.pathResolver.resolvePackAgentPath(
-                packName,
-                `${values.name}.md`,
-              ),
+              deps.pathResolver.resolvePackAgentPath(packName, `${values.name}.md`),
               renderAgentFrontmatter(values),
             );
           }
@@ -483,26 +459,23 @@ export function rootPackResourceReducer(
           return;
         }
 
-        const packNames =
-          await deps.ctx.ui.custom<ReadonlyArray<string> | null>(
-            getMultiSelectorFactory(
-              "Which packs do you want to delete?",
-              packNamesResult.data.map((packName) => ({
-                value: packName,
-                label: packName,
-                description: `Delete pack '${packName}'`,
-              })),
-            ),
-          );
+        const packNames = await deps.ctx.ui.custom<ReadonlyArray<string> | null>(
+          getMultiSelectorFactory(
+            "Which packs do you want to delete?",
+            packNamesResult.data.map((packName) => ({
+              value: packName,
+              label: packName,
+              description: `Delete pack '${packName}'`,
+            })),
+          ),
+        );
 
         if (!packNames || packNames.length === 0) {
           return;
         }
 
         for (const packName of packNames) {
-          await deps.fileSystem.removeDirectory(
-            deps.pathResolver.resolvePackPath(packName),
-          );
+          await deps.fileSystem.removeDirectory(deps.pathResolver.resolvePackPath(packName));
         }
 
         deps.ctx.ui.notify(`Deleted ${packNames.length} pack(s)`);
@@ -561,12 +534,10 @@ export function skillPackResourceReducer(
         };
 
         if (requiredValues.confirm) {
-          const submittedOptionalValues =
-            await deps.ctx.ui.custom<OptionalSkillFields | null>(
-              (tui, theme, _kb, done) =>
-                createOptionalSkillForm(tui, theme, done),
-              formOverlayOptions,
-            );
+          const submittedOptionalValues = await deps.ctx.ui.custom<OptionalSkillFields | null>(
+            (tui, theme, _kb, done) => createOptionalSkillForm(tui, theme, done),
+            formOverlayOptions,
+          );
 
           if (submittedOptionalValues) {
             optionalValues = submittedOptionalValues;
@@ -578,21 +549,14 @@ export function skillPackResourceReducer(
           packName,
           `${skillName}/SKILL.md`,
         );
-        const existingSkillResult =
-          await deps.fileSystem.readFile(skillFilePath);
+        const existingSkillResult = await deps.fileSystem.readFile(skillFilePath);
 
         if (existingSkillResult.success) {
-          deps.ctx.ui.notify(
-            `This skill already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This skill already exists in pack '${packName}'`, "error");
           return;
         }
 
-        const skillPath = deps.pathResolver.resolvePackSkillPath(
-          packName,
-          skillName,
-        );
+        const skillPath = deps.pathResolver.resolvePackSkillPath(packName, skillName);
         const directoryResult = await deps.fileSystem.mkdir(skillPath, {
           recursive: true,
         });
@@ -656,10 +620,7 @@ export function skillPackResourceReducer(
         }
 
         await deps.openExternalEditor(
-          deps.pathResolver.resolvePackSkillPath(
-            packName,
-            `${skillName}/SKILL.md`,
-          ),
+          deps.pathResolver.resolvePackSkillPath(packName, `${skillName}/SKILL.md`),
         );
       },
       [MOVE_LOCAL_COMMAND]: async () => {
@@ -713,8 +674,7 @@ export function skillPackResourceReducer(
         const destinationPath = deps.pathResolver.resolveLocalSkillPath(
           `${skillName}/SKILL.md`,
         );
-        const existingSkillResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingSkillResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingSkillResult.success) {
           deps.ctx.ui.notify("This local skill already exists", "error");
@@ -784,9 +744,7 @@ export function skillPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalSkillPath(
-          `${skillName}/SKILL.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalSkillPath(`${skillName}/SKILL.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -798,14 +756,10 @@ export function skillPackResourceReducer(
           packName,
           `${skillName}/SKILL.md`,
         );
-        const existingSkillResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingSkillResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingSkillResult.success) {
-          deps.ctx.ui.notify(
-            `This skill already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This skill already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -870,9 +824,7 @@ export function skillPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalSkillPath(
-          `${skillName}/SKILL.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalSkillPath(`${skillName}/SKILL.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -884,14 +836,10 @@ export function skillPackResourceReducer(
           packName,
           `${skillName}/SKILL.md`,
         );
-        const existingSkillResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingSkillResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingSkillResult.success) {
-          deps.ctx.ui.notify(
-            `This skill already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This skill already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -970,8 +918,7 @@ export function skillPackResourceReducer(
         const destinationPath = deps.pathResolver.resolveGlobalSkillPath(
           `${skillName}/SKILL.md`,
         );
-        const existingSkillResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingSkillResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingSkillResult.success) {
           deps.ctx.ui.notify("This global skill already exists", "error");
@@ -1095,14 +1042,10 @@ export function agentPackResourceReducer(
           packName,
           `${values.name}.md`,
         );
-        const existingAgentResult =
-          await deps.fileSystem.readFile(agentFilePath);
+        const existingAgentResult = await deps.fileSystem.readFile(agentFilePath);
 
         if (existingAgentResult.success) {
-          deps.ctx.ui.notify(
-            `This agent already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This agent already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1208,10 +1151,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolvePackAgentPath(
-          packName,
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1219,11 +1159,8 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const destinationPath = deps.pathResolver.resolveLocalAgentPath(
-          `${agentName}.md`,
-        );
-        const existingAgentResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const destinationPath = deps.pathResolver.resolveLocalAgentPath(`${agentName}.md`);
+        const existingAgentResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingAgentResult.success) {
           deps.ctx.ui.notify("This local agent already exists", "error");
@@ -1291,9 +1228,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalAgentPath(
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1305,14 +1240,10 @@ export function agentPackResourceReducer(
           packName,
           `${agentName}.md`,
         );
-        const existingAgentResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingAgentResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingAgentResult.success) {
-          deps.ctx.ui.notify(
-            `This agent already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This agent already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1377,9 +1308,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalAgentPath(
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalAgentPath(`${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1391,14 +1320,10 @@ export function agentPackResourceReducer(
           packName,
           `${agentName}.md`,
         );
-        const existingAgentResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingAgentResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingAgentResult.success) {
-          deps.ctx.ui.notify(
-            `This agent already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This agent already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1463,10 +1388,7 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolvePackAgentPath(
-          packName,
-          `${agentName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolvePackAgentPath(packName, `${agentName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1474,11 +1396,8 @@ export function agentPackResourceReducer(
           return;
         }
 
-        const destinationPath = deps.pathResolver.resolveGlobalAgentPath(
-          `${agentName}.md`,
-        );
-        const existingAgentResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const destinationPath = deps.pathResolver.resolveGlobalAgentPath(`${agentName}.md`);
+        const existingAgentResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingAgentResult.success) {
           deps.ctx.ui.notify("This global agent already exists", "error");
@@ -1597,8 +1516,7 @@ export function promptPackResourceReducer(
         }
 
         const template = await deps.ctx.ui.custom<string | undefined>(
-          (tui, theme, _keyboard, done) =>
-            new PromptTemplateOverlay(tui, theme, done),
+          (tui, theme, _keyboard, done) => new PromptTemplateOverlay(tui, theme, done),
           modalEditorOverlayOptions,
         );
 
@@ -1611,14 +1529,10 @@ export function promptPackResourceReducer(
           packName,
           `${values.name}.md`,
         );
-        const existingPromptResult =
-          await deps.fileSystem.readFile(promptFilePath);
+        const existingPromptResult = await deps.fileSystem.readFile(promptFilePath);
 
         if (existingPromptResult.success) {
-          deps.ctx.ui.notify(
-            `This prompt already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This prompt already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1735,11 +1649,8 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const destinationPath = deps.pathResolver.resolveLocalPromptPath(
-          `${promptName}.md`,
-        );
-        const existingPromptResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const destinationPath = deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`);
+        const existingPromptResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingPromptResult.success) {
           deps.ctx.ui.notify("This local prompt already exists", "error");
@@ -1807,9 +1718,7 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveGlobalPromptPath(
-          `${promptName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1821,14 +1730,10 @@ export function promptPackResourceReducer(
           packName,
           `${promptName}.md`,
         );
-        const existingPromptResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingPromptResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingPromptResult.success) {
-          deps.ctx.ui.notify(
-            `This prompt already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This prompt already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1893,9 +1798,7 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const sourcePath = deps.pathResolver.resolveLocalPromptPath(
-          `${promptName}.md`,
-        );
+        const sourcePath = deps.pathResolver.resolveLocalPromptPath(`${promptName}.md`);
         const contentResult = await deps.fileSystem.readFile(sourcePath);
 
         if (!contentResult.success) {
@@ -1907,14 +1810,10 @@ export function promptPackResourceReducer(
           packName,
           `${promptName}.md`,
         );
-        const existingPromptResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const existingPromptResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingPromptResult.success) {
-          deps.ctx.ui.notify(
-            `This prompt already exists in pack '${packName}'`,
-            "error",
-          );
+          deps.ctx.ui.notify(`This prompt already exists in pack '${packName}'`, "error");
           return;
         }
 
@@ -1990,11 +1889,8 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const destinationPath = deps.pathResolver.resolveGlobalPromptPath(
-          `${promptName}.md`,
-        );
-        const existingPromptResult =
-          await deps.fileSystem.readFile(destinationPath);
+        const destinationPath = deps.pathResolver.resolveGlobalPromptPath(`${promptName}.md`);
+        const existingPromptResult = await deps.fileSystem.readFile(destinationPath);
 
         if (existingPromptResult.success) {
           deps.ctx.ui.notify("This global prompt already exists", "error");
