@@ -160,7 +160,9 @@ export default function (pi: ExtensionAPI) {
 
         packs = result;
 
-        const sessionResult = await ctx.newSession();
+        const sessionResult = await ctx.newSession({
+          parentSession: ctx.sessionManager.getSessionFile(),
+        });
 
         if (sessionResult.cancelled) {
           ctx.ui.notify("Session cancelled", "error");
