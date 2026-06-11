@@ -101,6 +101,7 @@ export async function openExternalEditor(filePath: string) {
 
 const LOAD_PACK_FLAG = "resource:load-pack";
 export default function (pi: ExtensionAPI) {
+  const SESSION_SUB_COMMAND = "session";
   pi.registerFlag(LOAD_PACK_FLAG, {
     type: "string",
     description: "Load a pack using the it's name only",
@@ -129,7 +130,7 @@ export default function (pi: ExtensionAPI) {
     };
   });
 
-  pi.registerCommand(`${ROOT_PACK_COMMAND}:new`, {
+  pi.registerCommand(`${ROOT_PACK_COMMAND}:${SESSION_SUB_COMMAND}:new`, {
     description: `Do a new a session using one or more packs
     Use commas or spaces to specify how many packs you want to load`,
     handler: async (argument, ctx) => {
@@ -178,7 +179,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand(`${ROOT_PACK_COMMAND}:reload`, {
+  pi.registerCommand(`${ROOT_PACK_COMMAND}:${SESSION_SUB_COMMAND}:reload`, {
     description: `Reload a session using one or more packs
     Use commas or spaces to specify how many packs you want to load`,
     handler: async (argument, ctx) => {
