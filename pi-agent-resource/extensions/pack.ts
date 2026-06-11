@@ -129,6 +129,55 @@ export default function (pi: ExtensionAPI) {
     };
   });
 
+  pi.registerCommand(`${ROOT_PACK_COMMAND}:new`, {
+    description: `Do a new a session using one or more packs
+    Use commas or spaces to specify how many packs you want to load`,
+    handler: async (argument, ctx) => {
+      const pathResolver = getPathResolver();
+
+      const nodeFileSystem = new NodeFileSystem();
+
+      if (!argument) {
+        const directoriesResult = await nodeFileSystem.readDirectoryNames(
+          pathResolver.resolvePackPath(),
+        );
+
+        if (!directoriesResult.success) {
+          return ctx.ui.notify("No directories found", "error");
+        }
+
+        const result = await ctx.ui.custom(
+          getMultiSelectorFactory(
+            "What packs do you want to load for this session?",
+            directoriesResult.data.map((directory) => ({ value: directory, label: directory })),
+          ),
+        );
+
+        if (!result) {
+          return;
+        }
+
+        packs = result;
+
+        const sessionResult = await ctx.newSession();
+
+        if (sessionResult.cancelled) {
+          ctx.ui.notify("Session cancelled", "error");
+        }
+
+        return;
+      }
+
+      packs = argument.split(/[,\s]+/);
+
+      const sessionResult = await ctx.newSession();
+
+      if (sessionResult.cancelled) {
+        ctx.ui.notify("Session cancelled", "error");
+      }
+    },
+  });
+
   pi.registerCommand(`${ROOT_PACK_COMMAND}:reload`, {
     description: `Reload a session using one or more packs
     Use commas or spaces to specify how many packs you want to load`,
