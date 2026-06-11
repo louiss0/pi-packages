@@ -16,12 +16,15 @@ import {
   type ResourcePathResolver,
 } from "../shared/filesystem";
 import {
+  createAgentForm,
   createOptionalSkillForm,
   createPromptForm,
   createRequiredSkillForm,
   PromptTemplateOverlay,
+  renderAgentFrontmatter,
   renderPromptMarkdown,
   renderSkillMarkdown,
+  type AgentFields,
   type OptionalSkillFields,
   type PromptFields,
   type RequiredSkillFields,
@@ -343,6 +346,9 @@ type PackCommand = (typeof packCommands.options)[number];
 export const examplePromptContent =
   "---\nname: example\ndescription: This is an example pack\n---";
 
+export const exampleAgentContent =
+  "---\nname: example\ndescription: This is an example pack\ntools: read,write,bash\nmodel: claude\n---";
+
 export const exampleSkillContent =
   "---\nname: example\ndescription: This is an example pack\n---";
 
@@ -412,6 +418,35 @@ export function rootPackResourceReducer(
             await deps.fileSystem.writeFile(
               deps.pathResolver.resolvePackPromptPath(packName, `${values.name}.md`),
               renderPromptMarkdown(values, template),
+            );
+            continue;
+          }
+
+          if (resource === `${AGENT_COMMAND}s`) {
+            await deps.fileSystem.mkdir(deps.pathResolver.resolvePackAgentPath(packName, ""), {
+              recursive: true,
+            });
+
+            if (!shouldPrefill) {
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackAgentPath(packName, "example.md"),
+                exampleAgentContent,
+              );
+              continue;
+            }
+
+            const values = await deps.ctx.ui.custom<AgentFields | null>(
+              (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
+              formOverlayOptions,
+            );
+
+            if (!values) {
+              continue;
+            }
+
+            await deps.fileSystem.writeFile(
+              deps.pathResolver.resolvePackAgentPath(packName, `${values.name}.md`),
+              renderAgentFrontmatter(values),
             );
             continue;
           }

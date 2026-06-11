@@ -14,6 +14,7 @@ vi.mock("node:child_process", () => ({
 import { spawn } from "node:child_process";
 
 import {
+  exampleAgentContent,
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
