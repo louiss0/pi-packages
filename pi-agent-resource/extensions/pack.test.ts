@@ -14,8 +14,6 @@ vi.mock("node:child_process", () => ({
 import { spawn } from "node:child_process";
 
 import {
-  agentPackResourceReducer,
-  exampleAgentContent,
   examplePromptContent,
   exampleSkillContent,
   getCreatePackResourceSelector,
@@ -75,17 +73,15 @@ const mockCustomUIFactory = async <T>(
   return value;
 };
 
-const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(
-  () => {
-    return (_tui, _theme, _keybindingsManager, done) => {
-      return {
-        handleInput: vi.fn((data) => done(data)),
-        invalidate: vi.fn(),
-        render: vi.fn(),
-      };
+const mockGetMultiSelectorFactory = vi.fn<typeof getMultiSelectorFactory>(() => {
+  return (_tui, _theme, _keybindingsManager, done) => {
+    return {
+      handleInput: vi.fn((data) => done(data)),
+      invalidate: vi.fn(),
+      render: vi.fn(),
     };
-  },
-);
+  };
+});
 
 function createPathResolver() {
   const pathResolver = new PathResolver("/workspace", "/test-home");
@@ -101,24 +97,12 @@ function createPathResolver() {
     resolvePackPromptPath: vi.fn((packName, path) =>
       pathResolver.resolvePackPromptPath(packName, path),
     ),
-    resolveGlobalSkillPath: vi.fn((path) =>
-      pathResolver.resolveGlobalSkillPath(path),
-    ),
-    resolveLocalSkillPath: vi.fn((path) =>
-      pathResolver.resolveLocalSkillPath(path),
-    ),
-    resolveGlobalAgentPath: vi.fn((path) =>
-      pathResolver.resolveGlobalAgentPath(path),
-    ),
-    resolveLocalAgentPath: vi.fn((path) =>
-      pathResolver.resolveLocalAgentPath(path),
-    ),
-    resolveGlobalPromptPath: vi.fn((path) =>
-      pathResolver.resolveGlobalPromptPath(path),
-    ),
-    resolveLocalPromptPath: vi.fn((path) =>
-      pathResolver.resolveLocalPromptPath(path),
-    ),
+    resolveGlobalSkillPath: vi.fn((path) => pathResolver.resolveGlobalSkillPath(path)),
+    resolveLocalSkillPath: vi.fn((path) => pathResolver.resolveLocalSkillPath(path)),
+    resolveGlobalAgentPath: vi.fn((path) => pathResolver.resolveGlobalAgentPath(path)),
+    resolveLocalAgentPath: vi.fn((path) => pathResolver.resolveLocalAgentPath(path)),
+    resolveGlobalPromptPath: vi.fn((path) => pathResolver.resolveGlobalPromptPath(path)),
+    resolveLocalPromptPath: vi.fn((path) => pathResolver.resolveLocalPromptPath(path)),
   } satisfies ResourcePathResolver;
 }
 
@@ -178,8 +162,7 @@ describe("Pack", () => {
             .mockImplementationOnce(mockCustomUIFactory)
             .mockResolvedValueOnce({
               name: "ship-release",
-              description:
-                "This prompt creates release messaging with full file output",
+              description: "This prompt creates release messaging with full file output",
               "argument-hint": "<version>",
             })
             .mockResolvedValueOnce("Write the release template here")
@@ -190,8 +173,7 @@ describe("Pack", () => {
             })
             .mockResolvedValueOnce({
               name: "release-agent",
-              description:
-                "made for careful research and deep code review work",
+              description: "made for careful research and deep code review work",
               tools: "read,write,bash",
               model: "claude",
             }),
@@ -201,8 +183,7 @@ describe("Pack", () => {
         },
       } satisfies MockContext;
 
-      const mockCreatePackResourceSelector =
-        getMockCreatePackResourceSelector(resourceChoices);
+      const mockCreatePackResourceSelector = getMockCreatePackResourceSelector(resourceChoices);
 
       await rootPackResourceReducer("create", {
         createPackResourceSelector: mockCreatePackResourceSelector,
@@ -211,14 +192,8 @@ describe("Pack", () => {
         pathResolver,
       });
 
-      expect(ctx.ui.input).toHaveBeenCalledWith(
-        "pack",
-        "What is the name of your agent pack?",
-      );
-      expect(ctx.ui.custom).toHaveBeenNthCalledWith(
-        1,
-        mockCreatePackResourceSelector,
-      );
+      expect(ctx.ui.input).toHaveBeenCalledWith("pack", "What is the name of your agent pack?");
+      expect(ctx.ui.custom).toHaveBeenNthCalledWith(1, mockCreatePackResourceSelector);
       expect(ctx.ui.select).toHaveBeenCalledWith(
         "Do you want to pre-fill the selected pack resources?",
         ["yes", "no"],
@@ -229,8 +204,7 @@ describe("Pack", () => {
         renderPromptMarkdown(
           {
             name: "ship-release",
-            description:
-              "This prompt creates release messaging with full file output",
+            description: "This prompt creates release messaging with full file output",
             "argument-hint": "<version>",
           },
           "Write the release template here",
@@ -274,8 +248,7 @@ describe("Pack", () => {
         },
       } satisfies MockContext;
 
-      const mockCreatePackResourceSelector =
-        getMockCreatePackResourceSelector(resourceChoices);
+      const mockCreatePackResourceSelector = getMockCreatePackResourceSelector(resourceChoices);
 
       await rootPackResourceReducer("create", {
         createPackResourceSelector: mockCreatePackResourceSelector,
@@ -303,14 +276,11 @@ describe("Pack", () => {
       const removeDirectorySpy = vi.spyOn(fileSystem, "removeDirectory");
 
       fileSystem.seed({
-        [pathResolver.resolvePackAgentPath(packNames[0], "example.md")]:
-          exampleAgentContent,
-        [pathResolver.resolvePackPromptPath(packNames[0], "example.md")]:
-          examplePromptContent,
+        [pathResolver.resolvePackAgentPath(packNames[0], "example.md")]: exampleAgentContent,
+        [pathResolver.resolvePackPromptPath(packNames[0], "example.md")]: examplePromptContent,
         [pathResolver.resolvePackSkillPath(packNames[0], "example/SKILL.md")]:
           exampleSkillContent,
-        [pathResolver.resolvePackAgentPath(packNames[1], "example.md")]:
-          exampleAgentContent,
+        [pathResolver.resolvePackAgentPath(packNames[1], "example.md")]: exampleAgentContent,
       });
 
       const ctx = {
@@ -369,13 +339,10 @@ describe("Pack", () => {
     getResourcePath: (packName: string, resourceName: string) => string,
     content: string,
   ) {
-    const seedMap = folderNames.reduce<Record<string, string>>(
-      (filesByPath, folderName) => {
-        filesByPath[getResourcePath(folderName, "example")] = content;
-        return filesByPath;
-      },
-      {},
-    );
+    const seedMap = folderNames.reduce<Record<string, string>>((filesByPath, folderName) => {
+      filesByPath[getResourcePath(folderName, "example")] = content;
+      return filesByPath;
+    }, {});
 
     fileSystem.seed(seedMap);
   }
@@ -393,18 +360,14 @@ describe("Pack", () => {
     const result = await readDirectoryNamesSpy.mock.results[callIndex]?.value;
 
     if (!result?.success) {
-      throw new Error(
-        `Expected readDirectoryNames call ${callIndex + 1} to succeed`,
-      );
+      throw new Error(`Expected readDirectoryNames call ${callIndex + 1} to succeed`);
     }
 
     return result.data;
   }
 
   function definePackResourceReducerSuite(config: {
-    buildCreateUi: (
-      resourceName: string,
-    ) => Partial<ExtensionCommandContext["ui"]>;
+    buildCreateUi: (resourceName: string) => Partial<ExtensionCommandContext["ui"]>;
     exampleContent: string;
     expectCreateUi: (
       ui: Partial<ExtensionCommandContext["ui"]>,
@@ -433,16 +396,9 @@ describe("Pack", () => {
         randomFolder,
         randomResourceName,
       }) => {
-        seedPacksWithResource(
-          folders,
-          config.getEditFilePath,
-          config.exampleContent,
-        );
+        seedPacksWithResource(folders, config.getEditFilePath, config.exampleContent);
 
-        const readDirectoryNamesSpy = vi.spyOn(
-          fileSystem,
-          "readDirectoryNames",
-        );
+        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
         const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
         const ctx = {
@@ -461,24 +417,15 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(""),
-        );
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
 
-        const availablePackNames = await getReadDirectoryNamesData(
-          readDirectoryNamesSpy,
-        );
+        const availablePackNames = await getReadDirectoryNamesData(readDirectoryNamesSpy);
 
         expect(ctx.ui.select).toHaveBeenCalledWith(
           `What pack do you want to add the ${config.kind} to?`,
           availablePackNames,
         );
-        config.expectCreateUi(
-          ctx.ui,
-          folders,
-          randomFolder,
-          randomResourceName,
-        );
+        config.expectCreateUi(ctx.ui, folders, randomFolder, randomResourceName);
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
           config.getCreateContent(randomResourceName),
@@ -488,9 +435,7 @@ describe("Pack", () => {
         );
 
         await expect(
-          fileSystem.readFile(
-            config.getEditFilePath(randomFolder, randomResourceName),
-          ),
+          fileSystem.readFile(config.getEditFilePath(randomFolder, randomResourceName)),
         ).resolves.toMatchObject({
           data: config.getCreateContent(randomResourceName),
           success: true,
@@ -541,9 +486,7 @@ describe("Pack", () => {
           "error",
         );
         await expect(
-          fileSystem.readFile(
-            config.getEditFilePath(randomFolder, randomResourceName),
-          ),
+          fileSystem.readFile(config.getEditFilePath(randomFolder, randomResourceName)),
         ).resolves.toEqual({
           data: "existing resource content",
           success: true,
@@ -554,16 +497,9 @@ describe("Pack", () => {
         folders,
         randomFolder,
       }) => {
-        seedPacksWithResource(
-          folders,
-          config.getEditFilePath,
-          config.exampleContent,
-        );
+        seedPacksWithResource(folders, config.getEditFilePath, config.exampleContent);
 
-        const readDirectoryNamesSpy = vi.spyOn(
-          fileSystem,
-          "readDirectoryNames",
-        );
+        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
 
         const ctx = {
           ui: {
@@ -583,13 +519,9 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(""),
-        );
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
 
-        const availablePackNames = await getReadDirectoryNamesData(
-          readDirectoryNamesSpy,
-        );
+        const availablePackNames = await getReadDirectoryNamesData(readDirectoryNamesSpy);
 
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
@@ -623,10 +555,7 @@ describe("Pack", () => {
           ),
         );
 
-        const readDirectoryNamesSpy = vi.spyOn(
-          fileSystem,
-          "readDirectoryNames",
-        );
+        const readDirectoryNamesSpy = vi.spyOn(fileSystem, "readDirectoryNames");
         const removeResourceSpy = config.isDirectoryResource
           ? vi.spyOn(fileSystem, "removeDirectory")
           : vi.spyOn(fileSystem, "removeFile");
@@ -649,13 +578,9 @@ describe("Pack", () => {
           pathResolver,
         });
 
-        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(
-          pathResolver.resolvePackPath(""),
-        );
+        expect(readDirectoryNamesSpy).toHaveBeenCalledWith(pathResolver.resolvePackPath(""));
 
-        const availablePackNames = await getReadDirectoryNamesData(
-          readDirectoryNamesSpy,
-        );
+        const availablePackNames = await getReadDirectoryNamesData(readDirectoryNamesSpy);
 
         expect(ctx.ui.select).toHaveBeenNthCalledWith(
           1,
@@ -683,8 +608,7 @@ describe("Pack", () => {
         randomResourceName,
       }) => {
         fileSystem.seed({
-          [config.getEditFilePath(randomFolder, randomResourceName)]:
-            config.exampleContent,
+          [config.getEditFilePath(randomFolder, randomResourceName)]: config.exampleContent,
         });
 
         const ctx = {
@@ -738,8 +662,7 @@ describe("Pack", () => {
         randomResourceName,
       }) => {
         fileSystem.seed({
-          [config.getEditFilePath(randomFolder, randomResourceName)]:
-            config.exampleContent,
+          [config.getEditFilePath(randomFolder, randomResourceName)]: config.exampleContent,
         });
 
         const ctx = {
@@ -793,10 +716,8 @@ describe("Pack", () => {
         randomResourceName,
       }) => {
         fileSystem.seed({
-          [config.getEditFilePath(randomFolder, randomResourceName)]:
-            config.exampleContent,
-          [config.getLocalFilePath(randomResourceName)]:
-            "existing local resource",
+          [config.getEditFilePath(randomFolder, randomResourceName)]: config.exampleContent,
+          [config.getLocalFilePath(randomResourceName)]: "existing local resource",
         });
 
         const removeResourceSpy = config.isDirectoryResource
@@ -828,9 +749,7 @@ describe("Pack", () => {
           config.getDeletePath(randomFolder, randomResourceName),
         );
         await expect(
-          fileSystem.readFile(
-            config.getEditFilePath(randomFolder, randomResourceName),
-          ),
+          fileSystem.readFile(config.getEditFilePath(randomFolder, randomResourceName)),
         ).resolves.toMatchObject({
           data: config.exampleContent,
           success: true,
@@ -843,8 +762,7 @@ describe("Pack", () => {
       }) => {
         fileSystem.seed({
           [config.getLocalFilePath(randomResourceName)]: config.exampleContent,
-          [config.getEditFilePath(randomFolder, "example")]:
-            config.exampleContent,
+          [config.getEditFilePath(randomFolder, "example")]: config.exampleContent,
         });
 
         const ctx = {
@@ -881,9 +799,7 @@ describe("Pack", () => {
           `Which local ${config.kind} would you like to move?`,
           [randomResourceName],
         );
-        expect(readFileSpy).toHaveBeenCalledWith(
-          config.getLocalFilePath(randomResourceName),
-        );
+        expect(readFileSpy).toHaveBeenCalledWith(config.getLocalFilePath(randomResourceName));
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
           config.exampleContent,
@@ -899,8 +815,7 @@ describe("Pack", () => {
       }) => {
         fileSystem.seed({
           [config.getGlobalFilePath(randomResourceName)]: config.exampleContent,
-          [config.getEditFilePath(randomFolder, "example")]:
-            config.exampleContent,
+          [config.getEditFilePath(randomFolder, "example")]: config.exampleContent,
         });
 
         const ctx = {
@@ -937,9 +852,7 @@ describe("Pack", () => {
           `Which global ${config.kind} would you like to move?`,
           [randomResourceName],
         );
-        expect(readFileSpy).toHaveBeenCalledWith(
-          config.getGlobalFilePath(randomResourceName),
-        );
+        expect(readFileSpy).toHaveBeenCalledWith(config.getGlobalFilePath(randomResourceName));
         expect(writeFileSpy).toHaveBeenCalledWith(
           config.getCreateFilePath(randomFolder, randomResourceName),
           config.exampleContent,
@@ -977,18 +890,15 @@ describe("Pack", () => {
       pathResolver.resolvePackSkillPath(packName, resourceName),
     getEditFilePath: (packName, resourceName) =>
       pathResolver.resolvePackSkillPath(packName, `${resourceName}/SKILL.md`),
-    getGlobalDeletePath: (resourceName) =>
-      pathResolver.resolveGlobalSkillPath(resourceName),
+    getGlobalDeletePath: (resourceName) => pathResolver.resolveGlobalSkillPath(resourceName),
     getGlobalFilePath: (resourceName) =>
       pathResolver.resolveGlobalSkillPath(`${resourceName}/SKILL.md`),
     getGlobalRootPath: () => pathResolver.resolveGlobalSkillPath(""),
-    getLocalDeletePath: (resourceName) =>
-      pathResolver.resolveLocalSkillPath(resourceName),
+    getLocalDeletePath: (resourceName) => pathResolver.resolveLocalSkillPath(resourceName),
     getLocalFilePath: (resourceName) =>
       pathResolver.resolveLocalSkillPath(`${resourceName}/SKILL.md`),
     getLocalRootPath: () => pathResolver.resolveLocalSkillPath(""),
-    getPackResourcePath: (packName) =>
-      pathResolver.resolvePackSkillPath(packName, ""),
+    getPackResourcePath: (packName) => pathResolver.resolvePackSkillPath(packName, ""),
     isDirectoryResource: true,
     kind: "skill",
     reducer: skillPackResourceReducer,
@@ -999,10 +909,8 @@ describe("Pack", () => {
     randomResourceName,
   }) => {
     fileSystem.seed({
-      [pathResolver.resolvePackSkillPath(
-        randomFolder,
-        `${randomResourceName}/SKILL.md`,
-      )]: exampleSkillContent,
+      [pathResolver.resolvePackSkillPath(randomFolder, `${randomResourceName}/SKILL.md`)]:
+        exampleSkillContent,
     });
 
     vi.spyOn(fileSystem, "writeFile").mockResolvedValueOnce({
@@ -1028,19 +936,13 @@ describe("Pack", () => {
       pathResolver,
     });
 
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Could not write the local skill",
-      "error",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Could not write the local skill", "error");
     expect(removeDirectorySpy).not.toHaveBeenCalledWith(
       pathResolver.resolvePackSkillPath(randomFolder, randomResourceName),
     );
     await expect(
       fileSystem.readFile(
-        pathResolver.resolvePackSkillPath(
-          randomFolder,
-          `${randomResourceName}/SKILL.md`,
-        ),
+        pathResolver.resolvePackSkillPath(randomFolder, `${randomResourceName}/SKILL.md`),
       ),
     ).resolves.toMatchObject({
       data: exampleSkillContent,
@@ -1050,55 +952,11 @@ describe("Pack", () => {
 
   definePackResourceReducerSuite({
     buildCreateUi: (resourceName) => ({
-      custom: vi.fn().mockResolvedValueOnce({
-        name: resourceName,
-        description: "made for careful research and deep code review work",
-        tools: "read,write,bash",
-        model: "claude",
-      }),
-    }),
-    exampleContent: exampleAgentContent,
-    expectCreateUi: (ui) => {
-      expect(ui.custom).toHaveBeenCalledTimes(1);
-    },
-    getCreateContent: (resourceName) =>
-      renderAgentFrontmatter({
-        name: resourceName,
-        description: "made for careful research and deep code review work",
-        tools: "read,write,bash",
-        model: "claude",
-      }),
-    getCreateFilePath: (packName, resourceName) =>
-      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-    getDeletePath: (packName, resourceName) =>
-      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-    getEditFilePath: (packName, resourceName) =>
-      pathResolver.resolvePackAgentPath(packName, `${resourceName}.md`),
-    getGlobalDeletePath: (resourceName) =>
-      pathResolver.resolveGlobalAgentPath(`${resourceName}.md`),
-    getGlobalFilePath: (resourceName) =>
-      pathResolver.resolveGlobalAgentPath(`${resourceName}.md`),
-    getGlobalRootPath: () => pathResolver.resolveGlobalAgentPath(""),
-    getLocalDeletePath: (resourceName) =>
-      pathResolver.resolveLocalAgentPath(`${resourceName}.md`),
-    getLocalFilePath: (resourceName) =>
-      pathResolver.resolveLocalAgentPath(`${resourceName}.md`),
-    getLocalRootPath: () => pathResolver.resolveLocalAgentPath(""),
-    getPackResourcePath: (packName) =>
-      pathResolver.resolvePackAgentPath(packName, ""),
-    isDirectoryResource: false,
-    kind: "agent",
-    reducer: agentPackResourceReducer,
-  });
-
-  definePackResourceReducerSuite({
-    buildCreateUi: (resourceName) => ({
       custom: vi
         .fn()
         .mockResolvedValueOnce({
           name: resourceName,
-          description:
-            "This prompt creates a React component with full file output",
+          description: "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
         .mockResolvedValueOnce("Write the component template here"),
@@ -1111,8 +969,7 @@ describe("Pack", () => {
       renderPromptMarkdown(
         {
           name: resourceName,
-          description:
-            "This prompt creates a React component with full file output",
+          description: "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         },
         "Write the component template here",
@@ -1133,8 +990,7 @@ describe("Pack", () => {
     getLocalFilePath: (resourceName) =>
       pathResolver.resolveLocalPromptPath(`${resourceName}.md`),
     getLocalRootPath: () => pathResolver.resolveLocalPromptPath(""),
-    getPackResourcePath: (packName) =>
-      pathResolver.resolvePackPromptPath(packName, ""),
+    getPackResourcePath: (packName) => pathResolver.resolvePackPromptPath(packName, ""),
     isDirectoryResource: false,
     kind: "prompt",
     reducer: promptPackResourceReducer,
