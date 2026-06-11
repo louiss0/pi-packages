@@ -106,24 +106,66 @@ export default function (pi: ExtensionAPI) {
     description: "Load a pack using the it's name only",
   });
 
-  pi.on("resources_discover", (event, ctx) => {
-    if (event.reason === "reload") {
-      return;
-    }
-    const loadPack = pi.getFlag(LOAD_PACK_FLAG);
+  let packs: ReadonlyArray<string> | undefined;
 
+  pi.on("resources_discover", (event, ctx) => {
     const pathResolver = getPathResolver();
 
-    if (typeof loadPack !== "string") {
-      return;
+    if (event.reason === "startup") {
+      const loadPack = pi.getFlag(LOAD_PACK_FLAG);
+
+      if (typeof loadPack !== "string") {
+        return;
+      }
+
+      ctx.ui.notify(`Loading pack ${loadPack}`);
+
+      packs = loadPack.split(/[\s+,]/g);
     }
 
-    ctx.ui.notify(`Loading pack ${loadPack}`);
-
     return {
-      promptPaths: [pathResolver.resolvePackPromptPath(loadPack, "")],
-      skillPaths: [pathResolver.resolvePackSkillPath(loadPack, "")],
+      promptPaths: packs?.map((pack) => pathResolver.resolvePackPromptPath(pack, "")),
+      skillPaths: packs?.map((pack) => pathResolver.resolvePackSkillPath(pack, "")),
     };
+  });
+
+  pi.registerCommand(`${ROOT_PACK_COMMAND}:reload`, {
+    description: `Reload a session using one or more packs
+    Use commas or spaces to specify how many packs you want to load`,
+    handler: async (argument, ctx) => {
+      const pathResolver = getPathResolver();
+
+      const nodeFileSystem = new NodeFileSystem();
+
+      if (!argument) {
+        const directoriesResult = await nodeFileSystem.readDirectoryNames(
+          pathResolver.resolvePackPath(),
+        );
+
+        if (!directoriesResult.success) {
+          return ctx.ui.notify("No directories found");
+        }
+
+        const result = await ctx.ui.custom(
+          getMultiSelectorFactory(
+            "What packs do you want to load for this session?",
+            directoriesResult.data.map((directory) => ({ value: directory, label: directory })),
+          ),
+        );
+
+        if (!result) {
+          return;
+        }
+
+        packs = result;
+
+        return await ctx.reload();
+      }
+
+      packs = argument.split(/[,\s]+/);
+
+      return await ctx.reload();
+    },
   });
 
   pi.registerCommand(ROOT_PACK_COMMAND, {
