@@ -99,9 +99,10 @@ export async function openExternalEditor(filePath: string) {
   return undefined;
 }
 
-const LOAD_PACK_FLAG = "resource:load-pack";
 export default function (pi: ExtensionAPI) {
-  const SESSION_SUB_COMMAND = "session";
+  const SPACE_OR_COMMA_RANGE = /[\s,]+/;
+
+  const LOAD_PACK_FLAG = "resource:load-pack";
   pi.registerFlag(LOAD_PACK_FLAG, {
     type: "string",
     description: "Load a pack using the it's name only",
@@ -121,7 +122,7 @@ export default function (pi: ExtensionAPI) {
 
       ctx.ui.notify(`Loading pack ${loadPack}`);
 
-      packs = loadPack.split(/[\s+,]/g);
+      packs = loadPack.split(SPACE_OR_COMMA_RANGE);
     }
 
     return {
@@ -130,6 +131,7 @@ export default function (pi: ExtensionAPI) {
     };
   });
 
+  const SESSION_SUB_COMMAND = "session";
   pi.registerCommand(`${ROOT_PACK_COMMAND}:${SESSION_SUB_COMMAND}:new`, {
     description: `Do a new a session using one or more packs
     Use commas or spaces to specify how many packs you want to load`,
@@ -171,7 +173,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      packs = argument.split(/[,\s]+/);
+      packs = argument.split(SPACE_OR_COMMA_RANGE);
 
       const sessionResult = await ctx.newSession();
 
@@ -214,7 +216,7 @@ export default function (pi: ExtensionAPI) {
         return await ctx.reload();
       }
 
-      packs = argument.split(/[,\s]+/);
+      packs = argument.split(SPACE_OR_COMMA_RANGE);
 
       return await ctx.reload();
     },
