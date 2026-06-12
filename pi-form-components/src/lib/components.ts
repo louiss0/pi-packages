@@ -1,4 +1,9 @@
-import { DynamicBorder, Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
+import {
+  DynamicBorder,
+  ExtensionCommandContext,
+  Theme,
+  type ThemeColor,
+} from "@earendil-works/pi-coding-agent";
 import fs from "node:fs/promises";
 import {
   type Component,
@@ -15,7 +20,7 @@ import {
   truncateToWidth,
   KeybindingsManager,
 } from "@earendil-works/pi-tui";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 export interface FormComponent extends Component {
   setFocused(focused: boolean): void;
@@ -28,56 +33,75 @@ export interface FormComponent extends Component {
 
 type EditFileResult = {
   path: string;
-  content: string;
+  after: string;
   before: string;
   changed: boolean;
   exitCode: number | null;
 };
 
 export function createExternalEditor(editorCommand: string, filePath: string) {
-  return async (
+  return (
     _t: TUI,
     theme: Theme,
     _ky: KeybindingsManager,
     done: (result: EditFileResult | ExternalEditorError) => void,
   ) => {
-    try {
-      const parsed = editorCommand.split(" ").filter(Boolean); // filter(Boolean) prevents empty strings
+    // This function must be called like this for the code to work!
+    // The component won't appear
+    //! Don't ever try to make this function synchronuous
+    (async () => {
+      try {
+        const parsed = editorCommand.split(" ").filter(Boolean); // filter(Boolean) prevents empty strings
 
-      if (parsed.length === 0) {
-        done(new ExternalEditorError(`Invalid editor command: ${editorCommand}`));
-      }
+        if (parsed.length === 0) {
+          done(new ExternalEditorError(`Invalid editor command: ${editorCommand}`));
+          return;
+        }
 
-      const before = await fs.readFile(filePath, "utf8");
-      const [editor, ...editorArgs] = parsed;
+        const before = await fs.readFile(filePath, "utf8");
+        const [editor, ...editorArgs] = parsed;
 
-      const exitCode = await new Promise<number | null>((resolve, reject) => {
-        const child = spawn(editor, [...editorArgs, filePath], {
-          stdio: "inherit",
+        const FLAGS = ["--wait", "-w"];
+
+        const { stdout: helpOutput } = spawnSync(editor, ["--help"], {
           shell: true,
         });
 
-        child.on("error", (error) => reject(new Error("Spawn error", { cause: error })));
-        child.on("close", (code) => resolve(code));
-      });
+        const exitCode = await new Promise<number | null>((resolve, reject) => {
+          const args = [...editorArgs, filePath];
 
-      const content = await fs.readFile(filePath, "utf8");
+          const waitFlag = FLAGS.find((flag) => helpOutput.includes(flag));
 
-      done({
-        path: filePath,
-        before,
-        content,
-        changed: before !== content,
-        exitCode,
-      });
-    } catch (error) {
-      done(new ExternalEditorError("Spawn error", error));
-    }
+          if (waitFlag && !args.some((arg) => FLAGS.includes(arg))) {
+            args.push(waitFlag);
+          }
 
-    return new ExternalEditor(editorCommand, filePath, theme);
+          const child = spawn(editor, args, {
+            stdio: "inherit",
+            shell: true,
+          });
+
+          child.on("error", (error) => reject(new Error("Spawn error", { cause: error })));
+          child.on("close", (code) => resolve(code));
+        });
+
+        const after = await fs.readFile(filePath, "utf8");
+
+        done({
+          path: filePath,
+          before,
+          after,
+          changed: before !== after,
+          exitCode,
+        });
+      } catch (error) {
+        done(new ExternalEditorError("Spawn error", error));
+      }
+    })();
+
+    return new ExternalEditorPopUp(editorCommand, filePath, theme);
   };
 }
-
 class ExternalEditorError extends Error {
   constructor(message: string, cause?: unknown) {
     super(message, { cause });
@@ -85,7 +109,7 @@ class ExternalEditorError extends Error {
   }
 }
 
-class ExternalEditor extends Container {
+class ExternalEditorPopUp extends Container {
   #editorCommand: string;
   constructor(editorCommand: string, filePath: string, theme: Theme) {
     super();
