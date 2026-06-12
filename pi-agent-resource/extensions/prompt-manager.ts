@@ -15,10 +15,10 @@ import {
 import {
   createPromptForm,
   parsePromptFormValues,
-  PromptTemplateOverlay,
   type PromptFields,
   renderPromptMarkdown,
 } from "../shared/resource-components";
+import { editMarkdownWithExternalEditor } from "../shared/external-editor";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import {
   getFilterSubcommandArgumentCompletionFromStringUsingSubLabel,
@@ -146,14 +146,13 @@ export async function handleCreate(
     return;
   }
 
-  const template = await ctx.ui.custom<string | undefined>(
-    (tui, theme, _keyboard, done) =>
-      new PromptTemplateOverlay(tui, theme, done),
-    modalEditorOverlayOptions,
+  const template = await editMarkdownWithExternalEditor(
+    ctx,
+    "",
+    "prompts",
   );
 
-  if (template === undefined) {
-    ctx.ui.notify("Prompt creation cancelled", "info");
+  if (template instanceof Error) {
     return;
   }
 

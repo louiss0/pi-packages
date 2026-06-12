@@ -184,6 +184,10 @@ describe("Pack", () => {
       const resourceChoices = ["prompts", "skills"] as const;
       const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+
       const ctx = {
         ui: {
           custom: vi
@@ -195,7 +199,11 @@ describe("Pack", () => {
                 "This prompt creates release messaging with full file output",
               "argument-hint": "<version>",
             })
-            .mockResolvedValueOnce("Write the release template here")
+            .mockResolvedValueOnce({
+              after: "Write the release template here",
+              before: "",
+              changed: true,
+            })
             .mockResolvedValueOnce({
               name: "release-skill",
               description: "Useful skill description",
@@ -230,6 +238,10 @@ describe("Pack", () => {
         ["yes", "no"],
       );
       expect(pathResolver.resolvePackPath).toHaveBeenCalledWith(packName);
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "code",
+        expect.stringMatching(/draft\.md$/),
+      );
       expect(writeFileSpy).toHaveBeenCalledWith(
         pathResolver.resolvePackPromptPath(packName, "ship-release.md"),
         renderPromptMarkdown(
@@ -1043,17 +1055,27 @@ describe("Pack", () => {
   });
 
   definePackResourceReducerSuite({
-    buildCreateUi: (resourceName) => ({
-      custom: vi
-        .fn()
-        .mockResolvedValueOnce({
-          name: resourceName,
-          description:
-            "This prompt creates a React component with full file output",
-          "argument-hint": "<name> [directory]",
-        })
-        .mockResolvedValueOnce("Write the component template here"),
-    }),
+    buildCreateUi: (resourceName) => {
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+
+      return {
+        custom: vi
+          .fn()
+          .mockResolvedValueOnce({
+            name: resourceName,
+            description:
+              "This prompt creates a React component with full file output",
+            "argument-hint": "<name> [directory]",
+          })
+          .mockResolvedValueOnce({
+            after: "Write the component template here",
+            before: "",
+            changed: true,
+          }),
+      };
+    },
     exampleContent: examplePromptContent,
     expectCreateUi: (ui) => {
       expect(ui.custom).toHaveBeenCalledTimes(2);

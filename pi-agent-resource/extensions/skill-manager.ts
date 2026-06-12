@@ -27,7 +27,6 @@ import {
   parseOptionalSkillFormValues,
   parseRequiredSkillFormValues,
   renderSkillMarkdown,
-  SkillEditorOverlay,
   type OptionalSkillFields,
   type RequiredSkillFields,
   type SkillFrontmatterFields,
@@ -214,20 +213,20 @@ export async function handleEdit(
       return;
     }
   } else {
-    const editedContent = await ctx.ui.custom<string | undefined>(
-      (tui, theme, _kb, done) =>
-        new SkillEditorOverlay(tui, theme, currentContentResult.data, done),
-      modalEditorOverlayOptions,
-    );
+    const editor = process.env.VISUAL || process.env.EDITOR;
 
-    if (editedContent === undefined) {
-      ctx.ui.notify("Skill edit cancelled", "info");
+    if (!editor) {
+      ctx.ui.notify("Set $VISUAL or $EDITOR to edit skills", "error");
       return;
     }
 
-    const writeResult = await fileSystem.writeFile(skillPath, editedContent);
-    if (!writeResult.success) {
-      ctx.ui.notify(`Skill edit failed: ${writeResult.error.message}`, "error");
+    const result = await ctx.ui.custom<Error | { changed: boolean }>(
+      createExternalEditorFactory(editor, skillPath),
+      modalEditorOverlayOptions,
+    );
+
+    if (result instanceof Error) {
+      ctx.ui.notify(result.message, "error");
       return;
     }
   }

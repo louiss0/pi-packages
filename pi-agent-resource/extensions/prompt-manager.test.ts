@@ -35,6 +35,7 @@ vi.mock("@earendil-works/pi-tui", async () => {
 
 vi.mock("node:os", () => ({
   homedir: () => "/test-home",
+  tmpdir: () => "/tmp",
 }));
 
 import registerPromptManager, {
@@ -197,7 +198,10 @@ describe("extensions/prompt-manager", () => {
   });
 
   describe("handleCreate", () => {
-    it("writes the created prompt after the template overlay submits", async () => {
+    it("writes the created prompt after the external editor submits", async () => {
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
       const custom = vi
         .fn()
         .mockResolvedValueOnce({
@@ -206,7 +210,11 @@ describe("extensions/prompt-manager", () => {
             "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
-        .mockResolvedValueOnce("Write the component template here");
+        .mockResolvedValueOnce({
+          after: "Write the component template here",
+          before: "",
+          changed: true,
+        });
       const notify = vi.fn();
 
       await handleCreate(
@@ -226,6 +234,10 @@ describe("extensions/prompt-manager", () => {
         data: expect.stringContaining("Write the component template here"),
         success: true,
       });
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "code",
+        expect.stringMatching(/draft\.md$/),
+      );
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
@@ -235,6 +247,9 @@ describe("extensions/prompt-manager", () => {
     });
 
     it("writes the created local prompt when local scope is requested", async () => {
+      vi.stubEnv("VISUAL", "nvim");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
       const custom = vi
         .fn()
         .mockResolvedValueOnce({
@@ -243,7 +258,11 @@ describe("extensions/prompt-manager", () => {
             "This prompt creates a React component with full file output",
           "argument-hint": "<name> [directory]",
         })
-        .mockResolvedValueOnce("Write the component template here");
+        .mockResolvedValueOnce({
+          after: "Write the component template here",
+          before: "",
+          changed: true,
+        });
       const notify = vi.fn();
 
       const localFileSystem = new MemoryFileSystem();
@@ -261,6 +280,10 @@ describe("extensions/prompt-manager", () => {
         data: expect.stringContaining("Write the component template here"),
         success: true,
       });
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "nvim",
+        expect.stringMatching(/draft\.md$/),
+      );
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
@@ -300,7 +323,8 @@ describe("extensions/prompt-manager", () => {
         "code",
         promptPath,
       );
-      expect(custom).toHaveBeenCalledWith(
+      expect(custom).toHaveBeenNthCalledWith(
+        1,
         editorFactory,
         modalEditorOverlayOptions,
       );

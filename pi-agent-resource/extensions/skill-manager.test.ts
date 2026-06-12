@@ -125,29 +125,6 @@ describe("skill manager handlers", () => {
     expect(options).toEqual(formOverlayOptions);
   }
 
-  function expectEditorOverlayFactory(
-    custom: ReturnType<typeof vi.fn>,
-    callIndex: number,
-  ) {
-    const [factory, options] = custom.mock.calls[callIndex] as [
-      (
-        tui: TUI,
-        theme: Theme,
-        keyboard: unknown,
-        done: (value: unknown) => void,
-      ) => unknown,
-      unknown,
-    ];
-    const component = factory(createTui(), createTheme(), {}, vi.fn());
-
-    expect(
-      (component as { render: (width: number) => string[] })
-        .render(80)
-        .join("\n"),
-    ).toContain("Edit Skill Markdown");
-    expect(options).toEqual(modalEditorOverlayOptions);
-  }
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
@@ -539,12 +516,17 @@ describe("skill manager handlers", () => {
     );
   });
 
-  it("handleEdit uses an 80% overlay editor by default", async () => {
+  it("handleEdit uses the external editor factory by default", async () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
-    const custom = vi.fn().mockResolvedValueOnce(skillPath);
-    custom.mockResolvedValueOnce("updated skill content");
+    vi.stubEnv("EDITOR", "code");
+    const editorFactory = vi.fn();
+    mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+    const custom = vi
+      .fn()
+      .mockResolvedValueOnce(skillPath)
+      .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
 
@@ -556,14 +538,13 @@ describe("skill manager handlers", () => {
       getStubPathResolver,
     );
 
-    expectEditorOverlayFactory(custom, 1);
-    expect(mockCreateExternalEditorFactory).not.toHaveBeenCalled();
+    expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+      "code",
+      skillPath,
+    );
+    expect(custom).toHaveBeenNthCalledWith(2, editorFactory, modalEditorOverlayOptions);
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
-    expect(await memoryFileSystem.readFile(skillPath)).toEqual({
-      data: "updated skill content",
-      success: true,
-    });
     expect(reload).toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(
       "Skill updated. Reloading skills...",

@@ -22,13 +22,13 @@ import {
   createOptionalSkillForm,
   createPromptForm,
   createRequiredSkillForm,
-  PromptTemplateOverlay,
   renderPromptMarkdown,
   renderSkillMarkdown,
   type OptionalSkillFields,
   type PromptFields,
   type RequiredSkillFields,
 } from "../shared/resource-components";
+import { editMarkdownWithExternalEditor } from "../shared/external-editor";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
 const PACK_LABEL = "pack";
@@ -420,13 +420,13 @@ export function rootPackResourceReducer(
               continue;
             }
 
-            const template = await deps.ctx.ui.custom<string | undefined>(
-              (tui, theme, _keyboard, done) =>
-                new PromptTemplateOverlay(tui, theme, done),
-              modalEditorOverlayOptions,
+            const template = await editMarkdownWithExternalEditor(
+              deps.ctx,
+              "",
+              "pack prompts",
             );
 
-            if (template === undefined) {
+            if (template instanceof Error) {
               continue;
             }
 
@@ -1135,14 +1135,13 @@ export function promptPackResourceReducer(
           return;
         }
 
-        const template = await deps.ctx.ui.custom<string | undefined>(
-          (tui, theme, _keyboard, done) =>
-            new PromptTemplateOverlay(tui, theme, done),
-          modalEditorOverlayOptions,
+        const template = await editMarkdownWithExternalEditor(
+          deps.ctx,
+          "",
+          "pack prompts",
         );
 
-        if (template === undefined) {
-          deps.ctx.ui.notify("Prompt creation cancelled", "info");
+        if (template instanceof Error) {
           return;
         }
 
