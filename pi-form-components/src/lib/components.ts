@@ -1,16 +1,13 @@
-import {
-  DynamicBorder,
-  ExtensionCommandContext,
-  Theme,
-  type ThemeColor,
-} from "@earendil-works/pi-coding-agent";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
+import { DynamicBorder, Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Container,
   type Focusable,
   Input,
   Key,
+  KeybindingsManager,
   matchesKey,
   type SelectItem,
   SelectList,
@@ -18,9 +15,7 @@ import {
   Text,
   TUI,
   truncateToWidth,
-  KeybindingsManager,
 } from "@earendil-works/pi-tui";
-import { spawn, spawnSync } from "node:child_process";
 
 export interface FormComponent extends Component {
   setFocused(focused: boolean): void;
@@ -32,14 +27,12 @@ export interface FormComponent extends Component {
 }
 
 type EditFileResult = {
-  path: string;
   after: string;
   before: string;
   changed: boolean;
-  exitCode: number | null;
 };
 
-export function createExternalEditor(editorCommand: string, filePath: string) {
+export function createExternalEditorFactory(editorCommand: string, filePath: string) {
   return (
     _t: TUI,
     theme: Theme,
@@ -67,7 +60,7 @@ export function createExternalEditor(editorCommand: string, filePath: string) {
           shell: true,
         });
 
-        const exitCode = await new Promise<number | null>((resolve, reject) => {
+        await new Promise((resolve, reject) => {
           const args = [...editorArgs, filePath];
 
           const waitFlag = FLAGS.find((flag) => helpOutput.includes(flag));
@@ -88,11 +81,9 @@ export function createExternalEditor(editorCommand: string, filePath: string) {
         const after = await fs.readFile(filePath, "utf8");
 
         done({
-          path: filePath,
           before,
           after,
           changed: before !== after,
-          exitCode,
         });
       } catch (error) {
         done(new ExternalEditorError("Spawn error", error));

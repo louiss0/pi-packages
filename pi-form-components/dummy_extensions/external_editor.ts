@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createExternalEditor } from "../src/lib/components";
+import { createExternalEditorFactory } from "../src/lib/components";
 
 export default function externalEditior(pi: ExtensionAPI) {
   pi.registerCommand("external-editor", {
@@ -16,7 +16,7 @@ export default function externalEditior(pi: ExtensionAPI) {
 
       // ctx.ui.notify(`Opening file ${dummyFile} cwd ${import.meta.dirname}`, "warning");
 
-      const result = await ctx.ui.custom(createExternalEditor(EDITOR, dummyFile));
+      const result = await ctx.ui.custom(createExternalEditorFactory(EDITOR, dummyFile));
 
       if (result instanceof Error) {
         return ctx.ui.notify(result.message, "error");
