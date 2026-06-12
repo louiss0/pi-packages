@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join } from "node:path";
 import { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createExternalEditor } from "../src/lib/components";
 
@@ -12,9 +12,9 @@ export default function externalEditior(pi: ExtensionAPI) {
         return ctx.ui.notify("EDITOR environment variable not set", "error");
       }
 
-      const dummyFile = resolve("../fixtures/example.md");
+      const dummyFile = join(import.meta.dirname, "../fixtures/example.md");
 
-      ctx.ui.notify(`Opening file ${dummyFile}`, "warning");
+      // ctx.ui.notify(`Opening file ${dummyFile} cwd ${import.meta.dirname}`, "warning");
 
       const result = await ctx.ui.custom(createExternalEditor(EDITOR, dummyFile));
 
@@ -22,7 +22,7 @@ export default function externalEditior(pi: ExtensionAPI) {
         return ctx.ui.notify(result.message, "error");
       }
 
-      ctx.ui.notify(JSON.stringify(result));
+      ctx.ui.notify(result.after);
     },
   });
 }
