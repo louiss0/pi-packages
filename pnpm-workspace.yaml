@@ -1,4 +1,5 @@
 packages:
+  - bundled/*
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
   - "pi-form-components"
