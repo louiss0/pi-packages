@@ -4,6 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { createExternalEditorFactory } from "@code-fixer-23/pi-form-components";
 
 import {
   getPathResolver,
@@ -221,16 +222,20 @@ export async function handleEdit(
     return;
   }
 
-  const editedContent = await ctx.ui.editor("Edit Prompt", contentResult.data);
+  const editor = process.env.VISUAL || process.env.EDITOR;
 
-  if (editedContent === undefined) {
-    ctx.ui.notify("Prompt editing cancelled", "info");
+  if (!editor) {
+    ctx.ui.notify("Set $VISUAL or $EDITOR to edit prompts", "error");
     return;
   }
 
-  const writeResult = await fileSystem.writeFile(prompt.path, editedContent);
-  if (!writeResult.success) {
-    ctx.ui.notify(`Prompt edit failed: ${writeResult.error.message}`, "error");
+  const result = await ctx.ui.custom<Error | { changed: boolean }>(
+    createExternalEditorFactory(editor, prompt.path),
+    modalEditorOverlayOptions,
+  );
+
+  if (result instanceof Error) {
+    ctx.ui.notify(result.message, "error");
     return;
   }
 

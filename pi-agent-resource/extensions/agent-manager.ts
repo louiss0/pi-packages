@@ -4,6 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { createExternalEditorFactory } from "@code-fixer-23/pi-form-components";
 
 import {
   getPathResolver,
@@ -22,7 +23,7 @@ import {
   getFilterSubcommandArgumentCompletionFromStringUsingSubLabel,
   SubCommands,
 } from "../shared/subcommands";
-import { formOverlayOptions } from "../shared/ui";
+import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
 const extensionName = "agent-manager";
 const PI_DIRECTORY_NAME = ".pi";
@@ -209,19 +210,20 @@ export async function handleEdit(
     return;
   }
 
-  const editedContent = await ctx.ui.editor("Edit Agent", readResult.data);
+  const editor = process.env.VISUAL || process.env.EDITOR;
 
-  if (editedContent === undefined) {
-    ctx.ui.notify("Agent editing cancelled", "info");
+  if (!editor) {
+    ctx.ui.notify("Set $VISUAL or $EDITOR to edit agents", "error");
     return;
   }
 
-  const writeResult = await fileSystem.writeFile(agent.path, editedContent);
-  if (!writeResult.success) {
-    ctx.ui.notify(
-      getFileSystemErrorMessage("Agent edit failed", writeResult.error),
-      "error",
-    );
+  const result = await ctx.ui.custom<Error | { changed: boolean }>(
+    createExternalEditorFactory(editor, agent.path),
+    modalEditorOverlayOptions,
+  );
+
+  if (result instanceof Error) {
+    ctx.ui.notify(result.message, "error");
     return;
   }
 

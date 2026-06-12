@@ -1,10 +1,26 @@
 import { join } from "node:path";
+const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
+  mockCreateExternalEditorFactory: vi.fn(),
+}));
+
 import { Form } from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
+import { modalEditorOverlayOptions } from "../shared/ui";
+
+vi.mock("@code-fixer-23/pi-form-components", async () => {
+  const module = await vi.importActual<
+    typeof import("@code-fixer-23/pi-form-components")
+  >("@code-fixer-23/pi-form-components");
+
+  return {
+    ...module,
+    createExternalEditorFactory: mockCreateExternalEditorFactory,
+  };
+});
 
 vi.mock("@earendil-works/pi-tui", async () => {
   return vi.importActual<typeof import("@earendil-works/pi-tui")>(
@@ -360,33 +376,36 @@ describe("extensions/agent-manager", () => {
       memoryFileSystem.seed({
         [agentPath]: "---\nname: oracle\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("global: oracle");
-      const editor = vi.fn().mockResolvedValueOnce("updated agent content");
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+      const custom = vi
+        .fn()
+        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
       const notify = vi.fn();
+      const select = vi.fn().mockResolvedValueOnce("global: oracle");
 
       await handleEdit(
-        { ui: { notify, select, editor } } as never,
+        { ui: { custom, notify, select } } as never,
         "global",
         getStubResourceFileSystem,
         getStubPathResolver,
       );
 
-      const content = await memoryFileSystem.readFile(agentPath);
-
       expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
-      expect(editor).toHaveBeenCalledWith(
-        "Edit Agent",
-        "---\nname: oracle\n---\n",
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "code",
+        agentPath,
+      );
+      expect(custom).toHaveBeenCalledWith(
+        editorFactory,
+        modalEditorOverlayOptions,
       );
       expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
         "oracle.md",
       );
       expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
-      expect(content).toEqual({
-        data: "updated agent content",
-        success: true,
-      });
       expect(notify).toHaveBeenCalledWith("Agent edited");
     });
 
@@ -395,57 +414,56 @@ describe("extensions/agent-manager", () => {
       localFileSystem.seed({
         [localAgentPath]: "---\nname: oracle\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("local: oracle");
-      const editor = vi
+      vi.stubEnv("VISUAL", "nvim");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+      const custom = vi
         .fn()
-        .mockResolvedValueOnce("updated local agent content");
+        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
       const notify = vi.fn();
+      const select = vi.fn().mockResolvedValueOnce("local: oracle");
 
       await handleEdit(
-        { cwd: localCwd, ui: { notify, select, editor } } as never,
+        { cwd: localCwd, ui: { custom, notify, select } } as never,
         "local",
         () => new MemoryFileSystem(),
         getStubPathResolver,
       );
 
-      const content = await localFileSystem.readFile(localAgentPath);
-
       expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "nvim",
+        localAgentPath,
+      );
       expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
         "oracle.md",
       );
       expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
-      expect(content).toEqual({
-        data: "updated local agent content",
-        success: true,
-      });
       expect(notify).toHaveBeenCalledWith("Agent edited");
     });
 
-    it("reports filesystem errors when agent editing fails", async () => {
+    it("reports external editor errors when agent editing fails", async () => {
       memoryFileSystem.seed({
         [agentPath]: "---\nname: oracle\n---\n",
       });
-      const select = vi.fn().mockResolvedValueOnce("global: oracle");
-      const editor = vi.fn().mockResolvedValueOnce("updated agent content");
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+      const custom = vi
+        .fn()
+        .mockResolvedValueOnce(new Error("editor crashed"));
       const notify = vi.fn();
-      vi.spyOn(memoryFileSystem, "writeFile").mockResolvedValueOnce({
-        error: new Error("write denied"),
-        success: false,
-      });
+      const select = vi.fn().mockResolvedValueOnce("global: oracle");
 
       await handleEdit(
-        { ui: { notify, select, editor } } as never,
+        { ui: { custom, notify, select } } as never,
         "global",
         getStubResourceFileSystem,
         getStubPathResolver,
       );
 
-      expect(notify).toHaveBeenCalledWith(
-        "Agent edit failed: write denied",
-        "error",
-      );
+      expect(notify).toHaveBeenCalledWith("editor crashed", "error");
       expect(notify).not.toHaveBeenCalledWith("Agent edited");
     });
   });

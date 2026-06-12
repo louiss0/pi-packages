@@ -1,4 +1,6 @@
-import { EventEmitter } from "node:events";
+const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
+  mockCreateExternalEditorFactory: vi.fn(),
+}));
 
 import type {
   ExtensionCommandContext,
@@ -7,11 +9,16 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
 
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-}));
+vi.mock("@code-fixer-23/pi-form-components", async () => {
+  const module = await vi.importActual<
+    typeof import("@code-fixer-23/pi-form-components")
+  >("@code-fixer-23/pi-form-components");
 
-import { spawn } from "node:child_process";
+  return {
+    ...module,
+    createExternalEditorFactory: mockCreateExternalEditorFactory,
+  };
+});
 
 import {
   exampleAgentContent,
@@ -28,6 +35,7 @@ import {
   renderPromptMarkdown,
   renderSkillMarkdown,
 } from "../shared/resource-components";
+import { modalEditorOverlayOptions } from "../shared/ui";
 import {
   MemoryFileSystem,
   PathResolver,
@@ -137,17 +145,24 @@ describe("Pack", () => {
   });
 
   describe("openExternalEditor", () => {
-    it("treats exit code 0 as success", async () => {
-      const child = new EventEmitter() as EventEmitter & {
-        on: (event: string, listener: (...args: unknown[]) => void) => unknown;
-      };
-      vi.mocked(spawn).mockReturnValue(child as never);
-      process.env.EDITOR = "test-editor";
+    it("uses the shared external editor factory", async () => {
+      const editorFactory = vi.fn();
+      const custom = vi
+        .fn()
+        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const notify = vi.fn();
+      const ctx = createTestContext({ ui: { custom, notify } });
 
-      const resultPromise = openExternalEditor("/tmp/test.md");
-      child.emit("close", 0);
+      vi.stubEnv("EDITOR", "test-editor");
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
 
-      await expect(resultPromise).resolves.toBeUndefined();
+      await expect(openExternalEditor(ctx, "/tmp/test.md")).resolves.toBeUndefined();
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "test-editor",
+        "/tmp/test.md",
+      );
+      expect(custom).toHaveBeenCalledWith(editorFactory, modalEditorOverlayOptions);
+      expect(notify).not.toHaveBeenCalledWith(expect.any(String), "error");
     });
   });
 
@@ -583,6 +598,7 @@ describe("Pack", () => {
           ["example"],
         );
         expect(mockOpenExternalEditor).toHaveBeenCalledWith(
+          createTestContext(ctx),
           config.getEditFilePath(randomFolder, "example"),
         );
       });

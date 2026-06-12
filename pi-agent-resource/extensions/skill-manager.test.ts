@@ -1,4 +1,8 @@
 import { dirname, join } from "node:path";
+const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
+  mockCreateExternalEditorFactory: vi.fn(),
+}));
+
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
@@ -17,11 +21,16 @@ vi.mock("node:os", () => ({
   homedir: () => "/test-home",
 }));
 
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-}));
+vi.mock("@code-fixer-23/pi-form-components", async () => {
+  const module = await vi.importActual<
+    typeof import("@code-fixer-23/pi-form-components")
+  >("@code-fixer-23/pi-form-components");
 
-import { spawn } from "node:child_process";
+  return {
+    ...module,
+    createExternalEditorFactory: mockCreateExternalEditorFactory,
+  };
+});
 
 const TAB_KEY = "\t";
 const ENTER_KEY = "\r";
@@ -548,7 +557,7 @@ describe("skill manager handlers", () => {
     );
 
     expectEditorOverlayFactory(custom, 1);
-    expect(spawn).not.toHaveBeenCalled();
+    expect(mockCreateExternalEditorFactory).not.toHaveBeenCalled();
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(await memoryFileSystem.readFile(skillPath)).toEqual({
@@ -562,19 +571,17 @@ describe("skill manager handlers", () => {
     );
   });
 
-  it("handleEdit uses the external editor without shell mode", async () => {
+  it("handleEdit uses the external editor factory", async () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
     vi.stubEnv("VISUAL", 'code --wait +"set ft=markdown"');
-    vi.mocked(spawn).mockReturnValueOnce({
-      on: (event: string, callback: (value?: number) => void) => {
-        if (event === "exit") {
-          callback(0);
-        }
-      },
-    } as never);
-    const custom = vi.fn().mockResolvedValueOnce(skillPath);
+    const editorFactory = vi.fn();
+    mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+    const custom = vi
+      .fn()
+      .mockResolvedValueOnce(skillPath)
+      .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
 
@@ -586,11 +593,11 @@ describe("skill manager handlers", () => {
       getStubPathResolver,
     );
 
-    expect(spawn).toHaveBeenCalledWith(
-      "code",
-      ["--wait", "+set ft=markdown", skillPath],
-      expect.objectContaining({ shell: false }),
+    expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+      'code --wait +"set ft=markdown"',
+      skillPath,
     );
+    expect(custom).toHaveBeenNthCalledWith(2, editorFactory, modalEditorOverlayOptions);
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalled();

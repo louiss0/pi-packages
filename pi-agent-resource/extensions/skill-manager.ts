@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type {
@@ -6,6 +5,7 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { createExternalEditorFactory } from "@code-fixer-23/pi-form-components";
 import {
   type Component,
   Container,
@@ -204,7 +204,15 @@ export async function handleEdit(
       return;
     }
 
-    await openExternalEditor(editor, skillPath);
+    const result = await ctx.ui.custom<Error | { changed: boolean }>(
+      createExternalEditorFactory(editor, skillPath),
+      modalEditorOverlayOptions,
+    );
+
+    if (result instanceof Error) {
+      ctx.ui.notify(result.message, "error");
+      return;
+    }
   } else {
     const editedContent = await ctx.ui.custom<string | undefined>(
       (tui, theme, _kb, done) =>
@@ -433,107 +441,6 @@ async function listSkillNames(
   return entriesResult.data
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
-}
-
-function openExternalEditor(editor: string, filePath: string) {
-  const editorCommand = parseExternalEditorCommand(editor);
-
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      editorCommand.command,
-      [...editorCommand.args, filePath],
-      {
-        stdio: "inherit",
-        shell: false,
-      },
-    );
-
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(`Editor exited with code ${code ?? "unknown"}`));
-    });
-  });
-}
-
-function parseExternalEditorCommand(editor: string) {
-  const parts = tokenizeCommandLine(editor);
-  const [command, ...args] = parts;
-
-  if (!command) {
-    throw new Error("Set $VISUAL or $EDITOR to edit skills");
-  }
-
-  return { command, args };
-}
-
-function tokenizeCommandLine(commandLine: string) {
-  const parts: string[] = [];
-  let token = "";
-  let quote: '"' | "'" | null = null;
-
-  for (let index = 0; index < commandLine.length; index += 1) {
-    const character = commandLine[index];
-    const nextCharacter = commandLine[index + 1];
-
-    if (quote) {
-      if (
-        character === "\\" &&
-        quote === '"' &&
-        (nextCharacter === '"' || nextCharacter === "\\")
-      ) {
-        token += nextCharacter;
-        index += 1;
-        continue;
-      }
-
-      if (character === quote) {
-        quote = null;
-        continue;
-      }
-
-      token += character;
-      continue;
-    }
-
-    if (character === '"' || character === "'") {
-      quote = character;
-      continue;
-    }
-
-    if (/\s/.test(character)) {
-      if (token.length > 0) {
-        parts.push(token);
-        token = "";
-      }
-      continue;
-    }
-
-    if (
-      character === "\\" &&
-      (nextCharacter === '"' || nextCharacter === "'" || nextCharacter === "\\")
-    ) {
-      token += nextCharacter;
-      index += 1;
-      continue;
-    }
-
-    token += character;
-  }
-
-  if (quote) {
-    throw new Error("Unterminated quote in $VISUAL or $EDITOR");
-  }
-
-  if (token.length > 0) {
-    parts.push(token);
-  }
-
-  return parts;
 }
 
 async function readSkillFile(filePath: string, fileSystem: ResourceFileSystem) {

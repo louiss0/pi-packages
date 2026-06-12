@@ -1,10 +1,26 @@
 import { join } from "node:path";
+const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
+  mockCreateExternalEditorFactory: vi.fn(),
+}));
+
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import type { ResourcePathResolver } from "../shared/filesystem";
 import { resetDevelopmentExtensionNotice } from "../shared/runtime";
+import { modalEditorOverlayOptions } from "../shared/ui";
+
+vi.mock("@code-fixer-23/pi-form-components", async () => {
+  const module = await vi.importActual<
+    typeof import("@code-fixer-23/pi-form-components")
+  >("@code-fixer-23/pi-form-components");
+
+  return {
+    ...module,
+    createExternalEditorFactory: mockCreateExternalEditorFactory,
+  };
+});
 
 vi.mock("@earendil-works/pi-tui", async () => {
   const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
@@ -259,33 +275,40 @@ describe("extensions/prompt-manager", () => {
       memoryFileSystem.seed({
         [promptPath]: "---\nname: create-react-component\n---\n",
       });
+      vi.stubEnv("EDITOR", "code");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+      const custom = vi
+        .fn()
+        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const notify = vi.fn();
       const select = vi
         .fn()
         .mockResolvedValueOnce("global: create-react-component");
-      const editor = vi.fn().mockResolvedValueOnce("updated prompt content");
-      const notify = vi.fn();
 
       await handleEdit(
-        { ui: { notify, select, editor } } as never,
+        { ui: { custom, notify, select } } as never,
         "global",
         () => new MemoryFileSystem(),
         getStubPathResolver,
       );
 
-      const content = await memoryFileSystem.readFile(promptPath);
-
       expect(select).toHaveBeenCalledWith("Edit Prompt", [
         "global: create-react-component",
       ]);
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "code",
+        promptPath,
+      );
+      expect(custom).toHaveBeenCalledWith(
+        editorFactory,
+        modalEditorOverlayOptions,
+      );
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveGlobalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
       );
       expect(pathResolver.resolveLocalPromptPath).not.toHaveBeenCalled();
-      expect(content).toEqual({
-        data: "updated prompt content",
-        success: true,
-      });
       expect(notify).toHaveBeenCalledWith("Prompt edited");
     });
 
@@ -294,35 +317,36 @@ describe("extensions/prompt-manager", () => {
       localFileSystem.seed({
         [localPromptPath]: "---\nname: create-react-component\n---\n",
       });
+      vi.stubEnv("VISUAL", "nvim");
+      const editorFactory = vi.fn();
+      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
+      const custom = vi
+        .fn()
+        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const notify = vi.fn();
       const select = vi
         .fn()
         .mockResolvedValueOnce("local: create-react-component");
-      const editor = vi
-        .fn()
-        .mockResolvedValueOnce("updated local prompt content");
-      const notify = vi.fn();
 
       await handleEdit(
-        { cwd: localCwd, ui: { notify, select, editor } } as never,
+        { cwd: localCwd, ui: { custom, notify, select } } as never,
         "local",
         () => new MemoryFileSystem(),
         getStubPathResolver,
       );
 
-      const content = await localFileSystem.readFile(localPromptPath);
-
       expect(select).toHaveBeenCalledWith("Edit Prompt", [
         "local: create-react-component",
       ]);
+      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
+        "nvim",
+        localPromptPath,
+      );
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith();
       expect(pathResolver.resolveLocalPromptPath).toHaveBeenCalledWith(
         "create-react-component.md",
       );
       expect(pathResolver.resolveGlobalPromptPath).not.toHaveBeenCalled();
-      expect(content).toEqual({
-        data: "updated local prompt content",
-        success: true,
-      });
       expect(notify).toHaveBeenCalledWith("Prompt edited");
     });
   });

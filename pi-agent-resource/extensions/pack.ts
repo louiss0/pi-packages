@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import {
+  createExternalEditorFactory,
   MultiSelect,
   MultiSelectConfig,
 } from "@code-fixer-23/pi-form-components";
@@ -70,42 +70,27 @@ type PackResourceHandlers = Record<PackResourceCommand, () => Promise<void>>;
 
 export const ROOT_PACK_FOLDER_PATH = ".pi/packs/";
 
-class ExternalEditorError extends Error {
-  constructor(message: string, cause?: Error) {
-    super(message);
-    this.name = "ExternalEditorError";
-    this.cause = cause;
-  }
-}
+export async function openExternalEditor(
+  ctx: ExtensionCommandContext,
+  filePath: string,
+) {
+  const editor = process.env.VISUAL || process.env.EDITOR;
 
-export async function openExternalEditor(filePath: string) {
-  const { EDITOR } = process.env;
-
-  if (!EDITOR) {
-    return new ExternalEditorError("No external editor set");
+  if (!editor) {
+    ctx.ui.notify("Set $VISUAL or $EDITOR to edit pack resources", "error");
+    return new Error("No external editor set");
   }
 
-  const result = await new Promise<number | ExternalEditorError>(
-    (resolve, reject) => {
-      const [cmd, ...args] = EDITOR.split(" ");
-      const child = spawn(cmd, [...args, filePath]);
-
-      child.on("error", (err) =>
-        reject(new ExternalEditorError("Failed to use external editor", err)),
-      );
-      child.on("close", (value) =>
-        value === 0
-          ? resolve(value)
-          : reject(
-              new ExternalEditorError("Something went wrong while closing"),
-            ),
-      );
-    },
+  const result = await ctx.ui.custom<Error | { changed: boolean }>(
+    createExternalEditorFactory(editor, filePath),
+    modalEditorOverlayOptions,
   );
 
-  if (result instanceof ExternalEditorError) {
+  if (result instanceof Error) {
+    ctx.ui.notify(result.message, "error");
     return result;
   }
+
   return undefined;
 }
 
@@ -714,6 +699,7 @@ export function skillPackResourceReducer(
         }
 
         await deps.openExternalEditor(
+          deps.ctx,
           deps.pathResolver.resolvePackSkillPath(
             packName,
             `${skillName}/SKILL.md`,
@@ -1237,6 +1223,7 @@ export function promptPackResourceReducer(
         }
 
         await deps.openExternalEditor(
+          deps.ctx,
           deps.pathResolver.resolvePackPromptPath(packName, `${promptName}.md`),
         );
       },
