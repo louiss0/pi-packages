@@ -7,8 +7,15 @@ import {
   Text,
   type TUI,
 } from "@earendil-works/pi-tui";
+import fs from "node:fs/promises";
+import { spawn, spawnSync } from "node:child_process";
 import { vi } from "vitest";
-import { itemChoiceStyle, MultiSelect, Picker } from "./components";
+import {
+  createExternalEditorFactory,
+  itemChoiceStyle,
+  MultiSelect,
+  Picker,
+} from "./components";
 
 vi.mock("@earendil-works/pi-tui", async () => {
   const module = await vi.importActual<typeof import("@earendil-works/pi-tui")>(
@@ -20,6 +27,17 @@ vi.mock("@earendil-works/pi-tui", async () => {
     matchesKey: (data: string, key: string) => data === key,
   };
 });
+
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn(),
+  spawnSync: vi.fn(),
+}));
+
+vi.mock("node:fs/promises", () => ({
+  default: {
+    readFile: vi.fn(),
+  },
+}));
 
 function getRenderedContentLines(lines: string[]) {
   return lines.filter((line) => line.trim().length > 0);
@@ -780,6 +798,179 @@ describe("shared/components", () => {
 
       expect(done).toHaveBeenCalledTimes(1);
       expect(done).toHaveBeenCalledWith(null);
+    });
+  });
+});
+
+describe("createExternalEditorFactory", () => {
+  function createEditorChild() {
+    const listeners = new Map<string, (...args: Array<unknown>) => void>();
+
+    return {
+      emit(event: string, ...args: Array<unknown>) {
+        listeners.get(event)?.(...args);
+      },
+      on(event: string, listener: (...args: Array<unknown>) => void) {
+        listeners.set(event, listener);
+        return this;
+      },
+    };
+  }
+
+  async function openExternalEditor(editorCommand: string) {
+    const done = vi.fn<(result: unknown) => void>();
+    const result = new Promise<unknown>((resolve) => {
+      done.mockImplementation(resolve);
+    });
+
+    const component = createExternalEditorFactory(
+      editorCommand,
+      "/tmp/example.md",
+    )(createTui(), createTheme(), {} as never, done);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    return { component, done, result };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the popup with file and editor details", async () => {
+    vi.mocked(fs.readFile)
+      .mockResolvedValueOnce("before")
+      .mockResolvedValueOnce("after");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { component, result } = await openExternalEditor("code");
+    const output = component.render(80).join("\n");
+
+    expect(output).toContain("Editing file: /tmp/example.md");
+    expect(output).toContain("Editor: code");
+    expect(output).toContain("Close the editor to return to Pi.");
+
+    child.emit("close", 0);
+
+    await expect(result).resolves.toEqual({
+      after: "after",
+      before: "before",
+      changed: true,
+    });
+  });
+
+  it("reports an invalid editor command", async () => {
+    const { result } = await openExternalEditor("   ");
+
+    await expect(result).resolves.toMatchObject({
+      message: "Invalid editor command:    ",
+      name: "ExternalEditorError",
+    });
+    expect(fs.readFile).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("appends --wait when the editor supports it", async () => {
+    vi.mocked(fs.readFile)
+      .mockResolvedValueOnce("before")
+      .mockResolvedValueOnce("after");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { result } = await openExternalEditor("code --reuse-window");
+
+    child.emit("close", 0);
+    await result;
+
+    expect(spawn).toHaveBeenCalledWith(
+      "code",
+      ["--reuse-window", "/tmp/example.md", "--wait"],
+      expect.objectContaining({ shell: true, stdio: "inherit" }),
+    );
+  });
+
+  it("appends -w when the editor exposes the short wait flag", async () => {
+    vi.mocked(fs.readFile)
+      .mockResolvedValueOnce("before")
+      .mockResolvedValueOnce("after");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("-w") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { result } = await openExternalEditor("hx");
+
+    child.emit("close", 0);
+    await result;
+
+    expect(spawn).toHaveBeenCalledWith(
+      "hx",
+      ["/tmp/example.md", "-w"],
+      expect.objectContaining({ shell: true, stdio: "inherit" }),
+    );
+  });
+
+  it("does not duplicate an existing wait flag", async () => {
+    vi.mocked(fs.readFile)
+      .mockResolvedValueOnce("before")
+      .mockResolvedValueOnce("after");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { result } = await openExternalEditor("code --wait");
+
+    child.emit("close", 0);
+    await result;
+
+    expect(spawn).toHaveBeenCalledWith(
+      "code",
+      ["--wait", "/tmp/example.md"],
+      expect.objectContaining({ shell: true, stdio: "inherit" }),
+    );
+  });
+
+  it("reports when the file content is unchanged", async () => {
+    vi.mocked(fs.readFile)
+      .mockResolvedValueOnce("same")
+      .mockResolvedValueOnce("same");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { result } = await openExternalEditor("code");
+
+    child.emit("close", 0);
+
+    await expect(result).resolves.toEqual({
+      after: "same",
+      before: "same",
+      changed: false,
+    });
+  });
+
+  it("wraps child process errors in an ExternalEditorError", async () => {
+    vi.mocked(fs.readFile).mockResolvedValueOnce("before");
+    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("") } as never);
+
+    const child = createEditorChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+
+    const { result } = await openExternalEditor("code");
+
+    child.emit("error", new Error("boom"));
+
+    await expect(result).resolves.toMatchObject({
+      message: "Spawn error",
+      name: "ExternalEditorError",
     });
   });
 });
