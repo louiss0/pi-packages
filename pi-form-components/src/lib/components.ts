@@ -27,6 +27,65 @@ export interface FormComponent extends Component {
   readonly value: string | number | boolean;
 }
 
+function createExternalEditor(
+  editorCommand: string,
+  filePath: string,
+): Parameters<ExtensionCommandContext["ui"]["custom"]>[0] {
+  return () => {
+    queueMicrotask(async () => {
+      const parsed = editorCommand.split(" ");
+
+      if (parsed.length === 0) {
+        throw new Error(`Invalid editor command: ${editorCommand}`);
+      }
+
+      const [editor, ...editorArgs] = parsed;
+
+      const exitCode = await new Promise<number | null>((resolve) => {
+        const child = spawn(editor, [...editorArgs, filePath], {
+          stdio: "inherit",
+          shell: true,
+        });
+
+        child.on("error", () => resolve(null));
+        child.on("close", (code) => resolve(code));
+      });
+
+      const content = await fs.readFile(filePath, "utf8");
+
+      done({
+        path: filePath,
+        before,
+        content,
+        changed: before !== content,
+        exitCode,
+      });
+    });
+
+    return new ExternalEditor(editorCommand, filePath);
+  };
+}
+
+class ExternalEditor extends Container {
+  #editorCommand: string;
+  constructor(editorCommand: string, filePath: string) {
+    super();
+
+    this.#editorCommand = editorCommand;
+    this.addChild(
+      new Text(
+        [
+          `Editing file: ${filePath}`,
+          `Editor: ${this.#editorCommand}`,
+          "Close the editor to return to Pi.",
+        ].join("\n"),
+        2,
+        2,
+      ),
+    );
+  }
+}
+
 export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
   title?: string;
   items: T;
@@ -35,11 +94,7 @@ export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
   styles?: {
     title?: PickerText;
     item?: Record<
-      | "selectedPrefix"
-      | "selectedText"
-      | "description"
-      | "scrollInfo"
-      | "noMatch",
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
       PickerText
     >;
   };
