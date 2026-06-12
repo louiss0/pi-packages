@@ -1,3 +1,13 @@
+## 3.0.1 (2026-06-12)
+
+### 🩹 Fixes
+
+- **packages:** restore formatting and test expectations ([206a2e0](https://github.com/louiss0/pi-packages/commit/206a2e0))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 # 3.0.0 (2026-06-10)
 
 ### 🚀 Features

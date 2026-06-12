@@ -1,3 +1,26 @@
+# 4.0.0 (2026-06-12)
+
+### 🚀 Features
+
+- **pi-agent-resource:** add session file to new sessions with packs ([ec8efd8](https://github.com/louiss0/pi-packages/commit/ec8efd8))
+- **pi-agent-resource:** add new session command ([91dd1ca](https://github.com/louiss0/pi-packages/commit/91dd1ca))
+- **pi-agent-resource:** add pack loading ([a113332](https://github.com/louiss0/pi-packages/commit/a113332))
+- **pi-agent-resource:** use flag to register packs ([c6f1f58](https://github.com/louiss0/pi-packages/commit/c6f1f58))
+
+### 🩹 Fixes
+
+- **packages:** restore formatting and test expectations ([206a2e0](https://github.com/louiss0/pi-packages/commit/206a2e0))
+- **pi-agent-resource:** remove the last related agent code ([c52ee17](https://github.com/louiss0/pi-packages/commit/c52ee17))
+- **pi-agent-resource:** restore tsconfig and agent flow ([5d59d1f](https://github.com/louiss0/pi-packages/commit/5d59d1f))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.0.1
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.1.1 (2026-06-10)
 
 ### 🚀 Features
