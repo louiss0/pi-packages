@@ -1,8 +1,10 @@
 import {
   DynamicBorder,
+  ExtensionCommandContext,
   Theme,
   type ThemeColor,
 } from "@earendil-works/pi-coding-agent";
+import fs from "node:fs/promises";
 import {
   type Component,
   Container,
@@ -17,6 +19,7 @@ import {
   TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
+import { spawn } from "node:child_process";
 
 export interface FormComponent extends Component {
   setFocused(focused: boolean): void;
@@ -27,27 +30,39 @@ export interface FormComponent extends Component {
   readonly value: string | number | boolean;
 }
 
-function createExternalEditor(
-  editorCommand: string,
-  filePath: string,
-): Parameters<ExtensionCommandContext["ui"]["custom"]>[0] {
-  return () => {
-    queueMicrotask(async () => {
-      const parsed = editorCommand.split(" ");
+type EditFileResult = {
+  path: string;
+  content: string;
+  before: string;
+  changed: boolean;
+  exitCode: number | null;
+};
+
+export function createExternalEditor(editorCommand: string, filePath: string) {
+  return async (
+    _t: TUI,
+    theme: Theme,
+    _ky: Theme,
+    done: (result: EditFileResult | ExternalEditorError) => void,
+  ) => {
+    try {
+      const parsed = editorCommand.split(" ").filter(Boolean); // filter(Boolean) prevents empty strings
 
       if (parsed.length === 0) {
-        throw new Error(`Invalid editor command: ${editorCommand}`);
+        done(new ExternalEditorError(`Invalid editor command: ${editorCommand}`));
+        return;
       }
 
+      const before = await fs.readFile(filePath, "utf8");
       const [editor, ...editorArgs] = parsed;
 
-      const exitCode = await new Promise<number | null>((resolve) => {
+      const exitCode = await new Promise<number | null>((resolve, reject) => {
         const child = spawn(editor, [...editorArgs, filePath], {
           stdio: "inherit",
           shell: true,
         });
 
-        child.on("error", () => resolve(null));
+        child.on("error", (error) => reject(new Error("Spawn error", { cause: error })));
         child.on("close", (code) => resolve(code));
       });
 
@@ -60,24 +75,33 @@ function createExternalEditor(
         changed: before !== content,
         exitCode,
       });
-    });
+    } catch (error) {
+      done(new ExternalEditorError("Spawn error", error));
+    }
 
-    return new ExternalEditor(editorCommand, filePath);
+    return new ExternalEditor(editorCommand, filePath, theme);
   };
+}
+
+class ExternalEditorError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = "ExternalEditorError";
+  }
 }
 
 class ExternalEditor extends Container {
   #editorCommand: string;
-  constructor(editorCommand: string, filePath: string) {
+  constructor(editorCommand: string, filePath: string, theme: Theme) {
     super();
 
     this.#editorCommand = editorCommand;
     this.addChild(
       new Text(
         [
-          `Editing file: ${filePath}`,
+          theme.bold(`Editing file: ${filePath}`),
           `Editor: ${this.#editorCommand}`,
-          "Close the editor to return to Pi.",
+          theme.fg("warning", "Close the editor to return to Pi."),
         ].join("\n"),
         2,
         2,
@@ -127,11 +151,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   #styles: {
     title: PickerText;
     item: Record<
-      | "selectedPrefix"
-      | "selectedText"
-      | "description"
-      | "scrollInfo"
-      | "noMatch",
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
       PickerText
     >;
   };
@@ -172,12 +192,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     this.#done = done;
     this.#labelText = new Text(name);
 
-    const {
-      title = name,
-      spacing = 1,
-      itemChoiceStyle = "checkbox",
-      styles,
-    } = config;
+    const { title = name, spacing = 1, itemChoiceStyle = "checkbox", styles } = config;
 
     this.#itemStyle = this.itemChoiceStyleRecord[itemChoiceStyle];
     this.#styles = {
@@ -271,21 +286,13 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   }
 
   #createSelectList() {
-    const selectList = new SelectList(
-      this.#getRenderedItems(),
-      this.#items.length,
-      {
-        selectedPrefix: (text) =>
-          this.#theme.fg(this.#styles.item.selectedPrefix, text),
-        selectedText: (text) =>
-          this.#theme.fg(this.#styles.item.selectedText, text),
-        description: (text) =>
-          this.#theme.fg(this.#styles.item.description, text),
-        scrollInfo: (text) =>
-          this.#theme.fg(this.#styles.item.scrollInfo, text),
-        noMatch: (text) => this.#theme.fg(this.#styles.item.noMatch, text),
-      },
-    );
+    const selectList = new SelectList(this.#getRenderedItems(), this.#items.length, {
+      selectedPrefix: (text) => this.#theme.fg(this.#styles.item.selectedPrefix, text),
+      selectedText: (text) => this.#theme.fg(this.#styles.item.selectedText, text),
+      description: (text) => this.#theme.fg(this.#styles.item.description, text),
+      scrollInfo: (text) => this.#theme.fg(this.#styles.item.scrollInfo, text),
+      noMatch: (text) => this.#theme.fg(this.#styles.item.noMatch, text),
+    });
 
     selectList.onCancel = () => this.#done(null);
 
@@ -331,8 +338,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     }
 
     this.#selectedIndex =
-      (this.#selectedIndex + direction + this.#items.length) %
-      this.#items.length;
+      (this.#selectedIndex + direction + this.#items.length) % this.#items.length;
     this.#syncSelectList();
   }
 
@@ -348,12 +354,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
 
 export type PickerText = Exclude<
   ThemeColor,
-  | `b${string}`
-  | `t${string}`
-  | `c${string}`
-  | `md${string}`
-  | `u${string}`
-  | `sy${string}`
+  `b${string}` | `t${string}` | `c${string}` | `md${string}` | `u${string}` | `sy${string}`
 >;
 
 export interface PickerTheme {
@@ -379,11 +380,7 @@ type PickerOptions<T extends string> = {
     title?: PickerText;
     helpText?: PickerText;
     item?: Record<
-      | "selectedPrefix"
-      | "selectedText"
-      | "description"
-      | "scrollInfo"
-      | "noMatch",
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
       PickerText
     >;
     border?: Extract<ThemeColor, `border${string}`>;
@@ -405,11 +402,7 @@ export class Picker<T extends string> implements FormComponent {
   #name: string;
   #styles: NonNullable<PickerOptions<T>["styles"]> & {
     item: Record<
-      | "selectedPrefix"
-      | "selectedText"
-      | "description"
-      | "scrollInfo"
-      | "noMatch",
+      "selectedPrefix" | "selectedText" | "description" | "scrollInfo" | "noMatch",
       PickerText
     >;
   };
@@ -430,9 +423,7 @@ export class Picker<T extends string> implements FormComponent {
       items: config.items,
       itemLimit: config.itemLimit,
       lazyLoadStep: config.lazyLoadStep ?? config.itemLimit,
-      helpText:
-        config.helpText ??
-        "type to filter • ↑↓ navigate • enter execute • esc cancel",
+      helpText: config.helpText ?? "type to filter • ↑↓ navigate • enter execute • esc cancel",
       styles: {
         helpText: config.styles?.helpText ?? "accent",
         border: config.styles?.border ?? "borderAccent",
@@ -454,25 +445,17 @@ export class Picker<T extends string> implements FormComponent {
     this.#visibleCount = Math.min(items.length, itemLimit);
 
     this.#container.addChild(this.#labelText);
-    this.#container.addChild(
-      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
-    );
+    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
 
     if (title !== name) {
-      this.#container.addChild(
-        new Text(this.theme.fg(styles.title, this.theme.bold(title))),
-      );
+      this.#container.addChild(new Text(this.theme.fg(styles.title, this.theme.bold(title))));
     }
 
     this.#container.addChild(this.#filterLabel);
     this.#container.addChild(this.#listContainer);
-    this.#container.addChild(
-      new Text(this.theme.fg(styles.helpText, helpText)),
-    );
+    this.#container.addChild(new Text(this.theme.fg(styles.helpText, helpText)));
 
-    this.#container.addChild(
-      new DynamicBorder((text) => this.theme.fg(styles.border, text)),
-    );
+    this.#container.addChild(new DynamicBorder((text) => this.theme.fg(styles.border, text)));
     this.#container.addChild(this.#errorText);
     this.#container.addChild(new Spacer(1));
 
@@ -559,20 +542,13 @@ export class Picker<T extends string> implements FormComponent {
   }
 
   #createSelectList(items: SelectItem[]) {
-    const selectList = new SelectList(
-      items,
-      Math.min(items.length, this.#itemLimit),
-      {
-        selectedPrefix: (text) =>
-          this.theme.fg(this.#styles.item.selectedPrefix, text),
-        selectedText: (text) =>
-          this.theme.fg(this.#styles.item.selectedText, text),
-        description: (text) =>
-          this.theme.fg(this.#styles.item.description, text),
-        scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
-        noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
-      },
-    );
+    const selectList = new SelectList(items, Math.min(items.length, this.#itemLimit), {
+      selectedPrefix: (text) => this.theme.fg(this.#styles.item.selectedPrefix, text),
+      selectedText: (text) => this.theme.fg(this.#styles.item.selectedText, text),
+      description: (text) => this.theme.fg(this.#styles.item.description, text),
+      scrollInfo: (text) => this.theme.fg(this.#styles.item.scrollInfo, text),
+      noMatch: (text) => this.theme.fg(this.#styles.item.noMatch, text),
+    });
 
     selectList.onSelect = (item) => this.done(item.value as T);
     selectList.onCancel = () => this.done(null);
@@ -618,18 +594,14 @@ export class Picker<T extends string> implements FormComponent {
     }
 
     this.#selectedIndex =
-      (this.#selectedIndex + direction + visibleItems.length) %
-      visibleItems.length;
+      (this.#selectedIndex + direction + visibleItems.length) % visibleItems.length;
     this.#selectedValue = visibleItems[this.#selectedIndex] ?? null;
     this.#maybeLoadMore(this.#selectedValue as T);
     this.#syncSelectList();
   }
 
   #maybeLoadMore(selectedValue: T) {
-    if (
-      this.#Filter.value.length > 0 ||
-      this.#visibleCount >= this.#items.length
-    ) {
+    if (this.#Filter.value.length > 0 || this.#visibleCount >= this.#items.length) {
       return;
     }
 
@@ -639,10 +611,7 @@ export class Picker<T extends string> implements FormComponent {
       return;
     }
 
-    this.#visibleCount = Math.min(
-      this.#items.length,
-      this.#visibleCount + this.#lazyLoadStep,
-    );
+    this.#visibleCount = Math.min(this.#items.length, this.#visibleCount + this.#lazyLoadStep);
     this.#syncFilter();
   }
 
@@ -783,9 +752,7 @@ export class ConfirmationBox extends Container implements FormComponent {
     const prefix = this.#focused ? "> " : "  ";
     const box = this.#theme.fg("accent", ` ${this.#value ? "[x]" : "[ ]"}`);
     const lines = [truncateToWidth(`${prefix}${box} ${this.#message}`, width)];
-    const errorLines = this.#errorText
-      .render(width)
-      .filter((line) => line.length > 0);
+    const errorLines = this.#errorText.render(width).filter((line) => line.length > 0);
 
     return [...lines, ...errorLines];
   }
@@ -797,17 +764,13 @@ export class ConfirmationBox extends Container implements FormComponent {
 
 export type FormField = FormComponent;
 
-export type Parse<T extends Record<string, string | number | boolean>> = (
-  value: T,
-) =>
+export type Parse<T extends Record<string, string | number | boolean>> = (value: T) =>
   | {
       [key in keyof T]?: string[];
     }
   | undefined;
 
-export interface FormOptions<
-  T extends Record<string, string | number | boolean>,
-> {
+export interface FormOptions<T extends Record<string, string | number | boolean>> {
   title: string;
   fields: FormField[];
   parse: Parse<T>;
@@ -895,10 +858,7 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     if (matchesKey(data, Key.enter)) {
-      if (
-        this.#fields.length === 0 ||
-        this.#activeFieldIndex === this.#fields.length - 1
-      ) {
+      if (this.#fields.length === 0 || this.#activeFieldIndex === this.#fields.length - 1) {
         this.#submit();
         return;
       }
@@ -919,8 +879,7 @@ export class Form<T extends Record<string, string | number | boolean>>
     }
 
     this.#activeFieldIndex =
-      (this.#activeFieldIndex + direction + this.#fields.length) %
-      this.#fields.length;
+      (this.#activeFieldIndex + direction + this.#fields.length) % this.#fields.length;
     this.#syncFieldFocus();
     this.tui.requestRender();
   }
@@ -1005,8 +964,6 @@ export class Form<T extends Record<string, string | number | boolean>>
       return [];
     }
 
-    return this.#footer
-      .split(/\r?\n/)
-      .map((line) => truncateToWidth(line, width));
+    return this.#footer.split(/\r?\n/).map((line) => truncateToWidth(line, width));
   }
 }
