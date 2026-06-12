@@ -54,6 +54,7 @@ export function createExternalEditorFactory(editorCommand: string, filePath: str
         const before = await fs.readFile(filePath, "utf8");
         const [editor, ...editorArgs] = parsed;
 
+        // This is to force the waiting of the popup to appear while editing
         const FLAGS = ["--wait", "-w"];
 
         const { stdout: helpOutput } = spawnSync(editor, ["--help"], {
@@ -65,7 +66,10 @@ export function createExternalEditorFactory(editorCommand: string, filePath: str
 
           const waitFlag = FLAGS.find((flag) => helpOutput.includes(flag));
 
-          if (waitFlag && !args.some((arg) => FLAGS.includes(arg))) {
+          const waitFlagExistsAndArgsDoesNotHaveAnyOfThem =
+            waitFlag && !args.some((arg) => FLAGS.includes(arg));
+
+          if (waitFlagExistsAndArgsDoesNotHaveAnyOfThem) {
             args.push(waitFlag);
           }
 
