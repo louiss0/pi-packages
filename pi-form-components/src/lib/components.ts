@@ -1,9 +1,4 @@
-import {
-  DynamicBorder,
-  ExtensionCommandContext,
-  Theme,
-  type ThemeColor,
-} from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
 import fs from "node:fs/promises";
 import {
   type Component,
@@ -18,6 +13,7 @@ import {
   Text,
   TUI,
   truncateToWidth,
+  KeybindingsManager,
 } from "@earendil-works/pi-tui";
 import { spawn } from "node:child_process";
 
@@ -42,7 +38,7 @@ export function createExternalEditor(editorCommand: string, filePath: string) {
   return async (
     _t: TUI,
     theme: Theme,
-    _ky: Theme,
+    _ky: KeybindingsManager,
     done: (result: EditFileResult | ExternalEditorError) => void,
   ) => {
     try {
@@ -50,7 +46,6 @@ export function createExternalEditor(editorCommand: string, filePath: string) {
 
       if (parsed.length === 0) {
         done(new ExternalEditorError(`Invalid editor command: ${editorCommand}`));
-        return;
       }
 
       const before = await fs.readFile(filePath, "utf8");
