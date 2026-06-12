@@ -8,8 +8,8 @@
     "forceConsistentCasingInFileNames": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["vitest/globals", "node"],
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [],
+  "references": []
 }

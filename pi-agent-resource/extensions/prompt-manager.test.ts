@@ -170,9 +170,12 @@ describe("extensions/prompt-manager", () => {
       });
 
       expect(errors).toEqual({
-        name: "Name must be at least 3 characters\nName must be lowercase letters, numbers, and dashes only",
-        description: "Description must be at least 35 characters",
-        "argument-hint": "Argument hint must use [] or <> tokens",
+        name: [
+          "Name must be at least 3 characters",
+          "Name must be lowercase letters, numbers, and dashes only",
+        ],
+        description: ["Description must be at least 35 characters"],
+        "argument-hint": ["Argument hint must use [] or <> tokens"],
       });
     });
   });

@@ -335,8 +335,8 @@ describe("skill manager handlers", () => {
           description: "",
         }),
       ).toEqual({
-        name: "Must be lowercase alphanumeric with dashes only",
-        description: "Description is required",
+        name: ["Must be lowercase alphanumeric with dashes only"],
+        description: ["Description is required"],
       });
     });
   });
@@ -350,9 +350,9 @@ describe("skill manager handlers", () => {
           allowedTools: "bash read",
         }),
       ).toEqual({
-        license: "License must be a valid path",
-        compatibility: "Compatibility must be 500 characters or fewer",
-        allowedTools: "Allowed tools must be a comma-separated list",
+        license: ["License must be a valid path"],
+        compatibility: ["Compatibility must be 500 characters or fewer"],
+        allowedTools: ["Allowed tools must be a comma-separated list"],
       });
     });
   });

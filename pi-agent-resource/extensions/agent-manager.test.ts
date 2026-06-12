@@ -233,10 +233,13 @@ describe("extensions/agent-manager", () => {
       });
 
       expect(errors).toEqual({
-        name: "Name must be lowercase letters, numbers, and dashes only",
-        description: "Description must be at least 35 characters",
-        tools: "Tools must be a lowercase comma-separated list",
-        model: "Model must be at least 2 characters\nModel must be lowercase",
+        name: ["Name must be lowercase letters, numbers, and dashes only"],
+        description: ["Description must be at least 35 characters"],
+        tools: ["Tools must be a lowercase comma-separated list"],
+        model: [
+          "Model must be at least 2 characters",
+          "Model must be lowercase",
+        ],
       });
     });
   });
