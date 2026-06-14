@@ -1,6 +1,8 @@
 # @code-fixer-23/pi-agent-resource
 
-`@code-fixer-23/pi-agent-resource` adds interactive Pi resource-management workflows for agents, prompts, skills, and reusable packs. It solves the repetitive parts of creating and maintaining Pi assets by combining validated forms, editor overlays, local-vs-global path resolution, and pack-aware loading into ready-to-use extensions. In practice, the package plugs into Pi's command system and resource discovery lifecycle so users can create or reorganize resources without manually building frontmatter, folder structures, or pack search paths.
+`@code-fixer-23/pi-agent-resource` is a Pi extension package for creating, editing, and organizing Pi resources—agents, prompts, and skills—without leaving the Pi interface. It ships four extensions that cover the full lifecycle of each resource type: form-based creation with validated metadata, external editor integration for rich content, scoped placement in either your global Pi home or the current project directory, and pack management that bundles resources together and teaches Pi how to discover them during a session.
+
+Every resource type in Pi follows strict layout conventions—correct frontmatter keys, `skills/<name>/SKILL.md` directory nesting, grouped prompt directories with `_index.md`, and so on. This package handles all of that so you can focus on writing the content itself. Each manager provides global and local variants of create, edit, and delete, with the same form and editor workflows in both scopes.
 
 [![npm version](https://img.shields.io/npm/v/%40code-fixer-23%2Fpi-agent-resource)](https://www.npmjs.com/package/@code-fixer-23/pi-agent-resource)
 [![npm downloads](https://img.shields.io/npm/dm/%40code-fixer-23%2Fpi-agent-resource)](https://www.npmjs.com/package/@code-fixer-23/pi-agent-resource)
@@ -9,72 +11,53 @@
 
 ![Agent Resource](./assets/Big-Agent-Resource.png)
 
-## Package structure
-
-This package currently ships four Pi extensions:
-
-- `agent-manager`
-- `prompt-manager`
-- `skill-manager`
-- `pack`
-
-It also includes package artwork in `assets/`, but it does not currently ship standalone prompts, skills, or themes of its own.
-
 ## Agent Manager
 
-The agent manager handles markdown agent definitions in either your global Pi home or the current project's `.pi/agents` directory. It is aimed at the workflow where you want to scaffold a valid agent quickly, inspect an existing one, or remove outdated agent definitions without leaving Pi.
+The agent manager creates and maintains agent definition files in either your global Pi home (`~/.pi/agent/agents`) or the current project's `.pi/agents` directory. All three subcommands work the same way regardless of scope; the only difference is where the resulting file is written.
 
 ### Commands
 
 #### `resource:agent <create|edit|delete>`
 
-Manages global agents in `~/.pi/agent/agents`.
+Manages agents in `~/.pi/agent/agents`.
 
-- `create` opens a validated form for `name`, `description`, `tools`, and `model`, then writes a new markdown file with normalized frontmatter.
-- `edit` lets you select an existing global agent and reopen its raw markdown in Pi's editor so you can make direct changes.
-- `delete` lists existing global agents and removes the selected file.
+`create` opens a validated form collecting `name`, `description`, `tools` (comma-separated), and `model`. The name must be lowercase, the tools list is checked for valid formatting, and model values are constrained to a lowercase format before anything is written. Once the form passes, the extension writes a properly structured markdown file with the correct frontmatter.
+
+`edit` presents a list of existing global agents. After you select one, the file opens in your external editor using `$VISUAL` or `$EDITOR` (checked in that order). The extension requires one of those variables to be set.
+
+`delete` shows the same selection list and removes the chosen file.
 
 #### `resource:local-agent <create|edit|delete>`
 
-Runs the same workflows against the current project's `.pi/agents` directory.
+Runs the same create/edit/delete workflows against the current project's `.pi/agents` directory. Before making any change, the extension announces the resolved path so it is clear which workspace it is about to modify. This is useful when the agent should travel with a repository rather than live in your global Pi home.
 
-- `create` is useful when the agent should travel with a repository instead of living in your global Pi home.
-- `edit` targets the project-local copy, which helps when a repo needs its own agent behavior.
-- `delete` removes the local file and leaves global agents untouched.
-
-### Features
-
-Agent creation is validation-first. The form enforces lowercase-oriented naming, requires a meaningful description, checks comma-separated tool lists, and keeps model values in a restricted lowercase format before anything is written. Local commands also announce the resolved project path before they mutate files, which makes it clear which workspace Pi is about to change.
+---
 
 ## Prompt Manager
 
-The prompt manager is built for prompt authoring workflows that need both structured frontmatter and freeform markdown content. It coordinates the prompt form and the editor overlay so prompt metadata and prompt body are created in the same flow.
+The prompt manager handles prompt files in `~/.pi/agent/prompts` or the project-local `.pi/prompts` directory. Prompt creation is a two-stage workflow because prompts have two distinct parts: structured frontmatter metadata and a freeform markdown template body.
 
 ### Commands
 
 #### `resource:prompts <create|edit|delete>`
 
-Manages global prompts in `~/.pi/agent/prompts`.
+Manages prompts in `~/.pi/agent/prompts`.
 
-- `create` starts with a frontmatter form for fields like `name`, `description`, and `argument-hint`, then opens a dedicated editor overlay for the markdown template body before the prompt is saved.
-- `edit` reopens an existing prompt in Pi's editor so the full file can be revised.
-- `delete` removes the selected prompt from the global prompt store.
+`create` works in two stages. First, a form collects the required frontmatter fields: `name`, `description`, and the optional `argument-hint` field (validated for correct syntax). Once the metadata passes, the workflow continues into your external editor where you write the markdown template body. The prompt file is written only after both stages complete successfully.
+
+`edit` opens an existing prompt in your external editor (`$VISUAL` or `$EDITOR`).
+
+`delete` understands the difference between a plain prompt file and a grouped prompt (a directory containing `_index.md`). Selecting a grouped prompt removes the entire directory rather than just the index file, keeping the prompt layout clean.
 
 #### `resource:local-prompt <create|edit|delete>`
 
-Runs the same prompt workflows against `.pi/prompts` in the current project.
+Runs the same workflows against `.pi/prompts` in the current project. Local prompts are useful for repo-specific conventions or prompt packs that should travel with the repository.
 
-- `create` is useful for repo-specific prompt packs or project conventions.
-- `edit` keeps prompt maintenance local to the workspace.
-- `delete` removes only the local prompt resource.
-
-### Features
-
-Prompt creation is a two-stage authoring workflow. First, Pi validates the frontmatter fields, including `argument-hint` syntax. Once that metadata passes, the workflow continues into the editor overlay where the actual markdown template is written. Deletion also understands grouped prompts: when a prompt is backed by a directory, the manager targets `_index.md` for selection and removes the whole grouped prompt directory when deleting.
+---
 
 ## Skill Manager
 
-The skill manager is designed for the more structured skill lifecycle, where a skill lives in its own folder and often needs either rich in-Pi editing or a handoff to an external editor. It supports both global and project-local skills while preserving Pi's `skills/<name>/SKILL.md` layout.
+The skill manager maintains the `skills/<name>/SKILL.md` layout that Pi requires. Skills live in `~/.pi/agent/skills` globally or in `.pi/skills` locally. Creation is staged so the common path stays short while still allowing richer metadata when needed. After any edit, Pi reloads automatically so the updated skill is immediately available.
 
 ### Commands
 
@@ -82,95 +65,92 @@ The skill manager is designed for the more structured skill lifecycle, where a s
 
 Manages global skills in `~/.pi/agent/skills/<name>/SKILL.md`.
 
-- `create` begins with a required metadata form, then optionally collects `license`, `compatibility`, and `allowedTools` before creating the skill directory and `SKILL.md` file.
-- `edit` lets you choose a skill and then updates it either inside Pi or through your external editor configuration.
-- `delete` removes the entire selected skill directory, not just the markdown file, which keeps the skill layout clean.
+`create` runs in two stages. The first form collects the required `name` and `description` fields and ends with a confirmation checkbox: if you confirm, a second form appears to collect optional metadata (`license`, `compatibility`, `allowedTools`). Skipping the optional form still creates a valid skill; the confirmation just unlocks the extended fields for when you need them.
+
+`edit` resolves the editing mode before opening anything. It first checks whether `--external-skill-editor` was passed, then reads the `[skill]` section of `.pi-resource.toml` if neither flag is set. After saving, Pi reloads so the skill is available in the current session without a manual restart.
+
+`delete` removes the entire skill directory—not just the `SKILL.md` file—keeping the layout clean for when the skill is re-created later.
 
 #### `resource:local-skill <create|edit|delete>`
 
-Runs the same skill lifecycle against `.pi/skills/<name>/SKILL.md` in the current project.
-
-- `create` makes repository-scoped skills that can ship with the project.
-- `edit` targets the local skill tree rather than the global one.
-- `delete` removes the local skill directory from the repository.
-
-### Features
-
-Skill creation is intentionally staged. The first form collects the required identity fields, then a confirmation step decides whether the workflow should continue into the optional metadata form. That makes the fast path short while still supporting richer skill metadata when you need it.
-
-Skill editing also supports two different editing styles. By default, Pi can open the skill in its own overlay workflow. If you prefer your shell editor, the workflow can switch to an external process and then trigger a Pi reload so the updated skill becomes available immediately.
+Runs the same lifecycle against `.pi/skills/<name>/SKILL.md` in the current project. Useful for repository-scoped skills that ship with the codebase.
 
 ### Flags
 
 #### `--external-skill-editor`
 
-`--external-skill-editor` changes the `edit` workflow to launch your configured external editor instead of Pi's internal editor UI. It is intended specifically for editing, so it keeps create and delete flows focused on their own jobs rather than overloading a single flag with unrelated behavior.
+`--external-skill-editor` is a boolean flag that forces the `edit` subcommand to open the skill file in your external editor (`$VISUAL` or `$EDITOR`). It applies only to `edit`; passing it with `create` or `delete` produces an error.
 
 ### Features
 
-The edit workflow can also be steered by a project-level `.pi-resource.toml` file. When the skill lifecycle starts, the extension first checks for an explicit flag override. If none is provided, it reads `[skill]` configuration from `.pi-resource.toml`, decides whether editing should stay inside Pi or hand off to the external editor, and then finalizes the workflow with a Pi reload after the file changes are saved.
+**`.pi-resource.toml` editor configuration**
+
+When `--external-skill-editor` is not set, the edit workflow consults a project-level `.pi-resource.toml` file. Setting `editor = "external"` under `[skill]` makes every skill edit in that project open in the external editor without requiring anyone to pass the flag manually:
+
+```toml
+[skill]
+editor = "external"
+```
+
+The flag takes precedence over the file. If neither is set, the extension opens the skill through the external editor by default.
+
+---
 
 ## Pack
 
-The pack extension coordinates reusable collections of skills and prompts and then teaches Pi how to load them for the current session. It is useful when you want a named bundle of resources that can be created, edited, deleted, moved between scopes, or activated together.
+The pack extension groups skills and prompts into named bundles under `.pi/packs` and registers those bundles with Pi's resource discovery system. Once a pack is loaded, its contents are available alongside your global and local resources for the duration of the session. Packs can be created with content upfront, populated incrementally, or reorganized by moving individual resources between pack, local, and global scopes.
 
 ### Commands
 
 #### `resource:pack <create|delete>`
 
-Manages pack containers under `.pi/packs`.
+Manages pack containers.
 
-- `create` asks for the pack name, lets you choose whether the pack should contain prompts, skills, or both, and then creates the underlying folder structure.
-- During `create`, you can either prefill the selected resources through the same prompt and skill forms used elsewhere in the package or generate starter example files when you just want the structure in place first.
-- `delete` supports multi-selection so you can remove several packs in one run.
+`create` collects a pack name, asks which resource types the pack should contain (skills, prompts, or both), and then asks whether to prefill resources now or generate starter example files. Choosing to prefill runs the same validated form and editor workflows used by the skill and prompt managers. Skipping prefill writes a minimal `example.md` or `example/SKILL.md` so the pack structure is ready to populate later.
+
+`delete` opens a multi-select list of existing packs and removes all selected pack directories in one run.
 
 #### `resource:pack:skill <create|edit|delete|move-local|move-local-to-pack|move-global|move-global-to-pack>`
 
-Manages skills inside packs and moves them between pack, local, and global locations.
+Manages skills inside packs and moves them between locations.
 
-- `create` adds a new skill to a chosen pack using the same staged required-plus-optional metadata flow as the skill manager.
-- `edit` opens an existing packed skill in the external editor, which is useful when pack contents are being maintained as files.
-- `delete` removes a skill from the selected pack.
-- `move-local` moves a skill out of a pack into the current project's local skill area.
-- `move-local-to-pack` imports a local skill into a chosen pack.
-- `move-global` moves a skill out of a pack into the global skill store.
-- `move-global-to-pack` imports a global skill into a chosen pack.
+- `create` adds a new skill to a chosen pack using the same staged required-then-optional metadata flow as the skill manager.
+- `edit` opens the packed skill in the external editor.
+- `delete` removes the skill from the selected pack.
+- `move-local` extracts the skill from a pack and places it in the project's local skill directory, removing it from the pack.
+- `move-local-to-pack` imports a local skill into a chosen pack, removing it from the local directory.
+- `move-global` extracts the skill from a pack and promotes it to the global skill store.
+- `move-global-to-pack` imports a global skill into a chosen pack, removing it from the global store.
 
 #### `resource:pack:prompt <create|edit|delete|move-local|move-local-to-pack|move-global|move-global-to-pack>`
 
-Runs the same style of pack management for prompts.
-
-- `create` adds a prompt to a selected pack through the frontmatter form and template editor workflow.
-- `edit` opens a packed prompt in the external editor.
-- `delete` removes a prompt from the chosen pack.
-- `move-local` moves a packed prompt into the current project's local prompt directory.
-- `move-local-to-pack` imports a local prompt into a pack.
-- `move-global` moves a packed prompt into the global prompt store.
-- `move-global-to-pack` imports a global prompt into a pack.
+Runs the same management for prompts inside packs. `create` uses the two-stage frontmatter form and editor workflow. Move commands mirror the skill variants, targeting the global and local prompt directories instead.
 
 #### `resource:pack:session:new [packs]`
 
-Starts a new Pi session with one or more packs loaded.
-
-- When you pass `packs`, the argument can contain names separated by spaces or commas.
-- When you omit the argument, Pi opens a multi-select picker so you can choose packs interactively before the new session starts.
+Starts a new Pi session with the specified packs loaded. Pass pack names separated by spaces or commas to start immediately. When no argument is provided, a multi-select picker appears so you can choose packs interactively. The new session file links back to the parent session.
 
 #### `resource:pack:session:reload [packs]`
 
-Reloads the current Pi session with a new pack selection.
-
-- Passing names updates the loaded pack list immediately.
-- Omitting the argument opens the same interactive multi-select workflow used by `session:new`.
+Reloads the current Pi session with a new pack selection. Passing names switches the active packs immediately. Omitting the argument opens the same interactive picker as `session:new`.
 
 ### Flags
 
 #### `--resource:load-pack <string>`
 
-`--resource:load-pack` preloads one or more packs during Pi startup. The value can contain pack names separated by spaces or commas, which makes it useful for bootstrapping a repeatable session profile from the command line.
+`--resource:load-pack` preloads one or more packs when Pi starts. The value accepts pack names separated by spaces or commas. This is the recommended approach for bootstrapping a consistent session profile from a shell alias or a project launch configuration.
 
 ### Features
 
-Pack loading is coordinated through Pi's resource discovery lifecycle rather than through a one-off file scan. On startup, the extension first checks `--resource:load-pack` and turns that flag into the active pack list. Later, when Pi runs the `resources_discover` workflow, the extension responds by contributing prompt and skill search paths for each selected pack. Session commands reuse the same pack list behavior: they collect names, update the active selection, and then either start a new session or reload the current one so Pi resolves resources from the chosen packs.
+**Pack loading and resource discovery**
+
+Pack loading integrates with Pi's `resources_discover` lifecycle rather than performing a one-off file scan. The process works in two phases.
+
+At startup, when `resources_discover` fires with `reason: "startup"`, the extension reads `--resource:load-pack`, parses the names, and stores them as the active pack list. Whenever Pi runs the `resources_discover` workflow—whether at startup or after a reload—the extension responds by returning the prompt and skill directory paths for each active pack. Pi merges these paths into its resource search, making the pack contents available alongside global and local resources.
+
+Session commands reuse the same mechanism. `resource:pack:session:new` and `resource:pack:session:reload` update the active pack list, then trigger either a new session or a reload. The next `resources_discover` cycle sees the updated list and contributes the corresponding paths, so the new pack selection takes effect immediately.
+
+---
 
 ## Development
 
