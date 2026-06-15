@@ -1,3 +1,18 @@
+## 3.1.0 (2026-06-15)
+
+### 🚀 Features
+
+- **pi-form-components:** add external editor to components ([a45e244](https://github.com/louiss0/pi-packages/commit/a45e244))
+
+### 🩹 Fixes
+
+- **pi-agent-resource:** use proper path and change expectation ([b9c1234](https://github.com/louiss0/pi-packages/commit/b9c1234))
+- **pi-form-components:** make sure that the function is typed correctly ([abda57d](https://github.com/louiss0/pi-packages/commit/abda57d))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.0.1 (2026-06-12)
 
 ### 🩹 Fixes
