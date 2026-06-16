@@ -33,7 +33,7 @@
         "esbuildConfig": "tools/esbuild/package-json-plugin.cjs",
         "assets": [
           {
-            "input": "pi-form-components/public",
+            "input": "pi-form-components",
             "glob": "README.md",
             "output": "/"
           }
