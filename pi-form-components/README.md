@@ -299,28 +299,6 @@ if (result.changed) {
 }
 ```
 
-### validateType
-
-`validateType` is a small runtime guard for checking a value's type before it enters a form or extension workflow. It wraps `typeof` and returns a boolean.
-
-Arguments:
-
-- `unknown:value` the runtime value to check
-- `string:typeToValidate` the expected JavaScript `typeof` result
-
-Example:
-
-```ts
-validateType("prompt-name", "string"); // true
-validateType(42, "string");            // false
-```
-
-```ts
-if (!validateType(value, "string")) {
-  throw new Error("Expected a string form value");
-}
-```
-
 ## Building a custom field
 
 Any class that implements `FormComponent` can participate in a `Form` session alongside the built-in fields. The interface requires a `name` and `value` accessor plus three lifecycle methods:
