@@ -41,9 +41,7 @@ SOFTWARE.
 }
 
 function normalizeProjectFolders(projectFolders = []) {
-  const entries = Array.isArray(projectFolders)
-    ? projectFolders
-    : [projectFolders];
+  const entries = Array.isArray(projectFolders) ? projectFolders : [projectFolders];
   const extras = new Set(["extensions"]);
 
   for (const entry of entries) {
@@ -64,9 +62,7 @@ function normalizeProjectFolders(projectFolders = []) {
 }
 
 function getCreatePiPackageBin() {
-  const packageJsonPath = require.resolve(
-    "@code-fixer-23/create-pi-package/package.json",
-  );
+  const packageJsonPath = require.resolve("@code-fixer-23/create-pi-package/package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   const packageRoot = path.dirname(packageJsonPath);
 
@@ -96,9 +92,7 @@ function runCreatePiPackage(options) {
   });
 
   if (result.status !== 0) {
-    throw new Error(
-      result.stderr || result.stdout || "create-pi-package failed",
-    );
+    throw new Error(result.stderr || result.stdout || "create-pi-package failed");
   }
 
   return path.join(tempRoot, options.name);
@@ -160,13 +154,7 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   if (projectKind === "package") {
     delete packageJson.devDependencies?.vite;
     delete packageJson.devDependencies?.["vite-plugin-dts"];
-    packageJson.files = [
-      "*.js",
-      "*.map",
-      "README.md",
-      "src/**/*.d.ts",
-      "src/**/*.d.ts.map",
-    ];
+    packageJson.files = ["*.js", "*.map", "README.md", "src/**/*.d.ts", "src/**/*.d.ts.map"];
   }
 
   if (projectKind === "extension") {
@@ -194,8 +182,7 @@ function getTestTarget(runner) {
   return {
     executor: "nx:run-commands",
     options: {
-      command:
-        "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
+      command: "pnpm exec vitest run --config vitest.config.ts --passWithNoTests",
       cwd: "{projectRoot}",
     },
   };
@@ -203,40 +190,10 @@ function getTestTarget(runner) {
 
 function getPackageTargets(projectRoot) {
   return {
-    build: {
-      executor: "@nx/esbuild:esbuild",
-      outputs: ["{options.outputPath}"],
-      defaultConfiguration: "production",
-      options: {
-        main: `${projectRoot}/src/index.ts`,
-        outputPath: `bundled/${projectRoot}`,
-        outputFileName: "index.js",
-        tsConfig: `${projectRoot}/tsconfig.lib.json`,
-        platform: "node",
-        format: ["esm"],
-        esbuildConfig: "tools/esbuild/package-json-plugin.cjs",
-        assets: [
-          {
-            input: `${projectRoot}/public`,
-            glob: "README.md",
-            output: "/",
-          },
-        ],
-      },
-      configurations: {
-        development: {
-          minify: false,
-        },
-        production: {
-          minify: true,
-        },
-      },
-    },
     "nx-release-publish": {
       executor: "@nx/js:release-publish",
-      dependsOn: ["build"],
       options: {
-        packageRoot: `bundled/${projectRoot}`,
+        packageRoot: projectRoot,
       },
     },
   };
@@ -288,16 +245,14 @@ function writeProjectJson(tree, projectRoot, projectKind, runner) {
       check: {
         executor: "nx:run-commands",
         options: {
-          command:
-            "pnpm exec biome format --config-path biome.json {projectRoot}",
+          command: "pnpm exec biome format --config-path biome.json {projectRoot}",
           cwd: "{workspaceRoot}",
         },
       },
       format: {
         executor: "nx:run-commands",
         options: {
-          command:
-            "pnpm exec biome format --write --config-path biome.json {projectRoot}",
+          command: "pnpm exec biome format --write --config-path biome.json {projectRoot}",
           cwd: "{workspaceRoot}",
         },
       },
@@ -364,9 +319,7 @@ function normalizeVitestImports(tree, projectRoot) {
           )
           .join(", ");
 
-        return keptSpecifiers.length > 0
-          ? `import { ${keptSpecifiers} } from "vitest";\n`
-          : "";
+        return keptSpecifiers.length > 0 ? `import { ${keptSpecifiers} } from "vitest";\n` : "";
       },
     );
 
@@ -378,8 +331,7 @@ function normalizeVitestImports(tree, projectRoot) {
 
 function ensureVitestGlobals(tree, projectRoot) {
   visitFiles(tree, projectRoot, (filePath) => {
-    const isConfigFile =
-      /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(filePath);
+    const isConfigFile = /(?:^|\/)(?:vitest|vite)\.config\.(?:[cm]?ts|[cm]?js)$/.test(filePath);
     const isTsConfig = /(?:^|\/)tsconfig(?:\.spec)?\.json$/.test(filePath);
 
     if (!isConfigFile && !isTsConfig) {
@@ -400,14 +352,8 @@ function ensureVitestGlobals(tree, projectRoot) {
     let nextContent = content;
 
     if (/globals\s*:\s*false/.test(nextContent)) {
-      nextContent = nextContent.replace(
-        /globals\s*:\s*false/g,
-        "globals: true",
-      );
-    } else if (
-      /test\s*:\s*\{/.test(nextContent) &&
-      !/globals\s*:\s*true/.test(nextContent)
-    ) {
+      nextContent = nextContent.replace(/globals\s*:\s*false/g, "globals: true");
+    } else if (/test\s*:\s*\{/.test(nextContent) && !/globals\s*:\s*true/.test(nextContent)) {
       nextContent = nextContent.replace(
         /test\s*:\s*\{/,
         (match) => `${match}\n    globals: true,`,

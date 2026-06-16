@@ -19,40 +19,10 @@
         "cwd": "{workspaceRoot}"
       }
     },
-    "build": {
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
-      "options": {
-        "main": "pi-form-components/src/index.ts",
-        "outputPath": "bundled/pi-form-components",
-        "outputFileName": "index.js",
-        "tsConfig": "pi-form-components/tsconfig.lib.json",
-        "platform": "node",
-        "format": ["esm"],
-        "esbuildConfig": "tools/esbuild/package-json-plugin.cjs",
-        "assets": [
-          {
-            "input": "pi-form-components",
-            "glob": "README.md",
-            "output": "/"
-          }
-        ]
-      },
-      "configurations": {
-        "development": {
-          "minify": false
-        },
-        "production": {
-          "minify": true
-        }
-      }
-    },
     "nx-release-publish": {
       "executor": "@nx/js:release-publish",
-      "dependsOn": ["build"],
       "options": {
-        "packageRoot": "bundled/pi-form-components"
+        "packageRoot": "pi-form-components"
       }
     },
     "test": {

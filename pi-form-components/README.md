@@ -389,7 +389,7 @@ pnpm nx run pi-form-components:lint
 pnpm nx run pi-form-components:typecheck
 pnpm nx run pi-form-components:test
 pnpm nx run pi-form-components:metadata
-pnpm nx run pi-form-components:build
+pnpm nx run pi-form-components:nx-release-publish
 ```
 
-Production build artifacts are emitted into `bundled/pi-form-components`. Static publish files such as `README.md` live in `public/` and are copied into the bundled output during the build. The build also uses `tools/esbuild/package-json-plugin.cjs` to write the publishable `package.json` into that same bundled folder.
+The package is now published directly from `pi-form-components/` with no generated publish-output directory. `README.md` and the package source are used as-is during publishing.

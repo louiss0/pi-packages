@@ -57,7 +57,7 @@ pnpm nx g @code-fixer-23/pi-generators:extension my-package --no-interactive
 pnpm nx g @code-fixer-23/pi-generators:package my-package --no-interactive
 ```
 
-Generated shared packages publish from `bundled/<project-name>`. Their Nx esbuild build writes production artifacts into that bundled package root, copies explicit static assets from `public/`, and uses `tools/esbuild/package-json-plugin.cjs` via `esbuildConfig` to write the publishable `package.json` into the bundled output.
+Generated shared packages publish directly from the package source root. The package target publishes the workspace package folder as-is, with no generated publish-output directory.
 
 ### Add prompts or skills too
 
