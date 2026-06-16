@@ -9,8 +9,6 @@ allowBuilds:
   "@biomejs/biome": true
   "@google/genai": true
   "@swc/core": true
-  esbuild: set this to true or false
-
   koffi: true
   nx: true
   protobufjs: true
