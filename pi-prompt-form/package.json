@@ -5,7 +5,7 @@
     "vitest": "latest"
   },
   "name": "@code-fixer-23/pi-prompt-form",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "private": false,
   "publishConfig": {
     "access": "public"

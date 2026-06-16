@@ -1,3 +1,17 @@
+## 1.1.6 (2026-06-16)
+
+### 🩹 Fixes
+
+- **pi-bash-tooljack-nu:** add missing valibot dependency ([c01bd94](https://github.com/louiss0/pi-packages/commit/c01bd94))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.1.1
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.5 (2026-06-15)
 
 ### 🧱 Updated Dependencies
