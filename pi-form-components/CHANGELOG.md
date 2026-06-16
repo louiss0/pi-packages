@@ -1,3 +1,14 @@
+## 3.1.2 (2026-06-16)
+
+### 🩹 Fixes
+
+- **pi-form-components:** remove the utils from this project! ([3143647](https://github.com/louiss0/pi-packages/commit/3143647))
+- **pi-form-components:** remove public path I deleted the public folder earlier! That path was wrong! ([1316db0](https://github.com/louiss0/pi-packages/commit/1316db0))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.1.1 (2026-06-16)
 
 This was a version bump only for pi-form-components to align it with other projects, there were no code changes.
