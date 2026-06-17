@@ -1,3 +1,13 @@
+## 1.0.6 (2026-06-17)
+
+### 🩹 Fixes
+
+- **pi-prompt-guard:** make sure that guarding is set properly ([20e02b1](https://github.com/louiss0/pi-packages/commit/20e02b1))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.5 (2026-06-17)
 
 This was a version bump only for pi-prompt-guard to align it with other projects, there were no code changes.
