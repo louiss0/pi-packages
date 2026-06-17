@@ -147,13 +147,11 @@ describe("Pack", () => {
   describe("openExternalEditor", () => {
     it("uses the shared external editor factory", async () => {
       const editorFactory = vi.fn();
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({
-          before: "before",
-          after: "after",
-          changed: true,
-        });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const ctx = createTestContext({ ui: { custom, notify } });
 

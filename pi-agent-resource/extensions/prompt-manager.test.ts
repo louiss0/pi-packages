@@ -301,13 +301,11 @@ describe("extensions/prompt-manager", () => {
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({
-          before: "before",
-          after: "after",
-          changed: true,
-        });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const select = vi
         .fn()
@@ -348,13 +346,11 @@ describe("extensions/prompt-manager", () => {
       vi.stubEnv("VISUAL", "nvim");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({
-          before: "before",
-          after: "after",
-          changed: true,
-        });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const select = vi
         .fn()
