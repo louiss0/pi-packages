@@ -154,7 +154,14 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   if (projectKind === "package") {
     delete packageJson.devDependencies?.vite;
     delete packageJson.devDependencies?.["vite-plugin-dts"];
-    packageJson.files = ["*.js", "*.map", "README.md", "src/**/*.d.ts", "src/**/*.d.ts.map"];
+    packageJson.files = [
+      "README.md",
+      "src/**/*.ts",
+      "!src/**/*.spec.ts",
+      "!src/**/*.test.ts",
+      "src/**/*.d.ts",
+      "src/**/*.d.ts.map",
+    ];
   }
 
   if (projectKind === "extension") {
