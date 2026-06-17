@@ -13,9 +13,8 @@
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
   "files": [
-    "*.js",
-    "*.map",
     "README.md",
+    "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.d.ts.map"
   ],
@@ -29,7 +28,7 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "types": "./src/index.ts",
+      "types": "./src/index.d.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     }
