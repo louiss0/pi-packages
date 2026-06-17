@@ -1,3 +1,13 @@
+## 3.1.4 (2026-06-17)
+
+### 🩹 Fixes
+
+- **pi-form-components:** remove .js from components ([69d45ab](https://github.com/louiss0/pi-packages/commit/69d45ab))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.1.3 (2026-06-17)
 
 ### 🩹 Fixes
