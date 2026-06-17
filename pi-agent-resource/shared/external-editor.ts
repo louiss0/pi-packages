@@ -1,8 +1,4 @@
-import {
-  mkdtemp,
-  rm,
-  writeFile as writeTempFile,
-} from "node:fs/promises";
+import { mkdtemp, rm, writeFile as writeTempFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExternalEditorFactory } from "@code-fixer-23/pi-form-components";
@@ -51,13 +47,19 @@ export async function editMarkdownWithExternalEditor(
   initialContent: string,
   resourceLabel: string,
 ) {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-agent-resource-"));
+  const temporaryDirectory = await mkdtemp(
+    join(tmpdir(), "pi-agent-resource-"),
+  );
   const filePath = join(temporaryDirectory, "draft.md");
 
   await writeTempFile(filePath, initialContent, "utf8");
 
   try {
-    const result = await editFileWithExternalEditor(ctx, filePath, resourceLabel);
+    const result = await editFileWithExternalEditor(
+      ctx,
+      filePath,
+      resourceLabel,
+    );
 
     if (result instanceof Error) {
       return result;

@@ -16,7 +16,9 @@ export default function externalEditior(pi: ExtensionAPI) {
 
       // ctx.ui.notify(`Opening file ${dummyFile} cwd ${import.meta.dirname}`, "warning");
 
-      const result = await ctx.ui.custom(createExternalEditorFactory(EDITOR, dummyFile));
+      const result = await ctx.ui.custom(
+        createExternalEditorFactory(EDITOR, dummyFile),
+      );
 
       if (result instanceof Error) {
         return ctx.ui.notify(result.message, "error");

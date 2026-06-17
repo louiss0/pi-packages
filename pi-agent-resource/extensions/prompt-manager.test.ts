@@ -303,7 +303,11 @@ describe("extensions/prompt-manager", () => {
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
       const custom = vi
         .fn()
-        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+        .mockResolvedValueOnce({
+          before: "before",
+          after: "after",
+          changed: true,
+        });
       const notify = vi.fn();
       const select = vi
         .fn()
@@ -346,7 +350,11 @@ describe("extensions/prompt-manager", () => {
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
       const custom = vi
         .fn()
-        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+        .mockResolvedValueOnce({
+          before: "before",
+          after: "after",
+          changed: true,
+        });
       const notify = vi.fn();
       const select = vi
         .fn()

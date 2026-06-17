@@ -526,7 +526,11 @@ describe("skill manager handlers", () => {
     const custom = vi
       .fn()
       .mockResolvedValueOnce(skillPath)
-      .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      .mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
 
@@ -542,7 +546,11 @@ describe("skill manager handlers", () => {
       "code",
       skillPath,
     );
-    expect(custom).toHaveBeenNthCalledWith(2, editorFactory, modalEditorOverlayOptions);
+    expect(custom).toHaveBeenNthCalledWith(
+      2,
+      editorFactory,
+      modalEditorOverlayOptions,
+    );
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalled();
@@ -562,7 +570,11 @@ describe("skill manager handlers", () => {
     const custom = vi
       .fn()
       .mockResolvedValueOnce(skillPath)
-      .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      .mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
     const notify = vi.fn();
     const reload = vi.fn().mockResolvedValueOnce(undefined);
 
@@ -578,7 +590,11 @@ describe("skill manager handlers", () => {
       'code --wait +"set ft=markdown"',
       skillPath,
     );
-    expect(custom).toHaveBeenNthCalledWith(2, editorFactory, modalEditorOverlayOptions);
+    expect(custom).toHaveBeenNthCalledWith(
+      2,
+      editorFactory,
+      modalEditorOverlayOptions,
+    );
     expect(pathResolver.resolveGlobalSkillPath).toHaveBeenCalledWith();
     expect(pathResolver.resolveLocalSkillPath).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalled();

@@ -842,7 +842,9 @@ describe("createExternalEditorFactory", () => {
     vi.mocked(fs.readFile)
       .mockResolvedValueOnce("before")
       .mockResolvedValueOnce("after");
-    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: Buffer.from("--wait"),
+    } as never);
 
     const child = createEditorChild();
     vi.mocked(spawn).mockReturnValue(child as never);
@@ -878,7 +880,9 @@ describe("createExternalEditorFactory", () => {
     vi.mocked(fs.readFile)
       .mockResolvedValueOnce("before")
       .mockResolvedValueOnce("after");
-    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: Buffer.from("--wait"),
+    } as never);
 
     const child = createEditorChild();
     vi.mocked(spawn).mockReturnValue(child as never);
@@ -899,7 +903,9 @@ describe("createExternalEditorFactory", () => {
     vi.mocked(fs.readFile)
       .mockResolvedValueOnce("before")
       .mockResolvedValueOnce("after");
-    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("-w") } as never);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: Buffer.from("-w"),
+    } as never);
 
     const child = createEditorChild();
     vi.mocked(spawn).mockReturnValue(child as never);
@@ -920,7 +926,9 @@ describe("createExternalEditorFactory", () => {
     vi.mocked(fs.readFile)
       .mockResolvedValueOnce("before")
       .mockResolvedValueOnce("after");
-    vi.mocked(spawnSync).mockReturnValue({ stdout: Buffer.from("--wait") } as never);
+    vi.mocked(spawnSync).mockReturnValue({
+      stdout: Buffer.from("--wait"),
+    } as never);
 
     const child = createEditorChild();
     vi.mocked(spawn).mockReturnValue(child as never);
