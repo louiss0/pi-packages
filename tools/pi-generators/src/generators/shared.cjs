@@ -203,40 +203,10 @@ function getTestTarget(runner) {
 
 function getPackageTargets(projectRoot) {
   return {
-    build: {
-      executor: "@nx/esbuild:esbuild",
-      outputs: ["{options.outputPath}"],
-      defaultConfiguration: "production",
-      options: {
-        main: `${projectRoot}/src/index.ts`,
-        outputPath: `bundled/${projectRoot}`,
-        outputFileName: "index.js",
-        tsConfig: `${projectRoot}/tsconfig.lib.json`,
-        platform: "node",
-        format: ["esm"],
-        esbuildConfig: "tools/esbuild/package-json-plugin.cjs",
-        assets: [
-          {
-            input: `${projectRoot}/public`,
-            glob: "README.md",
-            output: "/",
-          },
-        ],
-      },
-      configurations: {
-        development: {
-          minify: false,
-        },
-        production: {
-          minify: true,
-        },
-      },
-    },
     "nx-release-publish": {
       executor: "@nx/js:release-publish",
-      dependsOn: ["build"],
       options: {
-        packageRoot: `bundled/${projectRoot}`,
+        packageRoot: projectRoot,
       },
     },
   };

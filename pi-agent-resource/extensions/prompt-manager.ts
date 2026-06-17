@@ -146,11 +146,7 @@ export async function handleCreate(
     return;
   }
 
-  const template = await editMarkdownWithExternalEditor(
-    ctx,
-    "",
-    "prompts",
-  );
+  const template = await editMarkdownWithExternalEditor(ctx, "", "prompts");
 
   if (template instanceof Error) {
     return;

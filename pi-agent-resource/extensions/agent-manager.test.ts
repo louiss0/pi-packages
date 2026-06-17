@@ -379,9 +379,11 @@ describe("extensions/agent-manager", () => {
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
 
@@ -417,9 +419,11 @@ describe("extensions/agent-manager", () => {
       vi.stubEnv("VISUAL", "nvim");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const select = vi.fn().mockResolvedValueOnce("local: oracle");
 
@@ -450,9 +454,7 @@ describe("extensions/agent-manager", () => {
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce(new Error("editor crashed"));
+      const custom = vi.fn().mockResolvedValueOnce(new Error("editor crashed"));
       const notify = vi.fn();
       const select = vi.fn().mockResolvedValueOnce("global: oracle");
 

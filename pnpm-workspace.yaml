@@ -1,5 +1,4 @@
 packages:
-  - bundled/*
   - "pi-bash-tooljack-nu"
   - "pi-agent-resource"
   - "pi-form-components"
@@ -10,7 +9,7 @@ allowBuilds:
   "@biomejs/biome": true
   "@google/genai": true
   "@swc/core": true
-  esbuild: true
   koffi: true
   nx: true
   protobufjs: true
+  esbuild: true

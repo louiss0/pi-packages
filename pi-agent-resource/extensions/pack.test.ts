@@ -147,21 +147,28 @@ describe("Pack", () => {
   describe("openExternalEditor", () => {
     it("uses the shared external editor factory", async () => {
       const editorFactory = vi.fn();
-      const custom = vi
-        .fn()
-        .mockResolvedValueOnce({ before: "before", after: "after", changed: true });
+      const custom = vi.fn().mockResolvedValueOnce({
+        before: "before",
+        after: "after",
+        changed: true,
+      });
       const notify = vi.fn();
       const ctx = createTestContext({ ui: { custom, notify } });
 
       vi.stubEnv("EDITOR", "test-editor");
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
 
-      await expect(openExternalEditor(ctx, "/tmp/test.md")).resolves.toBeUndefined();
+      await expect(
+        openExternalEditor(ctx, "/tmp/test.md"),
+      ).resolves.toBeUndefined();
       expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
         "test-editor",
         "/tmp/test.md",
       );
-      expect(custom).toHaveBeenCalledWith(editorFactory, modalEditorOverlayOptions);
+      expect(custom).toHaveBeenCalledWith(
+        editorFactory,
+        modalEditorOverlayOptions,
+      );
       expect(notify).not.toHaveBeenCalledWith(expect.any(String), "error");
     });
   });
