@@ -19,12 +19,6 @@
         "cwd": "{workspaceRoot}"
       }
     },
-    "nx-release-publish": {
-      "executor": "@nx/js:release-publish",
-      "options": {
-        "packageRoot": "pi-form-components"
-      }
-    },
     "test": {
       "executor": "@nx/vitest:test",
       "options": {
