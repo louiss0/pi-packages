@@ -1,3 +1,13 @@
+## 3.1.5 (2026-06-17)
+
+### 🩹 Fixes
+
+- **pi-form-components:** configure the proper path to published files ([2626b93](https://github.com/louiss0/pi-packages/commit/2626b93))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.1.4 (2026-06-17)
 
 ### 🩹 Fixes
