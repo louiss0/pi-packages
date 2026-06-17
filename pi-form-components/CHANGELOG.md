@@ -1,3 +1,13 @@
+## 3.1.3 (2026-06-17)
+
+### 🩹 Fixes
+
+- **pi-form-components:** publish from source without bundled output ([#4](https://github.com/louiss0/pi-packages/pull/4))
+
+### ❤️ Thank You
+
+- shelton louis @louiss0
+
 ## 3.1.2 (2026-06-16)
 
 ### 🩹 Fixes

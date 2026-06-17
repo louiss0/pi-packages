@@ -1,3 +1,7 @@
+## 1.0.5 (2026-06-17)
+
+This was a version bump only for pi-prompt-guard to align it with other projects, there were no code changes.
+
 ## 1.0.4 (2026-06-16)
 
 This was a version bump only for pi-prompt-guard to align it with other projects, there were no code changes.
