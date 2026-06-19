@@ -16,7 +16,11 @@ import {
   safeParse,
   string,
 } from "valibot";
-import { parseArgumentHint, parsePlaceholders, parseTemplate } from "./internal/prompt-parser";
+import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "./internal/prompt-parser";
 
 const formOverlayOptions = {
   overlay: true,
@@ -25,7 +29,10 @@ const formOverlayOptions = {
   },
 } as const;
 
-type PromptArgument = Exclude<ReturnType<typeof parseArgumentHint>, Error>[number];
+type PromptArgument = Exclude<
+  ReturnType<typeof parseArgumentHint>,
+  Error
+>[number];
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -151,7 +158,10 @@ export async function handlePromptInput(
     } as const;
   }
 
-  const argumentFields = createPromptArgumentFields(parsedArguments, passedArguments);
+  const argumentFields = createPromptArgumentFields(
+    parsedArguments,
+    passedArguments,
+  );
   const values = await ui.custom<PromptArgumentValues | null>(
     (tui, theme, _keyboard, done) =>
       createPromptArgumentsForm({
@@ -183,11 +193,18 @@ export async function handlePromptInput(
 
   return {
     action: "transform",
-    text: buildPromptInvocation(commandName, argumentFields, values, extraValue),
+    text: buildPromptInvocation(
+      commandName,
+      argumentFields,
+      values,
+      extraValue,
+    ),
   } as const;
 }
 
-export function tokenizePromptInput(text: string): TokenizedPromptInput | Error {
+export function tokenizePromptInput(
+  text: string,
+): TokenizedPromptInput | Error {
   const tokens: string[] = [];
   let currentToken = "";
   let activeQuote: '"' | "'" | null = null;
@@ -272,7 +289,8 @@ export function createPromptArgumentsForm({
     {
       title: `Fill /${commandName}`,
       fields: argumentFields.map(
-        (argument) => new LabelledInput(argument.name, theme, argument.initialValue),
+        (argument) =>
+          new LabelledInput(argument.name, theme, argument.initialValue),
       ),
       parse: (values) => parsePromptArgumentValues(schema, values),
       footer:
@@ -309,7 +327,9 @@ function parsePromptArgumentValues(
 
   const errors = new Map<string, string[]>();
 
-  for (const issue of result.issues as Array<BaseIssue<unknown> | StringIssue>) {
+  for (const issue of result.issues as Array<
+    BaseIssue<unknown> | StringIssue
+  >) {
     const key = issue.path?.[0]?.key;
 
     if (typeof key !== "string") {
@@ -337,7 +357,8 @@ async function maybeCollectExtraValue({
   initialValue,
 }: MaybeCollectExtraValueOptions) {
   const supportsExtraValue = placeholders.some(
-    (placeholder) => placeholder.kind === "named" || placeholder.kind === "rest",
+    (placeholder) =>
+      placeholder.kind === "named" || placeholder.kind === "rest",
   );
 
   if (!supportsExtraValue) {
@@ -353,7 +374,10 @@ async function maybeCollectExtraValue({
     return initialValue;
   }
 
-  const extraValue = await ui.input(`Extra info for /${commandName}`, initialValue);
+  const extraValue = await ui.input(
+    `Extra info for /${commandName}`,
+    initialValue,
+  );
 
   return extraValue === undefined ? null : extraValue.trim();
 }
@@ -422,7 +446,10 @@ class PiPromptFormWidgetHost {
     this.#status = status;
     this.#ui.setWidget(this.#key, [
       this.#ui.theme.bold(this.#widgetTitle),
-      this.#ui.theme.fg(this.#status === "filling" ? "warning" : "text", this.#status),
+      this.#ui.theme.fg(
+        this.#status === "filling" ? "warning" : "text",
+        this.#status,
+      ),
     ]);
   }
 
