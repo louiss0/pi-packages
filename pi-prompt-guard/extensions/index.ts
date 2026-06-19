@@ -23,7 +23,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", () => {
-    widgetHost.setStatusToUnguardingIfItIsNotGuarding();
+    widgetHost.setStatusToUnguardingIfItIsGuarding();
   });
 
   pi.on("turn_end", () => {
@@ -294,8 +294,8 @@ class PiPromptGuardWidgetHost {
     this.#setStatus("ready");
   }
 
-  setStatusToUnguardingIfItIsNotGuarding() {
-    if (this.#status !== "guarding") {
+  setStatusToUnguardingIfItIsGuarding() {
+    if (this.#status == "guarding") {
       this.#setStatus("unguarding");
     }
   }
