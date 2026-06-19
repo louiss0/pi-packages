@@ -1,3 +1,13 @@
+## 1.1.10 (2026-06-19)
+
+### 🩹 Fixes
+
+- **pi-prompt-form:** corrrect widget handling ([7093d24](https://github.com/louiss0/pi-packages/commit/7093d24))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.9 (2026-06-17)
 
 ### 🧱 Updated Dependencies

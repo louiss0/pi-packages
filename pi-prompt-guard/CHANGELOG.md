@@ -1,3 +1,13 @@
+## 1.0.7 (2026-06-19)
+
+### 🩹 Fixes
+
+- **pi-prompt-guard:** correct unguarding status transition ([7559544](https://github.com/louiss0/pi-packages/commit/7559544))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.6 (2026-06-17)
 
 ### 🩹 Fixes
