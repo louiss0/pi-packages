@@ -5,7 +5,8 @@ import {
   handlePromptInput,
   tokenizePromptInput,
   validatePromptArguments,
-} from "./index.js";
+  type GuardWidgetHost,
+} from "./index";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -16,6 +17,12 @@ type PromptCommand = Pick<SlashCommandInfo, "name" | "source"> & {
 function createPromptCommand(command: PromptCommand) {
   return command;
 }
+
+const MockGuardWidgetHost = {
+  setStatusToGuarding: vi.fn(),
+  setStatusToReady: vi.fn(),
+  setStatusToUnguardingIfItIsGuarding: vi.fn(),
+} satisfies GuardWidgetHost;
 
 describe("tokenizePromptInput", () => {
   it("supports quoted arguments", () => {
@@ -119,20 +126,21 @@ describe("validatePromptArguments", () => {
         promptArguments: [],
         placeholders: [{ kind: "named", name: "ARGUMENTS" }],
       }),
-    ).toBe(
-      "Prompt /release uses $ARGUMENTS but does not declare any arguments.",
-    );
+    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
   });
 });
 
 describe("handlePromptInput", () => {
   it("returns continue for non-command input", async () => {
-    const result = await handlePromptInput({
-      text: "hello",
-      ui: { notify: vi.fn() },
-      getCommands: vi.fn(() => []),
-      readPromptFile: vi.fn(),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "hello",
+        ui: { notify: vi.fn() },
+        getCommands: vi.fn(() => []),
+        readPromptFile: vi.fn(),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
   });
@@ -140,18 +148,21 @@ describe("handlePromptInput", () => {
   it("returns continue when the command is not a prompt", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/missing",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "missing",
-          source: "extension",
-          sourceInfo: { path: "ignored.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/missing",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "missing",
+            source: "extension",
+            sourceInfo: { path: "ignored.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
@@ -161,18 +172,21 @@ describe("handlePromptInput", () => {
     const notify = vi.fn();
     const readPromptFile = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/skill test",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "skill",
-          source: "prompt",
-          sourceInfo: { path: "skill.md" },
-        }),
-      ]),
-      readPromptFile,
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/skill test",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "skill",
+            source: "prompt",
+            sourceInfo: { path: "skill.md" },
+          }),
+        ]),
+        readPromptFile,
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(readPromptFile).not.toHaveBeenCalled();
@@ -182,20 +196,21 @@ describe("handlePromptInput", () => {
   it("does not treat /skill-prefixed names as /skill", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/skill-form forms",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "skill-form",
-          source: "prompt",
-          sourceInfo: { path: "skill-form.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <topic>\n---\nHello $1`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/skill-form forms",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "skill-form",
+            source: "prompt",
+            sourceInfo: { path: "skill-form.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
@@ -204,12 +219,15 @@ describe("handlePromptInput", () => {
   it("returns handled for invalid quoting", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: '/release "my project',
-      ui: { notify },
-      getCommands: vi.fn(() => []),
-      readPromptFile: vi.fn(),
-    });
+    const result = await handlePromptInput(
+      {
+        text: '/release "my project',
+        ui: { notify },
+        getCommands: vi.fn(() => []),
+        readPromptFile: vi.fn(),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
@@ -221,21 +239,23 @@ describe("handlePromptInput", () => {
   it("returns handled and notifies when prompt parsing fails", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () =>
-          `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
+        ),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
@@ -247,20 +267,21 @@ describe("handlePromptInput", () => {
   it("returns handled and notifies when required arguments are missing", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $1`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
@@ -272,20 +293,23 @@ describe("handlePromptInput", () => {
   it("returns handled and notifies when too many arguments are passed", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release pkg 1.0.0 extra",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release pkg 1.0.0 extra",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+        ),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
@@ -297,20 +321,23 @@ describe("handlePromptInput", () => {
   it("returns continue when quoted arguments are valid", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: '/release "my project" 1.0.0',
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: '/release "my project" 1.0.0',
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+        ),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
@@ -319,20 +346,21 @@ describe("handlePromptInput", () => {
   it("returns continue when rest arguments are allowed", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release pkg 1.0.0 extra",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $@`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release pkg 1.0.0 extra",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $@`),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
@@ -341,20 +369,21 @@ describe("handlePromptInput", () => {
   it("returns handled when prompt placeholders exceed declared arguments", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release pkg",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project>\n---\nHello $2`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release pkg",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
@@ -366,20 +395,23 @@ describe("handlePromptInput", () => {
   it("returns continue when prompt parsing and argument validation succeed", async () => {
     const notify = vi.fn();
 
-    const result = await handlePromptInput({
-      text: "/release pkg 1.0.0",
-      ui: { notify },
-      getCommands: vi.fn(() => [
-        createPromptCommand({
-          name: "release",
-          source: "prompt",
-          sourceInfo: { path: "release.md" },
-        }),
-      ]),
-      readPromptFile: vi.fn(
-        async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
-      ),
-    });
+    const result = await handlePromptInput(
+      {
+        text: "/release pkg 1.0.0",
+        ui: { notify },
+        getCommands: vi.fn(() => [
+          createPromptCommand({
+            name: "release",
+            source: "prompt",
+            sourceInfo: { path: "release.md" },
+          }),
+        ]),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+        ),
+      },
+      MockGuardWidgetHost,
+    );
 
     expect(result).toEqual({ action: "continue" });
     expect(notify).not.toHaveBeenCalled();
