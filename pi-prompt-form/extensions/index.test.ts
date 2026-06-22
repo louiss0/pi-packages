@@ -1,8 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionUIContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { Form } from "@code-fixer-23/pi-form-components";
 import { vi } from "vitest";
@@ -48,9 +44,7 @@ function createTui() {
 }
 
 function createUi(
-  overrides?: Partial<
-    Pick<ExtensionUIContext, "confirm" | "custom" | "input" | "notify">
-  >,
+  overrides?: Partial<Pick<ExtensionUIContext, "confirm" | "custom" | "input" | "notify">>,
 ) {
   return {
     confirm: vi.fn(async () => false),
@@ -180,14 +174,12 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "skill-form, MockPiFormWidget",
+            name: "skill-form",
             source: "prompt",
             sourceInfo: { path: "skill-form.md" },
           }),
         ]),
-        readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <topic>\n---\nHello $1`,
-        ),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
       },
       MockPiFormWidget,
     );
@@ -227,7 +219,7 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "release, MockPiFormWidget",
+            name: "release",
             source: "prompt",
             sourceInfo: { path: "release.md" },
           }),
@@ -256,7 +248,7 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "release, MockPiFormWidget",
+            name: "release",
             source: "prompt",
             sourceInfo: { path: "release.md" },
           }),
@@ -289,12 +281,7 @@ describe("handlePromptInput", () => {
               done: (value: string | null) => void,
             ) => Form<Record<string, string>>,
           ) => {
-            const form = factory(
-              createTui(),
-              createTheme(),
-              {} as never,
-              vi.fn(),
-            );
+            const form = factory(createTui(), createTheme(), {} as never, vi.fn());
             return form.render(120).join("\n");
           },
         ),
@@ -307,20 +294,17 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "release, MockPiFormWidget",
+            name: "release",
             source: "prompt",
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project>\n---\nHello $1`,
-        ),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
       },
       MockPiFormWidget,
     );
 
-    const renderedForm = (ui.custom as ReturnType<typeof vi.fn>).mock.results[0]
-      ?.value;
+    const renderedForm = (ui.custom as ReturnType<typeof vi.fn>).mock.results[0]?.value;
     await expect(renderedForm).resolves.toContain("my project");
   });
 
@@ -340,14 +324,12 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "release, MockPiFormWidget",
+            name: "release",
             source: "prompt",
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project>\n---\nHello $1 $@`,
-        ),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1 $@`),
       },
       MockPiFormWidget,
     );
@@ -371,14 +353,12 @@ describe("handlePromptInput", () => {
         ui,
         getCommands: vi.fn(() => [
           createPromptCommand({
-            name: "release, MockPiFormWidget",
+            name: "release",
             source: "prompt",
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project>\n---\nHello $1`,
-        ),
+        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
       },
       MockPiFormWidget,
     );
