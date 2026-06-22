@@ -219,10 +219,6 @@ export function validatePromptArguments({
     return `Prompt /${commandName} references argument ${highestReferencedPosition} but only declares ${declaredArgumentCount}.`;
   }
 
-  if (usesArgumentsPlaceholder && declaredArgumentCount === 0) {
-    return `Prompt /${commandName} uses $ARGUMENTS but does not declare any arguments.`;
-  }
-
   if (passedArguments.length < requiredArguments.length) {
     const missingArguments = requiredArguments
       .slice(passedArguments.length)

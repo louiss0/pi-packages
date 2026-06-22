@@ -118,7 +118,7 @@ describe("validatePromptArguments", () => {
     ).toBe("Prompt /release references argument 2 but only declares 1.");
   });
 
-  it("returns an error when $ARGUMENTS is used without declared arguments", () => {
+  it("returns nothing when $ARGUMENTS is used ", () => {
     expect(
       validatePromptArguments({
         commandName: "release",
@@ -126,7 +126,7 @@ describe("validatePromptArguments", () => {
         promptArguments: [],
         placeholders: [{ kind: "named", name: "ARGUMENTS" }],
       }),
-    ).toBe("Prompt /release uses $ARGUMENTS but does not declare any arguments.");
+    ).toBeNull();
   });
 });
 
