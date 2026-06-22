@@ -27,8 +27,7 @@ export function parseHistoryCommands(output: string) {
   }
 
   return parsedOutput.filter(
-    (value): value is string =>
-      typeof value === "string" && shouldIncludeHistoryCommand(value),
+    (value): value is string => typeof value === "string" && shouldIncludeHistoryCommand(value),
   );
 }
 
@@ -39,16 +38,10 @@ export function getRecentFirstHistoryItems<T extends string>(items: T[]) {
 export class HistoryPicker<T extends string> extends Picker<T> {
   constructor(
     configOptions: HistoryPickerConfigOptions<T>,
-    theme: unknown,
-    tui: unknown,
+    theme: PickerTheme,
+    tui: PickerTui,
     done: (value: T | null) => void,
   ) {
-    super(
-      "history",
-      { title: "Nushell History", ...configOptions },
-      theme as PickerTheme,
-      tui as PickerTui,
-      done,
-    );
+    super("history", { title: "Nushell History", ...configOptions }, theme, tui, done);
   }
 }
