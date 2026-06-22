@@ -61,7 +61,7 @@ class NuAutocompleteProvider implements AutocompleteProvider {
       return getCommandSuggestions(commandPrefix[1] ?? "");
     }
 
-    const envPrefix = textBeforeCursor.match(/\$env(?:\.([A-Za-z0-9_]*))?$/);
+    const envPrefix = textBeforeCursor.match(/\$env\.$/);
     if (envPrefix) {
       const propPrefix = envPrefix[1] ?? "";
       const items = getEnvSuggestions(propPrefix);
@@ -87,12 +87,7 @@ class NuAutocompleteProvider implements AutocompleteProvider {
       };
     }
 
-    return this.baseProvider.getSuggestions(
-      lines,
-      cursorLine,
-      cursorCol,
-      options,
-    );
+    return this.baseProvider.getSuggestions(lines, cursorLine, cursorCol, options);
   }
 
   applyCompletion(
@@ -108,25 +103,15 @@ class NuAutocompleteProvider implements AutocompleteProvider {
     const completionItem = item as CommandCompletionItem;
 
     if (!commandPrefix) {
-      return this.baseProvider.applyCompletion(
-        lines,
-        cursorLine,
-        cursorCol,
-        item,
-        prefix,
-      );
+      return this.baseProvider.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
     }
 
-    const beforeCommandTrigger = line.slice(
-      0,
-      cursorCol - commandPrefix[0].length,
-    );
+    const beforeCommandTrigger = line.slice(0, cursorCol - commandPrefix[0].length);
     const afterCursor = line.slice(cursorCol);
     const newLines = [...lines];
 
     if (completionItem.requiresClosure) {
-      newLines[cursorLine] =
-        `${beforeCommandTrigger}${item.value} {|$in| $in }${afterCursor}`;
+      newLines[cursorLine] = `${beforeCommandTrigger}${item.value} {|$in| $in }${afterCursor}`;
       return {
         lines: newLines,
         cursorLine,
@@ -394,21 +379,12 @@ export default function nuBashExtension(pi: ExtensionAPI) {
         const result = await pi.exec(NUSHELL_COMMAND, getNuArgs(command), {
           cwd: ctx.cwd,
         });
-        const message = formatToolOutput(
-          result.stdout,
-          result.stderr,
-          result.code,
-        );
+        const message = formatToolOutput(result.stdout, result.stderr, result.code);
 
-        ctx.ui.notify(
-          `Executed: ${command}\n${message}`,
-          result.code === 0 ? "info" : "error",
-        );
+        ctx.ui.notify(`Executed: ${command}\n${message}`, result.code === 0 ? "info" : "error");
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to execute Nushell history command";
+          error instanceof Error ? error.message : "Failed to execute Nushell history command";
         ctx.ui.notify(message, "error");
       }
     },
@@ -423,8 +399,7 @@ export default function nuBashExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "bash",
     label: "nushell",
-    description:
-      "Execute shell commands through Nushell instead of the default bash backend",
+    description: "Execute shell commands through Nushell instead of the default bash backend",
     promptSnippet: "Run Nushell commands in the current working directory",
     promptGuidelines: [
       "Use ';' to chain commands instead of '&&'",
@@ -448,8 +423,7 @@ export default function nuBashExtension(pi: ExtensionAPI) {
       command: Type.String({ description: "Bash command to execute" }),
       timeout: Type.Optional(
         Type.Number({
-          description:
-            "Optional timeout in seconds before the command is aborted",
+          description: "Optional timeout in seconds before the command is aborted",
         }),
       ),
     }),
