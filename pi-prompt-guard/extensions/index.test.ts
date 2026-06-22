@@ -207,7 +207,9 @@ describe("handlePromptInput", () => {
             sourceInfo: { path: "skill-form.md" },
           }),
         ]),
-        readPromptFile: vi.fn(async () => `---\nargument-hint: <topic>\n---\nHello $1`),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <topic>\n---\nHello $1`,
+        ),
       },
       MockGuardWidgetHost,
     );
@@ -251,7 +253,8 @@ describe("handlePromptInput", () => {
           }),
         ]),
         readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
+          async () =>
+            `---\nargument-hint: <project> [version] <tag>\n---\nHello $1`,
         ),
       },
       MockGuardWidgetHost,
@@ -278,7 +281,9 @@ describe("handlePromptInput", () => {
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $1`),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project>\n---\nHello $1`,
+        ),
       },
       MockGuardWidgetHost,
     );
@@ -305,7 +310,8 @@ describe("handlePromptInput", () => {
           }),
         ]),
         readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+          async () =>
+            `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
         ),
       },
       MockGuardWidgetHost,
@@ -333,7 +339,8 @@ describe("handlePromptInput", () => {
           }),
         ]),
         readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+          async () =>
+            `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
         ),
       },
       MockGuardWidgetHost,
@@ -357,7 +364,9 @@ describe("handlePromptInput", () => {
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $@`),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project>\n---\nHello $@`,
+        ),
       },
       MockGuardWidgetHost,
     );
@@ -380,7 +389,9 @@ describe("handlePromptInput", () => {
             sourceInfo: { path: "release.md" },
           }),
         ]),
-        readPromptFile: vi.fn(async () => `---\nargument-hint: <project>\n---\nHello $2`),
+        readPromptFile: vi.fn(
+          async () => `---\nargument-hint: <project>\n---\nHello $2`,
+        ),
       },
       MockGuardWidgetHost,
     );
@@ -407,7 +418,8 @@ describe("handlePromptInput", () => {
           }),
         ]),
         readPromptFile: vi.fn(
-          async () => `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
+          async () =>
+            `---\nargument-hint: <project> [version]\n---\nHello $1 $2`,
         ),
       },
       MockGuardWidgetHost,

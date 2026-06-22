@@ -1,7 +1,14 @@
-import { type ExtensionAPI, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import {
+  type ExtensionAPI,
+  type ExtensionUIContext,
+} from "@earendil-works/pi-coding-agent";
 import { readFile } from "node:fs/promises";
 
-import { parseArgumentHint, parsePlaceholders, parseTemplate } from "./internal/prompt-parser";
+import {
+  parseArgumentHint,
+  parsePlaceholders,
+  parseTemplate,
+} from "./internal/prompt-parser";
 
 export default function (pi: ExtensionAPI) {
   let widgetHost: PiPromptGuardWidgetHost;
@@ -58,7 +65,8 @@ type TokenizedPromptInput = {
 };
 
 const NON_SKILL_COMMAND_PATTERN = /^\/(?!skill(?:\s|$)).+/;
-const QUOTING_GUIDANCE = "If an argument contains spaces, wrap it in single or double quotes.";
+const QUOTING_GUIDANCE =
+  "If an argument contains spaces, wrap it in single or double quotes.";
 
 export async function handlePromptInput(
   { text, ui, getCommands, readPromptFile }: PromptInputContext,
@@ -82,8 +90,12 @@ export async function handlePromptInput(
     return { action: "continue" };
   }
 
-  const promptCommands = getCommands().filter((command) => command.source === "prompt");
-  const promptCommand = promptCommands.find((command) => command.name === commandName);
+  const promptCommands = getCommands().filter(
+    (command) => command.source === "prompt",
+  );
+  const promptCommand = promptCommands.find(
+    (command) => command.name === commandName,
+  );
 
   if (!promptCommand) {
     return { action: "continue" };
@@ -120,7 +132,9 @@ export async function handlePromptInput(
   return { action: "continue" };
 }
 
-export function tokenizePromptInput(text: string): TokenizedPromptInput | Error {
+export function tokenizePromptInput(
+  text: string,
+): TokenizedPromptInput | Error {
   const tokens: string[] = [];
   let currentToken = "";
   let activeQuote: '"' | "'" | null = null;
@@ -183,33 +197,49 @@ export function validatePromptArguments({
   promptArguments,
   placeholders,
 }: PromptArgumentValidation): string | null {
-  const highestExplicitPosition = placeholders.reduce((highestPosition, placeholder) => {
-    if (placeholder.kind === "single") {
-      return Math.max(highestPosition, placeholder.position);
-    }
+  const highestExplicitPosition = placeholders.reduce(
+    (highestPosition, placeholder) => {
+      if (placeholder.kind === "single") {
+        return Math.max(highestPosition, placeholder.position);
+      }
 
-    if (placeholder.kind === "slice") {
-      return Math.max(highestPosition, placeholder.start);
-    }
+      if (placeholder.kind === "slice") {
+        return Math.max(highestPosition, placeholder.start);
+      }
 
-    return highestPosition;
-  }, 0);
+      return highestPosition;
+    },
+    0,
+  );
 
-  const highestFiniteSliceEnd = placeholders.reduce((highestPosition, placeholder) => {
-    if (placeholder.kind === "slice" && placeholder.end !== Number.POSITIVE_INFINITY) {
-      return Math.max(highestPosition, placeholder.end);
-    }
+  const highestFiniteSliceEnd = placeholders.reduce(
+    (highestPosition, placeholder) => {
+      if (
+        placeholder.kind === "slice" &&
+        placeholder.end !== Number.POSITIVE_INFINITY
+      ) {
+        return Math.max(highestPosition, placeholder.end);
+      }
 
-    return highestPosition;
-  }, 0);
+      return highestPosition;
+    },
+    0,
+  );
 
   const usesArgumentsPlaceholder = placeholders.some(
     (placeholder) => placeholder.kind === "named",
   );
-  const usesRestPlaceholder = placeholders.some((placeholder) => placeholder.kind === "rest");
+  const usesRestPlaceholder = placeholders.some(
+    (placeholder) => placeholder.kind === "rest",
+  );
   const declaredArgumentCount = promptArguments.length;
-  const requiredArguments = promptArguments.filter((argument) => argument.required);
-  const highestReferencedPosition = Math.max(highestExplicitPosition, highestFiniteSliceEnd);
+  const requiredArguments = promptArguments.filter(
+    (argument) => argument.required,
+  );
+  const highestReferencedPosition = Math.max(
+    highestExplicitPosition,
+    highestFiniteSliceEnd,
+  );
 
   if (
     !usesArgumentsPlaceholder &&
@@ -228,11 +258,17 @@ export function validatePromptArguments({
     return `Missing required arguments for /${commandName}: ${missingArguments}.\n${QUOTING_GUIDANCE}`;
   }
 
-  if (highestExplicitPosition > 0 && passedArguments.length < highestExplicitPosition) {
+  if (
+    highestExplicitPosition > 0 &&
+    passedArguments.length < highestExplicitPosition
+  ) {
     return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}.\n${QUOTING_GUIDANCE}`;
   }
 
-  const allowedArgumentCount = Math.max(declaredArgumentCount, highestExplicitPosition);
+  const allowedArgumentCount = Math.max(
+    declaredArgumentCount,
+    highestExplicitPosition,
+  );
 
   if (
     !usesRestPlaceholder &&
@@ -284,7 +320,10 @@ class PiPromptGuardWidgetHost implements GuardWidgetHost {
     this.#status = status;
     this.#ui.setWidget(this.#key, [
       this.#ui.theme.bold(this.#widgetTitle),
-      this.#ui.theme.fg(this.#status === "guarding" ? "warning" : "text", this.#status),
+      this.#ui.theme.fg(
+        this.#status === "guarding" ? "warning" : "text",
+        this.#status,
+      ),
     ]);
   }
 
