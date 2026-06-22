@@ -7,7 +7,7 @@
     "vitest": "latest"
   },
   "name": "@code-fixer-23/pi-prompt-guard",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": false,
   "publishConfig": {
     "access": "public"

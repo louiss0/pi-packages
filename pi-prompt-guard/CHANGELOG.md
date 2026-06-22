@@ -1,3 +1,13 @@
+## 1.0.8 (2026-06-22)
+
+### 🩹 Fixes
+
+- **pi-prompt-guard:** allow $ARGUMENTS without declared arguments ([e244acd](https://github.com/louiss0/pi-packages/commit/e244acd))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.7 (2026-06-19)
 
 ### 🩹 Fixes
