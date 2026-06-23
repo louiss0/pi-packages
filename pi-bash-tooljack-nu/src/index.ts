@@ -154,64 +154,6 @@ function killNushellProcessTree(pid?: number) {
   }
 }
 
-const nuOperations: BashOperations = {
-  exec(command, cwd, options) {
-    return new Promise((resolve, reject) => {
-      const child = spawn(NUSHELL_COMMAND, getNuArgs(command), {
-        cwd,
-        detached: process.platform !== "win32",
-        env: options.env,
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-      });
-
-      let timedOut = false;
-      const timeoutHandle = options.timeout
-        ? setTimeout(() => {
-            timedOut = true;
-            killNushellProcessTree(child.pid);
-          }, options.timeout * 1000)
-        : undefined;
-
-      const abortHandler = () => {
-        killNushellProcessTree(child.pid);
-      };
-
-      options.signal?.addEventListener("abort", abortHandler, { once: true });
-
-      child.stdout?.on("data", options.onData);
-      child.stderr?.on("data", options.onData);
-
-      child.on("error", (error) => {
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-        options.signal?.removeEventListener("abort", abortHandler);
-        reject(error);
-      });
-
-      child.on("close", (code) => {
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-        options.signal?.removeEventListener("abort", abortHandler);
-
-        if (options.signal?.aborted) {
-          reject(new Error("aborted"));
-          return;
-        }
-
-        if (timedOut) {
-          reject(new Error(`timeout:${options.timeout}`));
-          return;
-        }
-
-        resolve({ exitCode: code ?? 1 });
-      });
-    });
-  },
-};
-
 function getNuArgs(command: string) {
   return ["-c", command];
 }
@@ -466,6 +408,64 @@ export default function nuBashExtension(pi: ExtensionAPI) {
       };
     },
   });
+
+  const nuOperations: BashOperations = {
+    exec(command, cwd, options) {
+      return new Promise((resolve, reject) => {
+        const child = spawn(NUSHELL_COMMAND, getNuArgs(command), {
+          cwd,
+          detached: process.platform !== "win32",
+          env: options.env,
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        });
+
+        let timedOut = false;
+        const timeoutHandle = options.timeout
+          ? setTimeout(() => {
+              timedOut = true;
+              killNushellProcessTree(child.pid);
+            }, options.timeout * 1000)
+          : undefined;
+
+        const abortHandler = () => {
+          killNushellProcessTree(child.pid);
+        };
+
+        options.signal?.addEventListener("abort", abortHandler, { once: true });
+
+        child.stdout?.on("data", options.onData);
+        child.stderr?.on("data", options.onData);
+
+        child.on("error", (error) => {
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
+          options.signal?.removeEventListener("abort", abortHandler);
+          reject(error);
+        });
+
+        child.on("close", (code) => {
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
+          options.signal?.removeEventListener("abort", abortHandler);
+
+          if (options.signal?.aborted) {
+            reject(new Error("aborted"));
+            return;
+          }
+
+          if (timedOut) {
+            reject(new Error(`timeout:${options.timeout}`));
+            return;
+          }
+
+          resolve({ exitCode: code ?? 1 });
+        });
+      });
+    },
+  };
 
   pi.on("user_bash", async () => {
     return {
