@@ -39,7 +39,7 @@
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
     "gray-matter-es": "^0.2.1",
-    "valibot": "^1.4.1"
+    "valibot": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

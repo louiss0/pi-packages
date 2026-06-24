@@ -32,7 +32,7 @@
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
-    "valibot": "^1.4.1"
+    "valibot": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
