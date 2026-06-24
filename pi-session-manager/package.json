@@ -24,6 +24,9 @@
   "bugs": {
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
+  "dependencies": {
+    "valibot": "catalog:"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
