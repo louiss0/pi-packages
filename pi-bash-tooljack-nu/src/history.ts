@@ -27,7 +27,8 @@ export function parseHistoryCommands(output: string) {
   }
 
   return parsedOutput.filter(
-    (value): value is string => typeof value === "string" && shouldIncludeHistoryCommand(value),
+    (value): value is string =>
+      typeof value === "string" && shouldIncludeHistoryCommand(value),
   );
 }
 
@@ -42,6 +43,12 @@ export class HistoryPicker<T extends string> extends Picker<T> {
     tui: PickerTui,
     done: (value: T | null) => void,
   ) {
-    super("history", { title: "Nushell History", ...configOptions }, theme, tui, done);
+    super(
+      "history",
+      { title: "Nushell History", ...configOptions },
+      theme,
+      tui,
+      done,
+    );
   }
 }
