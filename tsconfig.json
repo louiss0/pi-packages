@@ -17,6 +17,9 @@
     },
     {
       "path": "./pi-prompt-form"
+    },
+    {
+      "path": "./pi-session-manager"
     }
   ]
 }

@@ -1,0 +1,31 @@
+{
+  "name": "@code-fixer-23/pi-session-manager",
+  "type": "module",
+  "version": "0.1.0",
+  "keywords": [
+    "pi-package"
+  ],
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "description": "Pi package scaffold for pi-session-manager",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/louiss0/pi-packages",
+    "directory": "pi-session-manager"
+  },
+  "homepage": "https://github.com/louiss0/pi-packages",
+  "bugs": {
+    "url": "https://github.com/louiss0/pi-packages/issues"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}

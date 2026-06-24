@@ -5,6 +5,7 @@ packages:
   - "tools/pi-generators"
   - "pi-prompt-form"
   - "pi-prompt-guard"
+  - "pi-session-manager"
 allowBuilds:
   "@biomejs/biome": true
   "@google/genai": true
