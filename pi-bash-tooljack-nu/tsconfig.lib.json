@@ -5,6 +5,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["node"],
+    "tsBuildInfoFile": "../dist/tsconfig.lib.tsbuildinfo",
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"],
