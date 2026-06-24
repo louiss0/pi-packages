@@ -6,6 +6,7 @@
     "emitDeclarationOnly": false,
     "forceConsistentCasingInFileNames": true,
     "module": "esnext",
+    "moduleResolution": "bundler",
     "types": ["node"],
   },
   "include": ["src/**/*.ts"],
