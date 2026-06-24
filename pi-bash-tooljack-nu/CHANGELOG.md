@@ -1,3 +1,17 @@
+## 1.2.0 (2026-06-24)
+
+### 🚀 Features
+
+- **pi-bash-tooljack-nu:** update Nushell prompt guidelines ([89adb38](https://github.com/louiss0/pi-packages/commit/89adb38))
+
+### 🩹 Fixes
+
+- **pi-bash-tooljack-nu:** simplify env completion regex and reformat code ([0b0fa39](https://github.com/louiss0/pi-packages/commit/0b0fa39))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.10 (2026-06-17)
 
 ### 🧱 Updated Dependencies
