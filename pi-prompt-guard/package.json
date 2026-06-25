@@ -1,10 +1,10 @@
 {
   "type": "module",
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.78.0",
-    "@earendil-works/pi-tui": "^0.78.0",
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:",
     "typescript": "latest",
-    "vitest": "latest"
+    "vitest": "catalog:"
   },
   "name": "@code-fixer-23/pi-prompt-guard",
   "version": "1.0.8",
@@ -33,8 +33,8 @@
     "!**/*.test.ts"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.78.0",
-    "@earendil-works/pi-tui": "^0.78.0"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:"
   },
   "pi": {
     "extensions": [

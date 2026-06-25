@@ -17,5 +17,6 @@ allowBuilds:
 
 catalog:
   valibot: "^1.4"
+  vitest: "^4.1.9"
   "@earendil-works/pi-coding-agent": "^0.78.0"
   "@earendil-works/pi-tui": "^0.78.0"
