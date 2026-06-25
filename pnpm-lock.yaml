@@ -6,9 +6,18 @@ settings:
 
 catalogs:
   default:
+    '@earendil-works/pi-coding-agent':
+      specifier: ^0.78.0
+      version: 0.78.1
+    '@earendil-works/pi-tui':
+      specifier: ^0.78.0
+      version: 0.78.1
     valibot:
       specifier: ^1.4
       version: 1.4.1
+    vitest:
+      specifier: ^4.1.9
+      version: 4.1.9
 
 importers:
 
@@ -227,16 +236,16 @@ importers:
         version: 0.2.1
     devDependencies:
       '@earendil-works/pi-coding-agent':
-        specifier: ^0.78.0
+        specifier: 'catalog:'
         version: 0.78.1(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-tui':
-        specifier: ^0.78.0
+        specifier: 'catalog:'
         version: 0.78.1
       typescript:
         specifier: latest
         version: 6.0.3
       vitest:
-        specifier: latest
+        specifier: 'catalog:'
         version: 4.1.9(@types/node@25.9.1)(@vitest/coverage-v8@4.1.7(vitest@4.1.7))(@vitest/ui@4.1.7(vitest@4.1.7))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   pi-session-manager:
