@@ -1,4 +1,9 @@
-import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  SessionManager,
+  type ExtensionAPI,
+  type ExtensionContext,
+  type SessionInfo,
+} from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import {
   digits,
@@ -17,12 +22,24 @@ export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", 
 
 type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
 
+export abstract class $TimestampCalculator {
+  HOUR_IN_MS = 60 ** 2 * 1000;
+  DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  WEEK_IN_MS = 7 * this.DAY_IN_MS;
+
+  abstract hour(number: number): number;
+  abstract day(number: number): number;
+  abstract week(number: number): number;
+}
+
 export default function (pi: ExtensionAPI) {
   const commandRoot = "session";
 
   pi.registerCommand(`${commandRoot}:clean:inactive`, {
     handler: async (_, ctx) => {
-      handleSessionCleanInactive(ctx);
+      const sessions = await SessionManager.list(ctx.cwd);
+
+      handleSessionCleanInactive({ sessions }, ctx);
     },
   });
 
@@ -42,7 +59,9 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      handleSessionCleanOlderThan(result.output, ctx);
+      const sessions = await SessionManager.list(ctx.cwd);
+
+      handleSessionCleanOlderThan(result.output, { sessions }, ctx);
     },
   });
 
@@ -64,7 +83,9 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
-      handleSessionDeleteLast(result.output, ctx);
+      const sessions = await SessionManager.list(ctx.cwd);
+
+      handleSessionDeleteLast(result.output, { sessions }, ctx);
     },
   });
 
@@ -90,11 +111,25 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-export function handleSessionCleanInactive(ctx: ExtensionContext) {}
+export function handleSessionCleanInactive(
+  deps: {
+    sessions: Array<SessionInfo>;
+    cleanSessionsOlderThan: (timestamp: number) => void;
+  },
+  ctx: ExtensionContext,
+) {}
 
-export function handleSessionCleanOlderThan(input: string, ctx: ExtensionContext) {}
+export function handleSessionCleanOlderThan(
+  input: string,
+  deps: { sessions: Array<SessionInfo> },
+  ctx: ExtensionContext,
+) {}
 
-export function handleSessionDeleteLast(number: number, ctx: ExtensionContext) {}
+export function handleSessionDeleteLast(
+  number: number,
+  deps: { sessions: Array<SessionInfo> },
+  ctx: ExtensionContext,
+) {}
 
 export function handleSessionSeries(command: SessionSeriesCommand, ctx: ExtensionContext) {
   switch (command) {
