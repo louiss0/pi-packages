@@ -180,7 +180,7 @@ describe.todo("handleSessionCleanOlderThan", () => {
 
       const getSessionsBasedOnDurationIntegerAndUnit = vi.spyOn(
         mockSessionFilter,
-        "getSessionsBasedOnPredeterminedTimestamp",
+        "getSessionsBasedOnDurationIntegerAndUnit",
       );
 
       const durationRecord = { integer: 7, unit: "days" } as const;
@@ -223,7 +223,7 @@ describe.todo("handleSessionDeleteLast", () => {
 
       const getSessionsThatAreTheLastNth = vi.spyOn(
         mockSessionFilter,
-        "getSessionsBasedOnPredeterminedTimestamp",
+        "getSessionsThatAreTheLastNth",
       );
 
       const nthSessions = 5;
