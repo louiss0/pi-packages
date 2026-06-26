@@ -1,12 +1,14 @@
 import {
-  SessionManager,
   type ExtensionAPI,
   type ExtensionContext,
   type SessionInfo,
+  SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
+import { rmSync } from "fs";
 import {
   digits,
+  type InferOutput,
   picklist,
   pipe,
   regex,
@@ -15,22 +17,43 @@ import {
   summarize,
   transform,
   union,
-  type InferOutput,
 } from "valibot";
 
 export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "resume"]);
 
 type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
+const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
+const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
+const durationRecordSchema = union(
+  [
+    pipe(
+      string(),
+      regex(integerWithUnitRE),
+      transform((input) => {
+        const { integer, unit } = integerWithUnitRE.exec(input)?.groups as {
+          integer: string;
+          unit: "days" | "weeks" | "hours";
+        };
 
-export abstract class $TimestampCalculator {
-  HOUR_IN_MS = 60 ** 2 * 1000;
-  DAY_IN_MS = 24 * this.HOUR_IN_MS;
-  WEEK_IN_MS = 7 * this.DAY_IN_MS;
+        return { integer: parseInt(integer), unit };
+      }),
+    ),
+    pipe(
+      string(),
+      regex(integerWithUnitShortRE),
+      transform((input) => {
+        const { integer, unit } = integerWithUnitShortRE.exec(input)?.groups as {
+          integer: string;
+          unit: "d" | "w" | "h";
+        };
+        return { integer: parseInt(integer), unit };
+      }),
+    ),
+  ],
+  "You can only use an integer suffixed by days, weeks, or hours or the shorthand d/w/h units",
+);
 
-  abstract hour(number: number): number;
-  abstract day(number: number): number;
-  abstract week(number: number): number;
-}
+export type DurationRecord = InferOutput<typeof durationRecordSchema>;
 
 export default function (pi: ExtensionAPI) {
   const commandRoot = "session";
@@ -39,21 +62,13 @@ export default function (pi: ExtensionAPI) {
     handler: async (_, ctx) => {
       const sessions = await SessionManager.list(ctx.cwd);
 
-      handleSessionCleanInactive({ sessions }, ctx);
+      handleSessionCleanInactive({}, ctx);
     },
   });
 
   pi.registerCommand(`${commandRoot}:clean:older-than`, {
     handler: async (args, ctx) => {
-      const durationLimitSchema = union(
-        [
-          pipe(string(), regex(/(?<integer>\d+)(?<unit>days|weeks|hours)/)),
-          pipe(string(), regex(/(?<integer>\d+)(?<unit>d|w|h)/)),
-        ],
-        "You can only use an integer suffixed by days, weeks, or hours or the shorthand d/w/h units",
-      );
-
-      const result = safeParse(durationLimitSchema, args);
+      const result = safeParse(durationRecordSchema, args);
 
       if (!result.success) {
         return ctx.ui.notify(summarize(result.issues), "error");
@@ -111,23 +126,58 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
+export abstract class $TimestampCalculator {
+  HOUR_IN_MS = 60 ** 2 * 1000;
+  DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  WEEK_IN_MS = 7 * this.DAY_IN_MS;
+
+  abstract hour(number: number): number;
+  abstract day(number: number): number;
+  abstract week(number: number): number;
+}
+
+export interface $SessionFilter {
+  readonly sessions: Array<SessionInfo>;
+  getSessionsBasedOnDurationIntegerAndUnit(
+    integer: DurationRecord["integer"],
+    durationUnit: DurationRecord["unit"],
+  ): Array<SessionInfo>;
+  getSessionsBasedOnPredeterminedTimestamp(): Array<SessionInfo>;
+
+  getSessionsThatAreTheLastNth(number: number): Array<SessionInfo>;
+}
+
+function removeSessionFiles(sessions: Array<SessionInfo>) {
+  for (const session of sessions) {
+    rmSync(session.path);
+  }
+}
+
+export type RemoveSessionFiles = typeof removeSessionFiles;
+
 export function handleSessionCleanInactive(
   deps: {
-    sessions: Array<SessionInfo>;
-    cleanSessionsOlderThan: (timestamp: number) => void;
+    sessionFilter: $SessionFilter;
+    removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
 ) {}
 
 export function handleSessionCleanOlderThan(
-  input: string,
-  deps: { sessions: Array<SessionInfo> },
+  input: DurationRecord,
+  deps: {
+    sessionFilter: $SessionFilter;
+    removeSessionFiles: RemoveSessionFiles;
+  },
   ctx: ExtensionContext,
 ) {}
 
 export function handleSessionDeleteLast(
   number: number,
-  deps: { sessions: Array<SessionInfo> },
+  deps: {
+    sessionFilter: $SessionFilter;
+    removeSessionFiles: RemoveSessionFiles;
+  },
   ctx: ExtensionContext,
 ) {}
 
