@@ -256,20 +256,98 @@ describe.todo("handleSessionDeleteLast", () => {
 
 describe.todo("handleSessionSeries", () => {
   it("creates a session series when create is passed", () => {
-    const context = {} satisfies MockExtenstionContext;
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi.fn<ExtensionUIContext["input"]>(),
+      },
+    } satisfies MockExtenstionContext;
 
-    handleSessionSeries("create", context as ExtensionContext);
+    handleSessionSeries("create", castToExtensionContext(context));
+
+    expect(context.ui.input).toHaveBeenCalledWith(
+      "What is the name of your session series?",
+      "What are you focused on?",
+    );
+
+    expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
   });
 
   it("deletes a session series when delete is passed", () => {
-    const context = {} satisfies MockExtenstionContext;
+    const sessionSeries = [
+      "refactor-auth-middleware",
+      "fix-memory-leak-prod",
+      "implement-graphql-subscriptions",
+      "update-dependency-vulnerabilities",
+      "ui-component-library-migration",
+      "optimize-database-queries",
+      "setup-ci-cd-pipeline",
+      "unit-test-coverage-boost",
+      "api-documentation-swagger",
+      "feature-flag-cleanup",
+    ];
 
-    handleSessionSeries("delete", context as ExtensionContext);
+    const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
+
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
+      },
+    } satisfies MockExtenstionContext;
+
+    handleSessionSeries("delete", castToExtensionContext(context));
+
+    expect(context.ui.select).toHaveBeenCalledWith(
+      "Which session series would you like to delete?",
+      sessionSeries,
+    );
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `This series ${context.ui.select.mock.settledResults[0]?.value} and it's related sessions`,
+    );
   });
 
   it("Makes a new session in a series new is passed", () => {
-    const context = {} satisfies MockExtenstionContext;
+    const sessionSeries = [
+      "refactor-auth-middleware",
+      "fix-memory-leak-prod",
+      "implement-graphql-subscriptions",
+      "update-dependency-vulnerabilities",
+      "ui-component-library-migration",
+      "optimize-database-queries",
+      "setup-ci-cd-pipeline",
+      "unit-test-coverage-boost",
+      "api-documentation-swagger",
+      "feature-flag-cleanup",
+    ];
 
-    handleSessionSeries("new", context as ExtensionContext);
+    const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
+
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi.fn<ExtensionUIContext["input"]>(),
+        select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
+      },
+    } satisfies MockExtenstionContext;
+
+    handleSessionSeries("new", castToExtensionContext(context));
+
+    expect(context.ui.select).toHaveBeenCalledWith(
+      "Which session series would you like to create a new session in?",
+      sessionSeries,
+    );
+
+    expect(context.ui.input).toHaveBeenCalledWith(
+      "What is the name of the this new session?",
+      "What do you want your agent to do now?",
+    );
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}
+      with ${context.ui.input.mock.settledResults[0]?.value}
+      `,
+    );
   });
 });
