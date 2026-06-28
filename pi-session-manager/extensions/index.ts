@@ -181,7 +181,11 @@ export function handleSessionDeleteLast(
   ctx: ExtensionContext,
 ) {}
 
-export function handleSessionSeries(command: SessionSeriesCommand, ctx: ExtensionContext) {
+export function handleSessionSeries(command: SessionSeriesCommand, deps:{
+
+  setSessionName: ExtensionAPI['setSessionName']
+
+} ctx: ExtensionContext) {
   switch (command) {
     case "new":
       break;

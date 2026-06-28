@@ -1,4 +1,6 @@
 import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
   ExtensionContext,
   ExtensionUIContext,
   SessionInfo,
@@ -14,8 +16,8 @@ import {
   type RemoveSessionFiles,
 } from ".";
 
-type MockExtenstionContext =
-  | Partial<ExtensionContext>
+type MockExtenstionCommandContext =
+  | Partial<ExtensionCommandContext>
   | {
       ui: Partial<ExtensionUIContext>;
     };
@@ -121,7 +123,7 @@ const cleanIt = it
   })
   .extend("timestampCalculator", new MockPastTimestampCalculator());
 
-function castToExtensionContext(context: MockExtenstionContext): ExtensionContext {
+function castToExtensionContext(context: MockExtenstionCommandContext): ExtensionContext {
   return context as ExtensionContext;
 }
 
@@ -135,7 +137,7 @@ describe.todo("handleSessionCleanInactive", () => {
         ui: {
           notify: vi.fn<ExtensionContext["ui"]["notify"]>(),
         },
-      } satisfies MockExtenstionContext;
+      } satisfies MockExtenstionCommandContext;
 
       const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
@@ -178,7 +180,7 @@ describe.todo("handleSessionCleanOlderThan", () => {
         ui: {
           notify: vi.fn(),
         },
-      } satisfies MockExtenstionContext;
+      } satisfies MockExtenstionCommandContext;
 
       const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
@@ -224,7 +226,7 @@ describe.todo("handleSessionDeleteLast", () => {
         ui: {
           notify: vi.fn(),
         },
-      } satisfies MockExtenstionContext;
+      } satisfies MockExtenstionCommandContext;
 
       const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
@@ -257,18 +259,40 @@ describe.todo("handleSessionDeleteLast", () => {
 describe.todo("handleSessionSeries", () => {
   it("creates a session series when create is passed", () => {
     const context = {
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+        options?.withSession?.({} as never);
+        return { cancelled: false };
+      }),
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
-        input: vi.fn<ExtensionUIContext["input"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue("Implement Auth")
+          .mockResolvedValue("Create JWT Token"),
       },
-    } satisfies MockExtenstionContext;
+    } satisfies MockExtenstionCommandContext;
 
-    handleSessionSeries("create", castToExtensionContext(context));
+    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+
+    handleSessionSeries("create", { setSessionName }, castToExtensionContext(context));
 
     expect(context.ui.input).toHaveBeenCalledWith(
       "What is the name of your session series?",
       "What are you focused on?",
     );
+
+    expect(context.ui.input).toHaveBeenCalledWith(
+      "What is the name of the new session you want to make in this one?",
+      "What task is a part of what you are focusing on?",
+    );
+
+    const sessionTitleAndSubTitle = `${context.ui.input.mock.settledResults[0]?.value}--${context.ui.input.mock.settledResults[1]?.value}`;
+
+    expect(context.newSession).toHaveBeenCalledWith({
+      withSession: vi.fn(() => setSessionName(sessionTitleAndSubTitle)),
+    });
+
+    expect(setSessionName).toHaveBeenCalledWith(sessionTitleAndSubTitle);
 
     expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
   });
@@ -294,9 +318,11 @@ describe.todo("handleSessionSeries", () => {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
       },
-    } satisfies MockExtenstionContext;
+    } satisfies MockExtenstionCommandContext;
 
-    handleSessionSeries("delete", castToExtensionContext(context));
+    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+
+    handleSessionSeries("delete", { setSessionName }, castToExtensionContext(context));
 
     expect(context.ui.select).toHaveBeenCalledWith(
       "Which session series would you like to delete?",
@@ -332,9 +358,11 @@ describe.todo("handleSessionSeries", () => {
           .mockResolvedValue("Add tests to the lib/index.ts file"),
         select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
       },
-    } satisfies MockExtenstionContext;
+    } satisfies MockExtenstionCommandContext;
 
-    handleSessionSeries("new", castToExtensionContext(context));
+    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+
+    handleSessionSeries("new", { setSessionName }, castToExtensionContext(context));
 
     expect(context.ui.select).toHaveBeenCalledWith(
       "Which session series would you like to create a new session in?",
