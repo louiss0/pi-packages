@@ -281,7 +281,14 @@ describe.todo("handleSessionSeries", () => {
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
-    handleSessionSeries("create", { setSessionName }, castToExtensionContext(context));
+    handleSessionSeries(
+      "create",
+      {
+        setSessionName,
+        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+      },
+      castToExtensionContext(context),
+    );
 
     expect(context.ui.input).toHaveBeenCalledWith(
       "What is the name of your session series?",
@@ -296,7 +303,7 @@ describe.todo("handleSessionSeries", () => {
     const sessionTitleAndSubTitle = `${context.ui.input.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
 
     expect(context.newSession).toHaveBeenCalledWith({
-      withSession: vi.fn(() => setSessionName(sessionTitleAndSubTitle)),
+      withSession: expect.any(Function),
     });
 
     expect(setSessionName).toHaveBeenCalledWith(sessionTitleAndSubTitle);
@@ -403,6 +410,10 @@ describe.todo("handleSessionSeries", () => {
     const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
 
     const context = {
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+        options?.withSession?.({} as never);
+        return { cancelled: false };
+      }),
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         input: vi
@@ -414,7 +425,14 @@ describe.todo("handleSessionSeries", () => {
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
-    handleSessionSeries("new", { setSessionName }, castToExtensionContext(context));
+    handleSessionSeries(
+      "new",
+      {
+        setSessionName,
+        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+      },
+      castToExtensionContext(context),
+    );
 
     expect(context.ui.select).toHaveBeenCalledWith(
       "Which session series would you like to create a new session in?",
@@ -425,6 +443,13 @@ describe.todo("handleSessionSeries", () => {
       "What is the name of the this new session?",
       "What do you want your agent to do now?",
     );
+
+    expect(context.newSession).toHaveBeenCalledWith({
+      withSession: expect.any(Function),
+    });
+
+    const sessionSeriesAndTitle = `${context.ui.select.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
+    expect(setSessionName).toHaveBeenCalledWith(sessionSeriesAndTitle);
 
     expect(context.ui.notify).toHaveBeenCalledWith(
       `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}
