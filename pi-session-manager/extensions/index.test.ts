@@ -144,6 +144,8 @@ describe.todo("handleSessionCleanInactive", () => {
         "getSessionsBasedOnPredeterminedTimestamp",
       );
 
+      const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
+
       handleSessionCleanInactive(
         {
           sessionFilter: mockSessionFilter,
@@ -158,6 +160,8 @@ describe.todo("handleSessionCleanInactive", () => {
       );
 
       expect(getSessionsBasedOnPredeterminedTimestamp).toHaveBeenCalled();
+
+      expect(timeStampDaySpy).toHaveBeenCalledWith(3);
 
       expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
         getSessionsBasedOnPredeterminedTimestamp.mock.results[0]?.value,
@@ -182,6 +186,7 @@ describe.todo("handleSessionCleanOlderThan", () => {
         mockSessionFilter,
         "getSessionsBasedOnDurationIntegerAndUnit",
       );
+      const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
 
       const durationRecord = { integer: 7, unit: "days" } as const;
       handleSessionCleanOlderThan(
@@ -201,6 +206,8 @@ describe.todo("handleSessionCleanOlderThan", () => {
         durationRecord.integer,
         durationRecord.unit,
       );
+
+      expect(timeStampDaySpy).toHaveBeenCalledWith(durationRecord.integer);
 
       expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
         getSessionsBasedOnDurationIntegerAndUnit.mock.results[0]?.value,
