@@ -117,7 +117,8 @@ const generateSessionsBasedOnModifiedTimeCalculation = (
   }));
 };
 
-const cleanIt = it
+// THis is written like this so that I can use the outline to find tests
+const test = it
   .extend("sessions", () => {
     const modifiedTimeCalculator = new ModifiedTimeCalculator();
     return [
@@ -137,130 +138,124 @@ function castToExtensionContext(context: MockExtenstionCommandContext): Extensio
 const mockRemoveSessionFiles = vi.fn<RemoveSessionFiles>();
 
 describe.todo("handleSessionCleanInactive", () => {
-  cleanIt(
-    "gets rid of all sessions that haven't been modified in the last three days",
-    ({ sessions, timestampCalculator }) => {
-      const context = {
-        ui: {
-          notify: vi.fn<ExtensionContext["ui"]["notify"]>(),
-        },
-      } satisfies MockExtenstionCommandContext;
+  test("gets rid of all sessions that haven't been modified in the last three days", ({
+    sessions,
+    timestampCalculator,
+  }) => {
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionContext["ui"]["notify"]>(),
+      },
+    } satisfies MockExtenstionCommandContext;
 
-      const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
-      const getSessionsBasedOnPredeterminedTimestamp = vi.spyOn(
-        mockSessionFilter,
-        "getSessionsBasedOnPredeterminedTimestamp",
-      );
+    const getSessionsBasedOnPredeterminedTimestamp = vi.spyOn(
+      mockSessionFilter,
+      "getSessionsBasedOnPredeterminedTimestamp",
+    );
 
-      const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
+    const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
 
-      handleSessionCleanInactive(
-        {
-          sessionFilter: mockSessionFilter,
-          removeSessionFiles: mockRemoveSessionFiles,
-        },
-        castToExtensionContext(context),
-      );
+    handleSessionCleanInactive(
+      {
+        sessionFilter: mockSessionFilter,
+        removeSessionFiles: mockRemoveSessionFiles,
+      },
+      castToExtensionContext(context),
+    );
 
-      expect(context.ui.notify).toHaveBeenCalledWith(
-        "Getting rid of all sessions that have been inactive for three days",
-        "warning",
-      );
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      "Getting rid of all sessions that have been inactive for three days",
+      "warning",
+    );
 
-      expect(getSessionsBasedOnPredeterminedTimestamp).toHaveBeenCalled();
+    expect(getSessionsBasedOnPredeterminedTimestamp).toHaveBeenCalled();
 
-      expect(timeStampDaySpy).toHaveBeenCalledWith(3);
+    expect(timeStampDaySpy).toHaveBeenCalledWith(3);
 
-      expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
-        getSessionsBasedOnPredeterminedTimestamp.mock.results[0]?.value,
-      );
-    },
-  );
+    expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
+      getSessionsBasedOnPredeterminedTimestamp.mock.results[0]?.value,
+    );
+  });
 });
 
 describe.todo("handleSessionCleanOlderThan", () => {
-  cleanIt(
-    "cleans sessions older than the specified unit",
-    ({ sessions, timestampCalculator }) => {
-      const context = {
-        ui: {
-          notify: vi.fn(),
-        },
-      } satisfies MockExtenstionCommandContext;
+  test("cleans sessions older than the specified unit", ({ sessions, timestampCalculator }) => {
+    const context = {
+      ui: {
+        notify: vi.fn(),
+      },
+    } satisfies MockExtenstionCommandContext;
 
-      const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
-      const getSessionsBasedOnDurationIntegerAndUnit = vi.spyOn(
-        mockSessionFilter,
-        "getSessionsBasedOnDurationIntegerAndUnit",
-      );
-      const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
+    const getSessionsBasedOnDurationIntegerAndUnit = vi.spyOn(
+      mockSessionFilter,
+      "getSessionsBasedOnDurationIntegerAndUnit",
+    );
+    const timeStampDaySpy = vi.spyOn(timestampCalculator, "day");
 
-      const durationRecord = { integer: 7, unit: "days" } as const;
-      handleSessionCleanOlderThan(
-        durationRecord,
-        {
-          sessionFilter: mockSessionFilter,
-          removeSessionFiles: mockRemoveSessionFiles,
-        },
-        castToExtensionContext(context),
-      );
+    const durationRecord = { integer: 7, unit: "days" } as const;
+    handleSessionCleanOlderThan(
+      durationRecord,
+      {
+        sessionFilter: mockSessionFilter,
+        removeSessionFiles: mockRemoveSessionFiles,
+      },
+      castToExtensionContext(context),
+    );
 
-      expect(context.ui.notify).toHaveBeenCalledWith(
-        `Deleteing sessions that are from ${durationRecord.integer} ${durationRecord.unit} ago`,
-      );
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `Deleteing sessions that are from ${durationRecord.integer} ${durationRecord.unit} ago`,
+    );
 
-      expect(getSessionsBasedOnDurationIntegerAndUnit).toHaveBeenCalledWith(
-        durationRecord.integer,
-        durationRecord.unit,
-      );
+    expect(getSessionsBasedOnDurationIntegerAndUnit).toHaveBeenCalledWith(
+      durationRecord.integer,
+      durationRecord.unit,
+    );
 
-      expect(timeStampDaySpy).toHaveBeenCalledWith(durationRecord.integer);
+    expect(timeStampDaySpy).toHaveBeenCalledWith(durationRecord.integer);
 
-      expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
-        getSessionsBasedOnDurationIntegerAndUnit.mock.results[0]?.value,
-      );
-    },
-  );
+    expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
+      getSessionsBasedOnDurationIntegerAndUnit.mock.results[0]?.value,
+    );
+  });
 });
 
 describe.todo("handleSessionDeleteLast", () => {
-  cleanIt(
-    "deletes the last sessions by a specified nth",
-    ({ sessions, timestampCalculator }) => {
-      const context = {
-        ui: {
-          notify: vi.fn(),
-        },
-      } satisfies MockExtenstionCommandContext;
+  test("deletes the last sessions by a specified nth", ({ sessions, timestampCalculator }) => {
+    const context = {
+      ui: {
+        notify: vi.fn(),
+      },
+    } satisfies MockExtenstionCommandContext;
 
-      const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
 
-      const getSessionsThatAreTheLastNth = vi.spyOn(
-        mockSessionFilter,
-        "getSessionsThatAreTheLastNth",
-      );
+    const getSessionsThatAreTheLastNth = vi.spyOn(
+      mockSessionFilter,
+      "getSessionsThatAreTheLastNth",
+    );
 
-      const nthSessions = 5;
-      handleSessionDeleteLast(
-        nthSessions,
-        {
-          sessionFilter: mockSessionFilter,
-          removeSessionFiles: mockRemoveSessionFiles,
-        },
-        castToExtensionContext(context),
-      );
+    const nthSessions = 5;
+    handleSessionDeleteLast(
+      nthSessions,
+      {
+        sessionFilter: mockSessionFilter,
+        removeSessionFiles: mockRemoveSessionFiles,
+      },
+      castToExtensionContext(context),
+    );
 
-      expect(context.ui.notify).toHaveBeenCalledWith(`Deleting the last ${nthSessions}`);
+    expect(context.ui.notify).toHaveBeenCalledWith(`Deleting the last ${nthSessions}`);
 
-      expect(getSessionsThatAreTheLastNth).toHaveBeenCalledWith(nthSessions);
+    expect(getSessionsThatAreTheLastNth).toHaveBeenCalledWith(nthSessions);
 
-      expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
-        getSessionsThatAreTheLastNth.mock.results[0]?.value,
-      );
-    },
-  );
+    expect(mockRemoveSessionFiles).toHaveBeenCalledWith(
+      getSessionsThatAreTheLastNth.mock.results[0]?.value,
+    );
+  });
 });
 
 describe.todo("handleSessionSeries", () => {
