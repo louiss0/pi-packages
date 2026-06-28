@@ -55,6 +55,8 @@ const durationRecordSchema = union(
 
 export type DurationRecord = InferOutput<typeof durationRecordSchema>;
 
+export const SESION_TITLE_SEPARATOR = "--";
+
 export default function (pi: ExtensionAPI) {
   const commandRoot = "session";
 
@@ -145,6 +147,8 @@ export interface $SessionFilter {
   getSessionsBasedOnPredeterminedTimestamp(): Array<SessionInfo>;
 
   getSessionsThatAreTheLastNth(number: number): Array<SessionInfo>;
+
+  getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo>;
 }
 
 function removeSessionFiles(sessions: Array<SessionInfo>) {
@@ -181,11 +185,14 @@ export function handleSessionDeleteLast(
   ctx: ExtensionContext,
 ) {}
 
-export function handleSessionSeries(command: SessionSeriesCommand, deps:{
-
-  setSessionName: ExtensionAPI['setSessionName']
-
-} ctx: ExtensionContext) {
+export function handleSessionSeries(
+  command: SessionSeriesCommand,
+  deps: {
+    setSessionName: ExtensionAPI["setSessionName"];
+    sessionFilter: $SessionFilter;
+  },
+  ctx: ExtensionContext,
+) {
   switch (command) {
     case "new":
       break;

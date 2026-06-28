@@ -14,6 +14,7 @@ import {
   type $SessionFilter,
   type DurationRecord,
   type RemoveSessionFiles,
+  SESION_TITLE_SEPARATOR,
 } from ".";
 
 type MockExtenstionCommandContext =
@@ -59,6 +60,12 @@ class MockSessionFilter implements $SessionFilter {
 
   get sessions(): SessionInfo[] {
     return this.#sessions;
+  }
+
+  getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo> {
+    return this.#sessions.filter((session) =>
+      session.name?.startsWith(`${title}${SESION_TITLE_SEPARATOR}`),
+    );
   }
 
   getSessionsThatAreTheLastNth(number: number) {
@@ -286,7 +293,7 @@ describe.todo("handleSessionSeries", () => {
       "What task is a part of what you are focusing on?",
     );
 
-    const sessionTitleAndSubTitle = `${context.ui.input.mock.settledResults[0]?.value}--${context.ui.input.mock.settledResults[1]?.value}`;
+    const sessionTitleAndSubTitle = `${context.ui.input.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
 
     expect(context.newSession).toHaveBeenCalledWith({
       withSession: vi.fn(() => setSessionName(sessionTitleAndSubTitle)),
@@ -298,7 +305,7 @@ describe.todo("handleSessionSeries", () => {
   });
 
   it("deletes a session series when delete is passed", () => {
-    const sessionSeries = [
+    const sessionSerieses = [
       "refactor-auth-middleware",
       "fix-memory-leak-prod",
       "implement-graphql-subscriptions",
@@ -311,7 +318,28 @@ describe.todo("handleSessionSeries", () => {
       "feature-flag-cleanup",
     ];
 
-    const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
+    const now = Date.now();
+
+    const generateSessionsFromSerieses = (): SessionInfo[] => {
+      return sessionSerieses
+        .map((series, i) =>
+          Array.from({ length: 3 }, (_, j) => ({
+            path: `/path/to/session/${i}__${j}`,
+            id: `session-id-${i}__${j}`,
+            cwd: `/user/work/${i}__${j}`,
+            name: `${series}${SESION_TITLE_SEPARATOR}Session ${i}__${j}`,
+            parentSessionPath: j > 5 ? `/path/to/parent/${i}__${j}` : `/path/to/parent/${i}`,
+            created: new Date(now - 1000000 * i),
+            modified: new Date(now - i * 1000),
+            messageCount: i * j * 2,
+            firstMessage: `Hello from session ${i}`,
+            allMessagesText: `Full history for session ${i}`,
+          })),
+        )
+        .flat();
+    };
+
+    const randomSeries = sessionSerieses[Math.floor(Math.random() * sessionSerieses.length)];
 
     const context = {
       ui: {
@@ -322,11 +350,35 @@ describe.todo("handleSessionSeries", () => {
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
-    handleSessionSeries("delete", { setSessionName }, castToExtensionContext(context));
+    const mockSessionFilter = new MockSessionFilter(
+      generateSessionsFromSerieses(),
+      new MockPastTimestampCalculator(),
+    );
+
+    const mockGetSessionsThatHaveTheTitleAsAPrefixSpy = vi.spyOn(
+      mockSessionFilter,
+      "getSessionsThatHaveTheTitleAsAPrefix",
+    );
+
+    const removeSessionFiles = vi.fn<RemoveSessionFiles>();
+
+    handleSessionSeries(
+      "delete",
+      { setSessionName, sessionFilter: mockSessionFilter },
+      castToExtensionContext(context),
+    );
 
     expect(context.ui.select).toHaveBeenCalledWith(
       "Which session series would you like to delete?",
-      sessionSeries,
+      sessionSerieses,
+    );
+
+    expect(mockGetSessionsThatHaveTheTitleAsAPrefixSpy).toHaveBeenCalledWith(
+      context.ui.select.mock.settledResults[0]?.value,
+    );
+
+    expect(removeSessionFiles).toHaveBeenCalledWith(
+      mockGetSessionsThatHaveTheTitleAsAPrefixSpy.mock.results[0]?.value,
     );
 
     expect(context.ui.notify).toHaveBeenCalledWith(
