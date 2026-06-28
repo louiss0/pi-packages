@@ -19,7 +19,7 @@ import {
   union,
 } from "valibot";
 
-export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "resume"]);
+export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new"]);
 
 type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
 const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
@@ -185,12 +185,11 @@ export function handleSessionSeries(command: SessionSeriesCommand, ctx: Extensio
   switch (command) {
     case "new":
       break;
+
     case "create":
       break;
-    case "delete":
-      break;
 
-    case "resume":
+    case "delete":
       break;
 
     default: {

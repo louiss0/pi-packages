@@ -272,10 +272,4 @@ describe.todo("handleSessionSeries", () => {
 
     handleSessionSeries("new", context as ExtensionContext);
   });
-
-  it("Resumes a session in a series resume is passed", () => {
-    const context = {} satisfies MockExtenstionContext;
-
-    handleSessionSeries("resume", context as ExtensionContext);
-  });
 });
