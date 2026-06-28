@@ -327,7 +327,9 @@ describe.todo("handleSessionSeries", () => {
     const context = {
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
-        input: vi.fn<ExtensionUIContext["input"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue("Add tests to the lib/index.ts file"),
         select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
       },
     } satisfies MockExtenstionContext;
