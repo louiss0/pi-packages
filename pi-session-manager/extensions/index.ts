@@ -204,8 +204,8 @@ export const sessionSeriesEntrySchema = object({
 function getSessionEntryWithSeries(sesssionEntries: SessionEntry[]) {
   return sesssionEntries.find(
     (entry) =>
-      entry.type === sessionSeriesEntry.entries.type.literal &&
-      entry.customType === sessionSeriesEntry.entries.customType.literal,
+      entry.type === sessionSeriesEntrySchema.entries.type.literal &&
+      entry.customType === sessionSeriesEntrySchema.entries.customType.literal,
   );
 }
 
