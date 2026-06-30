@@ -6,7 +6,6 @@ import {
   type SessionInfo,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { CONFIG_DIR_NAME } from "../node_modules/@earendil-works/pi-coding-agent/dist/config.js";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import { existsSync, readFileSync, rmSync } from "fs";
 import { join } from "path";
@@ -26,6 +25,7 @@ import {
   union,
 } from "valibot";
 
+const CONFIG_DIR_NAME = ".pi";
 const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
 const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
 const durationRecordSchema = union(
@@ -46,7 +46,8 @@ const durationRecordSchema = union(
       string(),
       regex(integerWithUnitShortRE),
       transform((input) => {
-        const { integer, unit } = integerWithUnitShortRE.exec(input)?.groups as {
+        const { integer, unit } = integerWithUnitShortRE.exec(input)
+          ?.groups as {
           integer: string;
           unit: "d" | "w" | "h";
         };
@@ -61,7 +62,12 @@ const durationRecordSchema = union(
 export type DurationRecord = InferOutput<typeof durationRecordSchema>;
 
 export const SESION_TITLE_SEPARATOR = "--";
-export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
+export const sessionSeriesCommandsSchema = picklist([
+  "create",
+  "delete",
+  "new",
+  "continue",
+]);
 export const sessionSeriesEntrySchema = object({
   type: literal("custom"),
   customType: literal("session-manager/series"),
@@ -73,31 +79,18 @@ export const sessionSeriesEntrySchema = object({
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
   InferOutput<typeof sessionSeriesEntrySchema>;
 
-export interface TimestampCalculator {
-  readonly now: number;
-  readonly HOUR_IN_MS: number;
-  readonly DAY_IN_MS: number;
-  readonly WEEK_IN_MS: number;
-  hour(number: number): number;
-  day(number: number): number;
-  week(number: number): number;
+export abstract class $TimestampCalculator {
+  readonly now = Date.now();
+  readonly HOUR_IN_MS = 60 ** 2 * 1000;
+  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
+
+  abstract hour(number: number): number;
+  abstract day(number: number): number;
+  abstract week(number: number): number;
 }
 
-class TimestampCalculatorImpl implements TimestampCalculator {
-  readonly now = Date.now();
-
-  get HOUR_IN_MS() {
-    return 60 ** 2 * 1000;
-  }
-
-  get DAY_IN_MS() {
-    return 24 * this.HOUR_IN_MS;
-  }
-
-  get WEEK_IN_MS() {
-    return 7 * this.DAY_IN_MS;
-  }
-
+class TimestampCalculator extends $TimestampCalculator {
   hour(number: number) {
     return this.now - number * this.HOUR_IN_MS;
   }
@@ -111,7 +104,7 @@ class TimestampCalculatorImpl implements TimestampCalculator {
   }
 }
 
-export interface SessionFilter {
+export interface $SessionFilter {
   readonly sessions: Array<SessionInfo>;
   getSessionsBasedOnDurationIntegerAndUnit(
     integer: DurationRecord["integer"],
@@ -122,12 +115,15 @@ export interface SessionFilter {
   getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo>;
 }
 
-class SessionFilterImpl implements SessionFilter {
+class SessionFilter implements $SessionFilter {
   readonly sessions: Array<SessionInfo>;
 
-  readonly #timestampCalculator: TimestampCalculator;
+  readonly #timestampCalculator: $TimestampCalculator;
 
-  constructor(sessions: Array<SessionInfo>, timestampCalculator: TimestampCalculator) {
+  constructor(
+    sessions: Array<SessionInfo>,
+    timestampCalculator: $TimestampCalculator,
+  ) {
     this.sessions = sessions;
     this.#timestampCalculator = timestampCalculator;
   }
@@ -140,20 +136,27 @@ class SessionFilterImpl implements SessionFilter {
       switch (durationUnit) {
         case "hours":
         case "h":
-          return session.modified.getTime() < this.#timestampCalculator.hour(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.hour(integer)
+          );
         case "days":
         case "d":
-          return session.modified.getTime() < this.#timestampCalculator.day(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.day(integer)
+          );
         case "weeks":
         case "w":
-          return session.modified.getTime() < this.#timestampCalculator.week(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.week(integer)
+          );
       }
     });
   }
 
   getSessionsBasedOnPredeterminedTimestamp() {
     return this.sessions.filter(
-      (session) => session.modified.getTime() < this.#timestampCalculator.day(3),
+      (session) =>
+        session.modified.getTime() < this.#timestampCalculator.day(3),
     );
   }
 
@@ -179,7 +182,11 @@ function removeSessionFiles(sessions: Array<SessionInfo>) {
 export type RemoveSessionFiles = typeof removeSessionFiles;
 
 function getSessionSeriesTitles(cwd?: string) {
-  const configPath = join(cwd ?? process.cwd(), CONFIG_DIR_NAME, "pi-session-manager.config.json");
+  const configPath = join(
+    cwd ?? process.cwd(),
+    CONFIG_DIR_NAME,
+    "pi-session-manager.config.json",
+  );
 
   if (!existsSync(configPath)) {
     return [] as string[];
@@ -188,7 +195,10 @@ function getSessionSeriesTitles(cwd?: string) {
   try {
     const parsed = JSON.parse(readFileSync(configPath, "utf8"));
 
-    if (Array.isArray(parsed) && parsed.every((title) => typeof title === "string")) {
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((title) => typeof title === "string")
+    ) {
       return parsed;
     }
   } catch {
@@ -204,7 +214,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand(`${commandRoot}:clean:inactive`, {
     handler: async (_, ctx) => {
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilterImpl(sessions, new TimestampCalculatorImpl());
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
 
       handleSessionCleanInactive(
         {
@@ -225,7 +238,10 @@ export default function (pi: ExtensionAPI) {
       }
 
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilterImpl(sessions, new TimestampCalculatorImpl());
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
 
       handleSessionCleanOlderThan(
         result.output,
@@ -243,7 +259,10 @@ export default function (pi: ExtensionAPI) {
       const autoCompleteItems: Array<AutocompleteItem> = [];
 
       for (let i = 1; i <= 10; i++) {
-        autoCompleteItems.push({ value: i.toString(), label: `last ${i.toString()}` });
+        autoCompleteItems.push({
+          value: i.toString(),
+          label: `last ${i.toString()}`,
+        });
       }
 
       return autoCompleteItems.filter((item) => item.value === prefix);
@@ -257,7 +276,10 @@ export default function (pi: ExtensionAPI) {
       }
 
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilterImpl(sessions, new TimestampCalculatorImpl());
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
 
       handleSessionDeleteLast(
         result.output,
@@ -291,7 +313,7 @@ export default function (pi: ExtensionAPI) {
         result.output,
         {
           setSessionName: pi.setSessionName,
-          sessionFilter: new SessionFilterImpl([], new TimestampCalculatorImpl()),
+          sessionFilter: new SessionFilter([], new TimestampCalculator()),
           getSessionEntryWithSeries,
           appendEntry: pi.appendEntry,
           removeSessionFiles,
@@ -302,7 +324,9 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-function getSessionEntryWithSeries(sesssionEntries: SessionEntry[]): SessionSeriesEntry | undefined {
+function getSessionEntryWithSeries(
+  sesssionEntries: SessionEntry[],
+): SessionSeriesEntry | undefined {
   return sesssionEntries.find(
     (entry): entry is SessionSeriesEntry =>
       entry.type === sessionSeriesEntrySchema.entries.type.literal &&
@@ -314,53 +338,66 @@ export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
 
 export function handleSessionCleanInactive(
   deps: {
-    sessionFilter: SessionFilter;
+    sessionFilter: $SessionFilter;
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
 ) {
-  ctx.ui.notify("Getting rid of all sessions that have been inactive for three days", "warning");
-  deps.removeSessionFiles(deps.sessionFilter.getSessionsBasedOnPredeterminedTimestamp());
+  ctx.ui.notify(
+    "Getting rid of all sessions that have been inactive for three days",
+    "warning",
+  );
+  deps.removeSessionFiles(
+    deps.sessionFilter.getSessionsBasedOnPredeterminedTimestamp(),
+  );
 }
 
 export function handleSessionCleanOlderThan(
   input: DurationRecord,
   deps: {
-    sessionFilter: SessionFilter;
+    sessionFilter: $SessionFilter;
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
 ) {
-  ctx.ui.notify(`Deleteing sessions that are from ${input.integer} ${input.unit} ago`);
+  ctx.ui.notify(
+    `Deleteing sessions that are from ${input.integer} ${input.unit} ago`,
+  );
   deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsBasedOnDurationIntegerAndUnit(input.integer, input.unit),
+    deps.sessionFilter.getSessionsBasedOnDurationIntegerAndUnit(
+      input.integer,
+      input.unit,
+    ),
   );
 }
 
 export function handleSessionDeleteLast(
   number: number,
   deps: {
-    sessionFilter: SessionFilter;
+    sessionFilter: $SessionFilter;
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
 ) {
   ctx.ui.notify(`Deleting the last ${number}`);
-  deps.removeSessionFiles(deps.sessionFilter.getSessionsThatAreTheLastNth(number));
+  deps.removeSessionFiles(
+    deps.sessionFilter.getSessionsThatAreTheLastNth(number),
+  );
 }
 
 export async function handleSessionSeries(
   command: SessionSeriesCommand,
   deps: {
     setSessionName: ExtensionAPI["setSessionName"];
-    sessionFilter: SessionFilter;
+    sessionFilter: $SessionFilter;
     getSessionEntryWithSeries: GetSessionEntryWithSeries;
     appendEntry: ExtensionAPI["appendEntry"];
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
 ) {
-  const commandContext = ctx as ExtensionContext & Pick<ExtensionCommandContext, "newSession">;
+  const commandContext = ctx as ExtensionContext &
+    Pick<ExtensionCommandContext, "newSession">;
 
   switch (command) {
     case "create": {
@@ -380,10 +417,13 @@ export async function handleSessionSeries(
       await commandContext.newSession({
         withSession: async () => {
           deps.setSessionName(`${series}${SESION_TITLE_SEPARATOR}${title}`);
-          deps.appendEntry(sessionSeriesEntrySchema.entries.customType.literal, {
-            series,
-            createdAt: new Date().toISOString(),
-          });
+          deps.appendEntry(
+            sessionSeriesEntrySchema.entries.customType.literal,
+            {
+              series,
+              createdAt: new Date().toISOString(),
+            },
+          );
         },
       });
 
@@ -401,7 +441,9 @@ export async function handleSessionSeries(
         return;
       }
 
-      deps.removeSessionFiles(deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series));
+      deps.removeSessionFiles(
+        deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series),
+      );
       ctx.ui.notify(`This series ${series} and it's related sessions`);
       return;
     }
@@ -441,7 +483,9 @@ export async function handleSessionSeries(
         return;
       }
 
-      const title = await ctx.ui.input(`What's the new title for the session in series ${entry.data.series}`);
+      const title = await ctx.ui.input(
+        `What's the new title for the session in series ${entry.data.series}`,
+      );
 
       if (!title) {
         return;
@@ -449,7 +493,9 @@ export async function handleSessionSeries(
 
       await commandContext.newSession({
         withSession: async () => {
-          deps.setSessionName(`${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`);
+          deps.setSessionName(
+            `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
+          );
         },
       });
 

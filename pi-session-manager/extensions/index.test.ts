@@ -10,14 +10,14 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
+  $TimestampCalculator,
+  type $SessionFilter,
   type DurationRecord,
   type RemoveSessionFiles,
   SESION_TITLE_SEPARATOR,
   type GetSessionEntryWithSeries,
   sessionSeriesEntrySchema,
-  type SessionFilter,
   type SessionSeriesEntry,
-  type TimestampCalculator,
 } from ".";
 import { parse } from "valibot";
 
@@ -28,11 +28,7 @@ type MockExtenstionCommandContext =
       sessionManager?: Partial<ExtensionContext["sessionManager"]>;
     };
 
-class MockPastTimestampCalculator {
-  readonly now = Date.now();
-  readonly HOUR_IN_MS = 60 ** 2 * 1000;
-  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
-  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
+class MockPastTimestampCalculator extends $TimestampCalculator {
   #nowTimestamp = this.now;
 
   hour(number = 1): number {
@@ -48,11 +44,7 @@ class MockPastTimestampCalculator {
   }
 }
 
-class ModifiedTimeCalculator {
-  readonly HOUR_IN_MS = 60 ** 2 * 1000;
-  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
-  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
-
+class ModifiedTimeCalculator extends $TimestampCalculator {
   hour = (multiplier: number): number => {
     return multiplier * this.HOUR_IN_MS;
   };
@@ -66,12 +58,15 @@ class ModifiedTimeCalculator {
   };
 }
 
-class MockSessionFilter implements SessionFilter {
+class MockSessionFilter implements $SessionFilter {
   #sessions: SessionInfo[] = [];
 
-  #timestampCalculator: TimestampCalculator;
+  #timestampCalculator: $TimestampCalculator;
 
-  constructor(sessions: SessionInfo[], timestampCalculator: TimestampCalculator) {
+  constructor(
+    sessions: SessionInfo[],
+    timestampCalculator: $TimestampCalculator,
+  ) {
     this.#sessions = sessions;
     this.#timestampCalculator = timestampCalculator;
   }
@@ -98,20 +93,27 @@ class MockSessionFilter implements SessionFilter {
       switch (durationUnit) {
         case "hours":
         case "h":
-          return session.modified.getTime() < this.#timestampCalculator.hour(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.hour(integer)
+          );
         case "days":
         case "d":
-          return session.modified.getTime() < this.#timestampCalculator.day(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.day(integer)
+          );
         case "weeks":
         case "w":
-          return session.modified.getTime() < this.#timestampCalculator.week(integer);
+          return (
+            session.modified.getTime() < this.#timestampCalculator.week(integer)
+          );
       }
     });
   }
 
   getSessionsBasedOnPredeterminedTimestamp() {
     return this.#sessions.filter(
-      (session) => session.modified.getTime() < this.#timestampCalculator.day(3),
+      (session) =>
+        session.modified.getTime() < this.#timestampCalculator.day(3),
     );
   }
 }
@@ -149,7 +151,9 @@ const test = it
   })
   .extend("timestampCalculator", new MockPastTimestampCalculator());
 
-function castToExtensionContext(context: MockExtenstionCommandContext): ExtensionContext {
+function castToExtensionContext(
+  context: MockExtenstionCommandContext,
+): ExtensionContext {
   return context as ExtensionContext;
 }
 
@@ -166,7 +170,10 @@ describe("handleSessionCleanInactive", () => {
       },
     } satisfies MockExtenstionCommandContext;
 
-    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(
+      sessions,
+      timestampCalculator,
+    );
 
     const getSessionsBasedOnPredeterminedTimestamp = vi.spyOn(
       mockSessionFilter,
@@ -199,14 +206,20 @@ describe("handleSessionCleanInactive", () => {
 });
 
 describe("handleSessionCleanOlderThan", () => {
-  test("cleans sessions older than the specified unit", ({ sessions, timestampCalculator }) => {
+  test("cleans sessions older than the specified unit", ({
+    sessions,
+    timestampCalculator,
+  }) => {
     const context = {
       ui: {
         notify: vi.fn(),
       },
     } satisfies MockExtenstionCommandContext;
 
-    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(
+      sessions,
+      timestampCalculator,
+    );
 
     const getSessionsBasedOnDurationIntegerAndUnit = vi.spyOn(
       mockSessionFilter,
@@ -242,14 +255,20 @@ describe("handleSessionCleanOlderThan", () => {
 });
 
 describe("handleSessionDeleteLast", () => {
-  test("deletes the last sessions by a specified nth", ({ sessions, timestampCalculator }) => {
+  test("deletes the last sessions by a specified nth", ({
+    sessions,
+    timestampCalculator,
+  }) => {
     const context = {
       ui: {
         notify: vi.fn(),
       },
     } satisfies MockExtenstionCommandContext;
 
-    const mockSessionFilter = new MockSessionFilter(sessions, timestampCalculator);
+    const mockSessionFilter = new MockSessionFilter(
+      sessions,
+      timestampCalculator,
+    );
 
     const getSessionsThatAreTheLastNth = vi.spyOn(
       mockSessionFilter,
@@ -266,7 +285,9 @@ describe("handleSessionDeleteLast", () => {
       castToExtensionContext(context),
     );
 
-    expect(context.ui.notify).toHaveBeenCalledWith(`Deleting the last ${nthSessions}`);
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `Deleting the last ${nthSessions}`,
+    );
 
     expect(getSessionsThatAreTheLastNth).toHaveBeenCalledWith(nthSessions);
 
@@ -279,10 +300,12 @@ describe("handleSessionDeleteLast", () => {
 describe("handleSessionSeries", () => {
   it("creates a session series when create is passed", async () => {
     const context = {
-      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
-        return { cancelled: false };
-      }),
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(
+        async (options) => {
+          options?.withSession?.({} as never);
+          return { cancelled: false };
+        },
+      ),
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         input: vi
@@ -299,7 +322,10 @@ describe("handleSessionSeries", () => {
       "create",
       {
         setSessionName,
-        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
         appendEntry,
         getSessionEntryWithSeries() {
           return undefined;
@@ -337,7 +363,9 @@ describe("handleSessionSeries", () => {
       },
     );
 
-    expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      "Your session series has been created",
+    );
   });
 
   it("deletes a session series when delete is passed", async () => {
@@ -364,7 +392,8 @@ describe("handleSessionSeries", () => {
             id: `session-id-${i}__${j}`,
             cwd: `/user/work/${i}__${j}`,
             name: `${series}${SESION_TITLE_SEPARATOR}Session ${i}__${j}`,
-            parentSessionPath: j > 5 ? `/path/to/parent/${i}__${j}` : `/path/to/parent/${i}`,
+            parentSessionPath:
+              j > 5 ? `/path/to/parent/${i}__${j}` : `/path/to/parent/${i}`,
             created: new Date(now - 1000000 * i),
             modified: new Date(now - i * 1000),
             messageCount: i * j * 2,
@@ -375,12 +404,15 @@ describe("handleSessionSeries", () => {
         .flat();
     };
 
-    const randomSeries = sessionSerieses[Math.floor(Math.random() * sessionSerieses.length)];
+    const randomSeries =
+      sessionSerieses[Math.floor(Math.random() * sessionSerieses.length)];
 
     const context = {
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
-        select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
+        select: vi
+          .fn<ExtensionUIContext["select"]>()
+          .mockResolvedValue(randomSeries),
       },
     } satisfies MockExtenstionCommandContext;
 
@@ -446,19 +478,24 @@ describe("handleSessionSeries", () => {
       "feature-flag-cleanup",
     ];
 
-    const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
+    const randomSeries =
+      sessionSeries[Math.floor(Math.random() * sessionSeries.length)];
 
     const context = {
-      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
-        return { cancelled: false };
-      }),
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(
+        async (options) => {
+          options?.withSession?.({} as never);
+          return { cancelled: false };
+        },
+      ),
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         input: vi
           .fn<ExtensionUIContext["input"]>()
           .mockResolvedValue("Add tests to the lib/index.ts file"),
-        select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
+        select: vi
+          .fn<ExtensionUIContext["select"]>()
+          .mockResolvedValue(randomSeries),
       },
     } satisfies MockExtenstionCommandContext;
 
@@ -468,7 +505,10 @@ describe("handleSessionSeries", () => {
       "new",
       {
         setSessionName,
-        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
         appendEntry() {
           return;
         },
@@ -509,12 +549,15 @@ describe("handleSessionSeries", () => {
   it("continues a session in a series when continue is passed", async () => {
     const context = {
       sessionManager: {
-        getEntries: vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+        getEntries:
+          vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
       },
-      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
-        return { cancelled: false };
-      }),
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(
+        async (options) => {
+          options?.withSession?.({} as never);
+          return { cancelled: false };
+        },
+      ),
       ui: {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         input: vi
@@ -541,7 +584,10 @@ describe("handleSessionSeries", () => {
       "continue",
       {
         setSessionName,
-        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
         getSessionEntryWithSeries,
         appendEntry() {
           return;
@@ -559,7 +605,8 @@ describe("handleSessionSeries", () => {
       context.sessionManager.getEntries.mock.results[0]?.value,
     );
 
-    const entry = getSessionEntryWithSeries.mock.results[0]?.value as SessionSeriesEntry;
+    const entry = getSessionEntryWithSeries.mock.results[0]
+      ?.value as SessionSeriesEntry;
 
     expect(entry).toEqual(
       expect.objectContaining({
