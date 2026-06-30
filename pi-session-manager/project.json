@@ -60,9 +60,5 @@
       }
     }
   },
-  "tags": [
-    "npm:public",
-    "project:extension",
-    "status:supported"
-  ]
+  "tags": ["npm:public", "project:extension", "status:supported"]
 }

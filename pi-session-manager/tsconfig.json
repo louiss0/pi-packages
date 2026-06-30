@@ -21,12 +21,7 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "types": [
-      "vitest/globals",
-      "node"
-    ]
+    "types": ["vitest/globals", "node"]
   },
-  "include": [
-    "extensions/**/*.ts"
-  ]
+  "include": ["extensions/**/*.ts"]
 }
