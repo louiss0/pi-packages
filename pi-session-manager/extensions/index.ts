@@ -83,14 +83,27 @@ export default function (pi: ExtensionAPI) {
 
   let sessionManagerConfigurator: SessionManagerConfigurator;
 
-  pi.on("session_start", async (_, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     sessionManagerConfigurator = new SessionManagerConfigurator();
+    const eventIsNotReloadOrStartUp = event.reason !== "reload" && event.reason !== "startup";
+    if (eventIsNotReloadOrStartUp) {
+      return;
+    }
 
     const dayLimitResult = sessionManagerConfigurator.getSessionDeletionDayLimit();
 
     if (dayLimitResult instanceof SessionConfigError) {
-      ctx.ui.notify(dayLimitResult.message, "error");
-      return;
+      ctx.ui.notify(
+        `Generated initial session manager config.
+        Since there's no default daylimit for getting rid of the sessions
+        ${dayLimitResult.message}`,
+        "error",
+      );
+      sessionManagerConfigurator.generateInitialConfig(ctx.cwd);
+      return ctx.ui.notify(
+        `Every ${sessionManagerConfigurator.defaultSessionDeletionDayLimit} days unmodified sessions will be deleted `,
+        "warning",
+      );
     }
 
     const sessions = await SessionManager.list(ctx.cwd);
@@ -338,13 +351,13 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
 
   #configName = "pi-session-manager.config.json";
 
-  #defaultSessionDeletionDayLimit = 3;
+  readonly defaultSessionDeletionDayLimit = 3;
 
   readonly #configPath = join(this.#agentDir, this.#configName);
 
   generateInitialConfig(cwd: string): void {
     const config = {
-      sessionDeletionDayLimit: this.#defaultSessionDeletionDayLimit,
+      sessionDeletionDayLimit: this.defaultSessionDeletionDayLimit,
       seriesRecord: {
         [cwd]: [],
       },
