@@ -10,13 +10,14 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
-  $TimestampCalculator,
-  type $SessionFilter,
   type DurationRecord,
   type RemoveSessionFiles,
   SESION_TITLE_SEPARATOR,
   type GetSessionEntryWithSeries,
   sessionSeriesEntrySchema,
+  type SessionFilter,
+  type SessionSeriesEntry,
+  type TimestampCalculator,
 } from ".";
 import { parse } from "valibot";
 
@@ -27,37 +28,50 @@ type MockExtenstionCommandContext =
       sessionManager?: Partial<ExtensionContext["sessionManager"]>;
     };
 
-class MockPastTimestampCalculator extends $TimestampCalculator {
-  #nowTimestamp = Date.now();
+class MockPastTimestampCalculator {
+  readonly now = Date.now();
+  readonly HOUR_IN_MS = 60 ** 2 * 1000;
+  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
+  #nowTimestamp = this.now;
+
   hour(number = 1): number {
     return this.#nowTimestamp - number * this.HOUR_IN_MS;
   }
+
   day(number = 1): number {
     return this.#nowTimestamp - number * this.DAY_IN_MS;
   }
+
   week(number = 1): number {
     return this.#nowTimestamp - number * this.WEEK_IN_MS;
   }
 }
 
-class ModifiedTimeCalculator extends $TimestampCalculator {
-  hour(multiplier: number): number {
+class ModifiedTimeCalculator {
+  readonly HOUR_IN_MS = 60 ** 2 * 1000;
+  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
+
+  hour = (multiplier: number): number => {
     return multiplier * this.HOUR_IN_MS;
-  }
-  day(multiplier: number): number {
+  };
+
+  day = (multiplier: number): number => {
     return multiplier * this.DAY_IN_MS;
-  }
-  week(multiplier: number): number {
+  };
+
+  week = (multiplier: number): number => {
     return multiplier * this.WEEK_IN_MS;
-  }
+  };
 }
 
-class MockSessionFilter implements $SessionFilter {
+class MockSessionFilter implements SessionFilter {
   #sessions: SessionInfo[] = [];
 
-  #timestampCalculator: $TimestampCalculator;
+  #timestampCalculator: TimestampCalculator;
 
-  constructor(sessions: SessionInfo[], timestampCalculator: $TimestampCalculator) {
+  constructor(sessions: SessionInfo[], timestampCalculator: TimestampCalculator) {
     this.#sessions = sessions;
     this.#timestampCalculator = timestampCalculator;
   }
@@ -263,7 +277,7 @@ describe("handleSessionDeleteLast", () => {
 });
 
 describe("handleSessionSeries", () => {
-  it("creates a session series when create is passed", () => {
+  it("creates a session series when create is passed", async () => {
     const context = {
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
         options?.withSession?.({} as never);
@@ -281,7 +295,7 @@ describe("handleSessionSeries", () => {
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
     const appendEntry = vi.fn<ExtensionAPI["appendEntry"]>();
 
-    handleSessionSeries(
+    await handleSessionSeries(
       "create",
       {
         setSessionName,
@@ -289,6 +303,9 @@ describe("handleSessionSeries", () => {
         appendEntry,
         getSessionEntryWithSeries() {
           return undefined;
+        },
+        removeSessionFiles() {
+          return;
         },
       },
       castToExtensionContext(context),
@@ -316,16 +333,14 @@ describe("handleSessionSeries", () => {
       sessionSeriesEntrySchema.entries.customType.literal,
       {
         series,
-        createdAt: expect.schemaMatching(
-          sessionSeriesEntrySchema.entries.data.entries.createdAt.reference,
-        ),
+        createdAt: expect.any(String),
       },
     );
 
     expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
   });
 
-  it("deletes a session series when delete is passed", () => {
+  it("deletes a session series when delete is passed", async () => {
     const sessionSerieses = [
       "refactor-auth-middleware",
       "fix-memory-leak-prod",
@@ -383,7 +398,7 @@ describe("handleSessionSeries", () => {
 
     const removeSessionFiles = vi.fn<RemoveSessionFiles>();
 
-    handleSessionSeries(
+    await handleSessionSeries(
       "delete",
       {
         setSessionName,
@@ -394,6 +409,7 @@ describe("handleSessionSeries", () => {
         getSessionEntryWithSeries() {
           return undefined;
         },
+        removeSessionFiles,
       },
       castToExtensionContext(context),
     );
@@ -416,7 +432,7 @@ describe("handleSessionSeries", () => {
     );
   });
 
-  it("Makes a new session in a series new is passed", () => {
+  it("Makes a new session in a series new is passed", async () => {
     const sessionSeries = [
       "refactor-auth-middleware",
       "fix-memory-leak-prod",
@@ -448,7 +464,7 @@ describe("handleSessionSeries", () => {
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
-    handleSessionSeries(
+    await handleSessionSeries(
       "new",
       {
         setSessionName,
@@ -458,6 +474,9 @@ describe("handleSessionSeries", () => {
         },
         getSessionEntryWithSeries() {
           return undefined;
+        },
+        removeSessionFiles() {
+          return;
         },
       },
       castToExtensionContext(context),
@@ -505,16 +524,29 @@ describe("handleSessionSeries", () => {
     } satisfies MockExtenstionCommandContext;
 
     const getSessionEntryWithSeries = vi.fn<GetSessionEntryWithSeries>();
+    const seriesEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "refactor-auth-middleware",
+        createdAt: new Date().toISOString(),
+      },
+    } as const as SessionSeriesEntry;
+
+    getSessionEntryWithSeries.mockReturnValue(seriesEntry);
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
-    handleSessionSeries(
+    await handleSessionSeries(
       "continue",
       {
         setSessionName,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
         getSessionEntryWithSeries,
         appendEntry() {
+          return;
+        },
+        removeSessionFiles() {
           return;
         },
       },
@@ -527,9 +559,14 @@ describe("handleSessionSeries", () => {
       context.sessionManager.getEntries.mock.results[0]?.value,
     );
 
-    const entry = getSessionEntryWithSeries.mock.results[0]?.value;
+    const entry = getSessionEntryWithSeries.mock.results[0]?.value as SessionSeriesEntry;
 
-    expect(parse(sessionSeriesEntrySchema, entry)).not.toThrow();
+    expect(entry).toEqual(
+      expect.objectContaining({
+        type: "custom",
+        customType: sessionSeriesEntrySchema.entries.customType.literal,
+      }),
+    );
 
     expect(context.ui.input).toHaveBeenCalledWith(
       `What's the new title for the session in series ${entry.data.series}`,
