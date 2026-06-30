@@ -474,7 +474,7 @@ export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
 export function handleSessionCleanInactive(
   deps: {
     sessionFilter: $SessionFilter;
-    sessionManagerConfigurator: SessionManagerConfigurator;
+    sessionManagerConfigurator: $SessionManagerConfigurator;
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
@@ -523,7 +523,7 @@ export async function handleSessionSeries(
   command: SessionSeriesCommand,
   deps: {
     setSessionName: ExtensionAPI["setSessionName"];
-    sessionManagerConfigurator: SessionManagerConfigurator;
+    sessionManagerConfigurator: $SessionManagerConfigurator;
     sessionFilter: $SessionFilter;
     getSessionEntryWithSeries: GetSessionEntryWithSeries;
     appendEntry: ExtensionAPI["appendEntry"];
