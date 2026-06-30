@@ -46,8 +46,7 @@ const durationRecordSchema = union(
       string(),
       regex(integerWithUnitShortRE),
       transform((input) => {
-        const { integer, unit } = integerWithUnitShortRE.exec(input)
-          ?.groups as {
+        const { integer, unit } = integerWithUnitShortRE.exec(input)?.groups as {
           integer: string;
           unit: "d" | "w" | "h";
         };
@@ -62,12 +61,7 @@ const durationRecordSchema = union(
 export type DurationRecord = InferOutput<typeof durationRecordSchema>;
 
 export const SESION_TITLE_SEPARATOR = "--";
-export const sessionSeriesCommandsSchema = picklist([
-  "create",
-  "delete",
-  "new",
-  "continue",
-]);
+export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
 export const sessionSeriesEntrySchema = object({
   type: literal("custom"),
   customType: literal("session-manager/series"),
@@ -120,10 +114,7 @@ class SessionFilter implements $SessionFilter {
 
   readonly #timestampCalculator: $TimestampCalculator;
 
-  constructor(
-    sessions: Array<SessionInfo>,
-    timestampCalculator: $TimestampCalculator,
-  ) {
+  constructor(sessions: Array<SessionInfo>, timestampCalculator: $TimestampCalculator) {
     this.sessions = sessions;
     this.#timestampCalculator = timestampCalculator;
   }
@@ -136,27 +127,20 @@ class SessionFilter implements $SessionFilter {
       switch (durationUnit) {
         case "hours":
         case "h":
-          return (
-            session.modified.getTime() < this.#timestampCalculator.hour(integer)
-          );
+          return session.modified.getTime() < this.#timestampCalculator.hour(integer);
         case "days":
         case "d":
-          return (
-            session.modified.getTime() < this.#timestampCalculator.day(integer)
-          );
+          return session.modified.getTime() < this.#timestampCalculator.day(integer);
         case "weeks":
         case "w":
-          return (
-            session.modified.getTime() < this.#timestampCalculator.week(integer)
-          );
+          return session.modified.getTime() < this.#timestampCalculator.week(integer);
       }
     });
   }
 
   getSessionsBasedOnPredeterminedTimestamp() {
     return this.sessions.filter(
-      (session) =>
-        session.modified.getTime() < this.#timestampCalculator.day(3),
+      (session) => session.modified.getTime() < this.#timestampCalculator.day(3),
     );
   }
 
@@ -195,10 +179,7 @@ function getSessionSeriesTitles(cwd?: string) {
   try {
     const parsed = JSON.parse(readFileSync(configPath, "utf8"));
 
-    if (
-      Array.isArray(parsed) &&
-      parsed.every((title) => typeof title === "string")
-    ) {
+    if (Array.isArray(parsed) && parsed.every((title) => typeof title === "string")) {
       return parsed;
     }
   } catch {
@@ -214,10 +195,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand(`${commandRoot}:clean:inactive`, {
     handler: async (_, ctx) => {
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilter(
-        sessions,
-        new TimestampCalculator(),
-      );
+      const sessionFilter = new SessionFilter(sessions, new TimestampCalculator());
 
       handleSessionCleanInactive(
         {
@@ -238,10 +216,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilter(
-        sessions,
-        new TimestampCalculator(),
-      );
+      const sessionFilter = new SessionFilter(sessions, new TimestampCalculator());
 
       handleSessionCleanOlderThan(
         result.output,
@@ -276,10 +251,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const sessions = await SessionManager.list(ctx.cwd);
-      const sessionFilter = new SessionFilter(
-        sessions,
-        new TimestampCalculator(),
-      );
+      const sessionFilter = new SessionFilter(sessions, new TimestampCalculator());
 
       handleSessionDeleteLast(
         result.output,
@@ -309,11 +281,13 @@ export default function (pi: ExtensionAPI) {
         return ctx.ui.notify(summarize(result.issues), "error");
       }
 
+      const sessions = await SessionManager.list(ctx.cwd);
+
       await handleSessionSeries(
         result.output,
         {
           setSessionName: pi.setSessionName,
-          sessionFilter: new SessionFilter([], new TimestampCalculator()),
+          sessionFilter: new SessionFilter(sessions, new TimestampCalculator()),
           getSessionEntryWithSeries,
           appendEntry: pi.appendEntry,
           removeSessionFiles,
@@ -347,9 +321,7 @@ export function handleSessionCleanInactive(
     "Getting rid of all sessions that have been inactive for three days",
     "warning",
   );
-  deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsBasedOnPredeterminedTimestamp(),
-  );
+  deps.removeSessionFiles(deps.sessionFilter.getSessionsBasedOnPredeterminedTimestamp());
 }
 
 export function handleSessionCleanOlderThan(
@@ -360,14 +332,9 @@ export function handleSessionCleanOlderThan(
   },
   ctx: ExtensionContext,
 ) {
-  ctx.ui.notify(
-    `Deleteing sessions that are from ${input.integer} ${input.unit} ago`,
-  );
+  ctx.ui.notify(`Deleteing sessions that are from ${input.integer} ${input.unit} ago`);
   deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsBasedOnDurationIntegerAndUnit(
-      input.integer,
-      input.unit,
-    ),
+    deps.sessionFilter.getSessionsBasedOnDurationIntegerAndUnit(input.integer, input.unit),
   );
 }
 
@@ -380,9 +347,7 @@ export function handleSessionDeleteLast(
   ctx: ExtensionContext,
 ) {
   ctx.ui.notify(`Deleting the last ${number}`);
-  deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsThatAreTheLastNth(number),
-  );
+  deps.removeSessionFiles(deps.sessionFilter.getSessionsThatAreTheLastNth(number));
 }
 
 export async function handleSessionSeries(
@@ -396,8 +361,7 @@ export async function handleSessionSeries(
   },
   ctx: ExtensionContext,
 ) {
-  const commandContext = ctx as ExtensionContext &
-    Pick<ExtensionCommandContext, "newSession">;
+  const commandContext = ctx as ExtensionContext & Pick<ExtensionCommandContext, "newSession">;
 
   switch (command) {
     case "create": {
@@ -417,13 +381,10 @@ export async function handleSessionSeries(
       await commandContext.newSession({
         withSession: async () => {
           deps.setSessionName(`${series}${SESION_TITLE_SEPARATOR}${title}`);
-          deps.appendEntry(
-            sessionSeriesEntrySchema.entries.customType.literal,
-            {
-              series,
-              createdAt: new Date().toISOString(),
-            },
-          );
+          deps.appendEntry(sessionSeriesEntrySchema.entries.customType.literal, {
+            series,
+            createdAt: new Date().toISOString(),
+          });
         },
       });
 
@@ -441,9 +402,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      deps.removeSessionFiles(
-        deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series),
-      );
+      deps.removeSessionFiles(deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series));
       ctx.ui.notify(`This series ${series} and it's related sessions`);
       return;
     }
@@ -493,9 +452,7 @@ export async function handleSessionSeries(
 
       await commandContext.newSession({
         withSession: async () => {
-          deps.setSessionName(
-            `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
-          );
+          deps.setSessionName(`${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`);
         },
       });
 
