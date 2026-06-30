@@ -216,7 +216,8 @@ export function handleSessionSeries(
   deps: {
     setSessionName: ExtensionAPI["setSessionName"];
     sessionFilter: $SessionFilter;
-    getSessionEntryWithSeries?: GetSessionEntryWithSeries;
+    getSessionEntryWithSeries: GetSessionEntryWithSeries;
+    appendEntry: ExtensionAPI["appendEntry"];
   },
   ctx: ExtensionContext,
 ) {

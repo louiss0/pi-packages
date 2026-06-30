@@ -141,7 +141,7 @@ function castToExtensionContext(context: MockExtenstionCommandContext): Extensio
 
 const mockRemoveSessionFiles = vi.fn<RemoveSessionFiles>();
 
-describe.todo("handleSessionCleanInactive", () => {
+describe("handleSessionCleanInactive", () => {
   test("gets rid of all sessions that haven't been modified in the last three days", ({
     sessions,
     timestampCalculator,
@@ -184,7 +184,7 @@ describe.todo("handleSessionCleanInactive", () => {
   });
 });
 
-describe.todo("handleSessionCleanOlderThan", () => {
+describe("handleSessionCleanOlderThan", () => {
   test("cleans sessions older than the specified unit", ({ sessions, timestampCalculator }) => {
     const context = {
       ui: {
@@ -227,7 +227,7 @@ describe.todo("handleSessionCleanOlderThan", () => {
   });
 });
 
-describe.todo("handleSessionDeleteLast", () => {
+describe("handleSessionDeleteLast", () => {
   test("deletes the last sessions by a specified nth", ({ sessions, timestampCalculator }) => {
     const context = {
       ui: {
@@ -262,7 +262,7 @@ describe.todo("handleSessionDeleteLast", () => {
   });
 });
 
-describe.todo("handleSessionSeries", () => {
+describe("handleSessionSeries", () => {
   it("creates a session series when create is passed", () => {
     const context = {
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
@@ -279,12 +279,17 @@ describe.todo("handleSessionSeries", () => {
     } satisfies MockExtenstionCommandContext;
 
     const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+    const appendEntry = vi.fn<ExtensionAPI["appendEntry"]>();
 
     handleSessionSeries(
       "create",
       {
         setSessionName,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        appendEntry,
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
       },
       castToExtensionContext(context),
     );
@@ -299,13 +304,23 @@ describe.todo("handleSessionSeries", () => {
       "What task is a part of what you are focusing on?",
     );
 
-    const sessionTitleAndSubTitle = `${context.ui.input.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
+    const series = context.ui.input.mock.settledResults[0]?.value;
+    const sessionTitleAndSubTitle = `${series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
 
     expect(context.newSession).toHaveBeenCalledWith({
       withSession: expect.any(Function),
     });
 
     expect(setSessionName).toHaveBeenCalledWith(sessionTitleAndSubTitle);
+    expect(appendEntry).toHaveBeenCalledWith(
+      sessionSeriesEntrySchema.entries.customType.literal,
+      {
+        series,
+        createdAt: expect.schemaMatching(
+          sessionSeriesEntrySchema.entries.data.entries.createdAt.reference,
+        ),
+      },
+    );
 
     expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
   });
@@ -370,7 +385,16 @@ describe.todo("handleSessionSeries", () => {
 
     handleSessionSeries(
       "delete",
-      { setSessionName, sessionFilter: mockSessionFilter },
+      {
+        setSessionName,
+        sessionFilter: mockSessionFilter,
+        appendEntry() {
+          return;
+        },
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
+      },
       castToExtensionContext(context),
     );
 
@@ -429,6 +453,12 @@ describe.todo("handleSessionSeries", () => {
       {
         setSessionName,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        appendEntry() {
+          return;
+        },
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
       },
       castToExtensionContext(context),
     );
@@ -484,6 +514,9 @@ describe.todo("handleSessionSeries", () => {
         setSessionName,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
         getSessionEntryWithSeries,
+        appendEntry() {
+          return;
+        },
       },
       castToExtensionContext(context),
     );
