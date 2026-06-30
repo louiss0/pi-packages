@@ -321,6 +321,7 @@ describe("handleSessionDeleteLast", () => {
 describe("handleSessionSeries", () => {
   it("creates a session series when create is passed", async () => {
     const context = {
+      cwd: "/pi-packages",
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
         options?.withSession?.({} as never);
         return { cancelled: false };
@@ -615,7 +616,7 @@ describe("handleSessionSeries", () => {
         series: "refactor-auth-middleware",
         createdAt: new Date().toISOString(),
       },
-    } as const as SessionSeriesEntry;
+    } as SessionSeriesEntry;
 
     getSessionEntryWithSeries.mockReturnValue(seriesEntry);
 
