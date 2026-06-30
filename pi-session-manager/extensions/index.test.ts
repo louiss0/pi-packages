@@ -383,7 +383,9 @@ describe("handleSessionSeries", () => {
       sessionSeriesEntrySchema.entries.customType.literal,
       {
         series,
-        createdAt: expect.any(String),
+        createdAt: expect.schemaMatching(
+          sessionSeriesEntrySchema.entries.data.entries.createdAt,
+        ),
       },
     );
     expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series);
@@ -647,12 +649,7 @@ describe("handleSessionSeries", () => {
 
     const entry = getSessionEntryWithSeries.mock.results[0]?.value as SessionSeriesEntry;
 
-    expect(entry).toEqual(
-      expect.objectContaining({
-        type: "custom",
-        customType: sessionSeriesEntrySchema.entries.customType.literal,
-      }),
-    );
+    expect(entry).toEqual(expect.schemaMatching(sessionSeriesEntrySchema));
 
     expect(context.ui.input).toHaveBeenCalledWith(
       `What's the new title for the session in series ${entry.data.series}`,

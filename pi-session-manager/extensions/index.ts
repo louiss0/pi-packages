@@ -16,6 +16,7 @@ import {
   type InferOutput,
   integer,
   isoDateTime,
+  isoTimestamp,
   literal,
   number,
   object,
@@ -71,7 +72,7 @@ export const sessionSeriesEntrySchema = object({
   customType: literal("session-manager/series"),
   data: object({
     series: string(),
-    createdAt: pipe(string(), isoDateTime()),
+    createdAt: pipe(string(), isoTimestamp()),
   }),
 });
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
