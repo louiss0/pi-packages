@@ -5,18 +5,23 @@ import {
   type SessionEntry,
   type SessionInfo,
   SessionManager,
+  getAgentDir,
 } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
-import { existsSync, readFileSync, rmSync } from "fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import {
+  array,
   digits,
   type InferOutput,
+  integer,
   isoDateTime,
   literal,
+  number,
   object,
   picklist,
   pipe,
+  record,
   regex,
   safeParse,
   string,
@@ -25,7 +30,6 @@ import {
   union,
 } from "valibot";
 
-const CONFIG_DIR_NAME = ".pi";
 const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
 const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
 const durationRecordSchema = union(
@@ -73,124 +77,37 @@ export const sessionSeriesEntrySchema = object({
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
   InferOutput<typeof sessionSeriesEntrySchema>;
 
-export abstract class $TimestampCalculator {
-  readonly now = Date.now();
-  readonly HOUR_IN_MS = 60 ** 2 * 1000;
-  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
-  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
-
-  abstract hour(number: number): number;
-  abstract day(number: number): number;
-  abstract week(number: number): number;
-}
-
-class TimestampCalculator extends $TimestampCalculator {
-  hour(number: number) {
-    return this.now - number * this.HOUR_IN_MS;
-  }
-
-  day(number: number) {
-    return this.now - number * this.DAY_IN_MS;
-  }
-
-  week(number: number) {
-    return this.now - number * this.WEEK_IN_MS;
-  }
-}
-
-export interface $SessionFilter {
-  readonly sessions: Array<SessionInfo>;
-  getSessionsBasedOnDurationIntegerAndUnit(
-    integer: DurationRecord["integer"],
-    durationUnit: DurationRecord["unit"],
-  ): Array<SessionInfo>;
-  getSessionsBasedOnPredeterminedTimestamp(): Array<SessionInfo>;
-  getSessionsThatAreTheLastNth(number: number): Array<SessionInfo>;
-  getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo>;
-}
-
-class SessionFilter implements $SessionFilter {
-  readonly sessions: Array<SessionInfo>;
-
-  readonly #timestampCalculator: $TimestampCalculator;
-
-  constructor(sessions: Array<SessionInfo>, timestampCalculator: $TimestampCalculator) {
-    this.sessions = sessions;
-    this.#timestampCalculator = timestampCalculator;
-  }
-
-  getSessionsBasedOnDurationIntegerAndUnit(
-    integer: DurationRecord["integer"],
-    durationUnit: DurationRecord["unit"],
-  ) {
-    return this.sessions.filter((session) => {
-      switch (durationUnit) {
-        case "hours":
-        case "h":
-          return session.modified.getTime() < this.#timestampCalculator.hour(integer);
-        case "days":
-        case "d":
-          return session.modified.getTime() < this.#timestampCalculator.day(integer);
-        case "weeks":
-        case "w":
-          return session.modified.getTime() < this.#timestampCalculator.week(integer);
-      }
-    });
-  }
-
-  getSessionsBasedOnPredeterminedTimestamp() {
-    return this.sessions.filter(
-      (session) => session.modified.getTime() < this.#timestampCalculator.day(3),
-    );
-  }
-
-  getSessionsThatAreTheLastNth(number: number) {
-    return this.sessions.slice(-number);
-  }
-
-  getSessionsThatHaveTheTitleAsAPrefix(title: string) {
-    return this.sessions.filter((session) =>
-      session.name?.startsWith(`${title}${SESION_TITLE_SEPARATOR}`),
-    );
-  }
-}
-
-type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
-
-function removeSessionFiles(sessions: Array<SessionInfo>) {
-  for (const session of sessions) {
-    rmSync(session.path);
-  }
-}
-
-export type RemoveSessionFiles = typeof removeSessionFiles;
-
-function getSessionSeriesTitles(cwd?: string) {
-  const configPath = join(
-    cwd ?? process.cwd(),
-    CONFIG_DIR_NAME,
-    "pi-session-manager.config.json",
-  );
-
-  if (!existsSync(configPath)) {
-    return [] as string[];
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(configPath, "utf8"));
-
-    if (Array.isArray(parsed) && parsed.every((title) => typeof title === "string")) {
-      return parsed;
-    }
-  } catch {
-    return [] as string[];
-  }
-
-  return [] as string[];
-}
-
 export default function (pi: ExtensionAPI) {
   const commandRoot = "session";
+
+  let sessionManagerConfigurator: SessionManagerConfigurator;
+
+  pi.on("session_start", async (_, ctx) => {
+    sessionManagerConfigurator = new SessionManagerConfigurator();
+
+    const dayLimitResult = sessionManagerConfigurator.getSessionDeletionDayLimit();
+
+    if (dayLimitResult instanceof SessionConfigError) {
+      ctx.ui.notify(dayLimitResult.message, "error");
+      return;
+    }
+
+    const sessions = await SessionManager.list(ctx.cwd);
+    const sessionFilter = new SessionFilter(sessions, new TimestampCalculator());
+
+    const unmodifiedSessionsFromThePastNthDays =
+      sessionFilter.getSessionsBasedOnDayLimit(dayLimitResult);
+
+    if (unmodifiedSessionsFromThePastNthDays.length === 0) {
+      return;
+    }
+
+    removeSessionFiles(unmodifiedSessionsFromThePastNthDays);
+    ctx.ui.notify(
+      `Removed ${unmodifiedSessionsFromThePastNthDays.length} inactive session(s).`,
+      "info",
+    );
+  });
 
   pi.registerCommand(`${commandRoot}:clean:inactive`, {
     handler: async (_, ctx) => {
@@ -200,6 +117,7 @@ export default function (pi: ExtensionAPI) {
       handleSessionCleanInactive(
         {
           sessionFilter,
+          sessionManagerConfigurator,
           removeSessionFiles,
         },
         ctx,
@@ -287,6 +205,7 @@ export default function (pi: ExtensionAPI) {
         result.output,
         {
           setSessionName: pi.setSessionName,
+          sessionManagerConfigurator: new SessionManagerConfigurator(),
           sessionFilter: new SessionFilter(sessions, new TimestampCalculator()),
           getSessionEntryWithSeries,
           appendEntry: pi.appendEntry,
@@ -296,6 +215,248 @@ export default function (pi: ExtensionAPI) {
       );
     },
   });
+}
+
+export abstract class $TimestampCalculator {
+  readonly now = Date.now();
+  readonly HOUR_IN_MS = 60 ** 2 * 1000;
+  readonly DAY_IN_MS = 24 * this.HOUR_IN_MS;
+  readonly WEEK_IN_MS = 7 * this.DAY_IN_MS;
+
+  abstract hour(number: number): number;
+  abstract day(number: number): number;
+  abstract week(number: number): number;
+}
+
+class TimestampCalculator extends $TimestampCalculator {
+  hour(number: number) {
+    return this.now - number * this.HOUR_IN_MS;
+  }
+
+  day(number: number) {
+    return this.now - number * this.DAY_IN_MS;
+  }
+
+  week(number: number) {
+    return this.now - number * this.WEEK_IN_MS;
+  }
+}
+
+export interface $SessionFilter {
+  readonly sessions: Array<SessionInfo>;
+  getSessionsBasedOnDurationIntegerAndUnit(
+    integer: DurationRecord["integer"],
+    durationUnit: DurationRecord["unit"],
+  ): Array<SessionInfo>;
+  getSessionsBasedOnDayLimit(dayLimit: number): Array<SessionInfo>;
+  getSessionsThatAreTheLastNth(number: number): Array<SessionInfo>;
+  getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo>;
+}
+
+class SessionFilter implements $SessionFilter {
+  readonly sessions: Array<SessionInfo>;
+
+  readonly #timestampCalculator: $TimestampCalculator;
+
+  constructor(sessions: Array<SessionInfo>, timestampCalculator: $TimestampCalculator) {
+    this.sessions = sessions;
+    this.#timestampCalculator = timestampCalculator;
+  }
+
+  getSessionsBasedOnDurationIntegerAndUnit(
+    integer: DurationRecord["integer"],
+    durationUnit: DurationRecord["unit"],
+  ) {
+    return this.sessions.filter((session) => {
+      switch (durationUnit) {
+        case "hours":
+        case "h":
+          return session.modified.getTime() < this.#timestampCalculator.hour(integer);
+        case "days":
+        case "d":
+          return session.modified.getTime() < this.#timestampCalculator.day(integer);
+        case "weeks":
+        case "w":
+          return session.modified.getTime() < this.#timestampCalculator.week(integer);
+      }
+    });
+  }
+
+  getSessionsBasedOnDayLimit(dayLimit: number) {
+    return this.sessions.filter(
+      (session) => session.modified.getTime() < this.#timestampCalculator.day(dayLimit),
+    );
+  }
+
+  getSessionsThatAreTheLastNth(number: number) {
+    return this.sessions.slice(-number);
+  }
+
+  getSessionsThatHaveTheTitleAsAPrefix(title: string) {
+    return this.sessions.filter((session) =>
+      session.name?.startsWith(`${title}${SESION_TITLE_SEPARATOR}`),
+    );
+  }
+}
+
+type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
+
+function removeSessionFiles(sessions: Array<SessionInfo>) {
+  for (const session of sessions) {
+    rmSync(session.path);
+  }
+}
+
+export type RemoveSessionFiles = typeof removeSessionFiles;
+
+export const sessionManagerConfigSchema = object({
+  sessionDeletionDayLimit: pipe(number(), integer()),
+  seriesRecord: record(string(), array(string())),
+});
+
+export type SessionManagerConfig = InferOutput<typeof sessionManagerConfigSchema>;
+
+export interface $SessionManagerConfigurator {
+  configureSessionDeletionDayLimit(days: number): void;
+  getSessionTitlesForCwd(cwd: string): string[] | SessionConfigError;
+  appendSessionSeriesBasedOnCwd(cwd: string, series: string): void;
+  deleteSessionSeriesBasedOnCwd(cwd: string, series: string): void;
+  getSessionDeletionDayLimit(): number | SessionConfigError;
+  generateInitialConfig(cwd: string): void;
+}
+
+export class SessionConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SessionConfigError";
+  }
+}
+
+class SessionManagerConfigurator implements $SessionManagerConfigurator {
+  #agentDir = getAgentDir();
+
+  #configName = "pi-session-manager.config.json";
+
+  #defaultSessionDeletionDayLimit = 3;
+
+  readonly #configPath = join(this.#agentDir, this.#configName);
+
+  generateInitialConfig(cwd: string): void {
+    const config = {
+      sessionDeletionDayLimit: this.#defaultSessionDeletionDayLimit,
+      seriesRecord: {
+        [cwd]: [],
+      },
+    } satisfies SessionManagerConfig;
+
+    writeFileSync(this.#configPath, JSON.stringify(config), {
+      encoding: "utf-8",
+    });
+  }
+
+  #readConfig() {
+    try {
+      const config = readFileSync(this.#configPath, {
+        encoding: "utf-8",
+      });
+
+      const parsed = JSON.parse(config);
+
+      return safeParse(sessionManagerConfigSchema, parsed);
+    } catch (e) {
+      if (e instanceof Error) {
+        return new SessionConfigError(e.message);
+      }
+
+      return new SessionConfigError(e as string);
+    }
+  }
+
+  deleteSessionSeriesBasedOnCwd(cwd: string, title: string): void {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return;
+    }
+
+    if (!result.success) {
+      return;
+    }
+
+    const { seriesRecord } = result.output;
+
+    if (!seriesRecord[cwd]) {
+      return;
+    }
+
+    seriesRecord[cwd] = seriesRecord[cwd].filter((t) => t !== title);
+
+    writeFileSync(this.#configPath, JSON.stringify({ ...result.output, seriesRecord }));
+  }
+
+  getSessionDeletionDayLimit() {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return result;
+    }
+
+    if (!result.success) {
+      return new SessionConfigError(summarize(result.issues));
+    }
+
+    return result.output.sessionDeletionDayLimit;
+  }
+
+  getSessionTitlesForCwd(cwd: string) {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return result;
+    }
+
+    if (!result.success) {
+      return new SessionConfigError(summarize(result.issues));
+    }
+
+    return result.output.seriesRecord[cwd] ?? [];
+  }
+
+  configureSessionDeletionDayLimit(days: number): void {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return;
+    }
+
+    if (!result.success) {
+      return;
+    }
+
+    result.output.sessionDeletionDayLimit = days;
+
+    writeFileSync(this.#configPath, JSON.stringify(result.output), {
+      encoding: "utf-8",
+    });
+  }
+
+  appendSessionSeriesBasedOnCwd(cwd: string, title: string): void {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return;
+    }
+
+    if (!result.success) {
+      return;
+    }
+
+    result.output.seriesRecord[cwd] = (result.output.seriesRecord[cwd] ?? []).concat(title);
+
+    writeFileSync(this.#configPath, JSON.stringify(result.output), {
+      encoding: "utf-8",
+    });
+  }
 }
 
 function getSessionEntryWithSeries(
@@ -313,6 +474,7 @@ export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
 export function handleSessionCleanInactive(
   deps: {
     sessionFilter: $SessionFilter;
+    sessionManagerConfigurator: SessionManagerConfigurator;
     removeSessionFiles: RemoveSessionFiles;
   },
   ctx: ExtensionContext,
@@ -321,7 +483,14 @@ export function handleSessionCleanInactive(
     "Getting rid of all sessions that have been inactive for three days",
     "warning",
   );
-  deps.removeSessionFiles(deps.sessionFilter.getSessionsBasedOnPredeterminedTimestamp());
+  const dayLimit = deps.sessionManagerConfigurator.getSessionDeletionDayLimit();
+
+  if (dayLimit instanceof SessionConfigError) {
+    ctx.ui.notify(dayLimit.message, "error");
+    return;
+  }
+
+  deps.removeSessionFiles(deps.sessionFilter.getSessionsBasedOnDayLimit(dayLimit));
 }
 
 export function handleSessionCleanOlderThan(
@@ -354,6 +523,7 @@ export async function handleSessionSeries(
   command: SessionSeriesCommand,
   deps: {
     setSessionName: ExtensionAPI["setSessionName"];
+    sessionManagerConfigurator: SessionManagerConfigurator;
     sessionFilter: $SessionFilter;
     getSessionEntryWithSeries: GetSessionEntryWithSeries;
     appendEntry: ExtensionAPI["appendEntry"];
@@ -385,6 +555,7 @@ export async function handleSessionSeries(
             series,
             createdAt: new Date().toISOString(),
           });
+          deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(ctx.cwd, series);
         },
       });
 
@@ -393,9 +564,16 @@ export async function handleSessionSeries(
     }
 
     case "delete": {
+      const result = deps.sessionManagerConfigurator.getSessionTitlesForCwd(ctx.cwd);
+
+      if (result instanceof SessionConfigError) {
+        ctx.ui.notify(result.message, "error");
+        return;
+      }
+
       const series = await ctx.ui.select(
         "Which session series would you like to delete?",
-        getSessionSeriesTitles(ctx.cwd),
+        result,
       );
 
       if (!series) {
@@ -403,15 +581,23 @@ export async function handleSessionSeries(
       }
 
       deps.removeSessionFiles(deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series));
+      deps.sessionManagerConfigurator.deleteSessionSeriesBasedOnCwd(ctx.cwd, series);
       ctx.ui.notify(`This series ${series} and it's related sessions`);
       return;
     }
 
     case "new": {
+      const result = deps.sessionManagerConfigurator.getSessionTitlesForCwd(ctx.cwd);
+      if (result instanceof SessionConfigError) {
+        ctx.ui.notify(result.message, "error");
+        return;
+      }
+
       const series = await ctx.ui.select(
         "Which session series would you like to create a new session in?",
-        getSessionSeriesTitles(ctx.cwd),
+        result,
       );
+
       const title = await ctx.ui.input(
         "What is the name of the this new session?",
         "What do you want your agent to do now?",
