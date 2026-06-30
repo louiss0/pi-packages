@@ -15,12 +15,16 @@ import {
   type DurationRecord,
   type RemoveSessionFiles,
   SESION_TITLE_SEPARATOR,
+  type GetSessionEntryWithSeries,
+  sessionSeriesEntrySchema,
 } from ".";
+import { parse } from "valibot";
 
 type MockExtenstionCommandContext =
   | Partial<ExtensionCommandContext>
   | {
-      ui: Partial<ExtensionUIContext>;
+      ui?: Partial<ExtensionUIContext>;
+      sessionManager?: Partial<ExtensionContext["sessionManager"]>;
     };
 
 class MockPastTimestampCalculator extends $TimestampCalculator {
@@ -448,6 +452,65 @@ describe.todo("handleSessionSeries", () => {
 
     expect(context.ui.notify).toHaveBeenCalledWith(
       `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}
+      with ${context.ui.input.mock.settledResults[0]?.value}
+      `,
+    );
+  });
+
+  it("continues a session in a series when continue is passed", async () => {
+    const context = {
+      sessionManager: {
+        getEntries: vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+      },
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+        options?.withSession?.({} as never);
+        return { cancelled: false };
+      }),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue("Make coverage for Processor full"),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    const getSessionEntryWithSeries = vi.fn<GetSessionEntryWithSeries>();
+
+    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+
+    handleSessionSeries(
+      "continue",
+      {
+        setSessionName,
+        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        getSessionEntryWithSeries,
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(context.sessionManager.getEntries).toHaveBeenCalled();
+
+    expect(getSessionEntryWithSeries).toHaveBeenCalledWith(
+      context.sessionManager.getEntries.mock.results[0]?.value,
+    );
+
+    const entry = getSessionEntryWithSeries.mock.results[0]?.value;
+
+    expect(parse(sessionSeriesEntrySchema, entry)).not.toThrow();
+
+    expect(context.ui.input).toHaveBeenCalledWith(
+      `What's the new title for the session in series ${entry.data.series}`,
+    );
+
+    expect(context.newSession).toHaveBeenCalledWith({
+      withSession: expect.any(Function),
+    });
+
+    const sessionSeriesAndTitle = `${entry.data.series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
+    expect(setSessionName).toHaveBeenCalledWith(sessionSeriesAndTitle);
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `You have created a new session in ${entry.data.series}
       with ${context.ui.input.mock.settledResults[0]?.value}
       `,
     );

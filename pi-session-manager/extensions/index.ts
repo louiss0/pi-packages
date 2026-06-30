@@ -1,6 +1,8 @@
 import {
+  type CustomEntry,
   type ExtensionAPI,
   type ExtensionContext,
+  type SessionEntry,
   type SessionInfo,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
@@ -9,6 +11,10 @@ import { rmSync } from "fs";
 import {
   digits,
   type InferOutput,
+  isoDateTime,
+  literal,
+  nullable,
+  object,
   picklist,
   pipe,
   regex,
@@ -19,9 +25,6 @@ import {
   union,
 } from "valibot";
 
-export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new"]);
-
-type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
 const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
 const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
 const durationRecordSchema = union(
@@ -185,11 +188,35 @@ export function handleSessionDeleteLast(
   ctx: ExtensionContext,
 ) {}
 
+export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
+
+type SessionSeriesCommand = InferOutput<typeof sessionSeriesCommandsSchema>;
+
+export const sessionSeriesEntrySchema = object({
+  type: literal("custom"),
+  customType: literal("session-manager/series"),
+  data: object({
+    series: string(),
+    createdAt: pipe(string(), isoDateTime()),
+  }),
+});
+
+function getSessionEntryWithSeries(sesssionEntries: SessionEntry[]) {
+  return sesssionEntries.find(
+    (entry) =>
+      entry.type === sessionSeriesEntry.entries.type.literal &&
+      entry.customType === sessionSeriesEntry.entries.customType.literal,
+  );
+}
+
+export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
+
 export function handleSessionSeries(
   command: SessionSeriesCommand,
   deps: {
     setSessionName: ExtensionAPI["setSessionName"];
     sessionFilter: $SessionFilter;
+    getSessionEntryWithSeries?: GetSessionEntryWithSeries;
   },
   ctx: ExtensionContext,
 ) {
@@ -201,6 +228,9 @@ export function handleSessionSeries(
       break;
 
     case "delete":
+      break;
+
+    case "continue":
       break;
 
     default: {
