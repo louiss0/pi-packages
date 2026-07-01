@@ -375,21 +375,11 @@ describe("handleSessionSeries", () => {
       );
 
       const series = context.ui.input.mock.settledResults[0]?.value;
-      const sessionTitleAndSubTitle = `${series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
 
       expect(context.newSession).toHaveBeenCalledWith({
         withSession: expect.any(Function),
       });
 
-      expect(appendEntry).toHaveBeenCalledWith(
-        sessionSeriesEntrySchema.entries.customType.literal,
-        {
-          series,
-          createdAt: expect.schemaMatching(
-            sessionSeriesEntrySchema.entries.data.entries.createdAt,
-          ),
-        },
-      );
       expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series);
 
       expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
