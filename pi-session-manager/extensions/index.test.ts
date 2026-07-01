@@ -99,6 +99,11 @@ class MockSessionFilter implements $SessionFilter {
         case "weeks":
         case "w":
           return session.modified.getTime() < this.#timestampCalculator.week(integer);
+        default: {
+          const exhausted: never = durationUnit;
+
+          return exhausted;
+        }
       }
     });
   }
