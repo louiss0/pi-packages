@@ -698,13 +698,13 @@ export async function handleSessionSeries(
         (value) => `This series has already been added ${value}`,
       );
 
-      const titleResult = deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
+      const titlesResult = deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
         ctx.cwd,
         series,
       );
 
-      if (titleResult instanceof SessionConfigError) {
-        ctx.ui.notify(titleResult.message, "error");
+      if (titlesResult instanceof SessionConfigError) {
+        ctx.ui.notify(titlesResult.message, "error");
         return;
       }
 
@@ -712,7 +712,7 @@ export async function handleSessionSeries(
         ctx,
         "What is the name of the new session you want to make in this one?",
         "What task is a part of what you are focusing on?",
-        titleResult,
+        titlesResult,
         (value) => `This title has already been added ${value}`,
       );
 
@@ -739,7 +739,7 @@ export async function handleSessionSeries(
         },
       });
 
-      return sessionData;
+      break;
     }
 
     case "delete": {
@@ -827,7 +827,7 @@ export async function handleSessionSeries(
         },
       });
 
-      return sessionData;
+      break;
     }
 
     case "continue": {
@@ -839,7 +839,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      const titleResult = getSessionTitlesForSeriesFromSessions(
+      const titlesResult = getSessionTitlesForSeriesFromSessions(
         deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(entry.data.series),
         entry.data.series,
       );
@@ -848,7 +848,7 @@ export async function handleSessionSeries(
         ctx,
         `What's the new title for the session in series ${entry.data.series}`,
         undefined,
-        titleResult,
+        titlesResult,
         (value) => `This title has already been added ${value}`,
       );
 
@@ -877,7 +877,7 @@ export async function handleSessionSeries(
         },
       });
 
-      return sessionData;
+      break;
     }
 
     default: {
