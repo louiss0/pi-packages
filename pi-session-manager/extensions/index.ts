@@ -13,7 +13,6 @@ import {
   array,
   checkItems,
   digits,
-  guard,
   type InferOutput,
   integer,
   isoTimestamp,
@@ -305,8 +304,12 @@ export type SessionManagerConfig = InferOutput<typeof sessionManagerConfigSchema
 
 export interface $SessionManagerConfigurator {
   configureSessionDeletionDayLimit(days: number): void;
-  getSessionTitlesForCwd(cwd: string): string[] | SessionConfigError;
-  appendSessionSeriesBasedOnCwd(cwd: string, series: string): void;
+  getSessionSeriesForCwd(cwd: string): string[] | SessionConfigError;
+  getSessionTitlesForSeriesBasedOnCwd(
+    cwd: string,
+    series: string,
+  ): string[] | SessionConfigError;
+  appendSessionSeriesBasedOnCwd(cwd: string, series: string, title: string): void;
   deleteSessionSeriesBasedOnCwd(cwd: string, series: string): void;
   getSessionDeletionDayLimit(): number | SessionConfigError;
   generateInitialConfig(cwd: string): void;
@@ -359,7 +362,7 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     }
   }
 
-  deleteSessionSeriesBasedOnCwd(cwd: string, title: string): void {
+  deleteSessionSeriesBasedOnCwd(cwd: string, series: string): void {
     const result = this.#readConfig();
 
     if (result instanceof SessionConfigError) {
@@ -371,12 +374,13 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     }
 
     const { seriesRecord } = result.output;
+    const cwdSeriesRecord = seriesRecord[cwd];
 
-    if (!seriesRecord[cwd]) {
+    if (!cwdSeriesRecord) {
       return;
     }
 
-    seriesRecord[cwd] = seriesRecord[cwd].filter((t) => t !== title);
+    delete cwdSeriesRecord[series.trim()];
 
     writeFileSync(this.#configPath, JSON.stringify({ ...result.output, seriesRecord }));
   }
@@ -395,7 +399,7 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     return result.output.sessionDeletionDayLimit;
   }
 
-  getSessionTitlesForCwd(cwd: string) {
+  getSessionSeriesForCwd(cwd: string) {
     const result = this.#readConfig();
 
     if (result instanceof SessionConfigError) {
@@ -406,7 +410,21 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
       return new SessionConfigError(summarize(result.issues));
     }
 
-    return result.output.seriesRecord[cwd] ?? [];
+    return Object.keys(result.output.seriesRecord[cwd] ?? {});
+  }
+
+  getSessionTitlesForSeriesBasedOnCwd(cwd: string, series: string) {
+    const result = this.#readConfig();
+
+    if (result instanceof SessionConfigError) {
+      return result;
+    }
+
+    if (!result.success) {
+      return new SessionConfigError(summarize(result.issues));
+    }
+
+    return result.output.seriesRecord[cwd]?.[series.trim()] ?? [];
   }
 
   configureSessionDeletionDayLimit(days: number): void {
@@ -427,7 +445,7 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     });
   }
 
-  appendSessionSeriesBasedOnCwd(cwd: string, title: string): void {
+  appendSessionSeriesBasedOnCwd(cwd: string, series: string, title: string): void {
     const result = this.#readConfig();
 
     if (result instanceof SessionConfigError) {
@@ -438,7 +456,16 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
       return;
     }
 
-    result.output.seriesRecord[cwd] = (result.output.seriesRecord[cwd] ?? []).concat(title);
+    const normalizedSeries = series.trim();
+    const normalizedTitle = title.trim();
+    const cwdSeriesRecord = result.output.seriesRecord[cwd] ?? {};
+    const titles = cwdSeriesRecord[normalizedSeries] ?? [];
+
+    if (!titles.some((existingTitle) => existingTitle.trim() === normalizedTitle)) {
+      cwdSeriesRecord[normalizedSeries] = titles.concat(normalizedTitle);
+    }
+
+    result.output.seriesRecord[cwd] = cwdSeriesRecord;
 
     writeFileSync(this.#configPath, JSON.stringify(result.output), {
       encoding: "utf-8",
@@ -557,6 +584,42 @@ export const sessionSeriesEntrySchema = object({
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
   InferOutput<typeof sessionSeriesEntrySchema>;
 
+function promptForUniqueTrimmedInput(
+  ctx: ExtensionCommandContext,
+  prompt: string,
+  description: string | undefined,
+  existingValues: string[],
+  duplicateMessage: (value: string) => string,
+) {
+  return (async () => {
+    while (true) {
+      const value = await ctx.ui.input(prompt, description);
+      const trimmedValue = value?.trim();
+
+      if (!trimmedValue) {
+        continue;
+      }
+
+      if (existingValues.some((existingValue) => existingValue.trim() === trimmedValue)) {
+        ctx.ui.notify(duplicateMessage(trimmedValue), "warning");
+        continue;
+      }
+
+      return trimmedValue;
+    }
+  })();
+}
+
+function getSessionTitlesForSeriesFromSessions(sessions: SessionInfo[], series: string) {
+  const prefix = `${series.trim()}${SESION_TITLE_SEPARATOR}`;
+
+  return sessions
+    .map((session) => session.name?.trim())
+    .filter((name): name is string => Boolean(name?.startsWith(prefix)))
+    .map((name) => name.slice(prefix.length).trim())
+    .filter((title) => title.length > 0);
+}
+
 export async function handleSessionSeries(
   command: SessionSeriesCommand,
   deps: {
@@ -569,22 +632,46 @@ export async function handleSessionSeries(
 ) {
   switch (command) {
     case "create": {
-      const series = await ctx.ui.input(
-        "What is the name of your session series?",
-        "What are you focused on?",
-      );
-      const title = await ctx.ui.input(
-        "What is the name of the new session you want to make in this one?",
-        "What task is a part of what you are focusing on?",
-      );
+      const seriesResult = deps.sessionManagerConfigurator.getSessionSeriesForCwd(ctx.cwd);
 
-      if (!series || !title) {
+      if (seriesResult instanceof SessionConfigError) {
+        ctx.ui.notify(seriesResult.message, "error");
         return;
       }
 
+      const series = await promptForUniqueTrimmedInput(
+        ctx,
+        "What is the name of your session series?",
+        "What are you focused on?",
+        seriesResult,
+        (value) => `This series has already been added ${value}`,
+      );
+
+      const titleResult = deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
+        ctx.cwd,
+        series,
+      );
+
+      if (titleResult instanceof SessionConfigError) {
+        ctx.ui.notify(titleResult.message, "error");
+        return;
+      }
+
+      const title = await promptForUniqueTrimmedInput(
+        ctx,
+        "What is the name of the new session you want to make in this one?",
+        "What task is a part of what you are focusing on?",
+        titleResult,
+        (value) => `This title has already been added ${value}`,
+      );
+
       await ctx.newSession({
-        withSession: async (ctx) => {
-          deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(ctx.cwd, series);
+        withSession: async () => {
+          deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
+            ctx.cwd,
+            series,
+            title,
+          );
 
           ctx.ui.notify("Your session series has been created");
         },
@@ -601,7 +688,7 @@ export async function handleSessionSeries(
     }
 
     case "delete": {
-      const result = deps.sessionManagerConfigurator.getSessionTitlesForCwd(ctx.cwd);
+      const result = deps.sessionManagerConfigurator.getSessionSeriesForCwd(ctx.cwd);
 
       if (result instanceof SessionConfigError) {
         ctx.ui.notify(result.message, "error");
@@ -617,14 +704,17 @@ export async function handleSessionSeries(
         return;
       }
 
-      deps.removeSessionFiles(deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series));
+      deps.removeSessionFiles(
+        deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(series.trim()),
+      );
       deps.sessionManagerConfigurator.deleteSessionSeriesBasedOnCwd(ctx.cwd, series);
       ctx.ui.notify(`This series ${series} and it's related sessions`);
       return;
     }
 
     case "new": {
-      const result = deps.sessionManagerConfigurator.getSessionTitlesForCwd(ctx.cwd);
+      const result = deps.sessionManagerConfigurator.getSessionSeriesForCwd(ctx.cwd);
+
       if (result instanceof SessionConfigError) {
         ctx.ui.notify(result.message, "error");
         return;
@@ -635,17 +725,36 @@ export async function handleSessionSeries(
         result,
       );
 
-      const title = await ctx.ui.input(
-        "What is the name of the this new session?",
-        "What do you want your agent to do now?",
-      );
-
-      if (!series || !title) {
+      if (!series) {
         return;
       }
 
+      const titleResult = deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
+        ctx.cwd,
+        series,
+      );
+
+      if (titleResult instanceof SessionConfigError) {
+        ctx.ui.notify(titleResult.message, "error");
+        return;
+      }
+
+      const title = await promptForUniqueTrimmedInput(
+        ctx,
+        "What is the name of the this new session?",
+        "What do you want your agent to do now?",
+        titleResult,
+        (value) => `This title has already been added ${value}`,
+      );
+
       await ctx.newSession({
-        withSession: async (ctx) => {
+        withSession: async () => {
+          deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
+            ctx.cwd,
+            series,
+            title,
+          );
+
           ctx.ui.notify(`You have created a new session in ${series}
           with ${title}
           `);
@@ -671,16 +780,27 @@ export async function handleSessionSeries(
         return;
       }
 
-      const title = await ctx.ui.input(
-        `What's the new title for the session in series ${entry.data.series}`,
+      const titleResult = getSessionTitlesForSeriesFromSessions(
+        deps.sessionFilter.getSessionsThatHaveTheTitleAsAPrefix(entry.data.series),
+        entry.data.series,
       );
 
-      if (!title) {
-        return;
-      }
+      const title = await promptForUniqueTrimmedInput(
+        ctx,
+        `What's the new title for the session in series ${entry.data.series}`,
+        undefined,
+        titleResult,
+        (value) => `This title has already been added ${value}`,
+      );
 
       await ctx.newSession({
-        withSession: async (ctx) => {
+        withSession: async () => {
+          deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
+            ctx.cwd,
+            entry.data.series,
+            title,
+          );
+
           ctx.ui.notify(`You have created a new session in ${entry.data.series}
       with ${title}
       `);

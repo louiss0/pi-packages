@@ -1,5 +1,4 @@
 import type {
-  ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
   ExtensionUIContext,
@@ -149,14 +148,27 @@ class SessionManagerConfiguratorMock implements $SessionManagerConfigurator {
     };
   }
 
-  appendSessionSeriesBasedOnCwd(cwd: string, series: string): void {
-    this.#config.seriesRecord[cwd] = (this.#config.seriesRecord[cwd] ?? []).concat(series);
+  appendSessionSeriesBasedOnCwd(cwd: string, series: string, title: string): void {
+    const normalizedSeries = series.trim();
+    const normalizedTitle = title.trim();
+    const cwdSeriesRecord = this.#config.seriesRecord[cwd] ?? {};
+    const titles = cwdSeriesRecord[normalizedSeries] ?? [];
+
+    if (!titles.some((existingTitle) => existingTitle.trim() === normalizedTitle)) {
+      cwdSeriesRecord[normalizedSeries] = titles.concat(normalizedTitle);
+    }
+
+    this.#config.seriesRecord[cwd] = cwdSeriesRecord;
   }
 
   deleteSessionSeriesBasedOnCwd(cwd: string, series: string): void {
-    this.#config.seriesRecord[cwd] = (this.#config.seriesRecord[cwd] ?? []).filter(
-      (s) => s !== series,
-    );
+    const cwdSeriesRecord = this.#config.seriesRecord[cwd];
+
+    if (!cwdSeriesRecord) {
+      return;
+    }
+
+    delete cwdSeriesRecord[series.trim()];
   }
 
   configureSessionDeletionDayLimit(days: number): void {
@@ -172,15 +184,17 @@ class SessionManagerConfiguratorMock implements $SessionManagerConfigurator {
   }
 
   generateInitialConfig(cwd: string): void {
-    this.#config.seriesRecord[cwd] = [];
+    this.#config.seriesRecord[cwd] = {};
   }
 
-  getSessionTitlesForCwd(cwd: string): string[] | SessionConfigError {
-    if (!this.#config.seriesRecord[cwd]) {
-      return new SessionConfigError("no series found for cwd");
-    }
+  getSessionSeriesForCwd(cwd: string): string[] | SessionConfigError {
+    return Object.keys(this.#config.seriesRecord[cwd] ?? {});
+  }
 
-    return this.#config.seriesRecord[cwd];
+  getSessionTitlesForSeriesBasedOnCwd(cwd: string, series: string): string[] | SessionConfigError {
+    const cwdSeriesRecord = this.#config.seriesRecord[cwd] ?? {};
+
+    return cwdSeriesRecord[series.trim()] ?? [];
   }
 }
 
@@ -378,18 +392,19 @@ describe("handleSessionSeries", () => {
       );
 
       const series = context.ui.input.mock.settledResults[0]?.value;
+      const title = context.ui.input.mock.settledResults[1]?.value;
 
       expect(context.newSession).toHaveBeenCalledWith({
         withSession: expect.any(Function),
       });
 
-      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series);
+      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series, title);
 
       expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
     });
 
     const seriesInput = "Implement Auth";
-    it("notifies the user that a session series is already created if it exists and asks again", async () => {
+    it("keeps asking for a unique trimmed session series when creating", async () => {
       const context = {
         cwd: "/pi-packages",
         newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
@@ -398,19 +413,29 @@ describe("handleSessionSeries", () => {
         }),
         ui: {
           notify: vi.fn<ExtensionUIContext["notify"]>(),
-          input: vi.fn<ExtensionUIContext["input"]>().mockResolvedValue(seriesInput),
+          input: vi
+            .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValueOnce("  Implement Auth  ")
+            .mockResolvedValueOnce("  Implement Billing  ")
+            .mockResolvedValueOnce("  Create JWT Token  "),
         },
       } satisfies MockExtenstionCommandContext;
 
       const sessionManagerConfigurator = new SessionManagerConfiguratorMock({
         seriesRecord: {
-          [context.cwd]: [seriesInput],
+          [context.cwd]: {
+            [seriesInput]: ["Existing title"],
+          },
         },
       });
 
-      const getSessionTitlesForCwd = vi.spyOn(
+      const getSessionSeriesForCwdSpy = vi.spyOn(
         sessionManagerConfigurator,
-        "getSessionTitlesForCwd",
+        "getSessionSeriesForCwd",
+      );
+      const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
+        sessionManagerConfigurator,
+        "appendSessionSeriesBasedOnCwd",
       );
 
       await handleSessionSeries(
@@ -433,13 +458,20 @@ describe("handleSessionSeries", () => {
         "What are you focused on?",
       );
 
-      expect(getSessionTitlesForCwd).toHaveBeenCalledWith(context.cwd);
+      expect(getSessionSeriesForCwdSpy).toHaveBeenCalledWith(context.cwd);
 
       expect(context.ui.notify).toHaveBeenCalledWith(
         `This series has already been added ${seriesInput}`,
+        "warning",
       );
 
-      expect(context.ui.input).not.toHaveBeenCalled();
+      expect(context.ui.input).toHaveBeenCalledTimes(3);
+
+      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+        context.cwd,
+        "Implement Billing",
+        "Create JWT Token",
+      );
     });
   });
 
@@ -478,7 +510,8 @@ describe("handleSessionSeries", () => {
         .flat();
     };
 
-    const randomSeries = sessionSerieses[Math.floor(Math.random() * sessionSerieses.length)]!;
+    const randomSeries =
+      sessionSerieses[Math.floor(Math.random() * sessionSerieses.length)] ?? sessionSerieses[0];
 
     const context = {
       cwd: "/user/work/0",
@@ -502,12 +535,16 @@ describe("handleSessionSeries", () => {
 
     const sessionManagerConfigurator = new SessionManagerConfiguratorMock();
     sessionManagerConfigurator.generateInitialConfig("/user/work/0");
-    for (const series of sessionSerieses) {
-      sessionManagerConfigurator.appendSessionSeriesBasedOnCwd("/user/work/0", series);
+    for (const [index, series] of sessionSerieses.entries()) {
+      sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
+        "/user/work/0",
+        series,
+        `Session ${index}`,
+      );
     }
-    const getSessionTitlesForCwdSpy = vi.spyOn(
+    const getSessionSeriesForCwdSpy = vi.spyOn(
       sessionManagerConfigurator,
-      "getSessionTitlesForCwd",
+      "getSessionSeriesForCwd",
     );
     const deleteSessionSeriesBasedOnCwdSpy = vi.spyOn(
       sessionManagerConfigurator,
@@ -528,7 +565,7 @@ describe("handleSessionSeries", () => {
       castToExtensionContext(context),
     );
 
-    expect(getSessionTitlesForCwdSpy).toHaveBeenCalledWith(context.cwd);
+    expect(getSessionSeriesForCwdSpy).toHaveBeenCalledWith(context.cwd);
 
     expect(context.ui.select).toHaveBeenCalledWith(
       "Which session series would you like to delete?",
@@ -566,7 +603,8 @@ describe("handleSessionSeries", () => {
       "feature-flag-cleanup",
     ];
 
-    const randomSeries = sessionSeries[Math.floor(Math.random() * sessionSeries.length)]!;
+    const randomSeries =
+      sessionSeries[Math.floor(Math.random() * sessionSeries.length)] ?? sessionSeries[0];
 
     const context = {
       cwd: "/user/work/0",
@@ -582,16 +620,107 @@ describe("handleSessionSeries", () => {
         select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
       },
     } satisfies MockExtenstionCommandContext;
-    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
     const sessionManagerConfigurator = new SessionManagerConfiguratorMock();
     sessionManagerConfigurator.generateInitialConfig("/user/work/0");
-    for (const series of sessionSeries) {
-      sessionManagerConfigurator.appendSessionSeriesBasedOnCwd("/user/work/0", series);
+    for (const [index, series] of sessionSeries.entries()) {
+      sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
+        "/user/work/0",
+        series,
+        `Session ${index}`,
+      );
     }
-    const getSessionTitlesForCwdSpy = vi.spyOn(
+    const getSessionSeriesForCwdSpy = vi.spyOn(
       sessionManagerConfigurator,
-      "getSessionTitlesForCwd",
+      "getSessionSeriesForCwd",
+    );
+    const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
+      sessionManagerConfigurator,
+      "appendSessionSeriesBasedOnCwd",
+    );
+
+    const sessionData = await handleSessionSeries(
+      "new",
+      {
+        sessionManagerConfigurator,
+        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
+        removeSessionFiles() {
+          return;
+        },
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(getSessionSeriesForCwdSpy).toHaveBeenCalledWith(context.cwd);
+
+    expect(context.ui.select).toHaveBeenCalledWith(
+      "Which session series would you like to create a new session in?",
+      sessionSeries,
+    );
+
+    expect(context.ui.input).toHaveBeenCalledWith(
+      "What is the name of the this new session?",
+      "What do you want your agent to do now?",
+    );
+
+    expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+      context.cwd,
+      randomSeries,
+      "Add tests to the lib/index.ts file",
+    );
+
+    expect(context.newSession).toHaveBeenCalledWith({
+      withSession: expect.any(Function),
+    });
+
+    const sessionSeriesAndTitle = `${context.ui.select.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
+    expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}`,
+      ),
+    );
+  });
+
+  it("keeps asking for a unique trimmed title when creating a new session in a series", async () => {
+    const selectedSeries = "refactor-auth-middleware";
+
+    const context = {
+      cwd: "/user/work/0",
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+        options?.withSession?.({} as never);
+        return { cancelled: false };
+      }),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValueOnce("  Design JWT  ")
+          .mockResolvedValueOnce("  Refactor Hooks  "),
+        select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(selectedSeries),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    const sessionManagerConfigurator = new SessionManagerConfiguratorMock({
+      seriesRecord: {
+        [context.cwd]: {
+          [selectedSeries]: ["Design JWT"],
+        },
+      },
+    });
+
+    const getSessionTitlesForSeriesBasedOnCwdSpy = vi.spyOn(
+      sessionManagerConfigurator,
+      "getSessionTitlesForSeriesBasedOnCwd",
+    );
+    const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
+      sessionManagerConfigurator,
+      "appendSessionSeriesBasedOnCwd",
     );
 
     await handleSessionSeries(
@@ -610,34 +739,25 @@ describe("handleSessionSeries", () => {
       castToExtensionContext(context),
     );
 
-    expect(getSessionTitlesForCwdSpy).toHaveBeenCalledWith(context.cwd);
-
-    expect(context.ui.select).toHaveBeenCalledWith(
-      "Which session series would you like to create a new session in?",
-      sessionSeries,
+    expect(getSessionTitlesForSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+      context.cwd,
+      selectedSeries,
     );
-
-    expect(context.ui.input).toHaveBeenCalledWith(
-      "What is the name of the this new session?",
-      "What do you want your agent to do now?",
-    );
-
-    expect(context.newSession).toHaveBeenCalledWith({
-      withSession: expect.any(Function),
-    });
-
-    const sessionSeriesAndTitle = `${context.ui.select.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
-    expect(setSessionName).toHaveBeenCalledWith(sessionSeriesAndTitle);
-
     expect(context.ui.notify).toHaveBeenCalledWith(
-      `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}
-      with ${context.ui.input.mock.settledResults[0]?.value}
-      `,
+      `This title has already been added Design JWT`,
+      "warning",
+    );
+    expect(context.ui.input).toHaveBeenCalledTimes(2);
+    expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+      context.cwd,
+      selectedSeries,
+      "Refactor Hooks",
     );
   });
 
   it("continues a session in a series when continue is passed", async () => {
     const context = {
+      cwd: "/user/work/0",
       sessionManager: {
         getEntries: vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
       },
@@ -649,7 +769,8 @@ describe("handleSessionSeries", () => {
         notify: vi.fn<ExtensionUIContext["notify"]>(),
         input: vi
           .fn<ExtensionUIContext["input"]>()
-          .mockResolvedValue("Make coverage for Processor full"),
+          .mockResolvedValueOnce("  Make coverage for Processor full  ")
+          .mockResolvedValueOnce("  Make coverage for Processor optimized  "),
       },
     } satisfies MockExtenstionCommandContext;
 
@@ -665,14 +786,41 @@ describe("handleSessionSeries", () => {
 
     getSessionEntryWithSeries.mockReturnValue(seriesEntry);
 
-    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
+    const sessionManagerConfigurator = new SessionManagerConfiguratorMock({
+      seriesRecord: {
+        [context.cwd]: {
+          [seriesEntry.data.series]: ["Make coverage for Processor full"],
+        },
+      },
+    });
 
-    await handleSessionSeries(
+    const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
+      sessionManagerConfigurator,
+      "appendSessionSeriesBasedOnCwd",
+    );
+
+    const sessionData = await handleSessionSeries(
       "continue",
       {
-        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+        sessionFilter: new MockSessionFilter(
+          [
+            {
+              path: "/path/to/session/continue-0",
+              id: "session-id-continue-0",
+              cwd: context.cwd,
+              name: `${seriesEntry.data.series}${SESION_TITLE_SEPARATOR}Make coverage for Processor full`,
+              parentSessionPath: "/path/to/parent/continue-0",
+              created: new Date(),
+              modified: new Date(),
+              messageCount: 1,
+              firstMessage: "Hello from session continue",
+              allMessagesText: "Full history for session continue",
+            },
+          ],
+          new MockPastTimestampCalculator(),
+        ),
         getSessionEntryWithSeries,
-        sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+        sessionManagerConfigurator,
 
         removeSessionFiles() {
           return;
@@ -693,18 +841,30 @@ describe("handleSessionSeries", () => {
 
     expect(context.ui.input).toHaveBeenCalledWith(
       `What's the new title for the session in series ${entry.data.series}`,
+      undefined,
     );
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      `This title has already been added Make coverage for Processor full`,
+      "warning",
+    );
+    expect(context.ui.input).toHaveBeenCalledTimes(2);
 
     expect(context.newSession).toHaveBeenCalledWith({
       withSession: expect.any(Function),
     });
 
-    const sessionSeriesAndTitle = `${entry.data.series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
-    expect(setSessionName).toHaveBeenCalledWith(sessionSeriesAndTitle);
+    const sessionSeriesAndTitle = `${entry.data.series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value?.trim()}`;
+    expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
+    expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+      context.cwd,
+      entry.data.series,
+      "Make coverage for Processor optimized",
+    );
 
     expect(context.ui.notify).toHaveBeenCalledWith(
       `You have created a new session in ${entry.data.series}
-      with ${context.ui.input.mock.settledResults[0]?.value}
+      with ${context.ui.input.mock.settledResults[1]?.value?.trim()}
       `,
     );
   });
