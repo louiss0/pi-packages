@@ -352,10 +352,8 @@ describe("handleSessionSeries", () => {
     await handleSessionSeries(
       "create",
       {
-        setSessionName,
         sessionManagerConfigurator,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
-        appendEntry,
         getSessionEntryWithSeries() {
           return undefined;
         },
@@ -442,7 +440,6 @@ describe("handleSessionSeries", () => {
         select: vi.fn<ExtensionUIContext["select"]>().mockResolvedValue(randomSeries),
       },
     } satisfies MockExtenstionCommandContext;
-    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
 
     const mockSessionFilter = new MockSessionFilter(
       generateSessionsFromSerieses(),
@@ -473,12 +470,9 @@ describe("handleSessionSeries", () => {
     await handleSessionSeries(
       "delete",
       {
-        setSessionName,
         sessionManagerConfigurator,
         sessionFilter: mockSessionFilter,
-        appendEntry() {
-          return;
-        },
+
         getSessionEntryWithSeries() {
           return undefined;
         },
@@ -556,12 +550,9 @@ describe("handleSessionSeries", () => {
     await handleSessionSeries(
       "new",
       {
-        setSessionName,
         sessionManagerConfigurator,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
-        appendEntry() {
-          return;
-        },
+
         getSessionEntryWithSeries() {
           return undefined;
         },
@@ -632,13 +623,10 @@ describe("handleSessionSeries", () => {
     await handleSessionSeries(
       "continue",
       {
-        setSessionName,
         sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
         getSessionEntryWithSeries,
         sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
-        appendEntry() {
-          return;
-        },
+
         removeSessionFiles() {
           return;
         },
