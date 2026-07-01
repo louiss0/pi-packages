@@ -29,19 +29,6 @@ import {
   union,
 } from "valibot";
 
-export const SESION_TITLE_SEPARATOR = "--";
-export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
-export const sessionSeriesEntrySchema = object({
-  type: literal("custom"),
-  customType: literal("session-manager/series"),
-  data: object({
-    series: string(),
-    createdAt: pipe(string(), isoTimestamp()),
-  }),
-});
-export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
-  InferOutput<typeof sessionSeriesEntrySchema>;
-
 export default function (pi: ExtensionAPI) {
   const commandRoot = "session";
 
@@ -540,6 +527,19 @@ export function handleSessionDeleteLast(
   ctx.ui.notify(`Deleting the last ${number}`);
   deps.removeSessionFiles(deps.sessionFilter.getSessionsThatAreTheLastNth(number));
 }
+
+export const SESION_TITLE_SEPARATOR = "--";
+export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
+export const sessionSeriesEntrySchema = object({
+  type: literal("custom"),
+  customType: literal("session-manager/series"),
+  data: object({
+    series: string(),
+    createdAt: pipe(string(), isoTimestamp()),
+  }),
+});
+export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
+  InferOutput<typeof sessionSeriesEntrySchema>;
 
 export async function handleSessionSeries(
   command: SessionSeriesCommand,
