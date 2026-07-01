@@ -324,61 +324,75 @@ describe("handleSessionDeleteLast", () => {
 });
 
 describe("handleSessionSeries", () => {
-  it("creates a session series when create is passed", async () => {
-    const context = {
-      cwd: "/pi-packages",
-      newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
-        return { cancelled: false };
-      }),
-      ui: {
-        notify: vi.fn<ExtensionUIContext["notify"]>(),
-        input: vi
-          .fn<ExtensionUIContext["input"]>()
-          .mockResolvedValue("Implement Auth")
-          .mockResolvedValue("Create JWT Token"),
-      },
-    } satisfies MockExtenstionCommandContext;
+  describe("how it handles creation of tasks", () => {
+    it("creates a session series when create is passed", async () => {
+      const context = {
+        cwd: "/pi-packages",
+        newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+          options?.withSession?.({} as never);
+          return { cancelled: false };
+        }),
+        ui: {
+          notify: vi.fn<ExtensionUIContext["notify"]>(),
+          input: vi
+            .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValue("Implement Auth")
+            .mockResolvedValue("Create JWT Token"),
+        },
+      } satisfies MockExtenstionCommandContext;
 
-    const setSessionName = vi.fn<ExtensionAPI["setSessionName"]>();
-    const appendEntry = vi.fn<ExtensionAPI["appendEntry"]>();
+      const appendEntry = vi.fn<ExtensionAPI["appendEntry"]>();
 
-    const sessionManagerConfigurator = new SessionManagerConfiguratorMock();
-    const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
-      sessionManagerConfigurator,
-      "appendSessionSeriesBasedOnCwd",
-    );
-
-    await handleSessionSeries(
-      "create",
-      {
+      const sessionManagerConfigurator = new SessionManagerConfiguratorMock();
+      const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
         sessionManagerConfigurator,
-        sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
-        getSessionEntryWithSeries() {
-          return undefined;
+        "appendSessionSeriesBasedOnCwd",
+      );
+
+      await handleSessionSeries(
+        "create",
+        {
+          sessionManagerConfigurator,
+          sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+          getSessionEntryWithSeries() {
+            return undefined;
+          },
+          removeSessionFiles() {
+            return;
+          },
         },
-        removeSessionFiles() {
-          return;
+        castToExtensionContext(context),
+      );
+
+      expect(context.ui.input).toHaveBeenCalledWith(
+        "What is the name of your session series?",
+        "What are you focused on?",
+      );
+
+      expect(context.ui.input).toHaveBeenCalledWith(
+        "What is the name of the new session you want to make in this one?",
+        "What task is a part of what you are focusing on?",
+      );
+
+      const series = context.ui.input.mock.settledResults[0]?.value;
+      const sessionTitleAndSubTitle = `${series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
+
+      expect(context.newSession).toHaveBeenCalledWith({
+        withSession: expect.any(Function),
+      });
+
+      expect(appendEntry).toHaveBeenCalledWith(
+        sessionSeriesEntrySchema.entries.customType.literal,
+        {
+          series,
+          createdAt: expect.schemaMatching(
+            sessionSeriesEntrySchema.entries.data.entries.createdAt,
+          ),
         },
-      },
-      castToExtensionContext(context),
-    );
+      );
+      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series);
 
-    expect(context.ui.input).toHaveBeenCalledWith(
-      "What is the name of your session series?",
-      "What are you focused on?",
-    );
-
-    expect(context.ui.input).toHaveBeenCalledWith(
-      "What is the name of the new session you want to make in this one?",
-      "What task is a part of what you are focusing on?",
-    );
-
-    const series = context.ui.input.mock.settledResults[0]?.value;
-    const sessionTitleAndSubTitle = `${series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value}`;
-
-    expect(context.newSession).toHaveBeenCalledWith({
-      withSession: expect.any(Function),
+      expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
     });
 
     expect(setSessionName).toHaveBeenCalledWith(sessionTitleAndSubTitle);
