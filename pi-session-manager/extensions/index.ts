@@ -728,6 +728,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      const sessionData = {
+        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
+        entry: {
+          customType: sessionSeriesEntrySchema.entries.customType.literal,
+          series,
+          createdAt: new Date().toISOString(),
+        },
+      };
+
+      persistSessionSeriesData(sessionData);
+
       await ctx.newSession({
         withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
@@ -740,16 +751,6 @@ export async function handleSessionSeries(
         },
       });
 
-      const sessionData = {
-        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
-        entry: {
-          customType: sessionSeriesEntrySchema.entries.customType.literal,
-          series,
-          createdAt: new Date().toISOString(),
-        },
-      };
-
-      persistSessionSeriesData(sessionData);
       return sessionData;
     }
 
@@ -813,6 +814,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      const sessionData = {
+        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
+        entry: {
+          customType: sessionSeriesEntrySchema.entries.customType.literal,
+          series,
+          createdAt: new Date().toISOString(),
+        },
+      };
+
+      persistSessionSeriesData(sessionData);
+
       await ctx.newSession({
         withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
@@ -827,16 +839,6 @@ export async function handleSessionSeries(
         },
       });
 
-      const sessionData = {
-        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
-        entry: {
-          customType: sessionSeriesEntrySchema.entries.customType.literal,
-          series,
-          createdAt: new Date().toISOString(),
-        },
-      };
-
-      persistSessionSeriesData(sessionData);
       return sessionData;
     }
 
@@ -862,6 +864,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      const sessionData = {
+        sessionName: `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
+        entry: {
+          customType: sessionSeriesEntrySchema.entries.customType.literal,
+          series: entry.data.series,
+          createdAt: new Date().toISOString(),
+        },
+      };
+
+      persistSessionSeriesData(sessionData);
+
       await ctx.newSession({
         withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
@@ -876,16 +889,6 @@ export async function handleSessionSeries(
         },
       });
 
-      const sessionData = {
-        sessionName: `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
-        entry: {
-          customType: sessionSeriesEntrySchema.entries.customType.literal,
-          series: entry.data.series,
-          createdAt: new Date().toISOString(),
-        },
-      };
-
-      persistSessionSeriesData(sessionData);
       return sessionData;
     }
 
