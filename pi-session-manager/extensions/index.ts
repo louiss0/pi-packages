@@ -1,7 +1,6 @@
 import {
   type ExtensionAPI,
   type ExtensionCommandContext,
-  type ExtensionContext,
   getAgentDir,
   type SessionEntry,
   type SessionInfo,
@@ -15,7 +14,6 @@ import {
   digits,
   type InferOutput,
   integer,
-  isoDateTime,
   isoTimestamp,
   literal,
   number,
@@ -110,7 +108,7 @@ export default function (pi: ExtensionAPI) {
     const sessionFilter = new SessionFilter(sessions, new TimestampCalculator());
 
     const unmodifiedSessionsFromThePastNthDays =
-      sessionFilter.getSessionsBasedOnDayLimit(dayLimitResult);
+      sessionFilter.getModifiedSessionsBasedOnDayLimit(dayLimitResult);
 
     if (unmodifiedSessionsFromThePastNthDays.length === 0) {
       return;
@@ -258,11 +256,11 @@ class TimestampCalculator extends $TimestampCalculator {
 
 export interface $SessionFilter {
   readonly sessions: Array<SessionInfo>;
-  getSessionsBasedOnDurationIntegerAndUnit(
+  getModifiedSessionsBasedOnDurationIntegerAndUnit(
     integer: DurationRecord["integer"],
     durationUnit: DurationRecord["unit"],
   ): Array<SessionInfo>;
-  getSessionsBasedOnDayLimit(dayLimit: number): Array<SessionInfo>;
+  getModifiedSessionsBasedOnDayLimit(dayLimit: number): Array<SessionInfo>;
   getSessionsThatAreTheLastNth(number: number): Array<SessionInfo>;
   getSessionsThatHaveTheTitleAsAPrefix(title: string): Array<SessionInfo>;
 }
@@ -277,7 +275,7 @@ class SessionFilter implements $SessionFilter {
     this.#timestampCalculator = timestampCalculator;
   }
 
-  getSessionsBasedOnDurationIntegerAndUnit(
+  getModifiedSessionsBasedOnDurationIntegerAndUnit(
     integer: DurationRecord["integer"],
     durationUnit: DurationRecord["unit"],
   ) {
@@ -296,7 +294,7 @@ class SessionFilter implements $SessionFilter {
     });
   }
 
-  getSessionsBasedOnDayLimit(dayLimit: number) {
+  getModifiedSessionsBasedOnDayLimit(dayLimit: number) {
     return this.sessions.filter(
       (session) => session.modified.getTime() < this.#timestampCalculator.day(dayLimit),
     );
@@ -504,7 +502,7 @@ export function handleSessionCleanInactive(
     return;
   }
 
-  deps.removeSessionFiles(deps.sessionFilter.getSessionsBasedOnDayLimit(dayLimit));
+  deps.removeSessionFiles(deps.sessionFilter.getModifiedSessionsBasedOnDayLimit(dayLimit));
 }
 
 export function handleSessionCleanOlderThan(
@@ -517,7 +515,10 @@ export function handleSessionCleanOlderThan(
 ) {
   ctx.ui.notify(`Deleteing sessions that are from ${input.integer} ${input.unit} ago`);
   deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsBasedOnDurationIntegerAndUnit(input.integer, input.unit),
+    deps.sessionFilter.getModifiedSessionsBasedOnDurationIntegerAndUnit(
+      input.integer,
+      input.unit,
+    ),
   );
 }
 
