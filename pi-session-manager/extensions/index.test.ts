@@ -4,11 +4,16 @@ import type {
   ExtensionUIContext,
   SessionInfo,
 } from "@earendil-works/pi-coding-agent";
+import { existsSync } from "fs";
+import { tmpdir } from "os";
 import {
   handleSessionCleanInactive,
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
+  applyPersistedSessionSeriesData,
+  getSessionSeriesDataTempPath,
+  persistSessionSeriesData,
   $TimestampCalculator,
   type $SessionFilter,
   type DurationRecord,
@@ -216,7 +221,50 @@ function castToExtensionContext(context: MockExtenstionCommandContext) {
   return context as ExtensionCommandContext;
 }
 
+const tempSessionDataPath = getSessionSeriesDataTempPath();
+
 const mockRemoveSessionFiles = vi.fn<RemoveSessionFiles>();
+
+describe("persisted session series data", () => {
+  it("stores data in the OS temp dir and consumes it on session start", () => {
+    const sessionData = {
+      sessionName: `Implement Auth${SESION_TITLE_SEPARATOR}Create JWT Token`,
+      entry: {
+        customType: sessionSeriesEntrySchema.entries.customType.literal,
+        series: "Implement Auth",
+        createdAt: new Date().toISOString(),
+      },
+    };
+
+    persistSessionSeriesData(sessionData);
+
+    expect(tempSessionDataPath.startsWith(tmpdir())).toBe(true);
+    expect(existsSync(tempSessionDataPath)).toBe(true);
+
+    const pi = {
+      setSessionName: vi.fn(),
+      appendEntry: vi.fn(),
+    };
+    const ctx = {
+      ui: {
+        notify: vi.fn(),
+      },
+    };
+
+    expect(applyPersistedSessionSeriesData(pi as never, ctx as never)).toBe(true);
+
+    expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
+    expect(pi.appendEntry).toHaveBeenCalledWith(
+      sessionData.entry.customType,
+      {
+        series: sessionData.entry.series,
+        createdAt: sessionData.entry.createdAt,
+      },
+    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Setting necessary session data");
+    expect(existsSync(tempSessionDataPath)).toBe(false);
+  });
+});
 
 describe("handleSessionCleanInactive", () => {
   test("gets rid of all sessions that haven't been modified in the last three days", ({
@@ -345,10 +393,17 @@ describe("handleSessionDeleteLast", () => {
 describe("handleSessionSeries", () => {
   describe("how it handles creation of tasks", () => {
     it("creates a session series when create is passed", async () => {
+      const sessionCtx = {
+        cwd: "/session/create",
+        ui: {
+          notify: vi.fn(),
+        },
+      };
+
       const context = {
         cwd: "/pi-packages",
         newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-          options?.withSession?.({} as never);
+          options?.withSession?.(sessionCtx as never);
           return { cancelled: false };
         }),
         ui: {
@@ -398,17 +453,28 @@ describe("handleSessionSeries", () => {
         withSession: expect.any(Function),
       });
 
-      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series, title);
+      expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
+        sessionCtx.cwd,
+        series,
+        title,
+      );
 
-      expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
+      expect(sessionCtx.ui.notify).toHaveBeenCalledWith("Your session series has been created");
     });
 
     const seriesInput = "Implement Auth";
     it("keeps asking for a unique trimmed session series when creating", async () => {
+      const sessionCtx = {
+        cwd: "/session/create-unique",
+        ui: {
+          notify: vi.fn(),
+        },
+      };
+
       const context = {
         cwd: "/pi-packages",
         newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-          options?.withSession?.({} as never);
+          options?.withSession?.(sessionCtx as never);
           return { cancelled: false };
         }),
         ui: {
@@ -468,10 +534,12 @@ describe("handleSessionSeries", () => {
       expect(context.ui.input).toHaveBeenCalledTimes(3);
 
       expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
-        context.cwd,
+        sessionCtx.cwd,
         "Implement Billing",
         "Create JWT Token",
       );
+
+      expect(sessionCtx.ui.notify).toHaveBeenCalledWith("Your session series has been created");
     });
   });
 
@@ -606,10 +674,17 @@ describe("handleSessionSeries", () => {
     const randomSeries =
       sessionSeries[Math.floor(Math.random() * sessionSeries.length)] ?? sessionSeries[0];
 
+    const sessionCtx = {
+      cwd: "/session/new",
+      ui: {
+        notify: vi.fn(),
+      },
+    };
+
     const context = {
       cwd: "/user/work/0",
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
+        options?.withSession?.(sessionCtx as never);
         return { cancelled: false };
       }),
       ui: {
@@ -668,9 +743,15 @@ describe("handleSessionSeries", () => {
     );
 
     expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
-      context.cwd,
+      sessionCtx.cwd,
       randomSeries,
       "Add tests to the lib/index.ts file",
+    );
+
+    expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}`,
+      ),
     );
 
     expect(context.newSession).toHaveBeenCalledWith({
@@ -680,7 +761,7 @@ describe("handleSessionSeries", () => {
     const sessionSeriesAndTitle = `${context.ui.select.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
     expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
 
-    expect(context.ui.notify).toHaveBeenCalledWith(
+    expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining(
         `You have created a new session in ${context.ui.select.mock.settledResults[0]?.value}`,
       ),
@@ -690,10 +771,17 @@ describe("handleSessionSeries", () => {
   it("keeps asking for a unique trimmed title when creating a new session in a series", async () => {
     const selectedSeries = "refactor-auth-middleware";
 
+    const sessionCtx = {
+      cwd: "/session/new-series",
+      ui: {
+        notify: vi.fn(),
+      },
+    };
+
     const context = {
       cwd: "/user/work/0",
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
+        options?.withSession?.(sessionCtx as never);
         return { cancelled: false };
       }),
       ui: {
@@ -749,20 +837,33 @@ describe("handleSessionSeries", () => {
     );
     expect(context.ui.input).toHaveBeenCalledTimes(2);
     expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
-      context.cwd,
+      sessionCtx.cwd,
       selectedSeries,
       "Refactor Hooks",
+    );
+
+    expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
+      `You have created a new session in ${selectedSeries}
+          with Refactor Hooks
+          `,
     );
   });
 
   it("continues a session in a series when continue is passed", async () => {
+    const sessionCtx = {
+      cwd: "/session/continue",
+      ui: {
+        notify: vi.fn(),
+      },
+    };
+
     const context = {
       cwd: "/user/work/0",
       sessionManager: {
         getEntries: vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
       },
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
-        options?.withSession?.({} as never);
+        options?.withSession?.(sessionCtx as never);
         return { cancelled: false };
       }),
       ui: {
@@ -857,12 +958,12 @@ describe("handleSessionSeries", () => {
     const sessionSeriesAndTitle = `${entry.data.series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value?.trim()}`;
     expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
     expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
-      context.cwd,
+      sessionCtx.cwd,
       entry.data.series,
       "Make coverage for Processor optimized",
     );
 
-    expect(context.ui.notify).toHaveBeenCalledWith(
+    expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
       `You have created a new session in ${entry.data.series}
       with ${context.ui.input.mock.settledResults[1]?.value?.trim()}
       `,

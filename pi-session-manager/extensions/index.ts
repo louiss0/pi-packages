@@ -7,7 +7,8 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
-import { readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import {
   array,
@@ -36,15 +37,8 @@ export default function (pi: ExtensionAPI) {
 
   let sessionManagerConfigurator: SessionManagerConfigurator;
 
-  let sessionData: Awaited<ReturnType<typeof handleSessionSeries>>;
-
   pi.on("session_start", async (event, ctx) => {
-    if (sessionData) {
-      pi.setSessionName(sessionData.sessionName);
-      const { customType, ...data } = sessionData.entry;
-      pi.appendEntry(customType, data);
-      ctx.ui.notify("Setting necessary session data");
-    }
+    applyPersistedSessionSeriesData(pi, ctx);
 
     sessionManagerConfigurator = new SessionManagerConfigurator();
     const eventIsNotReloadOrStartUp = event.reason !== "reload" && event.reason !== "startup";
@@ -177,7 +171,7 @@ export default function (pi: ExtensionAPI) {
 
       const sessions = await SessionManager.list(ctx.cwd);
 
-      sessionData = await handleSessionSeries(
+      await handleSessionSeries(
         result.output,
         {
           sessionManagerConfigurator: new SessionManagerConfigurator(),
@@ -584,6 +578,75 @@ export const sessionSeriesEntrySchema = object({
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
   InferOutput<typeof sessionSeriesEntrySchema>;
 
+export const sessionSeriesDataSchema = object({
+  sessionName: string(),
+  entry: object({
+    customType: literal("session-manager/series"),
+    series: string(),
+    createdAt: pipe(string(), isoTimestamp()),
+  }),
+});
+
+export type SessionSeriesData = InferOutput<typeof sessionSeriesDataSchema>;
+
+const sessionSeriesDataTempFileName = "pi-session-manager.session-data.json";
+
+export function getSessionSeriesDataTempPath(baseDir = tmpdir()) {
+  return join(baseDir, sessionSeriesDataTempFileName);
+}
+
+export function persistSessionSeriesData(
+  sessionData: SessionSeriesData,
+  tempPath = getSessionSeriesDataTempPath(),
+) {
+  writeFileSync(tempPath, JSON.stringify(sessionData), {
+    encoding: "utf-8",
+  });
+}
+
+export function consumePersistedSessionSeriesData(tempPath = getSessionSeriesDataTempPath()) {
+  if (!existsSync(tempPath)) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      readFileSync(tempPath, {
+        encoding: "utf-8",
+      }),
+    );
+
+    const result = safeParse(sessionSeriesDataSchema, parsed);
+
+    if (!result.success) {
+      return;
+    }
+
+    unlinkSync(tempPath);
+    return result.output;
+  } catch {
+    return;
+  }
+}
+
+export function applyPersistedSessionSeriesData(
+  pi: Pick<ExtensionAPI, "setSessionName" | "appendEntry">,
+  ctx: Pick<ExtensionCommandContext, "ui">,
+  tempPath = getSessionSeriesDataTempPath(),
+) {
+  const sessionData = consumePersistedSessionSeriesData(tempPath);
+
+  if (!sessionData) {
+    return false;
+  }
+
+  pi.setSessionName(sessionData.sessionName);
+  const { customType, ...data } = sessionData.entry;
+  pi.appendEntry(customType, data);
+  ctx.ui.notify("Setting necessary session data");
+  return true;
+}
+
 function promptForUniqueTrimmedInput(
   ctx: ExtensionCommandContext,
   prompt: string,
@@ -666,18 +729,18 @@ export async function handleSessionSeries(
       );
 
       await ctx.newSession({
-        withSession: async () => {
+        withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
-            ctx.cwd,
+            sessionCtx.cwd,
             series,
             title,
           );
 
-          ctx.ui.notify("Your session series has been created");
+          sessionCtx.ui.notify("Your session series has been created");
         },
       });
 
-      return {
+      const sessionData = {
         sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
@@ -685,6 +748,9 @@ export async function handleSessionSeries(
           createdAt: new Date().toISOString(),
         },
       };
+
+      persistSessionSeriesData(sessionData);
+      return sessionData;
     }
 
     case "delete": {
@@ -748,20 +814,20 @@ export async function handleSessionSeries(
       );
 
       await ctx.newSession({
-        withSession: async () => {
+        withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
-            ctx.cwd,
+            sessionCtx.cwd,
             series,
             title,
           );
 
-          ctx.ui.notify(`You have created a new session in ${series}
+          sessionCtx.ui.notify(`You have created a new session in ${series}
           with ${title}
           `);
         },
       });
 
-      return {
+      const sessionData = {
         sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
@@ -769,6 +835,9 @@ export async function handleSessionSeries(
           createdAt: new Date().toISOString(),
         },
       };
+
+      persistSessionSeriesData(sessionData);
+      return sessionData;
     }
 
     case "continue": {
@@ -794,20 +863,20 @@ export async function handleSessionSeries(
       );
 
       await ctx.newSession({
-        withSession: async () => {
+        withSession: async (sessionCtx) => {
           deps.sessionManagerConfigurator.appendSessionSeriesBasedOnCwd(
-            ctx.cwd,
+            sessionCtx.cwd,
             entry.data.series,
             title,
           );
 
-          ctx.ui.notify(`You have created a new session in ${entry.data.series}
+          sessionCtx.ui.notify(`You have created a new session in ${entry.data.series}
       with ${title}
       `);
         },
       });
 
-      return {
+      const sessionData = {
         sessionName: `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
@@ -815,6 +884,9 @@ export async function handleSessionSeries(
           createdAt: new Date().toISOString(),
         },
       };
+
+      persistSessionSeriesData(sessionData);
+      return sessionData;
     }
 
     default: {
