@@ -135,13 +135,18 @@ const generateSessionsBasedOnModifiedTimeCalculation = (
 };
 
 class SessionManagerConfiguratorMock implements $SessionManagerConfigurator {
-  #config: SessionManagerConfig = {
-    sessionDeletionDayLimit: 3,
-    seriesRecord: {},
-  };
+  #config: SessionManagerConfig;
 
   get config(): SessionManagerConfig {
     return this.#config;
+  }
+
+  constructor(config: Partial<SessionManagerConfig> = {}) {
+    this.#config = {
+      sessionDeletionDayLimit: 3,
+      seriesRecord: {},
+      ...config,
+    };
   }
 
   appendSessionSeriesBasedOnCwd(cwd: string, series: string): void {
@@ -341,8 +346,6 @@ describe("handleSessionSeries", () => {
         },
       } satisfies MockExtenstionCommandContext;
 
-      const appendEntry = vi.fn<ExtensionAPI["appendEntry"]>();
-
       const sessionManagerConfigurator = new SessionManagerConfiguratorMock();
       const appendSessionSeriesBasedOnCwdSpy = vi.spyOn(
         sessionManagerConfigurator,
@@ -385,19 +388,59 @@ describe("handleSessionSeries", () => {
       expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
     });
 
-    expect(setSessionName).toHaveBeenCalledWith(sessionTitleAndSubTitle);
-    expect(appendEntry).toHaveBeenCalledWith(
-      sessionSeriesEntrySchema.entries.customType.literal,
-      {
-        series,
-        createdAt: expect.schemaMatching(
-          sessionSeriesEntrySchema.entries.data.entries.createdAt,
-        ),
-      },
-    );
-    expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(context.cwd, series);
+    const seriesInput = "Implement Auth";
+    it("notifies the user that a session series is already created if it exists and asks again", async () => {
+      const context = {
+        cwd: "/pi-packages",
+        newSession: vi.fn<ExtensionCommandContext["newSession"]>(async (options) => {
+          options?.withSession?.({} as never);
+          return { cancelled: false };
+        }),
+        ui: {
+          notify: vi.fn<ExtensionUIContext["notify"]>(),
+          input: vi.fn<ExtensionUIContext["input"]>().mockResolvedValue(seriesInput),
+        },
+      } satisfies MockExtenstionCommandContext;
 
-    expect(context.ui.notify).toHaveBeenCalledWith("Your session series has been created");
+      const sessionManagerConfigurator = new SessionManagerConfiguratorMock({
+        seriesRecord: {
+          [context.cwd]: [seriesInput],
+        },
+      });
+
+      const getSessionTitlesForCwd = vi.spyOn(
+        sessionManagerConfigurator,
+        "getSessionTitlesForCwd",
+      );
+
+      await handleSessionSeries(
+        "create",
+        {
+          sessionManagerConfigurator,
+          sessionFilter: new MockSessionFilter([], new MockPastTimestampCalculator()),
+          getSessionEntryWithSeries() {
+            return undefined;
+          },
+          removeSessionFiles() {
+            return;
+          },
+        },
+        castToExtensionContext(context),
+      );
+
+      expect(context.ui.input).toHaveBeenCalledWith(
+        "What is the name of your session series?",
+        "What are you focused on?",
+      );
+
+      expect(getSessionTitlesForCwd).toHaveBeenCalledWith(context.cwd);
+
+      expect(context.ui.notify).toHaveBeenCalledWith(
+        `This series has already been added ${seriesInput}`,
+      );
+
+      expect(context.ui.input).not.toHaveBeenCalled();
+    });
   });
 
   it("deletes a session series when delete is passed", async () => {

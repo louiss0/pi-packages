@@ -11,7 +11,9 @@ import { readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import {
   array,
+  checkItems,
   digits,
+  guard,
   type InferOutput,
   integer,
   isoTimestamp,
@@ -25,6 +27,7 @@ import {
   safeParse,
   string,
   summarize,
+  title,
   transform,
   union,
 } from "valibot";
@@ -280,10 +283,22 @@ function removeSessionFiles(sessions: Array<SessionInfo>) {
 }
 
 export type RemoveSessionFiles = typeof removeSessionFiles;
-
 export const sessionManagerConfigSchema = object({
   sessionDeletionDayLimit: pipe(number(), integer()),
-  seriesRecord: record(string(), array(string())),
+  seriesRecord: record(
+    pipe(string("must be a valid folder path"), title("folder-path")),
+    record(
+      pipe(string("must be a series Name"), title("series-name")),
+      pipe(
+        array(string("Must be a title")),
+        title("titles"),
+        checkItems(
+          (item, index, array) => array.indexOf(item) === index,
+          "Duplicate items are not allowed.",
+        ),
+      ),
+    ),
+  ),
 });
 
 export type SessionManagerConfig = InferOutput<typeof sessionManagerConfigSchema>;
@@ -317,7 +332,7 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     const config = {
       sessionDeletionDayLimit: this.defaultSessionDeletionDayLimit,
       seriesRecord: {
-        [cwd]: [],
+        [cwd]: {},
       },
     } satisfies SessionManagerConfig;
 
@@ -538,6 +553,7 @@ export const sessionSeriesEntrySchema = object({
     createdAt: pipe(string(), isoTimestamp()),
   }),
 });
+
 export type SessionSeriesEntry = Extract<SessionEntry, { type: "custom" }> &
   InferOutput<typeof sessionSeriesEntrySchema>;
 
