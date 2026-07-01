@@ -491,7 +491,7 @@ export function handleSessionCleanInactive(
     sessionManagerConfigurator: $SessionManagerConfigurator;
     removeSessionFiles: RemoveSessionFiles;
   },
-  ctx: ExtensionContext,
+  ctx: ExtensionCommandContext,
 ) {
   ctx.ui.notify(
     "Getting rid of all sessions that have been inactive for three days",
@@ -513,7 +513,7 @@ export function handleSessionCleanOlderThan(
     sessionFilter: $SessionFilter;
     removeSessionFiles: RemoveSessionFiles;
   },
-  ctx: ExtensionContext,
+  ctx: ExtensionCommandContext,
 ) {
   ctx.ui.notify(`Deleteing sessions that are from ${input.integer} ${input.unit} ago`);
   deps.removeSessionFiles(
@@ -527,7 +527,7 @@ export function handleSessionDeleteLast(
     sessionFilter: $SessionFilter;
     removeSessionFiles: RemoveSessionFiles;
   },
-  ctx: ExtensionContext,
+  ctx: ExtensionCommandContext,
 ) {
   ctx.ui.notify(`Deleting the last ${number}`);
   deps.removeSessionFiles(deps.sessionFilter.getSessionsThatAreTheLastNth(number));
@@ -543,10 +543,8 @@ export async function handleSessionSeries(
     appendEntry: ExtensionAPI["appendEntry"];
     removeSessionFiles: RemoveSessionFiles;
   },
-  ctx: ExtensionContext,
+  ctx: ExtensionCommandContext,
 ) {
-  const commandContext = ctx as ExtensionContext & Pick<ExtensionCommandContext, "newSession">;
-
   switch (command) {
     case "create": {
       const series = await ctx.ui.input(
@@ -562,7 +560,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      await commandContext.newSession({
+      await ctx.newSession({
         withSession: async () => {
           deps.setSessionName(`${series}${SESION_TITLE_SEPARATOR}${title}`);
           deps.appendEntry(sessionSeriesEntrySchema.entries.customType.literal, {
@@ -621,7 +619,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      await commandContext.newSession({
+      await ctx.newSession({
         withSession: async () => {
           deps.setSessionName(`${series}${SESION_TITLE_SEPARATOR}${title}`);
         },
@@ -650,7 +648,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      await commandContext.newSession({
+      await ctx.newSession({
         withSession: async () => {
           deps.setSessionName(`${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`);
         },
