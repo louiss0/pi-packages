@@ -29,40 +29,6 @@ import {
   union,
 } from "valibot";
 
-const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
-const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
-const durationRecordSchema = union(
-  [
-    pipe(
-      string(),
-      regex(integerWithUnitRE),
-      transform((input) => {
-        const { integer, unit } = integerWithUnitRE.exec(input)?.groups as {
-          integer: string;
-          unit: "days" | "weeks" | "hours";
-        };
-
-        return { integer: Number.parseInt(integer), unit };
-      }),
-    ),
-    pipe(
-      string(),
-      regex(integerWithUnitShortRE),
-      transform((input) => {
-        const { integer, unit } = integerWithUnitShortRE.exec(input)?.groups as {
-          integer: string;
-          unit: "d" | "w" | "h";
-        };
-
-        return { integer: Number.parseInt(integer), unit };
-      }),
-    ),
-  ],
-  "You can only use an integer suffixed by days, weeks, or hours or the shorthand d/w/h units",
-);
-
-export type DurationRecord = InferOutput<typeof durationRecordSchema>;
-
 export const SESION_TITLE_SEPARATOR = "--";
 export const sessionSeriesCommandsSchema = picklist(["create", "delete", "new", "continue"]);
 export const sessionSeriesEntrySchema = object({
@@ -511,6 +477,40 @@ export function handleSessionCleanInactive(
 
   deps.removeSessionFiles(deps.sessionFilter.getModifiedSessionsBasedOnDayLimit(dayLimit));
 }
+
+const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
+const integerWithUnitShortRE = /(?<integer>\d+)(?<unit>d|w|h)/;
+const durationRecordSchema = union(
+  [
+    pipe(
+      string(),
+      regex(integerWithUnitRE),
+      transform((input) => {
+        const { integer, unit } = integerWithUnitRE.exec(input)?.groups as {
+          integer: string;
+          unit: "days" | "weeks" | "hours";
+        };
+
+        return { integer: Number.parseInt(integer), unit };
+      }),
+    ),
+    pipe(
+      string(),
+      regex(integerWithUnitShortRE),
+      transform((input) => {
+        const { integer, unit } = integerWithUnitShortRE.exec(input)?.groups as {
+          integer: string;
+          unit: "d" | "w" | "h";
+        };
+
+        return { integer: Number.parseInt(integer), unit };
+      }),
+    ),
+  ],
+  "You can only use an integer suffixed by days, weeks, or hours or the shorthand d/w/h units",
+);
+
+export type DurationRecord = InferOutput<typeof durationRecordSchema>;
 
 export function handleSessionCleanOlderThan(
   input: DurationRecord,
