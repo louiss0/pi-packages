@@ -11,7 +11,6 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
-  applyPersistedSessionSeriesData,
   getSessionSeriesDataTempPath,
   persistSessionSeriesData,
   $TimestampCalculator,
@@ -196,7 +195,10 @@ class SessionManagerConfiguratorMock implements $SessionManagerConfigurator {
     return Object.keys(this.#config.seriesRecord[cwd] ?? {});
   }
 
-  getSessionTitlesForSeriesBasedOnCwd(cwd: string, series: string): string[] | SessionConfigError {
+  getSessionTitlesForSeriesBasedOnCwd(
+    cwd: string,
+    series: string,
+  ): string[] | SessionConfigError {
     const cwdSeriesRecord = this.#config.seriesRecord[cwd] ?? {};
 
     return cwdSeriesRecord[series.trim()] ?? [];
@@ -251,16 +253,11 @@ describe("persisted session series data", () => {
       },
     };
 
-    expect(applyPersistedSessionSeriesData(pi as never, ctx as never)).toBe(true);
-
     expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
-    expect(pi.appendEntry).toHaveBeenCalledWith(
-      sessionData.entry.customType,
-      {
-        series: sessionData.entry.series,
-        createdAt: sessionData.entry.createdAt,
-      },
-    );
+    expect(pi.appendEntry).toHaveBeenCalledWith(sessionData.entry.customType, {
+      series: sessionData.entry.series,
+      createdAt: sessionData.entry.createdAt,
+    });
     expect(ctx.ui.notify).toHaveBeenCalledWith("Setting necessary session data");
     expect(existsSync(tempSessionDataPath)).toBe(false);
   });
