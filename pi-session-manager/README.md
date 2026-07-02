@@ -1,11 +1,15 @@
 # pi-session-manager
 
+[!session-manager](https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-session-manager/assets/Pi-Session-Manager-Big.png)
+
+
 [![npm version](https://img.shields.io/npm/v/@code-fixer-23/pi-session-manager.svg)](https://www.npmjs.com/package/@code-fixer-23/pi-session-manager)
 [![downloads](https://img.shields.io/npm/dm/@code-fixer-23/pi-session-manager.svg)](https://www.npmjs.com/package/@code-fixer-23/pi-session-manager)
 [![license](https://img.shields.io/npm/l/@code-fixer-23/pi-session-manager.svg)](./LICENSE)
 [![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
-`pi-session-manager` adds local session cleanup and series management workflows to PI. It helps keep session history organized by pruning stale sessions stored on your machine, naming related sessions consistently, and carrying series context forward between sessions. The package plugs into PI’s extension lifecycle so it can react when a session starts, restore persisted series metadata, and expose commands that coordinate session creation, continuation, and cleanup.
+
+`pi-session-manager` adds local session cleanup and series management workflows to PI. It helps keep session history organized by pruning stale sessions stored on your machine, naming related sessions consistently, and carrying series context forward between sessions. The package plugs into PI's extension lifecycle so it can react when a session starts, restore persisted series metadata, and expose commands that coordinate session creation, continuation, and cleanup.
 
 ## pi-session-manager
 
