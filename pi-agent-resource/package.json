@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
+    "valibot": "catalog:",
     "memfs": "^4.57.2"
   },
   "peerDependencies": {
