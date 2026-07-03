@@ -146,9 +146,9 @@ Reloads the current Pi session with a new pack selection. Passing names switches
 
 Pack loading integrates with Pi's `resources_discover` lifecycle rather than performing a one-off file scan. The process works in two phases.
 
-At startup, when `resources_discover` fires with `reason: "startup"`, the extension reads `--resource:load-pack`, parses the names, and stores them as the active pack list. Whenever Pi runs the `resources_discover` workflow—whether at startup or after a reload—the extension responds by returning the prompt and skill directory paths for each active pack. Pi merges these paths into its resource search, making the pack contents available alongside global and local resources.
+At startup, when `resources_discover` fires with `reason: "startup"`, the extension reads `--resource:load-pack`, parses the names, and stores them in a JSON file in the OS temp directory. Whenever Pi runs the `resources_discover` workflow—whether at startup or after a reload—the extension reads that file again and returns the prompt and skill directory paths for each active pack. Pi merges these paths into its resource search, making the pack contents available alongside global and local resources.
 
-Session commands reuse the same mechanism. `resource:pack:session:new` and `resource:pack:session:reload` update the active pack list, then trigger either a new session or a reload. The next `resources_discover` cycle sees the updated list and contributes the corresponding paths, so the new pack selection takes effect immediately.
+Session commands reuse the same mechanism. `resource:pack:session:new` and `resource:pack:session:reload` update the temp file, then trigger either a new session or a reload. The next `resources_discover` cycle reads the updated file and contributes the corresponding paths, so the new pack selection takes effect immediately. Because the file lives in the temp directory, the selection is not meant to survive a full computer restart.
 
 ---
 
