@@ -1,3 +1,13 @@
+## 1.0.3 (2026-07-03)
+
+### 🩹 Fixes
+
+- **pi-session-manager:** persist session series without returns ([6d12cc0](https://github.com/louiss0/pi-packages/commit/6d12cc0))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.2 (2026-07-03)
 
 ### 🩹 Fixes

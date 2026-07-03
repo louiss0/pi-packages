@@ -1,3 +1,15 @@
+## 4.0.7 (2026-07-03)
+
+### 🩹 Fixes
+
+- **workspace:** standardize typecheck and pi metadata generation ([a92fe96](https://github.com/louiss0/pi-packages/commit/a92fe96))
+- **pi-agent-resource:** clear pack selection on quit ([5a34363](https://github.com/louiss0/pi-packages/commit/5a34363))
+- **pi-agent-resource:** always create selected pack resources ([47aafe9](https://github.com/louiss0/pi-packages/commit/47aafe9))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 4.0.6 (2026-06-17)
 
 ### 🧱 Updated Dependencies
