@@ -1,3 +1,13 @@
+## 1.0.1 (2026-07-03)
+
+### 🩹 Fixes
+
+- **pi-session-manager:** update package metadata ([78cafe6](https://github.com/louiss0/pi-packages/commit/78cafe6))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 # 1.0.0 (2026-07-02)
 
 ### 🚀 Features

@@ -1,3 +1,7 @@
+# 2.0.0 (2026-07-03)
+
+This was a version bump only for pi-prompt-guard to align it with other projects, there were no code changes.
+
 ## 1.0.8 (2026-06-22)
 
 ### 🩹 Fixes
