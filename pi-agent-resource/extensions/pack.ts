@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createExternalEditorFactory,
   MultiSelect,
@@ -11,7 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Component, SelectItem, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
-
+import { editMarkdownWithExternalEditor } from "../shared/external-editor";
 import {
   getPathResolver,
   NodeFileSystem,
@@ -22,13 +24,12 @@ import {
   createOptionalSkillForm,
   createPromptForm,
   createRequiredSkillForm,
-  renderPromptMarkdown,
-  renderSkillMarkdown,
   type OptionalSkillFields,
   type PromptFields,
   type RequiredSkillFields,
+  renderPromptMarkdown,
+  renderSkillMarkdown,
 } from "../shared/resource-components";
-import { editMarkdownWithExternalEditor } from "../shared/external-editor";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 
 const PACK_LABEL = "pack";
@@ -94,40 +95,90 @@ export async function openExternalEditor(
   return undefined;
 }
 
-export default function (pi: ExtensionAPI) {
-  const SPACE_OR_COMMA_RANGE = /[\s,]+/;
+export const PACK_SELECTION_FILE_NAME = "pi-agent-resource-packs.json";
 
+export function getPackSelectionFilePath(tempDirectory = tmpdir()) {
+  return join(tempDirectory, PACK_SELECTION_FILE_NAME);
+}
+
+export function splitPackNames(value: string) {
+  return value.split(/[\s,]+/).filter(Boolean);
+}
+
+export async function readPackSelection(
+  fileSystem: ResourceFileSystem,
+  filePath = getPackSelectionFilePath(),
+) {
+  const result = await fileSystem.readFile(filePath);
+
+  if (!result.success) {
+    return [] as ReadonlyArray<string>;
+  }
+
+  try {
+    const packs = JSON.parse(result.data);
+
+    if (!Array.isArray(packs)) {
+      return [] as ReadonlyArray<string>;
+    }
+
+    return packs.filter((pack): pack is string => typeof pack === "string");
+  } catch {
+    return [] as ReadonlyArray<string>;
+  }
+}
+
+export async function savePackSelection(
+  fileSystem: ResourceFileSystem,
+  packs: ReadonlyArray<string>,
+  filePath = getPackSelectionFilePath(),
+) {
+  return fileSystem.writeFile(filePath, JSON.stringify(packs, null, 2));
+}
+
+export async function getActivePackPaths(
+  fileSystem: ResourceFileSystem,
+  pathResolver: ResourcePathResolver,
+  filePath = getPackSelectionFilePath(),
+) {
+  const packs = await readPackSelection(fileSystem, filePath);
+
+  return {
+    promptPaths: packs.map((pack) =>
+      pathResolver.resolvePackPromptPath(pack, ""),
+    ),
+    skillPaths: packs.map((pack) =>
+      pathResolver.resolvePackSkillPath(pack, ""),
+    ),
+  };
+}
+
+export default function (pi: ExtensionAPI) {
   const LOAD_PACK_FLAG = "resource:load-pack";
   pi.registerFlag(LOAD_PACK_FLAG, {
     type: "string",
     description: "Load a pack using the it's name only",
   });
 
-  let packs: ReadonlyArray<string> | undefined;
-
-  pi.on("resources_discover", (event, ctx) => {
+  pi.on("resources_discover", async (event, ctx) => {
     const pathResolver = getPathResolver();
+    const fileSystem = new NodeFileSystem();
+    const selectionPath = getPackSelectionFilePath();
 
     if (event.reason === "startup") {
       const loadPack = pi.getFlag(LOAD_PACK_FLAG);
 
-      if (typeof loadPack !== "string") {
-        return;
+      if (typeof loadPack === "string") {
+        const packs = splitPackNames(loadPack);
+
+        if (packs.length > 0) {
+          ctx.ui.notify(`Loading pack ${loadPack}`);
+          await savePackSelection(fileSystem, packs, selectionPath);
+        }
       }
-
-      ctx.ui.notify(`Loading pack ${loadPack}`);
-
-      packs = loadPack.split(SPACE_OR_COMMA_RANGE);
     }
 
-    return {
-      promptPaths: packs?.map((pack) =>
-        pathResolver.resolvePackPromptPath(pack, ""),
-      ),
-      skillPaths: packs?.map((pack) =>
-        pathResolver.resolvePackSkillPath(pack, ""),
-      ),
-    };
+    return getActivePackPaths(fileSystem, pathResolver, selectionPath);
   });
 
   const SESSION_SUB_COMMAND = "session";
@@ -162,7 +213,7 @@ export default function (pi: ExtensionAPI) {
           return;
         }
 
-        packs = result;
+        await savePackSelection(nodeFileSystem, result);
 
         const sessionResult = await ctx.newSession({
           parentSession: ctx.sessionManager.getSessionFile(),
@@ -175,7 +226,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      packs = argument.split(SPACE_OR_COMMA_RANGE);
+      await savePackSelection(nodeFileSystem, splitPackNames(argument));
 
       const sessionResult = await ctx.newSession();
 
@@ -216,12 +267,12 @@ export default function (pi: ExtensionAPI) {
           return;
         }
 
-        packs = result;
+        await savePackSelection(nodeFileSystem, result);
 
         return await ctx.reload();
       }
 
-      packs = argument.split(SPACE_OR_COMMA_RANGE);
+      await savePackSelection(nodeFileSystem, splitPackNames(argument));
 
       return await ctx.reload();
     },
@@ -417,6 +468,10 @@ export function rootPackResourceReducer(
             );
 
             if (!values) {
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackPromptPath(packName, "example.md"),
+                examplePromptContent,
+              );
               continue;
             }
 
@@ -427,6 +482,10 @@ export function rootPackResourceReducer(
             );
 
             if (template instanceof Error) {
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackPromptPath(packName, "example.md"),
+                examplePromptContent,
+              );
               continue;
             }
 
@@ -473,6 +532,18 @@ export function rootPackResourceReducer(
             );
 
             if (!requiredValues) {
+              const skillPath = deps.pathResolver.resolvePackSkillPath(
+                packName,
+                "example",
+              );
+              await deps.fileSystem.mkdir(skillPath, { recursive: true });
+              await deps.fileSystem.writeFile(
+                deps.pathResolver.resolvePackSkillPath(
+                  packName,
+                  "example/SKILL.md",
+                ),
+                exampleSkillContent,
+              );
               continue;
             }
 

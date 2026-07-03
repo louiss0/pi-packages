@@ -21,27 +21,31 @@ vi.mock("@code-fixer-23/pi-form-components", async () => {
 });
 
 import {
-  exampleAgentContent,
-  examplePromptContent,
-  exampleSkillContent,
-  getCreatePackResourceSelector,
-  getMultiSelectorFactory,
-  openExternalEditor,
-  promptPackResourceReducer,
-  rootPackResourceReducer,
-  skillPackResourceReducer,
-} from "./pack";
+  MemoryFileSystem,
+  PathResolver,
+  type ResourcePathResolver,
+  type ResourceResult,
+} from "../shared/filesystem";
 import {
   renderPromptMarkdown,
   renderSkillMarkdown,
 } from "../shared/resource-components";
 import { modalEditorOverlayOptions } from "../shared/ui";
 import {
-  MemoryFileSystem,
-  PathResolver,
-  type ResourcePathResolver,
-  type ResourceResult,
-} from "../shared/filesystem";
+  exampleAgentContent,
+  examplePromptContent,
+  exampleSkillContent,
+  getActivePackPaths,
+  getCreatePackResourceSelector,
+  getMultiSelectorFactory,
+  openExternalEditor,
+  promptPackResourceReducer,
+  readPackSelection,
+  rootPackResourceReducer,
+  savePackSelection,
+  skillPackResourceReducer,
+  splitPackNames,
+} from "./pack";
 
 type MockContext =
   | Partial<ExtensionCommandContext>
@@ -155,6 +159,7 @@ describe("Pack", () => {
       const notify = vi.fn();
       const ctx = createTestContext({ ui: { custom, notify } });
 
+      vi.stubEnv("VISUAL", "");
       vi.stubEnv("EDITOR", "test-editor");
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
 
@@ -170,6 +175,47 @@ describe("Pack", () => {
         modalEditorOverlayOptions,
       );
       expect(notify).not.toHaveBeenCalledWith(expect.any(String), "error");
+    });
+  });
+
+  describe("pack state storage", () => {
+    it("splits pack names from comma and space separated input", () => {
+      expect(splitPackNames("alpha, beta  gamma")).toEqual([
+        "alpha",
+        "beta",
+        "gamma",
+      ]);
+    });
+
+    it("stores and reloads pack names from a JSON file", async () => {
+      const filePath = "/packs/pi-agent-resource-packs.json";
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(fileSystem, ["alpha", "beta"], filePath);
+
+      await expect(readPackSelection(fileSystem, filePath)).resolves.toEqual([
+        "alpha",
+        "beta",
+      ]);
+    });
+
+    it("loads pack paths from the file each time they are needed", async () => {
+      const filePath = "/packs/pi-agent-resource-packs.json";
+      const readFileSpy = vi.spyOn(fileSystem, "readFile");
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(fileSystem, ["alpha"], filePath);
+
+      await expect(
+        getActivePackPaths(fileSystem, pathResolver, filePath),
+      ).resolves.toEqual({
+        promptPaths: [pathResolver.resolvePackPromptPath("alpha", "")],
+        skillPaths: [pathResolver.resolvePackSkillPath("alpha", "")],
+      });
+
+      await getActivePackPaths(fileSystem, pathResolver, filePath);
+
+      expect(readFileSpy).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -191,6 +237,7 @@ describe("Pack", () => {
       const resourceChoices = ["prompts", "skills"] as const;
       const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
 
+      vi.stubEnv("VISUAL", "");
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
@@ -287,6 +334,44 @@ describe("Pack", () => {
           input: vi.fn().mockResolvedValue(packName),
           notify: vi.fn(),
           select: vi.fn().mockResolvedValue("no"),
+        },
+      } satisfies MockContext;
+
+      const mockCreatePackResourceSelector =
+        getMockCreatePackResourceSelector(resourceChoices);
+
+      await rootPackResourceReducer("create", {
+        createPackResourceSelector: mockCreatePackResourceSelector,
+        ctx: createTestContext(ctx),
+        fileSystem,
+        pathResolver,
+      });
+
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackPromptPath(packName, "example.md"),
+        examplePromptContent,
+      );
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        pathResolver.resolvePackSkillPath(packName, "example/SKILL.md"),
+        exampleSkillContent,
+      );
+    });
+
+    it("falls back to example resources when prefill is cancelled", async () => {
+      const packName = "front-end";
+      const resourceChoices = ["prompts", "skills"] as const;
+      const writeFileSpy = vi.spyOn(fileSystem, "writeFile");
+
+      const ctx = {
+        ui: {
+          custom: vi
+            .fn()
+            .mockImplementationOnce(mockCustomUIFactory)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null),
+          input: vi.fn().mockResolvedValue(packName),
+          notify: vi.fn(),
+          select: vi.fn().mockResolvedValue("yes"),
         },
       } satisfies MockContext;
 
@@ -1063,6 +1148,7 @@ describe("Pack", () => {
 
   definePackResourceReducerSuite({
     buildCreateUi: (resourceName) => {
+      vi.stubEnv("VISUAL", "");
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
