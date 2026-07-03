@@ -135,6 +135,10 @@ function updatePackageJson(tree, projectRoot, projectKind) {
   };
   packageJson.homepage = repositoryUrl;
   packageJson.bugs = { url: `${repositoryUrl}/issues` };
+  packageJson.pi = {
+    extensions: ["extensions", "extensions/!*.test.ts"],
+    image: "",
+  };
 
   delete packageJson.scripts;
 

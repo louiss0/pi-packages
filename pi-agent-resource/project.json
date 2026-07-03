@@ -4,6 +4,14 @@
   "projectType": "library",
   "root": "pi-agent-resource",
   "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^typecheck"],
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "{projectRoot}"
+      }
+    },
     "check": {
       "executor": "nx:run-commands",
       "options": {
