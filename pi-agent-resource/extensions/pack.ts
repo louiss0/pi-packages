@@ -136,6 +136,13 @@ export async function savePackSelection(
   return fileSystem.writeFile(filePath, JSON.stringify(packs, null, 2));
 }
 
+export async function clearPackSelection(
+  fileSystem: ResourceFileSystem,
+  filePath = getPackSelectionFilePath(),
+) {
+  return fileSystem.removeFile(filePath);
+}
+
 export async function getActivePackPaths(
   fileSystem: ResourceFileSystem,
   pathResolver: ResourcePathResolver,
@@ -179,6 +186,14 @@ export default function (pi: ExtensionAPI) {
     }
 
     return getActivePackPaths(fileSystem, pathResolver, selectionPath);
+  });
+
+  pi.on("session_shutdown", async (event) => {
+    if (event.reason !== "quit") {
+      return;
+    }
+
+    await clearPackSelection(new NodeFileSystem());
   });
 
   const SESSION_SUB_COMMAND = "session";

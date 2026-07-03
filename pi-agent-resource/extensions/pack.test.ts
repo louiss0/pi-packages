@@ -32,6 +32,7 @@ import {
 } from "../shared/resource-components";
 import { modalEditorOverlayOptions } from "../shared/ui";
 import {
+  clearPackSelection,
   exampleAgentContent,
   examplePromptContent,
   exampleSkillContent,
@@ -216,6 +217,18 @@ describe("Pack", () => {
       await getActivePackPaths(fileSystem, pathResolver, filePath);
 
       expect(readFileSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("removes the pack selection file when cleanup runs", async () => {
+      const filePath = "/packs/pi-agent-resource-packs.json";
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(fileSystem, ["alpha"], filePath);
+      await clearPackSelection(fileSystem, filePath);
+
+      await expect(readPackSelection(fileSystem, filePath)).resolves.toEqual(
+        [],
+      );
     });
   });
 
