@@ -51,13 +51,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    const sessionData = consumePersistedSessionSeriesData();
-
-    if (sessionData) {
-      pi.setSessionName(sessionData.sessionName);
-      const { customType, ...data } = sessionData.entry;
-      pi.appendEntry(customType, data);
-    }
+    applyPersistedSessionSeriesData(pi, ctx);
 
     const dayLimitResult =
       sessionManagerConfigurator.getSessionDeletionDayLimit();
@@ -692,6 +686,24 @@ export function consumePersistedSessionSeriesData(
   } catch {
     return;
   }
+}
+
+export function applyPersistedSessionSeriesData(
+  pi: Pick<ExtensionAPI, "setSessionName" | "appendEntry">,
+  ctx: Pick<ExtensionCommandContext, "ui">,
+  tempPath = getSessionSeriesDataTempPath(),
+) {
+  const sessionData = consumePersistedSessionSeriesData(tempPath);
+
+  if (!sessionData) {
+    return false;
+  }
+
+  pi.setSessionName(sessionData.sessionName);
+  const { customType, ...data } = sessionData.entry;
+  pi.appendEntry(customType, data);
+  ctx.ui.notify("Setting necessary session data");
+  return true;
 }
 
 function promptForUniqueTrimmedInput(

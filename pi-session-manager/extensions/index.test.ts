@@ -13,6 +13,8 @@ import {
   handleSessionSeries,
   getSessionSeriesDataTempPath,
   persistSessionSeriesData,
+  consumePersistedSessionSeriesData,
+  applyPersistedSessionSeriesData,
   $TimestampCalculator,
   type $SessionFilter,
   type DurationRecord,
@@ -271,6 +273,9 @@ describe("persisted session series data", () => {
       },
     };
 
+    expect(applyPersistedSessionSeriesData(pi as never, ctx as never)).toBe(
+      true,
+    );
     expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
     expect(pi.appendEntry).toHaveBeenCalledWith(sessionData.entry.customType, {
       series: sessionData.entry.series,
@@ -770,7 +775,7 @@ describe("handleSessionSeries", () => {
       "appendSessionSeriesBasedOnCwd",
     );
 
-    const sessionData = await handleSessionSeries(
+    await handleSessionSeries(
       "new",
       {
         sessionManagerConfigurator,
@@ -818,7 +823,9 @@ describe("handleSessionSeries", () => {
     });
 
     const sessionSeriesAndTitle = `${context.ui.select.mock.settledResults[0]?.value}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[0]?.value}`;
-    expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
+    expect(consumePersistedSessionSeriesData()).toMatchObject({
+      sessionName: sessionSeriesAndTitle,
+    });
 
     expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -969,7 +976,7 @@ describe("handleSessionSeries", () => {
       "appendSessionSeriesBasedOnCwd",
     );
 
-    const sessionData = await handleSessionSeries(
+    await handleSessionSeries(
       "continue",
       {
         sessionFilter: new MockSessionFilter(
@@ -1026,7 +1033,9 @@ describe("handleSessionSeries", () => {
     });
 
     const sessionSeriesAndTitle = `${entry.data.series}${SESION_TITLE_SEPARATOR}${context.ui.input.mock.settledResults[1]?.value?.trim()}`;
-    expect(sessionData).toMatchObject({ sessionName: sessionSeriesAndTitle });
+    expect(consumePersistedSessionSeriesData()).toMatchObject({
+      sessionName: sessionSeriesAndTitle,
+    });
     expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
       sessionCtx.cwd,
       entry.data.series,
