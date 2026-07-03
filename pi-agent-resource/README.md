@@ -142,11 +142,15 @@ Reloads the current Pi session with a new pack selection. Passing names switches
 
 ### Features
 
-**Warning: pack selection is temporary**
+`pi-agent-resource` provides pack creation, pack editing, and pack session loading for Pi resources. It also keeps the active pack list in the OS temp directory so the same selection can be reused during the current run.
 
-Pack loading uses a JSON file in the OS temp directory so the active pack list can be reused during the current Pi run. `resources_discover` reads that file whenever packs are needed, and `resource:pack:session:new` / `resource:pack:session:reload` update it before starting or reloading a session.
+> [!WARNING] Pack selection only lasts for the current Pi run
 
-The selection is removed when Pi exits, so it does not survive a shutdown or restart.
+> `pi-agent-resource` stores the active pack list in a JSON file inside the OS temp directory so pack loading, new sessions, and reloads can reuse the same selection while Pi is open.
+
+> `resource:pack:session:new`, `resource:pack:session:reload`, and `resources_discover` all work from that temp file, and Pi deletes it on quit.
+
+> This feature is session-scoped only; it is not meant to survive a shutdown or restart.
 
 ---
 
