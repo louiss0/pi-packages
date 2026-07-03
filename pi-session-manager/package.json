@@ -32,6 +32,10 @@
     "@earendil-works/pi-tui": "*"
   },
   "pi": {
+    "extensions": [
+      "extensions",
+      "extensions/!*.test.ts"
+    ],
     "image": "https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-session-manager/assets/Pi-Session-Manager-Small.png"
   }
 }
