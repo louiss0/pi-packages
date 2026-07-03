@@ -1,3 +1,13 @@
+## 1.0.2 (2026-07-03)
+
+### 🩹 Fixes
+
+- **pi-session-manager:** rename session manager asset filename ([386f99e](https://github.com/louiss0/pi-packages/commit/386f99e))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.1 (2026-07-03)
 
 ### 🩹 Fixes
