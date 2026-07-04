@@ -1,3 +1,13 @@
+## 1.0.4 (2026-07-04)
+
+### 🩹 Fixes
+
+- **pi-session-manager:** do proper session restoration ([271d67d](https://github.com/louiss0/pi-packages/commit/271d67d))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.3 (2026-07-03)
 
 ### 🩹 Fixes
