@@ -45,13 +45,16 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (event, ctx) => {
     sessionManagerConfigurator = new SessionManagerConfigurator();
+
+    if (event.reason !== "fork" && event.reason !== "reload") {
+      applyPersistedSessionSeriesData(pi, ctx);
+    }
+
     const eventIsNotReloadOrStartUp =
       event.reason !== "reload" && event.reason !== "startup";
     if (eventIsNotReloadOrStartUp) {
       return;
     }
-
-    applyPersistedSessionSeriesData(pi, ctx);
 
     const dayLimitResult =
       sessionManagerConfigurator.getSessionDeletionDayLimit();
