@@ -11,6 +11,7 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
+  getSessionEntryWithSeries,
   getSessionSeriesDataTempPath,
   persistSessionSeriesData,
   consumePersistedSessionSeriesData,
@@ -285,6 +286,54 @@ describe("persisted session series data", () => {
       "Setting necessary session data",
     );
     expect(existsSync(tempSessionDataPath)).toBe(false);
+  });
+});
+
+describe("getSessionEntryWithSeries", () => {
+  it("only returns the series entry that matches the current session name", () => {
+    const createdAt = new Date().toISOString();
+    const lspCoverageEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "LSP Coverage",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+    const authEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "Auth Cleanup",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [lspCoverageEntry, authEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toBe(authEntry);
+  });
+
+  it("does not return another session's series entry", () => {
+    const createdAt = new Date().toISOString();
+    const lspCoverageEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "LSP Coverage",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [lspCoverageEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -1006,6 +1055,9 @@ describe("handleSessionSeries", () => {
       sessionManager: {
         getEntries:
           vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+        getSessionName: vi
+          .fn<ExtensionCommandContext["sessionManager"]["getSessionName"]>()
+          .mockReturnValue("refactor-auth-middleware--current-task"),
       },
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
       ui: {
@@ -1058,6 +1110,9 @@ describe("handleSessionSeries", () => {
       sessionManager: {
         getEntries:
           vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+        getSessionName: vi
+          .fn<ExtensionCommandContext["sessionManager"]["getSessionName"]>()
+          .mockReturnValue("refactor-auth-middleware--current-task"),
       },
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(
         async (options) => {
@@ -1133,6 +1188,7 @@ describe("handleSessionSeries", () => {
 
     expect(getSessionEntryWithSeries).toHaveBeenCalledWith(
       context.sessionManager.getEntries.mock.results[0]?.value,
+      context.sessionManager.getSessionName(),
     );
 
     const entry = getSessionEntryWithSeries.mock.results[0]

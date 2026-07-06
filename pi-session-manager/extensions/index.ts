@@ -515,13 +515,22 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
   }
 }
 
-function getSessionEntryWithSeries(
-  sesssionEntries: SessionEntry[],
+export function getSessionEntryWithSeries(
+  sessionEntries: SessionEntry[],
+  sessionName?: string,
 ): SessionSeriesEntry | undefined {
-  return sesssionEntries.find(
+  const matchingEntries = sessionEntries.filter(
     (entry): entry is SessionSeriesEntry =>
       entry.type === sessionSeriesEntrySchema.entries.type.literal &&
       entry.customType === sessionSeriesEntrySchema.entries.customType.literal,
+  );
+
+  if (!sessionName) {
+    return matchingEntries.at(-1);
+  }
+
+  return matchingEntries.find((entry) =>
+    sessionName.startsWith(`${entry.data.series}${SESION_TITLE_SEPARATOR}`),
   );
 }
 
@@ -939,7 +948,10 @@ export async function handleSessionSeries(
 
     case "continue": {
       const entries = ctx.sessionManager.getEntries();
-      const entry = deps.getSessionEntryWithSeries(entries);
+      const entry = deps.getSessionEntryWithSeries(
+        entries,
+        ctx.sessionManager.getSessionName(),
+      );
 
       if (!entry) {
         ctx.ui.notify("No session series was found", "error");
