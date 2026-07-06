@@ -507,6 +507,40 @@ describe("handleSessionSeries", () => {
       );
     });
 
+    it("stops creating a session series when the series prompt is cancelled", async () => {
+      const context = {
+        cwd: "/pi-packages",
+        newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+        ui: {
+          notify: vi.fn<ExtensionUIContext["notify"]>(),
+          input: vi
+            .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValue(undefined),
+        },
+      } satisfies MockExtenstionCommandContext;
+
+      await handleSessionSeries(
+        "create",
+        {
+          sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+          sessionFilter: new MockSessionFilter(
+            [],
+            new MockPastTimestampCalculator(),
+          ),
+          getSessionEntryWithSeries() {
+            return undefined;
+          },
+          removeSessionFiles() {
+            return;
+          },
+        },
+        castToExtensionContext(context),
+      );
+
+      expect(context.ui.input).toHaveBeenCalledTimes(1);
+      expect(context.newSession).not.toHaveBeenCalled();
+    });
+
     const seriesInput = "Implement Auth";
     it("keeps asking for a unique trimmed session series when creating", async () => {
       const sessionCtx = {
@@ -834,6 +868,50 @@ describe("handleSessionSeries", () => {
     );
   });
 
+  it("stops creating a new session in a series when the title prompt is cancelled", async () => {
+    const selectedSeries = "refactor-auth-middleware";
+    const context = {
+      cwd: "/user/work/cancel-new-title",
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue(undefined),
+        select: vi
+          .fn<ExtensionUIContext["select"]>()
+          .mockResolvedValue(selectedSeries),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    await handleSessionSeries(
+      "new",
+      {
+        sessionManagerConfigurator: new SessionManagerConfiguratorMock({
+          seriesRecord: {
+            [context.cwd]: {
+              [selectedSeries]: [],
+            },
+          },
+        }),
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
+        removeSessionFiles() {
+          return;
+        },
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(context.ui.input).toHaveBeenCalledTimes(1);
+    expect(context.newSession).not.toHaveBeenCalled();
+  });
+
   it("keeps asking for a unique trimmed title when creating a new session in a series", async () => {
     const selectedSeries = "refactor-auth-middleware";
 
@@ -920,6 +998,51 @@ describe("handleSessionSeries", () => {
           with Refactor Hooks
           `,
     );
+  });
+
+  it("stops continuing a session in a series when the title prompt is cancelled", async () => {
+    const context = {
+      cwd: "/user/work/cancel-continue-title",
+      sessionManager: {
+        getEntries:
+          vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+      },
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue(undefined),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    await handleSessionSeries(
+      "continue",
+      {
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
+        getSessionEntryWithSeries() {
+          return {
+            type: "custom",
+            customType: sessionSeriesEntrySchema.entries.customType.literal,
+            data: {
+              series: "refactor-auth-middleware",
+              createdAt: new Date().toISOString(),
+            },
+          } as SessionSeriesEntry;
+        },
+        sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+        removeSessionFiles() {
+          return;
+        },
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(context.ui.input).toHaveBeenCalledTimes(1);
+    expect(context.newSession).not.toHaveBeenCalled();
   });
 
   it("continues a session in a series when continue is passed", async () => {

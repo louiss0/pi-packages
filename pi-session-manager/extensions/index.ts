@@ -721,6 +721,10 @@ function promptForUniqueTrimmedInput(
       const value = await ctx.ui.input(prompt, description);
       const trimmedValue = value?.trim();
 
+      if (value === undefined) {
+        return;
+      }
+
       if (!trimmedValue) {
         continue;
       }
@@ -780,6 +784,10 @@ export async function handleSessionSeries(
         (value) => `This series has already been added ${value}`,
       );
 
+      if (!series) {
+        return;
+      }
+
       const titlesResult =
         deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
           ctx.cwd,
@@ -798,6 +806,10 @@ export async function handleSessionSeries(
         titlesResult,
         (value) => `This title has already been added ${value}`,
       );
+
+      if (!title) {
+        return;
+      }
 
       const sessionData = {
         sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
@@ -893,6 +905,10 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      if (!title) {
+        return;
+      }
+
       const sessionData = {
         sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
         entry: {
@@ -944,6 +960,10 @@ export async function handleSessionSeries(
         titlesResult,
         (value) => `This title has already been added ${value}`,
       );
+
+      if (!title) {
+        return;
+      }
 
       const sessionData = {
         sessionName: `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
