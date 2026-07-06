@@ -254,6 +254,7 @@ describe("persisted session series data", () => {
       sessionName: `Implement Auth${SESION_TITLE_SEPARATOR}Create JWT Token`,
       entry: {
         customType: sessionSeriesEntrySchema.entries.customType.literal,
+        sessionName: `Implement Auth${SESION_TITLE_SEPARATOR}Create JWT Token`,
         series: "Implement Auth",
         createdAt: new Date().toISOString(),
       },
@@ -279,6 +280,7 @@ describe("persisted session series data", () => {
     );
     expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
     expect(pi.appendEntry).toHaveBeenCalledWith(sessionData.entry.customType, {
+      sessionName: sessionData.entry.sessionName,
       series: sessionData.entry.series,
       createdAt: sessionData.entry.createdAt,
     });
@@ -296,6 +298,7 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
+        sessionName: `LSP Coverage${SESION_TITLE_SEPARATOR}Add diagnostics`,
         series: "LSP Coverage",
         createdAt,
       },
@@ -304,6 +307,7 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
+        sessionName: `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
         series: "Auth Cleanup",
         createdAt,
       },
@@ -323,6 +327,7 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
+        sessionName: `LSP Coverage${SESION_TITLE_SEPARATOR}Add diagnostics`,
         series: "LSP Coverage",
         createdAt,
       },
@@ -1080,6 +1085,7 @@ describe("handleSessionSeries", () => {
             type: "custom",
             customType: sessionSeriesEntrySchema.entries.customType.literal,
             data: {
+              sessionName: "refactor-auth-middleware--current-task",
               series: "refactor-auth-middleware",
               createdAt: new Date().toISOString(),
             },
@@ -1134,6 +1140,7 @@ describe("handleSessionSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
+        sessionName: "refactor-auth-middleware--current-task",
         series: "refactor-auth-middleware",
         createdAt: new Date().toISOString(),
       },
