@@ -254,8 +254,8 @@ describe("persisted session series data", () => {
       sessionName: `Implement Auth${SESION_TITLE_SEPARATOR}Create JWT Token`,
       entry: {
         customType: sessionSeriesEntrySchema.entries.customType.literal,
-        sessionName: `Implement Auth${SESION_TITLE_SEPARATOR}Create JWT Token`,
         series: "Implement Auth",
+        sessionTitle: "Create JWT Token",
         createdAt: new Date().toISOString(),
       },
     };
@@ -280,8 +280,8 @@ describe("persisted session series data", () => {
     );
     expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
     expect(pi.appendEntry).toHaveBeenCalledWith(sessionData.entry.customType, {
-      sessionName: sessionData.entry.sessionName,
       series: sessionData.entry.series,
+      sessionTitle: sessionData.entry.sessionTitle,
       createdAt: sessionData.entry.createdAt,
     });
     expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -298,8 +298,8 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
-        sessionName: `LSP Coverage${SESION_TITLE_SEPARATOR}Add diagnostics`,
         series: "LSP Coverage",
+        sessionTitle: "Add diagnostics",
         createdAt,
       },
     } as SessionSeriesEntry;
@@ -307,8 +307,8 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
-        sessionName: `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
         series: "Auth Cleanup",
+        sessionTitle: "Fix token refresh",
         createdAt,
       },
     } as SessionSeriesEntry;
@@ -327,8 +327,8 @@ describe("getSessionEntryWithSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
-        sessionName: `LSP Coverage${SESION_TITLE_SEPARATOR}Add diagnostics`,
         series: "LSP Coverage",
+        sessionTitle: "Add diagnostics",
         createdAt,
       },
     } as SessionSeriesEntry;
@@ -1085,8 +1085,8 @@ describe("handleSessionSeries", () => {
             type: "custom",
             customType: sessionSeriesEntrySchema.entries.customType.literal,
             data: {
-              sessionName: "refactor-auth-middleware--current-task",
               series: "refactor-auth-middleware",
+              sessionTitle: "current-task",
               createdAt: new Date().toISOString(),
             },
           } as SessionSeriesEntry;
@@ -1140,8 +1140,8 @@ describe("handleSessionSeries", () => {
       type: "custom",
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
-        sessionName: "refactor-auth-middleware--current-task",
         series: "refactor-auth-middleware",
+        sessionTitle: "current-task",
         createdAt: new Date().toISOString(),
       },
     } as SessionSeriesEntry;

@@ -530,7 +530,9 @@ export function getSessionEntryWithSeries(
   }
 
   return matchingEntries.find(
-    (entry) => entry.data.sessionName === sessionName,
+    (entry) =>
+      `${entry.data.series}${SESION_TITLE_SEPARATOR}${entry.data.sessionTitle}` ===
+      sessionName,
   );
 }
 
@@ -639,8 +641,8 @@ export const sessionSeriesEntrySchema = object({
   type: literal("custom"),
   customType: literal("session-manager/series"),
   data: object({
-    sessionName: string(),
     series: string(),
+    sessionTitle: string(),
     createdAt: pipe(string(), isoTimestamp()),
   }),
 });
@@ -652,8 +654,8 @@ export const sessionSeriesDataSchema = object({
   sessionName: string(),
   entry: object({
     customType: literal("session-manager/series"),
-    sessionName: string(),
     series: string(),
+    sessionTitle: string(),
     createdAt: pipe(string(), isoTimestamp()),
   }),
 });
@@ -827,8 +829,8 @@ export async function handleSessionSeries(
         sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
-          sessionName,
           series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };
@@ -927,8 +929,8 @@ export async function handleSessionSeries(
         sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
-          sessionName,
           series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };
@@ -988,8 +990,8 @@ export async function handleSessionSeries(
         sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
-          sessionName,
           series: entry.data.series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };
