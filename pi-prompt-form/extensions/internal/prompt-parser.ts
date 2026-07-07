@@ -109,6 +109,7 @@ export function parseArgumentHint(
 
 export type Placeholder =
   | { kind: "single"; position: number }
+  | { kind: "default"; position: number; value: string }
   | { kind: "slice"; start: number; end: number }
   | { kind: "named"; name: "ARGUMENTS" }
   | { kind: "rest" };
@@ -120,8 +121,13 @@ export class InvalidPlaceholderError extends Error {
   }
 }
 
-const PLACEHOLDER_PATTERN =
-  /\{@:([0-9]+)(?::([0-9]+))?\}|\$ARGUMENTS|\$@|\$([0-9]+)/g;
+const PLACEHOLDER_PATTERN = /\$\{[^}]+\}|\$ARGUMENTS|\$@|\$[1-9]\d*/g;
+
+// `${1:-fallback}` keeps prompt templates concise when a typed argument is blank.
+const DEFAULT_PLACEHOLDER_PATTERN = /^\$\{([1-9]\d*):-([^}]*)\}$/;
+
+// `${@:N}` and `${@:N:L}` expand from a 1-based argument position.
+const SLICE_PLACEHOLDER_PATTERN = /^\$\{@:([1-9]\d*)(?::([1-9]\d*))?\}$/;
 
 export function parsePlaceholders(
   markdownContent: string,
@@ -144,29 +150,54 @@ export function parsePlaceholders(
 
   const placeholders: Placeholder[] = [];
 
-  for (const match of markdownContent.matchAll(PLACEHOLDER_PATTERN)) {
-    const [placeholder, sliceStart, sliceEnd, singlePosition] = match;
+  for (const placeholder of markdownContent.matchAll(PLACEHOLDER_PATTERN)) {
+    const [placeholderText] = placeholder;
 
-    if (placeholder === "$ARGUMENTS") {
+    if (placeholderText === "$ARGUMENTS") {
       placeholders.push({ kind: "named", name: "ARGUMENTS" });
       continue;
     }
 
-    if (placeholder === "$@") {
+    if (placeholderText === "$@") {
       placeholders.push({ kind: "rest" });
       continue;
     }
 
-    if (singlePosition) {
-      placeholders.push({ kind: "single", position: Number(singlePosition) });
+    if (/^\$[1-9]\d*$/.test(placeholderText)) {
+      placeholders.push({
+        kind: "single",
+        position: Number(placeholderText.slice(1)),
+      });
       continue;
     }
 
-    if (sliceStart) {
+    const defaultMatch = DEFAULT_PLACEHOLDER_PATTERN.exec(placeholderText);
+
+    if (defaultMatch) {
+      const [, position, value] = defaultMatch;
+
+      placeholders.push({
+        kind: "default",
+        position: Number(position),
+        value: value ?? "",
+      });
+
+      continue;
+    }
+
+    const sliceMatch = SLICE_PLACEHOLDER_PATTERN.exec(placeholderText);
+
+    if (sliceMatch) {
+      const [, startText, lengthText] = sliceMatch;
+      const start = Number(startText);
+      const length = lengthText ? Number(lengthText) : Number.POSITIVE_INFINITY;
+      const end =
+        length === Number.POSITIVE_INFINITY ? length : start + length - 1;
+
       placeholders.push({
         kind: "slice",
-        start: Number(sliceStart),
-        end: sliceEnd ? Number(sliceEnd) : Number.POSITIVE_INFINITY,
+        start,
+        end,
       });
     }
   }
