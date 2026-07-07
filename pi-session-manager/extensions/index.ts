@@ -515,14 +515,52 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
   }
 }
 
-function getSessionEntryWithSeries(
-  sesssionEntries: SessionEntry[],
+export function getSessionEntryWithSeries(
+  sessionEntries: SessionEntry[],
+  sessionName?: string,
 ): SessionSeriesEntry | undefined {
-  return sesssionEntries.find(
+  const matchingEntries = sessionEntries.filter(
     (entry): entry is SessionSeriesEntry =>
       entry.type === sessionSeriesEntrySchema.entries.type.literal &&
       entry.customType === sessionSeriesEntrySchema.entries.customType.literal,
   );
+
+  if (!sessionName) {
+    return;
+  }
+
+  const normalizedSessionName = sessionName.trim();
+  const matchedEntry = matchingEntries.find((entry) => {
+    const sessionTitle =
+      entry.data.sessionTitle ?? getSessionTitleFromSessionName(normalizedSessionName, entry.data.series);
+
+    if (!sessionTitle) {
+      return false;
+    }
+
+    return `${entry.data.series}${SESION_TITLE_SEPARATOR}${sessionTitle}` === normalizedSessionName;
+  });
+
+  if (!matchedEntry || matchedEntry.data.sessionTitle) {
+    return matchedEntry;
+  }
+
+  const sessionTitle = getSessionTitleFromSessionName(
+    normalizedSessionName,
+    matchedEntry.data.series,
+  );
+
+  if (!sessionTitle) {
+    return matchedEntry;
+  }
+
+  return {
+    ...matchedEntry,
+    data: {
+      ...matchedEntry.data,
+      sessionTitle,
+    },
+  } as SessionSeriesEntry;
 }
 
 export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
@@ -620,6 +658,20 @@ export function handleSessionDeleteLast(
 }
 
 export const SESION_TITLE_SEPARATOR = "--";
+
+function getSessionTitleFromSessionName(
+  sessionName: string,
+  series: string,
+) {
+  const prefix = `${series.trim()}${SESION_TITLE_SEPARATOR}`;
+
+  if (!sessionName.startsWith(prefix)) {
+    return;
+  }
+
+  return sessionName.slice(prefix.length).trim();
+}
+
 export const sessionSeriesCommandsSchema = picklist([
   "create",
   "delete",
@@ -631,6 +683,7 @@ export const sessionSeriesEntrySchema = object({
   customType: literal("session-manager/series"),
   data: object({
     series: string(),
+    sessionTitle: string(),
     createdAt: pipe(string(), isoTimestamp()),
   }),
 });
@@ -643,6 +696,7 @@ export const sessionSeriesDataSchema = object({
   entry: object({
     customType: literal("session-manager/series"),
     series: string(),
+    sessionTitle: string(),
     createdAt: pipe(string(), isoTimestamp()),
   }),
 });
@@ -721,6 +775,10 @@ function promptForUniqueTrimmedInput(
       const value = await ctx.ui.input(prompt, description);
       const trimmedValue = value?.trim();
 
+      if (value === undefined) {
+        return;
+      }
+
       if (!trimmedValue) {
         continue;
       }
@@ -780,6 +838,10 @@ export async function handleSessionSeries(
         (value) => `This series has already been added ${value}`,
       );
 
+      if (!series) {
+        return;
+      }
+
       const titlesResult =
         deps.sessionManagerConfigurator.getSessionTitlesForSeriesBasedOnCwd(
           ctx.cwd,
@@ -799,11 +861,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      if (!title) {
+        return;
+      }
+
+      const sessionName = `${series}${SESION_TITLE_SEPARATOR}${title}`;
       const sessionData = {
-        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
+        sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
           series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };
@@ -893,11 +961,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      if (!title) {
+        return;
+      }
+
+      const sessionName = `${series}${SESION_TITLE_SEPARATOR}${title}`;
       const sessionData = {
-        sessionName: `${series}${SESION_TITLE_SEPARATOR}${title}`,
+        sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
           series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };
@@ -923,7 +997,10 @@ export async function handleSessionSeries(
 
     case "continue": {
       const entries = ctx.sessionManager.getEntries();
-      const entry = deps.getSessionEntryWithSeries(entries);
+      const entry = deps.getSessionEntryWithSeries(
+        entries,
+        ctx.sessionManager.getSessionName(),
+      );
 
       if (!entry) {
         ctx.ui.notify("No session series was found", "error");
@@ -945,11 +1022,17 @@ export async function handleSessionSeries(
         (value) => `This title has already been added ${value}`,
       );
 
+      if (!title) {
+        return;
+      }
+
+      const sessionName = `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`;
       const sessionData = {
-        sessionName: `${entry.data.series}${SESION_TITLE_SEPARATOR}${title}`,
+        sessionName,
         entry: {
           customType: sessionSeriesEntrySchema.entries.customType.literal,
           series: entry.data.series,
+          sessionTitle: title,
           createdAt: new Date().toISOString(),
         },
       };

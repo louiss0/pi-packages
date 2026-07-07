@@ -11,6 +11,7 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
+  getSessionEntryWithSeries,
   getSessionSeriesDataTempPath,
   persistSessionSeriesData,
   consumePersistedSessionSeriesData,
@@ -254,6 +255,7 @@ describe("persisted session series data", () => {
       entry: {
         customType: sessionSeriesEntrySchema.entries.customType.literal,
         series: "Implement Auth",
+        sessionTitle: "Create JWT Token",
         createdAt: new Date().toISOString(),
       },
     };
@@ -279,12 +281,89 @@ describe("persisted session series data", () => {
     expect(pi.setSessionName).toHaveBeenCalledWith(sessionData.sessionName);
     expect(pi.appendEntry).toHaveBeenCalledWith(sessionData.entry.customType, {
       series: sessionData.entry.series,
+      sessionTitle: sessionData.entry.sessionTitle,
       createdAt: sessionData.entry.createdAt,
     });
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       "Setting necessary session data",
     );
     expect(existsSync(tempSessionDataPath)).toBe(false);
+  });
+});
+
+describe("getSessionEntryWithSeries", () => {
+  it("only returns the series entry that matches the current session name", () => {
+    const createdAt = new Date().toISOString();
+    const lspCoverageEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "LSP Coverage",
+        sessionTitle: "Add diagnostics",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+    const authEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "Auth Cleanup",
+        sessionTitle: "Fix token refresh",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [lspCoverageEntry, authEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toBe(authEntry);
+  });
+
+  it("does not return another session's series entry", () => {
+    const createdAt = new Date().toISOString();
+    const lspCoverageEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "LSP Coverage",
+        sessionTitle: "Add diagnostics",
+        createdAt,
+      },
+    } as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [lspCoverageEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("falls back to the session name when legacy series entries are missing sessionTitle", () => {
+    const createdAt = new Date().toISOString();
+    const legacyEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "Auth Cleanup",
+        createdAt,
+      },
+    } as unknown as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [legacyEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toEqual({
+      ...legacyEntry,
+      data: {
+        ...legacyEntry.data,
+        sessionTitle: "Fix token refresh",
+      },
+    });
   });
 });
 
@@ -505,6 +584,40 @@ describe("handleSessionSeries", () => {
       expect(sessionCtx.ui.notify).toHaveBeenCalledWith(
         "Your session series has been created",
       );
+    });
+
+    it("stops creating a session series when the series prompt is cancelled", async () => {
+      const context = {
+        cwd: "/pi-packages",
+        newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+        ui: {
+          notify: vi.fn<ExtensionUIContext["notify"]>(),
+          input: vi
+            .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValue(undefined),
+        },
+      } satisfies MockExtenstionCommandContext;
+
+      await handleSessionSeries(
+        "create",
+        {
+          sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+          sessionFilter: new MockSessionFilter(
+            [],
+            new MockPastTimestampCalculator(),
+          ),
+          getSessionEntryWithSeries() {
+            return undefined;
+          },
+          removeSessionFiles() {
+            return;
+          },
+        },
+        castToExtensionContext(context),
+      );
+
+      expect(context.ui.input).toHaveBeenCalledTimes(1);
+      expect(context.newSession).not.toHaveBeenCalled();
     });
 
     const seriesInput = "Implement Auth";
@@ -834,6 +947,50 @@ describe("handleSessionSeries", () => {
     );
   });
 
+  it("stops creating a new session in a series when the title prompt is cancelled", async () => {
+    const selectedSeries = "refactor-auth-middleware";
+    const context = {
+      cwd: "/user/work/cancel-new-title",
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue(undefined),
+        select: vi
+          .fn<ExtensionUIContext["select"]>()
+          .mockResolvedValue(selectedSeries),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    await handleSessionSeries(
+      "new",
+      {
+        sessionManagerConfigurator: new SessionManagerConfiguratorMock({
+          seriesRecord: {
+            [context.cwd]: {
+              [selectedSeries]: [],
+            },
+          },
+        }),
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
+        getSessionEntryWithSeries() {
+          return undefined;
+        },
+        removeSessionFiles() {
+          return;
+        },
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(context.ui.input).toHaveBeenCalledTimes(1);
+    expect(context.newSession).not.toHaveBeenCalled();
+  });
+
   it("keeps asking for a unique trimmed title when creating a new session in a series", async () => {
     const selectedSeries = "refactor-auth-middleware";
 
@@ -922,6 +1079,55 @@ describe("handleSessionSeries", () => {
     );
   });
 
+  it("stops continuing a session in a series when the title prompt is cancelled", async () => {
+    const context = {
+      cwd: "/user/work/cancel-continue-title",
+      sessionManager: {
+        getEntries:
+          vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+        getSessionName: vi
+          .fn<ExtensionCommandContext["sessionManager"]["getSessionName"]>()
+          .mockReturnValue("refactor-auth-middleware--current-task"),
+      },
+      newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+        input: vi
+          .fn<ExtensionUIContext["input"]>()
+          .mockResolvedValue(undefined),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    await handleSessionSeries(
+      "continue",
+      {
+        sessionFilter: new MockSessionFilter(
+          [],
+          new MockPastTimestampCalculator(),
+        ),
+        getSessionEntryWithSeries() {
+          return {
+            type: "custom",
+            customType: sessionSeriesEntrySchema.entries.customType.literal,
+            data: {
+              series: "refactor-auth-middleware",
+              sessionTitle: "current-task",
+              createdAt: new Date().toISOString(),
+            },
+          } as SessionSeriesEntry;
+        },
+        sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+        removeSessionFiles() {
+          return;
+        },
+      },
+      castToExtensionContext(context),
+    );
+
+    expect(context.ui.input).toHaveBeenCalledTimes(1);
+    expect(context.newSession).not.toHaveBeenCalled();
+  });
+
   it("continues a session in a series when continue is passed", async () => {
     const sessionCtx = {
       cwd: "/session/continue",
@@ -935,6 +1141,9 @@ describe("handleSessionSeries", () => {
       sessionManager: {
         getEntries:
           vi.fn<ExtensionCommandContext["sessionManager"]["getEntries"]>(),
+        getSessionName: vi
+          .fn<ExtensionCommandContext["sessionManager"]["getSessionName"]>()
+          .mockReturnValue("refactor-auth-middleware--current-task"),
       },
       newSession: vi.fn<ExtensionCommandContext["newSession"]>(
         async (options) => {
@@ -957,6 +1166,7 @@ describe("handleSessionSeries", () => {
       customType: sessionSeriesEntrySchema.entries.customType.literal,
       data: {
         series: "refactor-auth-middleware",
+        sessionTitle: "current-task",
         createdAt: new Date().toISOString(),
       },
     } as SessionSeriesEntry;
@@ -1010,6 +1220,7 @@ describe("handleSessionSeries", () => {
 
     expect(getSessionEntryWithSeries).toHaveBeenCalledWith(
       context.sessionManager.getEntries.mock.results[0]?.value,
+      context.sessionManager.getSessionName(),
     );
 
     const entry = getSessionEntryWithSeries.mock.results[0]
