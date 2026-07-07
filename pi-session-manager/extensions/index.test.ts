@@ -340,6 +340,31 @@ describe("getSessionEntryWithSeries", () => {
       ),
     ).toBeUndefined();
   });
+
+  it("falls back to the session name when legacy series entries are missing sessionTitle", () => {
+    const createdAt = new Date().toISOString();
+    const legacyEntry = {
+      type: "custom",
+      customType: sessionSeriesEntrySchema.entries.customType.literal,
+      data: {
+        series: "Auth Cleanup",
+        createdAt,
+      },
+    } as unknown as SessionSeriesEntry;
+
+    expect(
+      getSessionEntryWithSeries(
+        [legacyEntry],
+        `Auth Cleanup${SESION_TITLE_SEPARATOR}Fix token refresh`,
+      ),
+    ).toEqual({
+      ...legacyEntry,
+      data: {
+        ...legacyEntry.data,
+        sessionTitle: "Fix token refresh",
+      },
+    });
+  });
 });
 
 describe("handleSessionCleanInactive", () => {
