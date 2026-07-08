@@ -1,3 +1,13 @@
+## 2.0.1 (2026-07-08)
+
+### 🩹 Fixes
+
+- prompt parsing and session-series continuation ([#6](https://github.com/louiss0/pi-packages/pull/6))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 # 2.0.0 (2026-07-03)
 
 This was a version bump only for pi-prompt-guard to align it with other projects, there were no code changes.

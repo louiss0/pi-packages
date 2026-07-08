@@ -1,7 +1,7 @@
 {
   "name": "@code-fixer-23/pi-session-manager",
   "type": "module",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "keywords": [
     "pi-package"
   ],

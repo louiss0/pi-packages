@@ -1,3 +1,13 @@
+## 1.1.11 (2026-07-08)
+
+### 🩹 Fixes
+
+- prompt parsing and session-series continuation ([#6](https://github.com/louiss0/pi-packages/pull/6))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.10 (2026-06-19)
 
 ### 🩹 Fixes
