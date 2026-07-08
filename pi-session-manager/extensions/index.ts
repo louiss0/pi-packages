@@ -532,13 +532,17 @@ export function getSessionEntryWithSeries(
   const normalizedSessionName = sessionName.trim();
   const matchedEntry = matchingEntries.find((entry) => {
     const sessionTitle =
-      entry.data.sessionTitle ?? getSessionTitleFromSessionName(normalizedSessionName, entry.data.series);
+      entry.data.sessionTitle ??
+      getSessionTitleFromSessionName(normalizedSessionName, entry.data.series);
 
     if (!sessionTitle) {
       return false;
     }
 
-    return `${entry.data.series}${SESION_TITLE_SEPARATOR}${sessionTitle}` === normalizedSessionName;
+    return (
+      `${entry.data.series}${SESION_TITLE_SEPARATOR}${sessionTitle}` ===
+      normalizedSessionName
+    );
   });
 
   if (!matchedEntry || matchedEntry.data.sessionTitle) {
@@ -659,10 +663,7 @@ export function handleSessionDeleteLast(
 
 export const SESION_TITLE_SEPARATOR = "--";
 
-function getSessionTitleFromSessionName(
-  sessionName: string,
-  series: string,
-) {
+function getSessionTitleFromSessionName(sessionName: string, series: string) {
   const prefix = `${series.trim()}${SESION_TITLE_SEPARATOR}`;
 
   if (!sessionName.startsWith(prefix)) {

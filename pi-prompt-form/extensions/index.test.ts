@@ -69,6 +69,19 @@ describe("tokenizePromptInput", () => {
     });
   });
 
+  it.each([
+    ['/release "line 1\nline 2"', ["line 1\nline 2"]],
+    ["/release 'line 1\nline 2'", ["line 1\nline 2"]],
+    ["/release line1\nline2", ["line1", "line2"]],
+    ['/release "first" second\nthird', ["first", "second", "third"]],
+    ['/release "\n"', ["\n"]],
+  ])("treats newline characters as part of quoted arguments in %s", (text, passedArguments) => {
+    expect(tokenizePromptInput(text)).toEqual({
+      commandName: "release",
+      passedArguments,
+    });
+  });
+
   it("returns an error for unterminated quotes", () => {
     expect(tokenizePromptInput('/release "my project')).toBeInstanceOf(Error);
   });
@@ -110,6 +123,55 @@ describe("buildPromptInvocation", () => {
         },
       ),
     ).toBe('/release "my project"');
+  });
+
+  it.each([
+    [
+      {
+        project: "line1\nline2",
+        notes: "",
+      },
+      '/release "line1\\nline2"',
+    ],
+    [
+      {
+        project: "path with spaces",
+        notes: "extra note",
+      },
+      '/release "path with spaces" "extra note"',
+    ],
+    [
+      {
+        project: 'quote "inside"',
+        notes: "",
+      },
+      '/release "quote \\"inside\\""',
+    ],
+    [
+      {
+        project: "tab\tseparated",
+        notes: "",
+      },
+      '/release "tab\\tseparated"',
+    ],
+    [
+      {
+        project: "multi\nline",
+        notes: "second line\nmore",
+      },
+      '/release "multi\\nline" "second line\\nmore"',
+    ],
+  ])("serializes newline-containing values in %s", (values, expected) => {
+    expect(
+      buildPromptInvocation(
+        "release",
+        [
+          { name: "project", required: true, position: 1, initialValue: "" },
+          { name: "notes", required: false, position: 2, initialValue: "" },
+        ],
+        values,
+      ),
+    ).toBe(expected);
   });
 
   it("appends extra trailing text raw", () => {

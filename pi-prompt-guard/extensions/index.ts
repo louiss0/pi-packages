@@ -197,55 +197,51 @@ export function validatePromptArguments({
   promptArguments,
   placeholders,
 }: PromptArgumentValidation): string | null {
-  const highestExplicitPosition = placeholders.reduce(
-    (highestPosition, placeholder) => {
-      if (placeholder.kind === "single") {
-        return Math.max(highestPosition, placeholder.position);
-      }
-
-      if (placeholder.kind === "slice") {
-        return Math.max(highestPosition, placeholder.start);
-      }
-
-      return highestPosition;
-    },
-    0,
+  const declaredArgumentCount = promptArguments.length;
+  const requiredArguments = promptArguments.filter(
+    (argument) => argument.required,
   );
-
-  const highestFiniteSliceEnd = placeholders.reduce(
-    (highestPosition, placeholder) => {
-      if (
-        placeholder.kind === "slice" &&
-        placeholder.end !== Number.POSITIVE_INFINITY
-      ) {
-        return Math.max(highestPosition, placeholder.end);
-      }
-
-      return highestPosition;
-    },
-    0,
-  );
-
   const usesArgumentsPlaceholder = placeholders.some(
     (placeholder) => placeholder.kind === "named",
   );
   const usesRestPlaceholder = placeholders.some(
     (placeholder) => placeholder.kind === "rest",
   );
-  const declaredArgumentCount = promptArguments.length;
-  const requiredArguments = promptArguments.filter(
-    (argument) => argument.required,
+  const highestSinglePosition = placeholders.reduce(
+    (highestPosition, placeholder) =>
+      placeholder.kind === "single"
+        ? Math.max(highestPosition, placeholder.position)
+        : highestPosition,
+    0,
   );
-  const highestReferencedPosition = Math.max(
-    highestExplicitPosition,
-    highestFiniteSliceEnd,
+  const highestDefaultPosition = placeholders.reduce(
+    (highestPosition, placeholder) =>
+      placeholder.kind === "default"
+        ? Math.max(highestPosition, placeholder.position)
+        : highestPosition,
+    0,
+  );
+  const invalidSlice = placeholders.find(
+    (placeholder) =>
+      placeholder.kind === "slice" &&
+      (placeholder.start > declaredArgumentCount ||
+        (placeholder.end !== Number.POSITIVE_INFINITY &&
+          placeholder.end > declaredArgumentCount) ||
+        placeholder.end < placeholder.start),
   );
 
-  if (
-    !usesArgumentsPlaceholder &&
-    !usesRestPlaceholder &&
-    highestReferencedPosition > declaredArgumentCount
-  ) {
+  if (invalidSlice?.kind === "slice") {
+    const rangeEnd =
+      invalidSlice.end === Number.POSITIVE_INFINITY
+        ? "end"
+        : `${invalidSlice.end}`;
+
+    return `Prompt /${commandName} references slice ${invalidSlice.start}..${rangeEnd} but only declares ${declaredArgumentCount}.`;
+  }
+
+  const highestReferencedPosition = Math.max(highestSinglePosition, 0);
+
+  if (highestReferencedPosition > declaredArgumentCount) {
     return `Prompt /${commandName} references argument ${highestReferencedPosition} but only declares ${declaredArgumentCount}.`;
   }
 
@@ -259,15 +255,16 @@ export function validatePromptArguments({
   }
 
   if (
-    highestExplicitPosition > 0 &&
-    passedArguments.length < highestExplicitPosition
+    highestSinglePosition > 0 &&
+    passedArguments.length < highestSinglePosition
   ) {
-    return `Missing argument for /${commandName}: placeholder requires argument ${highestExplicitPosition}.\n${QUOTING_GUIDANCE}`;
+    return `Missing argument for /${commandName}: placeholder requires argument ${highestSinglePosition}.\n${QUOTING_GUIDANCE}`;
   }
 
   const allowedArgumentCount = Math.max(
     declaredArgumentCount,
-    highestExplicitPosition,
+    highestSinglePosition,
+    highestDefaultPosition,
   );
 
   if (
@@ -276,17 +273,6 @@ export function validatePromptArguments({
     passedArguments.length > allowedArgumentCount
   ) {
     return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}.\n${QUOTING_GUIDANCE}`;
-  }
-
-  const invalidSlice = placeholders.find(
-    (placeholder) =>
-      placeholder.kind === "slice" &&
-      placeholder.end !== Number.POSITIVE_INFINITY &&
-      placeholder.end < placeholder.start,
-  );
-
-  if (invalidSlice?.kind === "slice") {
-    return `Invalid placeholder range for /${commandName}: {@:${invalidSlice.start}:${invalidSlice.end}}`;
   }
 
   return null;
