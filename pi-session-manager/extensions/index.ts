@@ -529,11 +529,42 @@ export function getSessionEntryWithSeries(
     return;
   }
 
-  return matchingEntries.find(
-    (entry) =>
-      `${entry.data.series}${SESION_TITLE_SEPARATOR}${entry.data.sessionTitle}` ===
-      sessionName,
+  const normalizedSessionName = sessionName.trim();
+  const matchedEntry = matchingEntries.find((entry) => {
+    const sessionTitle =
+      entry.data.sessionTitle ??
+      getSessionTitleFromSessionName(normalizedSessionName, entry.data.series);
+
+    if (!sessionTitle) {
+      return false;
+    }
+
+    return (
+      `${entry.data.series}${SESION_TITLE_SEPARATOR}${sessionTitle}` ===
+      normalizedSessionName
+    );
+  });
+
+  if (!matchedEntry || matchedEntry.data.sessionTitle) {
+    return matchedEntry;
+  }
+
+  const sessionTitle = getSessionTitleFromSessionName(
+    normalizedSessionName,
+    matchedEntry.data.series,
   );
+
+  if (!sessionTitle) {
+    return matchedEntry;
+  }
+
+  return {
+    ...matchedEntry,
+    data: {
+      ...matchedEntry.data,
+      sessionTitle,
+    },
+  } as SessionSeriesEntry;
 }
 
 export type GetSessionEntryWithSeries = typeof getSessionEntryWithSeries;
@@ -631,6 +662,17 @@ export function handleSessionDeleteLast(
 }
 
 export const SESION_TITLE_SEPARATOR = "--";
+
+function getSessionTitleFromSessionName(sessionName: string, series: string) {
+  const prefix = `${series.trim()}${SESION_TITLE_SEPARATOR}`;
+
+  if (!sessionName.startsWith(prefix)) {
+    return;
+  }
+
+  return sessionName.slice(prefix.length).trim();
+}
+
 export const sessionSeriesCommandsSchema = picklist([
   "create",
   "delete",
