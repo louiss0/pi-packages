@@ -7,6 +7,7 @@ import {
   validatePromptArguments,
   type GuardWidgetHost,
 } from "./index";
+import type { Argument, Placeholder } from "./internal/prompt-parser";
 
 type SlashCommandInfo = ReturnType<ExtensionAPI["getCommands"]>[number];
 
@@ -29,6 +30,19 @@ describe("tokenizePromptInput", () => {
     expect(tokenizePromptInput('/release "my project" 1.0.0')).toEqual({
       commandName: "release",
       passedArguments: ["my project", "1.0.0"],
+    });
+  });
+
+  it.each([
+    ['/release "line 1\nline 2"', ["line 1\nline 2"]],
+    ["/release 'line 1\nline 2'", ["line 1\nline 2"]],
+    ["/release line1\nline2", ["line1", "line2"]],
+    ['/release "first" second\nthird', ["first", "second", "third"]],
+    ['/release "\n"', ["\n"]],
+  ])("treats newline characters as part of quoted arguments in %s", (text, passedArguments) => {
+    expect(tokenizePromptInput(text)).toEqual({
+      commandName: "release",
+      passedArguments,
     });
   });
 
@@ -55,45 +69,78 @@ describe("validatePromptArguments", () => {
     );
   });
 
-  it("returns an error when too many positional arguments are passed", () => {
-    expect(
-      validatePromptArguments({
-        commandName: "release",
-        passedArguments: ["pkg", "1.0.0", "extra"],
-        promptArguments: [
-          { name: "project", required: true, position: 1 },
-          { name: "version", required: false, position: 2 },
-        ],
-        placeholders: [
-          { kind: "single", position: 1 },
-          { kind: "single", position: 2 },
-        ],
-      }),
-    ).toBe(
-      "Too many arguments for /release: expected at most 2 but received 3.\nIf an argument contains spaces, wrap it in single or double quotes.",
-    );
-  });
+  const placeholderVariations: Array<{
+    passedArguments: string[];
+    promptArguments: Argument[];
+    placeholders: Placeholder[];
+    expected: string | null;
+  }> = [
+    {
+      passedArguments: ["pkg", "1.0.0"],
+      promptArguments: [
+        { name: "project", required: true, position: 1 },
+        { name: "version", required: false, position: 2 },
+      ],
+      placeholders: [
+        { kind: "single", position: 1 },
+        { kind: "default", position: 2, value: "latest" },
+      ],
+      expected: null,
+    },
+    {
+      passedArguments: ["pkg", "1.0.0", "extra"],
+      promptArguments: [
+        { name: "project", required: true, position: 1 },
+        { name: "version", required: false, position: 2 },
+        { name: "channel", required: false, position: 3 },
+      ],
+      placeholders: [
+        { kind: "single", position: 1 },
+        { kind: "slice", start: 2, end: Number.POSITIVE_INFINITY },
+      ],
+      expected: null,
+    },
+    {
+      passedArguments: ["pkg", "1.0.0", "beta"],
+      promptArguments: [
+        { name: "project", required: true, position: 1 },
+        { name: "version", required: false, position: 2 },
+        { name: "channel", required: false, position: 3 },
+      ],
+      placeholders: [
+        { kind: "single", position: 1 },
+        { kind: "slice", start: 2, end: 4 },
+      ],
+      expected: "Prompt /release references slice 2..4 but only declares 3.",
+    },
+    {
+      passedArguments: ["pkg"],
+      promptArguments: [{ name: "project", required: true, position: 1 }],
+      placeholders: [{ kind: "default", position: 1, value: "fallback" }],
+      expected: null,
+    },
+    {
+      passedArguments: ["pkg", "1.0.0", "extra"],
+      promptArguments: [{ name: "project", required: true, position: 1 }],
+      placeholders: [{ kind: "rest" }],
+      expected: null,
+    },
+  ];
 
-  it("allows extra arguments when the prompt uses $ARGUMENTS", () => {
+  it.each(placeholderVariations)("validates placeholder variations", ({
+    passedArguments,
+    promptArguments,
+    placeholders,
+    expected,
+  }) => {
     expect(
       validatePromptArguments({
         commandName: "release",
-        passedArguments: ["pkg", "1.0.0", "extra"],
-        promptArguments: [{ name: "project", required: true, position: 1 }],
-        placeholders: [{ kind: "named", name: "ARGUMENTS" }],
+        passedArguments,
+        promptArguments,
+        placeholders,
       }),
-    ).toBeNull();
-  });
-
-  it("allows extra arguments when the prompt uses $@", () => {
-    expect(
-      validatePromptArguments({
-        commandName: "release",
-        passedArguments: ["pkg", "1.0.0", "extra"],
-        promptArguments: [{ name: "project", required: true, position: 1 }],
-        placeholders: [{ kind: "rest" }],
-      }),
-    ).toBeNull();
+    ).toBe(expected);
   });
 
   it("returns an error when placeholders require a missing argument", () => {
@@ -116,6 +163,28 @@ describe("validatePromptArguments", () => {
         placeholders: [{ kind: "single", position: 2 }],
       }),
     ).toBe("Prompt /release references argument 2 but only declares 1.");
+  });
+
+  it("allows extra arguments when the prompt uses $ARGUMENTS", () => {
+    expect(
+      validatePromptArguments({
+        commandName: "release",
+        passedArguments: ["pkg", "1.0.0", "extra"],
+        promptArguments: [{ name: "project", required: true, position: 1 }],
+        placeholders: [{ kind: "named", name: "ARGUMENTS" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("allows extra arguments when the prompt uses $@", () => {
+    expect(
+      validatePromptArguments({
+        commandName: "release",
+        passedArguments: ["pkg", "1.0.0", "extra"],
+        promptArguments: [{ name: "project", required: true, position: 1 }],
+        placeholders: [{ kind: "rest" }],
+      }),
+    ).toBeNull();
   });
 
   it("returns nothing when $ARGUMENTS is used ", () => {
