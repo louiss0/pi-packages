@@ -62,28 +62,23 @@ function createUi(
 }
 
 describe("tokenizePromptInput", () => {
-  it("supports quoted arguments", () => {
-    expect(tokenizePromptInput('/release "my project" 1.0.0')).toEqual({
-      commandName: "release",
-      passedArguments: ["my project", "1.0.0"],
-    });
-  });
+  const delimiterCases = [
+    { text: '/release "my project" 1.0.0', passedArguments: ['"my', 'project"', "1.0.0"] },
+    { text: "/release 'my project'", passedArguments: ["'my", "project'"] },
+    { text: "/release one,two;three", passedArguments: ["one,two;three"] },
+    { text: "/release [one|two]", passedArguments: ["[one|two]"] },
+    { text: '/release "my project', passedArguments: ['"my', "project"] },
+    { text: "/release line1\nline2", passedArguments: ["line1", "line2"] },
+  ];
 
-  it.each([
-    ['/release "line 1\nline 2"', ["line 1\nline 2"]],
-    ["/release 'line 1\nline 2'", ["line 1\nline 2"]],
-    ["/release line1\nline2", ["line1", "line2"]],
-    ['/release "first" second\nthird', ["first", "second", "third"]],
-    ['/release "\n"', ["\n"]],
-  ])("treats newline characters as part of quoted arguments in %s", (text, passedArguments) => {
+  it.for(delimiterCases)("uses whitespace as the only argument delimiter", ({
+    text,
+    passedArguments,
+  }) => {
     expect(tokenizePromptInput(text)).toEqual({
       commandName: "release",
       passedArguments,
     });
-  });
-
-  it("returns an error for unterminated quotes", () => {
-    expect(tokenizePromptInput('/release "my project')).toBeInstanceOf(Error);
   });
 });
 
@@ -109,7 +104,7 @@ describe("createPromptArgumentsForm", () => {
 });
 
 describe("buildPromptInvocation", () => {
-  it("quotes values with spaces and trims trailing optional blanks", () => {
+  it("preserves values with spaces and trims trailing optional blanks", () => {
     expect(
       buildPromptInvocation(
         "release",
@@ -122,7 +117,7 @@ describe("buildPromptInvocation", () => {
           notes: "",
         },
       ),
-    ).toBe('/release "my project"');
+    ).toBe("/release my project");
   });
 
   it.each([
@@ -131,35 +126,35 @@ describe("buildPromptInvocation", () => {
         project: "line1\nline2",
         notes: "",
       },
-      '/release "line1\\nline2"',
+      "/release line1\nline2",
     ],
     [
       {
         project: "path with spaces",
         notes: "extra note",
       },
-      '/release "path with spaces" "extra note"',
+      "/release path with spaces extra note",
     ],
     [
       {
         project: 'quote "inside"',
         notes: "",
       },
-      '/release "quote \\"inside\\""',
+      '/release quote "inside"',
     ],
     [
       {
         project: "tab\tseparated",
         notes: "",
       },
-      '/release "tab\\tseparated"',
+      "/release tab\tseparated",
     ],
     [
       {
         project: "multi\nline",
         notes: "second line\nmore",
       },
-      '/release "multi\\nline" "second line\\nmore"',
+      "/release multi\nline second line\nmore",
     ],
   ])("serializes newline-containing values in %s", (values, expected) => {
     expect(
@@ -332,7 +327,7 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({
       action: "transform",
-      text: '/release "my project" 1.0.0',
+      text: "/release my project 1.0.0",
     });
     expect(ui.custom).toHaveBeenCalledOnce();
     expect(ui.notify).not.toHaveBeenCalled();
@@ -364,7 +359,7 @@ describe("handlePromptInput", () => {
 
     await handlePromptInput(
       {
-        text: '/release "my project"',
+        text: "/release my-project",
         hasUI: true,
         ui,
         getCommands: vi.fn(() => [
@@ -383,7 +378,7 @@ describe("handlePromptInput", () => {
 
     const renderedForm = (ui.custom as ReturnType<typeof vi.fn>).mock.results[0]
       ?.value;
-    await expect(renderedForm).resolves.toContain("my project");
+    await expect(renderedForm).resolves.toContain("my-project");
   });
 
   it("asks for extra trailing info when placeholders support it", async () => {

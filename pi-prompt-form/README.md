@@ -7,7 +7,7 @@
 ![license](https://img.shields.io/github/license/louiss0/pi-packages)
 ![CI](https://img.shields.io/github/actions/workflow/status/louiss0/pi-packages/ci.yml?branch=main)
 
-`pi-prompt-form` adds structured prompt input to PI. When a prompt-backed slash command declares an `argument-hint`, the package intercepts the user input, reads the prompt definition, and opens a terminal form so the user can fill required and optional values before the prompt executes. This helps prompt authors turn loosely typed slash commands into guided workflows, reduces quoting mistakes and missing arguments, and keeps prompt usage aligned with the prompt contract already declared in PI prompt files.
+`pi-prompt-form` adds structured prompt input to PI. When a prompt-backed slash command declares an `argument-hint`, the package intercepts the user input, reads the prompt definition, and opens a terminal form so the user can fill required and optional values before the prompt executes. This helps prompt authors turn loosely typed slash commands into guided workflows, reduces missing arguments, and keeps prompt usage aligned with the prompt contract already declared in PI prompt files.
 
 This package ships as a PI extension package and integrates with PI through the input event pipeline. It coordinates prompt lookup, prompt parsing, inline validation with Valibot, and command rewriting so the final prompt invocation still flows through PI as a normal slash command.
 
@@ -31,7 +31,7 @@ This enables prompt authors to keep using standard PI prompt metadata while givi
 
 #### Validation and submission flow
 
-After the form opens, Valibot validates the submitted values before the command is allowed to continue. Required fields must contain text, optional fields may stay blank, and validation errors are shown inside the form so the user can correct them immediately. When the form succeeds, the extension rebuilds the original slash command with properly quoted arguments and returns a transformed input result back into PI's normal execution flow.
+After the form opens, Valibot validates the submitted values before the command is allowed to continue. Required fields must contain text, optional fields may stay blank, and validation errors are shown inside the form so the user can correct them immediately. When the form succeeds, the extension rebuilds the original slash command with whitespace-separated arguments and returns a transformed input result back into PI's normal execution flow.
 
 That means the package improves prompt entry without introducing a separate execution system. The agent still receives a regular prompt command, but the user gets a safer and more guided path to produce it.
 
@@ -41,11 +41,9 @@ Some prompts accept more than the declared argument list. When the parsed prompt
 
 This keeps prompt authors free to combine guided inputs with open-ended trailing context. Structured values can be collected through the form, while prompts that support broader freeform input can still accept it in the same turn.
 
-#### Quote-aware argument handling
+#### Whitespace-delimited argument handling
 
-Before any form is shown, the extension tokenizes the original slash command with quote awareness. Multi-word values already typed by the user stay intact, and malformed quoted input is rejected early with a clear notification. After submission, the extension re-quotes values that need it before rewriting the command.
-
-This makes prompt usage more reliable for prompts whose arguments frequently contain spaces, titles, filenames, or natural-language fragments.
+Before showing a form, the extension splits the original slash command on whitespace. Quote and delimiter characters are preserved as ordinary argument content; they are not paired, interpreted, or used to reject input. Submitted form values are written back using the same whitespace-only convention.
 
 ## Development
 

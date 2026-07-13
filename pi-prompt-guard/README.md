@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/github/license/louiss0/pi-packages)](https://github.com/louiss0/pi-packages/blob/main/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/louiss0/pi-packages/ci.yml?branch=main)](https://github.com/louiss0/pi-packages/actions)
 
-`pi-prompt-guard` adds a validation layer in front of PI prompt execution. It intercepts slash-command prompt usage, resolves matching prompt files through PI's command registry, parses the prompt definition with its own internal prompt parser, and blocks invalid input before the agent starts. This helps catch malformed prompt templates, missing required arguments, mismatched positional placeholders, and quoting mistakes early, so prompt-driven workflows fail fast with actionable feedback instead of producing confusing agent behavior later in the turn.
+`pi-prompt-guard` adds a validation layer in front of PI prompt execution. It intercepts slash-command prompt usage, resolves matching prompt files through PI's command registry, parses the prompt definition with its own internal prompt parser, and blocks invalid input before the agent starts. This helps catch malformed prompt templates, missing required arguments, and mismatched positional placeholders early, so prompt-driven workflows fail fast with actionable feedback instead of producing confusing agent behavior later in the turn.
 
 
 This package is meant to run as a PI extension and depends on the PI extension runtime.
@@ -65,9 +65,9 @@ At runtime, the extension validates two things together:
 
 For fixed positional prompts, this catches mismatches such as a prompt declaring only `<project>` but using `$2` in the body. It also blocks user input that omits required arguments or sends more positional arguments than the prompt supports.
 
-#### Argument handling and quoting guidance
+#### Argument handling
 
-The extension validates both the prompt definition and the arguments the user typed for that prompt.
+The extension validates the prompt definition and the arguments the user typed for that prompt.
 
 It checks for:
 
@@ -75,15 +75,8 @@ It checks for:
 - too many positional arguments when a prompt only supports fixed positions
 - placeholder references such as `$2` or finite slices that exceed the arguments declared by the prompt
 - invalid uses of `$ARGUMENTS` when no arguments are declared
-- malformed quoted input such as unterminated `'...'` or `"..."`
 
-It also tokenizes prompt input with quote awareness, so users can pass multi-word values like:
-
-```text
-/release "my project" 1.0.0
-```
-
-When input appears to be split incorrectly, the extension advises users to wrap space-containing arguments in single or double quotes. This makes prompt usage more predictable for prompts that rely on positional values.
+Arguments are separated only by whitespace. Quote and delimiter characters are ordinary argument content: they are neither paired nor interpreted, and cannot cause a validation failure.
 
 #### Fixed arguments vs. `$ARGUMENTS` vs. `$@`
 

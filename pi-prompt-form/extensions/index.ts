@@ -102,14 +102,7 @@ export async function handlePromptInput(
 
   widgetHost.setStatusToFilling();
 
-  const tokenizedInput = tokenizePromptInput(text);
-
-  if (tokenizedInput instanceof Error) {
-    ui.notify(tokenizedInput.message, "error");
-    return { action: "handled" } as const;
-  }
-
-  const { commandName, passedArguments } = tokenizedInput;
+  const { commandName, passedArguments } = tokenizePromptInput(text);
 
   if (!commandName) {
     return { action: "continue" } as const;
@@ -202,52 +195,8 @@ export async function handlePromptInput(
   } as const;
 }
 
-export function tokenizePromptInput(
-  text: string,
-): TokenizedPromptInput | Error {
-  const tokens: string[] = [];
-  let currentToken = "";
-  let activeQuote: '"' | "'" | null = null;
-
-  for (const character of text.trim()) {
-    if (activeQuote) {
-      if (character === activeQuote) {
-        activeQuote = null;
-      } else {
-        currentToken += character;
-      }
-
-      continue;
-    }
-
-    if (character === '"' || character === "'") {
-      activeQuote = character;
-      continue;
-    }
-
-    if (/\s/.test(character)) {
-      if (currentToken) {
-        tokens.push(currentToken);
-        currentToken = "";
-      }
-
-      continue;
-    }
-
-    currentToken += character;
-  }
-
-  if (activeQuote) {
-    return new Error(
-      "Unterminated quoted argument.\nIf an argument contains spaces, wrap it in single or double quotes.",
-    );
-  }
-
-  if (currentToken) {
-    tokens.push(currentToken);
-  }
-
-  const [unparsedCommandName, ...passedArguments] = tokens;
+export function tokenizePromptInput(text: string): TokenizedPromptInput {
+  const [unparsedCommandName, ...passedArguments] = text.trim().split(/\s+/);
   const commandName = unparsedCommandName?.replace(/^\/+/, "") ?? "";
 
   return {
@@ -407,21 +356,11 @@ export function buildPromptInvocation(
     serializedArguments.pop();
   }
 
-  const quotedArguments = serializedArguments.map(quotePromptArgument);
-
-  return buildPromptWithExtraValue(commandName, quotedArguments, extraValue);
-}
-
-function quotePromptArgument(value: string) {
-  if (value.length === 0) {
-    return value;
-  }
-
-  if (!/\s|["']/.test(value)) {
-    return value;
-  }
-
-  return JSON.stringify(value);
+  return buildPromptWithExtraValue(
+    commandName,
+    serializedArguments,
+    extraValue,
+  );
 }
 
 export interface FormWidgetHost {

@@ -26,32 +26,23 @@ const MockGuardWidgetHost = {
 } satisfies GuardWidgetHost;
 
 describe("tokenizePromptInput", () => {
-  it("supports quoted arguments", () => {
-    expect(tokenizePromptInput('/release "my project" 1.0.0')).toEqual({
-      commandName: "release",
-      passedArguments: ["my project", "1.0.0"],
-    });
-  });
+  const delimiterCases = [
+    { text: '/release "my project" 1.0.0', passedArguments: ['"my', 'project"', "1.0.0"] },
+    { text: "/release 'my project'", passedArguments: ["'my", "project'"] },
+    { text: "/release one,two;three", passedArguments: ["one,two;three"] },
+    { text: "/release [one|two]", passedArguments: ["[one|two]"] },
+    { text: '/release "my project', passedArguments: ['"my', "project"] },
+    { text: "/release line1\nline2", passedArguments: ["line1", "line2"] },
+  ];
 
-  it.each([
-    ['/release "line 1\nline 2"', ["line 1\nline 2"]],
-    ["/release 'line 1\nline 2'", ["line 1\nline 2"]],
-    ["/release line1\nline2", ["line1", "line2"]],
-    ['/release "first" second\nthird', ["first", "second", "third"]],
-    ['/release "\n"', ["\n"]],
-  ])("treats newline characters as part of quoted arguments in %s", (text, passedArguments) => {
+  it.for(delimiterCases)("uses whitespace as the only argument delimiter", ({
+    text,
+    passedArguments,
+  }) => {
     expect(tokenizePromptInput(text)).toEqual({
       commandName: "release",
       passedArguments,
     });
-  });
-
-  it("returns an error for unterminated quotes", () => {
-    expect(tokenizePromptInput('/release "my project')).toBeInstanceOf(Error);
-    expect(tokenizePromptInput('/release "my project')).toHaveProperty(
-      "message",
-      "Unterminated quoted argument.\nIf an argument contains spaces, wrap it in single or double quotes.",
-    );
   });
 });
 
@@ -65,7 +56,7 @@ describe("validatePromptArguments", () => {
         placeholders: [{ kind: "single", position: 1 }],
       }),
     ).toBe(
-      "Missing required arguments for /release: <project>.\nIf an argument contains spaces, wrap it in single or double quotes.",
+      "Missing required arguments for /release: <project>.",
     );
   });
 
@@ -287,7 +278,7 @@ describe("handlePromptInput", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("returns handled for invalid quoting", async () => {
+  it("does not reject an unmatched delimiter", async () => {
     const notify = vi.fn();
 
     const result = await handlePromptInput(
@@ -300,11 +291,8 @@ describe("handlePromptInput", () => {
       MockGuardWidgetHost,
     );
 
-    expect(result).toEqual({ action: "handled" });
-    expect(notify).toHaveBeenCalledWith(
-      "Unterminated quoted argument.\nIf an argument contains spaces, wrap it in single or double quotes.",
-      "error",
-    );
+    expect(result).toEqual({ action: "continue" });
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("returns handled and notifies when prompt parsing fails", async () => {
@@ -359,7 +347,7 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Missing required arguments for /release: <project>.\nIf an argument contains spaces, wrap it in single or double quotes.",
+      "Missing required arguments for /release: <project>.",
       "error",
     );
   });
@@ -388,17 +376,17 @@ describe("handlePromptInput", () => {
 
     expect(result).toEqual({ action: "handled" });
     expect(notify).toHaveBeenCalledWith(
-      "Too many arguments for /release: expected at most 2 but received 3.\nIf an argument contains spaces, wrap it in single or double quotes.",
+      "Too many arguments for /release: expected at most 2 but received 3.",
       "error",
     );
   });
 
-  it("returns continue when quoted arguments are valid", async () => {
+  it("accepts delimiter characters as part of whitespace-delimited arguments", async () => {
     const notify = vi.fn();
 
     const result = await handlePromptInput(
       {
-        text: '/release "my project" 1.0.0',
+        text: '/release "project" 1.0.0',
         ui: { notify },
         getCommands: vi.fn(() => [
           createPromptCommand({

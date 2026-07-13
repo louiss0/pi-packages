@@ -65,8 +65,6 @@ type TokenizedPromptInput = {
 };
 
 const NON_SKILL_COMMAND_PATTERN = /^\/(?!skill(?:\s|$)).+/;
-const QUOTING_GUIDANCE =
-  "If an argument contains spaces, wrap it in single or double quotes.";
 
 export async function handlePromptInput(
   { text, ui, getCommands, readPromptFile }: PromptInputContext,
@@ -77,14 +75,7 @@ export async function handlePromptInput(
   }
   widgetHost.setStatusToGuarding();
 
-  const tokenizedInput = tokenizePromptInput(text);
-
-  if (tokenizedInput instanceof Error) {
-    ui.notify(tokenizedInput.message, "error");
-    return { action: "handled" };
-  }
-
-  const { commandName, passedArguments } = tokenizedInput;
+  const { commandName, passedArguments } = tokenizePromptInput(text);
 
   if (!commandName) {
     return { action: "continue" };
@@ -132,50 +123,8 @@ export async function handlePromptInput(
   return { action: "continue" };
 }
 
-export function tokenizePromptInput(
-  text: string,
-): TokenizedPromptInput | Error {
-  const tokens: string[] = [];
-  let currentToken = "";
-  let activeQuote: '"' | "'" | null = null;
-
-  for (const character of text.trim()) {
-    if (activeQuote) {
-      if (character === activeQuote) {
-        activeQuote = null;
-      } else {
-        currentToken += character;
-      }
-
-      continue;
-    }
-
-    if (character === '"' || character === "'") {
-      activeQuote = character;
-      continue;
-    }
-
-    if (/\s/.test(character)) {
-      if (currentToken) {
-        tokens.push(currentToken);
-        currentToken = "";
-      }
-
-      continue;
-    }
-
-    currentToken += character;
-  }
-
-  if (activeQuote) {
-    return new Error(`Unterminated quoted argument.\n${QUOTING_GUIDANCE}`);
-  }
-
-  if (currentToken) {
-    tokens.push(currentToken);
-  }
-
-  const [unparsedCommandName, ...passedArguments] = tokens;
+export function tokenizePromptInput(text: string): TokenizedPromptInput {
+  const [unparsedCommandName, ...passedArguments] = text.trim().split(/\s+/);
   const commandName = unparsedCommandName?.replace(/^\/+/, "") ?? "";
 
   return {
@@ -251,14 +200,14 @@ export function validatePromptArguments({
       .map((argument) => `<${argument.name}>`)
       .join(" ");
 
-    return `Missing required arguments for /${commandName}: ${missingArguments}.\n${QUOTING_GUIDANCE}`;
+    return `Missing required arguments for /${commandName}: ${missingArguments}.`;
   }
 
   if (
     highestSinglePosition > 0 &&
     passedArguments.length < highestSinglePosition
   ) {
-    return `Missing argument for /${commandName}: placeholder requires argument ${highestSinglePosition}.\n${QUOTING_GUIDANCE}`;
+    return `Missing argument for /${commandName}: placeholder requires argument ${highestSinglePosition}.`;
   }
 
   const allowedArgumentCount = Math.max(
@@ -272,7 +221,7 @@ export function validatePromptArguments({
     !usesArgumentsPlaceholder &&
     passedArguments.length > allowedArgumentCount
   ) {
-    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}.\n${QUOTING_GUIDANCE}`;
+    return `Too many arguments for /${commandName}: expected at most ${allowedArgumentCount} but received ${passedArguments.length}.`;
   }
 
   return null;
