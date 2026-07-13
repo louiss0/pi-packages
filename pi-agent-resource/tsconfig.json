@@ -13,10 +13,5 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["extensions/**/*.ts", "shared/**/*.ts"],
-  "references": [
-    {
-      "path": "../pi-form-components"
-    }
-  ]
+  "include": ["extensions/**/*.ts", "shared/**/*.ts"]
 }

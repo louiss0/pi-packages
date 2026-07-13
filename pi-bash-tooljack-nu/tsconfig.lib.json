@@ -8,10 +8,5 @@
     "tsBuildInfoFile": "../dist/tsconfig.lib.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"],
-  "references": [
-    {
-      "path": "../pi-form-components/tsconfig.lib.json"
-    }
-  ]
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"]
 }

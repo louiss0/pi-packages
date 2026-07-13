@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import {
   DynamicBorder,
@@ -63,6 +63,13 @@ export function createExternalEditorFactory(
         const before = await fs.readFile(filePath, "utf8");
         const [editor, ...editorArgs] = parsed;
 
+        if (!editor) {
+          done(
+            new ExternalEditorError(`Invalid editor command: ${editorCommand}`),
+          );
+          return;
+        }
+
         // This is to force the waiting of the popup to appear while editing
         const FLAGS = ["--wait", "-w"];
 
@@ -82,7 +89,7 @@ export function createExternalEditorFactory(
             args.push(waitFlag);
           }
 
-          const child = spawn(editor, args, {
+          const child: ChildProcess = spawn(editor, args, {
             stdio: "inherit",
             shell: true,
           });

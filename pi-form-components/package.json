@@ -16,9 +16,7 @@
     "README.md",
     "src/**/*.ts",
     "!src/**/*.spec.ts",
-    "!src/**/*.test.ts",
-    "src/**/*.d.ts",
-    "src/**/*.d.ts.map"
+    "!src/**/*.test.ts"
   ],
   "publishConfig": {
     "access": "public"
@@ -26,11 +24,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
-  "types": "./src/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "types": "./src/index.d.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     }
