@@ -27,7 +27,10 @@ const MockGuardWidgetHost = {
 
 describe("tokenizePromptInput", () => {
   const delimiterCases = [
-    { text: '/release "my project" 1.0.0', passedArguments: ['"my', 'project"', "1.0.0"] },
+    {
+      text: '/release "my project" 1.0.0',
+      passedArguments: ['"my', 'project"', "1.0.0"],
+    },
     { text: "/release 'my project'", passedArguments: ["'my", "project'"] },
     { text: "/release one,two;three", passedArguments: ["one,two;three"] },
     { text: "/release [one|two]", passedArguments: ["[one|two]"] },
@@ -55,9 +58,7 @@ describe("validatePromptArguments", () => {
         promptArguments: [{ name: "project", required: true, position: 1 }],
         placeholders: [{ kind: "single", position: 1 }],
       }),
-    ).toBe(
-      "Missing required arguments for /release: <project>.",
-    );
+    ).toBe("Missing required arguments for /release: <project>.");
   });
 
   const placeholderVariations: Array<{

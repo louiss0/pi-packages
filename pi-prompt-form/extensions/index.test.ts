@@ -63,7 +63,10 @@ function createUi(
 
 describe("tokenizePromptInput", () => {
   const delimiterCases = [
-    { text: '/release "my project" 1.0.0', passedArguments: ['"my', 'project"', "1.0.0"] },
+    {
+      text: '/release "my project" 1.0.0',
+      passedArguments: ['"my', 'project"', "1.0.0"],
+    },
     { text: "/release 'my project'", passedArguments: ["'my", "project'"] },
     { text: "/release one,two;three", passedArguments: ["one,two;three"] },
     { text: "/release [one|two]", passedArguments: ["[one|two]"] },
