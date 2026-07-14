@@ -1,6 +1,6 @@
 # pi-session-manager
 
-[!session-manager](https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-session-manager/assets/Pi-Session-Manager-Big.png)
+![Session Manager](https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-session-manager/assets/Pi-Session_Manager-Big.png)
 
 
 [![npm version](https://img.shields.io/npm/v/@code-fixer-23/pi-session-manager.svg)](https://www.npmjs.com/package/@code-fixer-23/pi-session-manager)
