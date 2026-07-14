@@ -764,7 +764,7 @@ export function applyPersistedSessionSeriesData(
   return true;
 }
 
-function promptForUniqueTrimmedInput(
+function promptForUniqueInput(
   ctx: ExtensionCommandContext,
   prompt: string,
   description: string | undefined,
@@ -774,15 +774,16 @@ function promptForUniqueTrimmedInput(
   return (async () => {
     while (true) {
       const value = await ctx.ui.input(prompt, description);
-      const trimmedValue = value?.trim();
 
-      if (value === undefined) {
+      if (!value) {
         return;
       }
 
-      if (!trimmedValue) {
+      if (/^\s+$/.test(value)) {
         continue;
       }
+
+      const trimmedValue = value.trim();
 
       if (
         existingValues.some(
@@ -831,7 +832,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      const series = await promptForUniqueTrimmedInput(
+      const series = await promptForUniqueInput(
         ctx,
         "What is the name of your session series?",
         "What are you focused on?",
@@ -854,7 +855,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      const title = await promptForUniqueTrimmedInput(
+      const title = await promptForUniqueInput(
         ctx,
         "What is the name of the new session you want to make in this one?",
         "What task is a part of what you are focusing on?",
@@ -954,7 +955,7 @@ export async function handleSessionSeries(
         return;
       }
 
-      const title = await promptForUniqueTrimmedInput(
+      const title = await promptForUniqueInput(
         ctx,
         "What is the name of the this new session?",
         "What do you want your agent to do now?",
@@ -1015,7 +1016,7 @@ export async function handleSessionSeries(
         entry.data.series,
       );
 
-      const title = await promptForUniqueTrimmedInput(
+      const title = await promptForUniqueInput(
         ctx,
         `What's the new title for the session in series ${entry.data.series}`,
         undefined,

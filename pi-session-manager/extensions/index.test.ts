@@ -620,6 +620,41 @@ describe("handleSessionSeries", () => {
       expect(context.newSession).not.toHaveBeenCalled();
     });
 
+    it("stops creating a session series when the series input is empty", async () => {
+      const context = {
+        cwd: "/pi-packages",
+        newSession: vi.fn<ExtensionCommandContext["newSession"]>(),
+        ui: {
+          notify: vi.fn<ExtensionUIContext["notify"]>(),
+          input: vi
+            .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValueOnce("")
+            .mockResolvedValueOnce("Should not be prompted"),
+        },
+      } satisfies MockExtenstionCommandContext;
+
+      await handleSessionSeries(
+        "create",
+        {
+          sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
+          sessionFilter: new MockSessionFilter(
+            [],
+            new MockPastTimestampCalculator(),
+          ),
+          getSessionEntryWithSeries() {
+            return undefined;
+          },
+          removeSessionFiles() {
+            return;
+          },
+        },
+        castToExtensionContext(context),
+      );
+
+      expect(context.ui.input).toHaveBeenCalledTimes(1);
+      expect(context.newSession).not.toHaveBeenCalled();
+    });
+
     const seriesInput = "Implement Auth";
     it("keeps asking for a unique trimmed session series when creating", async () => {
       const sessionCtx = {
@@ -641,6 +676,7 @@ describe("handleSessionSeries", () => {
           notify: vi.fn<ExtensionUIContext["notify"]>(),
           input: vi
             .fn<ExtensionUIContext["input"]>()
+            .mockResolvedValueOnce(" ")
             .mockResolvedValueOnce("  Implement Auth  ")
             .mockResolvedValueOnce("  Implement Billing  ")
             .mockResolvedValueOnce("  Create JWT Token  "),
@@ -694,7 +730,7 @@ describe("handleSessionSeries", () => {
         "warning",
       );
 
-      expect(context.ui.input).toHaveBeenCalledTimes(3);
+      expect(context.ui.input).toHaveBeenCalledTimes(4);
 
       expect(appendSessionSeriesBasedOnCwdSpy).toHaveBeenCalledWith(
         sessionCtx.cwd,
