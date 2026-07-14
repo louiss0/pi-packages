@@ -1,3 +1,14 @@
+## 1.0.6 (2026-07-14)
+
+### 🩹 Fixes
+
+- **pi-session-manager:** display README asset ([4628004](https://github.com/louiss0/pi-packages/commit/4628004))
+- **pi-session-manager:** respect empty title cancellation ([37729af](https://github.com/louiss0/pi-packages/commit/37729af))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.5 (2026-07-08)
 
 ### 🩹 Fixes
