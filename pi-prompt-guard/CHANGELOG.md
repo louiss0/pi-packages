@@ -1,3 +1,13 @@
+## 2.0.2 (2026-07-14)
+
+### 🩹 Fixes
+
+- **prompt-input:** parse prompt arguments using whitespace only ([11eabe7](https://github.com/louiss0/pi-packages/commit/11eabe7))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 2.0.1 (2026-07-08)
 
 ### 🩹 Fixes

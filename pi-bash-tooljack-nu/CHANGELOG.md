@@ -1,3 +1,13 @@
+## 1.2.2 (2026-07-14)
+
+### 🩹 Fixes
+
+- **bash-tooljack-nu:** order dependency typechecks ([996bb60](https://github.com/louiss0/pi-packages/commit/996bb60))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.2.1 (2026-07-08)
 
 ### 🩹 Fixes
