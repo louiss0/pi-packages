@@ -3,7 +3,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",
     "@earendil-works/pi-tui": "catalog:",
-    "typescript": "latest",
+    "typescript": "~6.0.3",
     "vitest": "catalog:"
   },
   "name": "@code-fixer-23/pi-prompt-guard",

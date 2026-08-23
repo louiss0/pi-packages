@@ -1,7 +1,7 @@
 {
   "type": "module",
   "devDependencies": {
-    "typescript": "latest",
+    "typescript": "~6.0.3",
     "vitest": "latest"
   },
   "name": "@code-fixer-23/pi-prompt-form",
