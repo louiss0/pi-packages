@@ -28,6 +28,10 @@ describe("bash tool timeout", () => {
 	let nushellChild: FakeChildProcess;
 
 	beforeEach(() => {
+		// Force the Windows branch so every case exercises the same taskkill path
+		vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+		// Never signal real processes if the Unix branch is reached
+		vi.spyOn(process, "kill").mockReturnValue(true);
 		const registeredTools = new Map<string, RegisteredTool>();
 		const api = {
 			registerTool: (tool: RegisteredTool) => {
@@ -50,7 +54,7 @@ describe("bash tool timeout", () => {
 
 	afterEach(() => {
 		vi.useRealTimers();
-		vi.resetAllMocks();
+		vi.restoreAllMocks();
 	});
 
 	it.each(timeoutCases)(
