@@ -165,7 +165,11 @@ function killNushellProcessTree(pid?: number) {
   try {
     process.kill(-pid, "SIGTERM");
   } catch {
-    process.kill(pid, "SIGTERM");
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // process tree already exited
+    }
   }
 }
 
@@ -398,40 +402,50 @@ export default function nuBashExtension(pi: ExtensionAPI) {
       ),
     }),
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
-      const timeoutSignal = params.timeout
-        ? AbortSignal.timeout(params.timeout * 1000)
+      // AbortSignal.timeout lives on Node's internal clock, invisible to fake
+      // timers and uncancelable; a manual setTimeout keeps the abort in our hands
+      const timeoutController = new AbortController();
+      const timeoutHandle = params.timeout
+        ? setTimeout(() => timeoutController.abort(), params.timeout * 1000)
         : undefined;
-      const combinedSignal = timeoutSignal
-        ? AbortSignal.any(signal ? [signal, timeoutSignal] : [timeoutSignal])
-        : signal;
 
-      const result = await executeNushellCommand(
-        params.command,
-        ctx.cwd,
-        combinedSignal,
-        onUpdate,
-      );
+      try {
+        const combinedSignal = AbortSignal.any(
+          signal
+            ? [signal, timeoutController.signal]
+            : [timeoutController.signal],
+        );
 
-      const toolOutput = await truncateBashToolOutput(result.output, ctx.cwd);
+        const result = await executeNushellCommand(
+          params.command,
+          ctx.cwd,
+          combinedSignal,
+          onUpdate,
+        );
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: toolOutput.output,
+        const toolOutput = await truncateBashToolOutput(result.output, ctx.cwd);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: toolOutput.output,
+            },
+          ],
+          details: {
+            command: params.command,
+            backend: "nu",
+            cwd: ctx.cwd,
+            exitCode: result.exitCode,
+            output: toolOutput.output,
+            killed: result.cancelled,
+            truncated: toolOutput.truncated,
           },
-        ],
-        details: {
-          command: params.command,
-          backend: "nu",
-          cwd: ctx.cwd,
-          exitCode: result.exitCode,
-          output: toolOutput.output,
-          killed: result.cancelled,
-          truncated: toolOutput.truncated,
-        },
-        isError: result.exitCode !== 0,
-      };
+          isError: result.exitCode !== 0,
+        };
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
     },
   });
 
