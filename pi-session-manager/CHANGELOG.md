@@ -1,3 +1,18 @@
+## 1.1.0 (2026-08-23)
+
+### 🚀 Features
+
+- **pi-session-manager:** persist config through extension settings ([933f395](https://github.com/louiss0/pi-packages/commit/933f395))
+
+### 🩹 Fixes
+
+- **workspace:** pin typescript to ~6.0.3 across packages ([e11938a](https://github.com/louiss0/pi-packages/commit/e11938a))
+- **pi-session-manager:** align test mocks with strict compiler flags ([fba5182](https://github.com/louiss0/pi-packages/commit/fba5182))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.0.6 (2026-07-14)
 
 ### 🩹 Fixes

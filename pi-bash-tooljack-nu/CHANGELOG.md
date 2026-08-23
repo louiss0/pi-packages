@@ -1,3 +1,9 @@
+## 1.2.3 (2026-08-23)
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.1.6
+
 ## 1.2.2 (2026-07-14)
 
 ### 🩹 Fixes

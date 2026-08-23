@@ -1,3 +1,7 @@
+## 3.1.6 (2026-08-23)
+
+This was a version bump only for pi-form-components to align it with other projects, there were no code changes.
+
 ## 3.1.5 (2026-06-17)
 
 ### 🩹 Fixes

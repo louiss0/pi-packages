@@ -1,3 +1,13 @@
+## 2.0.3 (2026-08-23)
+
+### 🩹 Fixes
+
+- **workspace:** pin typescript to ~6.0.3 across packages ([e11938a](https://github.com/louiss0/pi-packages/commit/e11938a))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 2.0.2 (2026-07-14)
 
 ### 🩹 Fixes
