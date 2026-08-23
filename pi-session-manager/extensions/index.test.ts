@@ -11,6 +11,10 @@ import {
   handleSessionCleanOlderThan,
   handleSessionDeleteLast,
   handleSessionSeries,
+  formatDeletedSessionsListing,
+  getSessionProjectName,
+  sortSessionsByProjectName,
+  presentDeletedSessions,
   getSessionEntryWithSeries,
   getSessionSeriesDataTempPath,
   persistSessionSeriesData,
@@ -225,6 +229,131 @@ class SessionManagerConfiguratorMock implements $SessionManagerConfigurator {
     return cwdSeriesRecord[series.trim()] ?? [];
   }
 }
+
+describe("deleted session reporting", () => {
+  type SessionOverrides = {
+    [K in keyof SessionInfo]?: SessionInfo[K] | undefined;
+  };
+
+  const buildSession = (overrides: SessionOverrides = {}): SessionInfo =>
+    ({
+      path: "/path/to/session",
+      id: "session-id",
+      cwd: "/user/work/project-a",
+      name: "Session A",
+      parentSessionPath: "/path/to/parent",
+      created: new Date(0),
+      modified: new Date(0),
+      messageCount: 1,
+      firstMessage: "Hello from session A",
+      allMessagesText: "Full history for session A",
+      ...overrides,
+    }) as SessionInfo;
+
+  it("derives the project name from the deepest cwd segment", () => {
+    const posixSession = buildSession({ cwd: "/user/work/project-a" });
+    const windowsSession = buildSession({
+      cwd: "C:\\Users\\bvlou\\projects\\project-b",
+    });
+
+    expect(getSessionProjectName(posixSession)).toBe("project-a");
+    expect(getSessionProjectName(windowsSession)).toBe("project-b");
+  });
+
+  it("sorts sessions by project name before modified time", () => {
+    const projectBSession = buildSession({
+      id: "project-b-session",
+      name: "Project B Session",
+      cwd: "/user/work/project-b",
+      modified: new Date(1000),
+    });
+    const projectAOldestSession = buildSession({
+      id: "project-a-oldest",
+      name: "Project A Oldest",
+      cwd: "/user/work/project-a",
+      modified: new Date(1000),
+    });
+    const projectARecentSession = buildSession({
+      id: "project-a-recent",
+      name: "Project A Recent",
+      cwd: "/user/work/project-a",
+      modified: new Date(5000),
+    });
+
+    expect(
+      sortSessionsByProjectName([
+        projectBSession,
+        projectARecentSession,
+        projectAOldestSession,
+      ]),
+    ).toEqual([projectAOldestSession, projectARecentSession, projectBSession]);
+  });
+
+  it("formats deleted sessions grouped under sorted project names", () => {
+    const projectBSession = buildSession({
+      name: "Project B Session",
+      cwd: "/user/work/project-b",
+    });
+    const projectASession = buildSession({
+      name: "Project A Session",
+      cwd: "/user/work/project-a",
+    });
+
+    expect(
+      formatDeletedSessionsListing([projectBSession, projectASession]),
+    ).toBe(
+      [
+        "Removed 2 session(s):",
+        "project-a",
+        "  Project A Session",
+        "project-b",
+        "  Project B Session",
+      ].join("\n"),
+    );
+  });
+
+  it("falls back to first message then id when a session has no name", () => {
+    const unnamedSession = buildSession({ name: undefined });
+
+    expect(formatDeletedSessionsListing([unnamedSession])).toBe(
+      ["Removed 1 session(s):", "project-a", "  Hello from session A"].join(
+        "\n",
+      ),
+    );
+  });
+
+  it("notifies nothing was deleted when the deletion list is empty", () => {
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    presentDeletedSessions([], castToExtensionContext(context));
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      "No sessions matched, so nothing was deleted.",
+      "info",
+    );
+  });
+
+  it("presents the formatted listing when sessions were deleted", () => {
+    const context = {
+      ui: {
+        notify: vi.fn<ExtensionUIContext["notify"]>(),
+      },
+    } satisfies MockExtenstionCommandContext;
+
+    const deletedSession = buildSession();
+
+    presentDeletedSessions([deletedSession], castToExtensionContext(context));
+
+    expect(context.ui.notify).toHaveBeenCalledWith(
+      formatDeletedSessionsListing([deletedSession]),
+      "info",
+    );
+  });
+});
 
 // THis is written like this so that I can use the outline to find tests
 const test = it
@@ -449,7 +578,7 @@ describe("handleSessionCleanOlderThan", () => {
     );
 
     expect(context.ui.notify).toHaveBeenCalledWith(
-      `Deleteing sessions that are from ${durationRecord.integer} ${durationRecord.unit} ago`,
+      `Deleting sessions that are from ${durationRecord.integer} ${durationRecord.unit} ago`,
     );
 
     expect(
@@ -551,8 +680,8 @@ describe("handleSessionSeries", () => {
           getSessionEntryWithSeries() {
             return undefined;
           },
-          removeSessionFiles() {
-            return;
+          removeSessionFiles(sessions) {
+            return sessions;
           },
         },
         castToExtensionContext(context),
@@ -609,8 +738,8 @@ describe("handleSessionSeries", () => {
           getSessionEntryWithSeries() {
             return undefined;
           },
-          removeSessionFiles() {
-            return;
+          removeSessionFiles(sessions) {
+            return sessions;
           },
         },
         castToExtensionContext(context),
@@ -644,8 +773,8 @@ describe("handleSessionSeries", () => {
           getSessionEntryWithSeries() {
             return undefined;
           },
-          removeSessionFiles() {
-            return;
+          removeSessionFiles(sessions) {
+            return sessions;
           },
         },
         castToExtensionContext(context),
@@ -711,8 +840,8 @@ describe("handleSessionSeries", () => {
           getSessionEntryWithSeries() {
             return undefined;
           },
-          removeSessionFiles() {
-            return;
+          removeSessionFiles(sessions) {
+            return sessions;
           },
         },
         castToExtensionContext(context),
@@ -936,8 +1065,8 @@ describe("handleSessionSeries", () => {
         getSessionEntryWithSeries() {
           return undefined;
         },
-        removeSessionFiles() {
-          return;
+        removeSessionFiles(sessions) {
+          return sessions;
         },
       },
       castToExtensionContext(context),
@@ -1016,8 +1145,8 @@ describe("handleSessionSeries", () => {
         getSessionEntryWithSeries() {
           return undefined;
         },
-        removeSessionFiles() {
-          return;
+        removeSessionFiles(sessions) {
+          return sessions;
         },
       },
       castToExtensionContext(context),
@@ -1086,8 +1215,8 @@ describe("handleSessionSeries", () => {
         getSessionEntryWithSeries() {
           return undefined;
         },
-        removeSessionFiles() {
-          return;
+        removeSessionFiles(sessions) {
+          return sessions;
         },
       },
       castToExtensionContext(context),
@@ -1153,8 +1282,8 @@ describe("handleSessionSeries", () => {
           } as SessionSeriesEntry;
         },
         sessionManagerConfigurator: new SessionManagerConfiguratorMock(),
-        removeSessionFiles() {
-          return;
+        removeSessionFiles(sessions) {
+          return sessions;
         },
       },
       castToExtensionContext(context),
@@ -1245,8 +1374,8 @@ describe("handleSessionSeries", () => {
         getSessionEntryWithSeries,
         sessionManagerConfigurator,
 
-        removeSessionFiles() {
-          return;
+        removeSessionFiles(sessions) {
+          return sessions;
         },
       },
       castToExtensionContext(context),
