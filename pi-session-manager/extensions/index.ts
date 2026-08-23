@@ -1,11 +1,15 @@
 import {
   type ExtensionAPI,
   type ExtensionCommandContext,
-  getAgentDir,
   type SessionEntry,
   type SessionInfo,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import {
+  getSetting,
+  type SettingDefinition,
+  setSetting,
+} from "@juanibiapina/pi-extension-settings";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import {
   existsSync,
@@ -24,7 +28,6 @@ import {
   integer,
   isoTimestamp,
   literal,
-  number,
   object,
   picklist,
   pipe,
@@ -39,7 +42,9 @@ import {
 } from "valibot";
 
 export default function (pi: ExtensionAPI) {
-  const commandRoot = "session";
+  const commandRoot = "session-manager";
+
+  registerSessionManagerSettings(pi);
 
   let sessionManagerConfigurator: SessionManagerConfigurator;
 
@@ -159,6 +164,88 @@ export default function (pi: ExtensionAPI) {
       }
 
       const sessions = await SessionManager.list(ctx.cwd);
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
+
+      handleSessionDeleteLast(
+        result.output,
+        {
+          sessionFilter,
+          removeSessionFiles,
+        },
+        ctx,
+      );
+    },
+  });
+
+  pi.registerCommand(`${commandRoot}:clean:inactive:all`, {
+    handler: async (_, ctx) => {
+      const sessions = await SessionManager.listAll();
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
+
+      handleSessionCleanInactive(
+        {
+          sessionFilter,
+          sessionManagerConfigurator,
+          removeSessionFiles,
+        },
+        ctx,
+      );
+    },
+  });
+
+  pi.registerCommand(`${commandRoot}:clean:older-than:all`, {
+    handler: async (args, ctx) => {
+      const result = safeParse(durationRecordSchema, args);
+
+      if (!result.success) {
+        return ctx.ui.notify(summarize(result.issues), "error");
+      }
+
+      const sessions = await SessionManager.listAll();
+      const sessionFilter = new SessionFilter(
+        sessions,
+        new TimestampCalculator(),
+      );
+
+      handleSessionCleanOlderThan(
+        result.output,
+        {
+          sessionFilter,
+          removeSessionFiles,
+        },
+        ctx,
+      );
+    },
+  });
+
+  pi.registerCommand(`${commandRoot}:delete-last:all`, {
+    getArgumentCompletions: (prefix) => {
+      const autoCompleteItems: Array<AutocompleteItem> = [];
+
+      for (let i = 1; i <= 10; i++) {
+        autoCompleteItems.push({
+          value: i.toString(),
+          label: `last ${i.toString()} in every project`,
+        });
+      }
+
+      return autoCompleteItems.filter((item) => item.value === prefix);
+    },
+    handler: async (args, ctx) => {
+      const intSchema = pipe(string(), digits(), transform(Number.parseInt));
+      const result = safeParse(intSchema, args);
+
+      if (!result.success) {
+        return ctx.ui.notify(summarize(result.issues), "error");
+      }
+
+      const sessions = await SessionManager.listAll();
       const sessionFilter = new SessionFilter(
         sessions,
         new TimestampCalculator(),
@@ -306,26 +393,130 @@ function removeSessionFiles(sessions: Array<SessionInfo>) {
   for (const session of sessions) {
     rmSync(session.path);
   }
+
+  return sessions;
 }
 
 export type RemoveSessionFiles = typeof removeSessionFiles;
-export const sessionManagerConfigSchema = object({
-  sessionDeletionDayLimit: pipe(number(), integer()),
-  seriesRecord: record(
-    pipe(string("must be a valid folder path"), title("folder-path")),
-    record(
-      pipe(string("must be a series Name"), title("series-name")),
-      pipe(
-        array(string("Must be a title")),
-        title("titles"),
-        checkItems(
-          (item, index, array) => array.indexOf(item) === index,
-          "Duplicate items are not allowed.",
-        ),
+
+const pathSegmentSeparatorRE = /[\\/]+/;
+
+// Sessions from every project share one listing, so the deepest cwd segment is the grouping key
+export function getSessionProjectName(session: SessionInfo) {
+  const cwdSegments = session.cwd.split(pathSegmentSeparatorRE).filter(Boolean);
+
+  return cwdSegments.at(-1) ?? session.cwd;
+}
+
+export function sortSessionsByProjectName(sessions: Array<SessionInfo>) {
+  return [...sessions].sort((session, otherSession) => {
+    const projectComparison = getSessionProjectName(session).localeCompare(
+      getSessionProjectName(otherSession),
+    );
+
+    if (projectComparison !== 0) {
+      return projectComparison;
+    }
+
+    return session.modified.getTime() - otherSession.modified.getTime();
+  });
+}
+
+function groupSessionLabelsByProject(sessions: Array<SessionInfo>) {
+  const sessionLabelsByProject = new Map<string, string[]>();
+
+  for (const session of sortSessionsByProjectName(sessions)) {
+    const project = getSessionProjectName(session);
+    const sessionLabel = session.name || session.firstMessage || session.id;
+
+    sessionLabelsByProject.set(project, [
+      ...(sessionLabelsByProject.get(project) ?? []),
+      sessionLabel,
+    ]);
+  }
+
+  return sessionLabelsByProject;
+}
+
+export function formatDeletedSessionsListing(sessions: Array<SessionInfo>) {
+  const listingLines = [`Removed ${sessions.length} session(s):`];
+
+  for (const [project, sessionLabels] of groupSessionLabelsByProject(
+    sessions,
+  )) {
+    listingLines.push(project);
+
+    for (const sessionLabel of sessionLabels) {
+      listingLines.push(`  ${sessionLabel}`);
+    }
+  }
+
+  return listingLines.join("\n");
+}
+
+export function presentDeletedSessions(
+  deletedSessions: Array<SessionInfo>,
+  ctx: Pick<ExtensionCommandContext, "ui">,
+) {
+  if (deletedSessions.length === 0) {
+    ctx.ui.notify("No sessions matched, so nothing was deleted.", "info");
+    return;
+  }
+
+  ctx.ui.notify(formatDeletedSessionsListing(deletedSessions), "info");
+}
+// Settings are persisted through @juanibiapina/pi-extension-settings under this extension name
+export const settingsExtensionName = "pi-session-manager";
+
+const sessionDeletionDayLimitSchema = pipe(
+  string("must be a whole number of days"),
+  regex(/^\d+$/),
+  transform(Number.parseInt),
+);
+
+export const seriesRecordSchema = record(
+  pipe(string("must be a valid folder path"), title("folder-path")),
+  record(
+    pipe(string("must be a series Name"), title("series-name")),
+    pipe(
+      array(string("Must be a title")),
+      title("titles"),
+      checkItems(
+        (item, index, array) => array.indexOf(item) === index,
+        "Duplicate items are not allowed.",
       ),
     ),
   ),
+);
+
+export type SeriesRecord = InferOutput<typeof seriesRecordSchema>;
+
+export const sessionManagerConfigSchema = object({
+  sessionDeletionDayLimit: sessionDeletionDayLimitSchema,
+  seriesRecord: seriesRecordSchema,
 });
+
+const sessionDeletionDayLimitSettingId = "sessionDeletionDayLimit";
+
+const seriesRecordSettingId = "seriesRecord";
+
+function registerSessionManagerSettings(
+  pi: Pick<ExtensionAPI, "events">,
+): void {
+  pi.events.emit("pi-extension-settings:register", {
+    name: settingsExtensionName,
+    settings: [
+      {
+        id: sessionDeletionDayLimitSettingId,
+        label: "Session Deletion Day Limit",
+        description:
+          "Unmodified sessions older than this many days get deleted on startup",
+        defaultValue: "3",
+        values: ["1", "3", "5", "7", "14", "30"],
+      },
+    ] satisfies SettingDefinition[],
+  });
+}
 
 export type SessionManagerConfig = InferOutput<
   typeof sessionManagerConfigSchema
@@ -356,36 +547,43 @@ export class SessionConfigError extends Error {
 }
 
 class SessionManagerConfigurator implements $SessionManagerConfigurator {
-  #agentDir = getAgentDir();
-
-  #configName = "pi-session-manager.config.json";
-
   readonly defaultSessionDeletionDayLimit = 3;
 
-  readonly #configPath = join(this.#agentDir, this.#configName);
-
   generateInitialConfig(cwd: string): void {
-    const config = {
-      sessionDeletionDayLimit: this.defaultSessionDeletionDayLimit,
-      seriesRecord: {
-        [cwd]: {},
-      },
-    } satisfies SessionManagerConfig;
+    this.configureSessionDeletionDayLimit(this.defaultSessionDeletionDayLimit);
 
-    writeFileSync(this.#configPath, JSON.stringify(config), {
-      encoding: "utf-8",
-    });
+    const result = this.#readSeriesRecord();
+
+    if (result instanceof SessionConfigError) {
+      return;
+    }
+
+    result[cwd] ??= {};
+
+    this.#writeSeriesRecord(result);
   }
 
-  #readConfig() {
+  #readSeriesRecord() {
     try {
-      const config = readFileSync(this.#configPath, {
-        encoding: "utf-8",
-      });
+      const storedSeriesRecord = getSetting(
+        settingsExtensionName,
+        seriesRecordSettingId,
+      );
 
-      const parsed = JSON.parse(config);
+      if (storedSeriesRecord === undefined) {
+        return {} as SeriesRecord;
+      }
 
-      return safeParse(sessionManagerConfigSchema, parsed);
+      const result = safeParse(
+        seriesRecordSchema,
+        JSON.parse(storedSeriesRecord),
+      );
+
+      if (!result.success) {
+        return new SessionConfigError(summarize(result.issues));
+      }
+
+      return result.output;
     } catch (e) {
       if (e instanceof Error) {
         return new SessionConfigError(e.message);
@@ -395,19 +593,22 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     }
   }
 
+  #writeSeriesRecord(seriesRecord: SeriesRecord): void {
+    setSetting(
+      settingsExtensionName,
+      seriesRecordSettingId,
+      JSON.stringify(seriesRecord),
+    );
+  }
+
   deleteSessionSeriesBasedOnCwd(cwd: string, series: string): void {
-    const result = this.#readConfig();
+    const result = this.#readSeriesRecord();
 
     if (result instanceof SessionConfigError) {
       return;
     }
 
-    if (!result.success) {
-      return;
-    }
-
-    const { seriesRecord } = result.output;
-    const cwdSeriesRecord = seriesRecord[cwd];
+    const cwdSeriesRecord = result[cwd];
 
     if (!cwdSeriesRecord) {
       return;
@@ -415,70 +616,56 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
 
     delete cwdSeriesRecord[series.trim()];
 
-    writeFileSync(
-      this.#configPath,
-      JSON.stringify({ ...result.output, seriesRecord }),
-    );
+    this.#writeSeriesRecord(result);
   }
 
   getSessionDeletionDayLimit() {
-    const result = this.#readConfig();
+    const storedDayLimit = getSetting(
+      settingsExtensionName,
+      sessionDeletionDayLimitSettingId,
+    );
 
-    if (result instanceof SessionConfigError) {
-      return result;
+    if (storedDayLimit === undefined) {
+      return new SessionConfigError(
+        "No session deletion day limit has been configured yet",
+      );
     }
+
+    const result = safeParse(sessionDeletionDayLimitSchema, storedDayLimit);
 
     if (!result.success) {
       return new SessionConfigError(summarize(result.issues));
     }
 
-    return result.output.sessionDeletionDayLimit;
+    return result.output;
   }
 
   getSessionSeriesForCwd(cwd: string) {
-    const result = this.#readConfig();
+    const result = this.#readSeriesRecord();
 
     if (result instanceof SessionConfigError) {
       return result;
     }
 
-    if (!result.success) {
-      return new SessionConfigError(summarize(result.issues));
-    }
-
-    return Object.keys(result.output.seriesRecord[cwd] ?? {});
+    return Object.keys(result[cwd] ?? {});
   }
 
   getSessionTitlesForSeriesBasedOnCwd(cwd: string, series: string) {
-    const result = this.#readConfig();
+    const result = this.#readSeriesRecord();
 
     if (result instanceof SessionConfigError) {
       return result;
     }
 
-    if (!result.success) {
-      return new SessionConfigError(summarize(result.issues));
-    }
-
-    return result.output.seriesRecord[cwd]?.[series.trim()] ?? [];
+    return result[cwd]?.[series.trim()] ?? [];
   }
 
   configureSessionDeletionDayLimit(days: number): void {
-    const result = this.#readConfig();
-
-    if (result instanceof SessionConfigError) {
-      return;
-    }
-
-    if (!result.success) {
-      return;
-    }
-
-    result.output.sessionDeletionDayLimit = days;
-
-    writeFileSync(this.#configPath, JSON.stringify(result.output), {
-      encoding: "utf-8",
-    });
+    setSetting(
+      settingsExtensionName,
+      sessionDeletionDayLimitSettingId,
+      days.toString(),
+    );
   }
 
   appendSessionSeriesBasedOnCwd(
@@ -486,19 +673,15 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
     series: string,
     title: string,
   ): void {
-    const result = this.#readConfig();
+    const result = this.#readSeriesRecord();
 
     if (result instanceof SessionConfigError) {
       return;
     }
 
-    if (!result.success) {
-      return;
-    }
-
     const normalizedSeries = series.trim();
     const normalizedTitle = title.trim();
-    const cwdSeriesRecord = result.output.seriesRecord[cwd] ?? {};
+    const cwdSeriesRecord = result[cwd] ?? {};
     const titles = cwdSeriesRecord[normalizedSeries] ?? [];
 
     if (
@@ -507,11 +690,9 @@ class SessionManagerConfigurator implements $SessionManagerConfigurator {
       cwdSeriesRecord[normalizedSeries] = titles.concat(normalizedTitle);
     }
 
-    result.output.seriesRecord[cwd] = cwdSeriesRecord;
+    result[cwd] = cwdSeriesRecord;
 
-    writeFileSync(this.#configPath, JSON.stringify(result.output), {
-      encoding: "utf-8",
-    });
+    this.#writeSeriesRecord(result);
   }
 }
 
@@ -588,9 +769,12 @@ export function handleSessionCleanInactive(
     return;
   }
 
-  deps.removeSessionFiles(
-    deps.sessionFilter.getModifiedSessionsBasedOnDayLimit(dayLimit),
-  );
+  const deletedSessions =
+    deps.removeSessionFiles(
+      deps.sessionFilter.getModifiedSessionsBasedOnDayLimit(dayLimit),
+    ) ?? [];
+
+  presentDeletedSessions(deletedSessions, ctx);
 }
 
 const integerWithUnitRE = /(?<integer>\d+)(?<unit>days|weeks|hours)/;
@@ -637,14 +821,17 @@ export function handleSessionCleanOlderThan(
   ctx: ExtensionCommandContext,
 ) {
   ctx.ui.notify(
-    `Deleteing sessions that are from ${input.integer} ${input.unit} ago`,
+    `Deleting sessions that are from ${input.integer} ${input.unit} ago`,
   );
-  deps.removeSessionFiles(
-    deps.sessionFilter.getModifiedSessionsBasedOnDurationIntegerAndUnit(
-      input.integer,
-      input.unit,
-    ),
-  );
+  const deletedSessions =
+    deps.removeSessionFiles(
+      deps.sessionFilter.getModifiedSessionsBasedOnDurationIntegerAndUnit(
+        input.integer,
+        input.unit,
+      ),
+    ) ?? [];
+
+  presentDeletedSessions(deletedSessions, ctx);
 }
 
 export function handleSessionDeleteLast(
@@ -656,9 +843,12 @@ export function handleSessionDeleteLast(
   ctx: ExtensionCommandContext,
 ) {
   ctx.ui.notify(`Deleting the last ${number}`);
-  deps.removeSessionFiles(
-    deps.sessionFilter.getSessionsThatAreTheLastNth(number),
-  );
+  const deletedSessions =
+    deps.removeSessionFiles(
+      deps.sessionFilter.getSessionsThatAreTheLastNth(number),
+    ) ?? [];
+
+  presentDeletedSessions(deletedSessions, ctx);
 }
 
 export const SESION_TITLE_SEPARATOR = "--";

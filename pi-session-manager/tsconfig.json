@@ -21,7 +21,12 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
+    "paths": {
+      "@juanibiapina/pi-extension-settings": [
+        "./types/pi-extension-settings.d.ts"
+      ]
+    },
     "types": ["vitest/globals", "node"]
   },
-  "include": ["extensions/**/*.ts"]
+  "include": ["extensions/**/*.ts", "types/**/*.d.ts"]
 }
