@@ -25,6 +25,7 @@
     "url": "https://github.com/louiss0/pi-packages/issues"
   },
   "dependencies": {
+    "@juanibiapina/pi-extension-settings": "^0.9.1",
     "valibot": "catalog:"
   },
   "peerDependencies": {
