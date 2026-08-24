@@ -18,6 +18,10 @@ import type {
   AutocompleteSuggestions,
 } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
+import {
+  getSetting,
+  type SettingDefinition,
+} from "@juanibiapina/pi-extension-settings";
 
 import { getCommandSuggestions, type CommandCompletionItem } from "./command";
 import {
@@ -28,8 +32,24 @@ import {
 } from "./history";
 
 const NUSHELL_COMMAND = "nu";
+const EXTENSION_NAME = "pi-bash-tooljack-nu";
 const CANCEL_HINT = "Press Escape to cancel.";
 const ENV_VARIABLE_NAMES = Object.keys(process.env).sort();
+
+const extensionSettings = [
+  {
+    id: "maxOutputLines",
+    label: "Maximum Output Lines",
+    description: "Maximum Nushell output lines before writing the full output to a file",
+    defaultValue: String(DEFAULT_MAX_LINES),
+  },
+  {
+    id: "maxOutputBytes",
+    label: "Maximum Output Bytes",
+    description: "Maximum Nushell output bytes before writing the full output to a file",
+    defaultValue: String(DEFAULT_MAX_BYTES),
+  },
+] satisfies SettingDefinition[];
 
 type BashToolUpdate = AgentToolResult<undefined>;
 
@@ -186,10 +206,32 @@ function formatToolOutput(stdout: string, stderr: string, exitCode: number) {
   return `(command exited with code ${exitCode})`;
 }
 
+function getPositiveSetting(
+  settingId: string,
+  defaultValue: number,
+  cwd: string,
+) {
+  const value = Number.parseInt(
+    getSetting(EXTENSION_NAME, settingId, String(defaultValue), { cwd }) ??
+      String(defaultValue),
+    10,
+  );
+
+  return Number.isFinite(value) && value > 0 ? value : defaultValue;
+}
+
 export async function truncateBashToolOutput(output: string, cwd: string) {
   const truncation = truncateTail(output, {
-    maxBytes: DEFAULT_MAX_BYTES,
-    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: getPositiveSetting(
+      "maxOutputBytes",
+      DEFAULT_MAX_BYTES,
+      cwd,
+    ),
+    maxLines: getPositiveSetting(
+      "maxOutputLines",
+      DEFAULT_MAX_LINES,
+      cwd,
+    ),
   });
 
   if (!truncation.truncated) {
@@ -328,6 +370,11 @@ async function executeNushellCommand(
 }
 
 export default function nuBashExtension(pi: ExtensionAPI) {
+  pi.events.emit("pi-extension-settings:register", {
+    name: EXTENSION_NAME,
+    settings: extensionSettings,
+  });
+
   pi.registerShortcut("ctrl+h", {
     description: "Show recent Nushell history",
     handler: async (ctx) => {

@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
+    "@juanibiapina/pi-extension-settings": "^0.9.1",
     "@sinclair/typebox": "^0.34.49",
     "valibot": "catalog:"
   },

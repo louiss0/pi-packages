@@ -23,6 +23,15 @@ Arguments:
 - `string:command` is the Nushell command text to execute in the current working directory
 - `number:timeout` optionally aborts the command after the given number of seconds
 
+## Extension settings
+
+This extension registers settings with `@juanibiapina/pi-extension-settings`. Use `/extension-settings` for global values or `/extension-settings-local` for project-specific values:
+
+- `Maximum Output Lines` (`maxOutputLines`) controls the line threshold before full output is saved. It defaults to Pi's `DEFAULT_MAX_LINES`.
+- `Maximum Output Bytes` (`maxOutputBytes`) controls the byte threshold before full output is saved. It defaults to Pi's `DEFAULT_MAX_BYTES`.
+
+Invalid or non-positive values safely fall back to Pi's defaults. Local project settings are resolved against the command's working directory.
+
 ## Shortcuts
 
 ### `Ctrl`+`H`
