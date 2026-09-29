@@ -40,13 +40,15 @@ const extensionSettings = [
   {
     id: "maxOutputLines",
     label: "Maximum Output Lines",
-    description: "Maximum Nushell output lines before writing the full output to a file",
+    description:
+      "Maximum Nushell output lines before writing the full output to a file",
     defaultValue: String(DEFAULT_MAX_LINES),
   },
   {
     id: "maxOutputBytes",
     label: "Maximum Output Bytes",
-    description: "Maximum Nushell output bytes before writing the full output to a file",
+    description:
+      "Maximum Nushell output bytes before writing the full output to a file",
     defaultValue: String(DEFAULT_MAX_BYTES),
   },
 ] satisfies SettingDefinition[];
@@ -222,16 +224,8 @@ function getPositiveSetting(
 
 export async function truncateBashToolOutput(output: string, cwd: string) {
   const truncation = truncateTail(output, {
-    maxBytes: getPositiveSetting(
-      "maxOutputBytes",
-      DEFAULT_MAX_BYTES,
-      cwd,
-    ),
-    maxLines: getPositiveSetting(
-      "maxOutputLines",
-      DEFAULT_MAX_LINES,
-      cwd,
-    ),
+    maxBytes: getPositiveSetting("maxOutputBytes", DEFAULT_MAX_BYTES, cwd),
+    maxLines: getPositiveSetting("maxOutputLines", DEFAULT_MAX_LINES, cwd),
   });
 
   if (!truncation.truncated) {

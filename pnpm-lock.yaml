@@ -188,7 +188,7 @@ importers:
         specifier: ^0.9.1
         version: 0.9.1
       '@sinclair/typebox':
-        specifier: ^0.34.49
+        specifier: '*'
         version: 0.34.49
       valibot:
         specifier: 'catalog:'

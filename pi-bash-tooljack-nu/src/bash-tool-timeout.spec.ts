@@ -37,6 +37,7 @@ describe("bash tool timeout", () => {
     vi.spyOn(process, "kill").mockReturnValue(true);
     const registeredTools = new Map<string, RegisteredTool>();
     const api = {
+      events: { emit: vi.fn() },
       registerTool: (tool: RegisteredTool) => {
         registeredTools.set(tool.name, tool);
       },
