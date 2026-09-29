@@ -1,3 +1,13 @@
+## 1.2.4 (2026-09-29)
+
+### 🩹 Fixes
+
+- **pi-bash-tooljack-nu:** declare host TypeBox as peer ([b797028](https://github.com/louiss0/pi-packages/commit/b797028))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.2.3 (2026-08-23)
 
 ### 🧱 Updated Dependencies
