@@ -25,7 +25,6 @@ import {
   checkItems,
   digits,
   type InferOutput,
-  integer,
   isoTimestamp,
   literal,
   object,
