@@ -1,3 +1,17 @@
+## 1.1.1 (2026-09-30)
+
+### 🚀 Features
+
+- **pi-agent-resource:** add MCP management and pack loading ([937616e](https://github.com/louiss0/pi-packages/commit/937616e))
+
+### 🩹 Fixes
+
+- **pi-session-manager:** drop the unused valibot integer import ([59b3c10](https://github.com/louiss0/pi-packages/commit/59b3c10))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.0 (2026-08-23)
 
 ### 🚀 Features

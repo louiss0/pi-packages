@@ -1,3 +1,17 @@
+## 3.1.7 (2026-09-30)
+
+### 🚀 Features
+
+- **pi-agent-resource:** add MCP management and pack loading ([937616e](https://github.com/louiss0/pi-packages/commit/937616e))
+
+### 🩹 Fixes
+
+- **pi-form-components:** build complete themes in the tests ([1add19f](https://github.com/louiss0/pi-packages/commit/1add19f))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 3.1.6 (2026-08-23)
 
 This was a version bump only for pi-form-components to align it with other projects, there were no code changes.

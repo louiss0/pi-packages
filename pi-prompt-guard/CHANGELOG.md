@@ -1,3 +1,13 @@
+## 2.0.4 (2026-09-30)
+
+### 🚀 Features
+
+- **pi-agent-resource:** add MCP management and pack loading ([937616e](https://github.com/louiss0/pi-packages/commit/937616e))
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 2.0.3 (2026-08-23)
 
 ### 🩹 Fixes

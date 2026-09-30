@@ -1,3 +1,17 @@
+## 1.1.14 (2026-09-30)
+
+### 🚀 Features
+
+- **pi-agent-resource:** add MCP management and pack loading ([937616e](https://github.com/louiss0/pi-packages/commit/937616e))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.1.7
+
+### ❤️ Thank You
+
+- louiss0 @louiss0
+
 ## 1.1.13 (2026-08-23)
 
 ### 🩹 Fixes
