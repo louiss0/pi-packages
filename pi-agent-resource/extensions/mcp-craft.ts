@@ -36,11 +36,13 @@ import {
   type InferOutput,
 } from "valibot";
 
-import { isNotFoundError, isRecord, parseJson } from "../shared/json";
 import {
-  NodeFileSystem,
-  type ResourceFileSystem,
-} from "../shared/filesystem";
+  getErrorMessage,
+  isNotFoundError,
+  isRecord,
+  parseJson,
+} from "../shared/json";
+import { NodeFileSystem, type ResourceFileSystem } from "../shared/filesystem";
 import { parseObjectErrors } from "../shared/parse";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import { getFilterSubcommandArgumentCompletionFromStringUsingSubLabel } from "../shared/subcommands";
@@ -76,6 +78,10 @@ const HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 
 const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+/** A quoted run, so an argument with spaces stays one argument. */
+const ARGUMENT_PATTERN = /"[^"]*"|'[^']*'|[^\s"']+/g;
+const QUOTED_ARGUMENT_PATTERN = /^(["'])(.*)\1$/;
 
 export type McpScope = "global" | "local";
 export type McpTransport = typeof STDIO_TRANSPORT | typeof HTTP_TRANSPORT;
@@ -117,10 +123,7 @@ const sharedServerFields = {
   toolExposure: optional(record(string(), picklist(EXPOSURES))),
   enabled: optional(boolean()),
   timeout: optional(
-    pipe(
-      number(),
-      minValue(1, "Timeout must be a positive number of seconds"),
-    ),
+    pipe(number(), minValue(1, "Timeout must be a positive number of seconds")),
   ),
 };
 
@@ -212,12 +215,18 @@ export function parseMcpServerConfig(
   );
 
   if (!result.success) {
-    return { success: false, error: `server "${name}": ${summarize(result.issues)}` };
+    return {
+      success: false,
+      error: `server "${name}": ${summarize(result.issues)}`,
+    };
   }
 
   // The schema was picked from the entry's own shape, so the output is that transport's.
   if ("url" in result.output) {
-    return { success: true, config: { ...result.output, type: HTTP_TRANSPORT } };
+    return {
+      success: true,
+      config: { ...result.output, type: HTTP_TRANSPORT },
+    };
   }
 
   return { success: true, config: { ...result.output, type: STDIO_TRANSPORT } };
@@ -231,6 +240,17 @@ export async function readMcpFile(
   const result = await fileSystem.readFile(getMcpFilePath(scope));
 
   if (!result.success) {
+    // A file that cannot be read is not an empty config, so it must stop the change.
+    if (!isNotFoundError(result.error)) {
+      return {
+        file: {},
+        serverConfigs: {},
+        servers: {},
+        errors: [],
+        fileError: `Could not read ${MCP_FILE_NAME}: ${getErrorMessage(result.error)}`,
+      };
+    }
+
     return { file: {}, serverConfigs: {}, servers: {}, errors: [] };
   }
 
@@ -262,6 +282,12 @@ export async function writeMcpFile(
   }
 
   const existingResult = await fileSystem.readFile(filePath);
+
+  // Only a file that is not there yet starts empty; any other read failure stops the write.
+  if (!existingResult.success && !isNotFoundError(existingResult.error)) {
+    return existingResult;
+  }
+
   const existingFile = existingResult.success
     ? parseMcpFile(existingResult.data).file
     : {};
@@ -274,9 +300,23 @@ export async function writeMcpFile(
 
 const serverNameField = pipe(
   string(),
-  minLength(1, "Name is required"),
+  check((value) => value.trim().length > 0, "Name is required"),
   maxLength(64, "Name must be 64 characters or fewer"),
-  regex(MCP_SERVER_NAME_PATTERN, 'Name must be letters, digits, "_" and "-" only'),
+  regex(
+    MCP_SERVER_NAME_PATTERN,
+    'Name must be letters, digits, "_" and "-" only',
+  ),
+);
+
+const commandField = pipe(
+  string(),
+  check((value) => value.trim().length > 0, "Command is required"),
+);
+
+const urlField = pipe(
+  string(),
+  check((value) => value.trim().length > 0, "URL is required"),
+  check(isHttpUrl, "URL must be an http or https URL"),
 );
 
 const exposureField = optional(
@@ -301,10 +341,25 @@ const timeoutField = optional(
   "",
 );
 
-const StdioServerFormSchema = object({
+const argsField = optional(
+  pipe(
+    string(),
+    check(
+      isArgsList,
+      "Args must be space separated, with quotes around an argument that has spaces",
+    ),
+  ),
+  "",
+);
+
+const StdioServerRequiredFieldsSchema = object({
   name: serverNameField,
-  command: pipe(string(), minLength(1, "Command is required")),
-  args: optional(pipe(string(), check(isSeparatedList, "Args must be comma separated")), ""),
+  command: commandField,
+  optionalFields: boolean(),
+});
+
+const StdioServerOptionalFieldsSchema = object({
+  args: argsField,
   env: optional(
     pipe(
       string(),
@@ -320,13 +375,14 @@ const StdioServerFormSchema = object({
   timeout: timeoutField,
 });
 
-const HttpServerFormSchema = object({
+const HttpServerRequiredFieldsSchema = object({
   name: serverNameField,
-  url: pipe(
-    string(),
-    minLength(1, "URL is required"),
-    check(isHttpUrl, "URL must be an http or https URL"),
-  ),
+  url: urlField,
+  optionalFields: boolean(),
+  oauthFields: boolean(),
+});
+
+const HttpServerOptionalFieldsSchema = object({
   headers: optional(
     pipe(
       string(),
@@ -339,7 +395,6 @@ const HttpServerFormSchema = object({
   ),
   exposure: exposureField,
   timeout: timeoutField,
-  confirm: boolean(),
 });
 
 const OAuthFormSchema = object({
@@ -349,7 +404,10 @@ const OAuthFormSchema = object({
   callbackPort: optional(
     pipe(
       string(),
-      check(isPositiveIntegerOrEmpty, "Callback port must be a positive number"),
+      check(
+        isPositiveIntegerOrEmpty,
+        "Callback port must be a positive number",
+      ),
     ),
     "",
   ),
@@ -365,27 +423,51 @@ const OAuthFormSchema = object({
   ),
 });
 
-export type StdioServerFields = InferOutput<typeof StdioServerFormSchema>;
-export type HttpServerFields = InferOutput<typeof HttpServerFormSchema>;
+export type StdioServerRequiredFields = InferOutput<
+  typeof StdioServerRequiredFieldsSchema
+>;
+export type StdioServerOptionalFields = InferOutput<
+  typeof StdioServerOptionalFieldsSchema
+>;
+export type HttpServerRequiredFields = InferOutput<
+  typeof HttpServerRequiredFieldsSchema
+>;
+export type HttpServerOptionalFields = InferOutput<
+  typeof HttpServerOptionalFieldsSchema
+>;
 export type OAuthFields = InferOutput<typeof OAuthFormSchema>;
 
 /**
  * The keys a form can write, taken from the form schemas so a field added to a form is
- * never also dropped on edit. Anything else, such as a hand written `toolExposure`, is
- * carried over untouched.
+ * never also dropped on edit. Anything else, such as a hand written `toolExposure` or an
+ * `oauth` block the form was not asked about, is carried over untouched.
  */
 const FORM_MANAGED_SERVER_FIELDS = new Set([
-  ...Object.keys(StdioServerFormSchema.entries),
-  ...Object.keys(HttpServerFormSchema.entries),
+  ...Object.keys(StdioServerRequiredFieldsSchema.entries),
+  ...Object.keys(StdioServerOptionalFieldsSchema.entries),
+  ...Object.keys(HttpServerRequiredFieldsSchema.entries),
+  ...Object.keys(HttpServerOptionalFieldsSchema.entries),
   "type",
 ]);
 
-export function parseStdioServerFormValues(values: StdioServerFields) {
-  return parseObjectErrors(StdioServerFormSchema, values);
+export function parseStdioServerFormValues(values: StdioServerRequiredFields) {
+  return parseObjectErrors(StdioServerRequiredFieldsSchema, values);
 }
 
-export function parseHttpServerFormValues(values: HttpServerFields) {
-  return parseObjectErrors(HttpServerFormSchema, values);
+export function parseStdioServerOptionalFormValues(
+  values: StdioServerOptionalFields,
+) {
+  return parseObjectErrors(StdioServerOptionalFieldsSchema, values);
+}
+
+export function parseHttpServerFormValues(values: HttpServerRequiredFields) {
+  return parseObjectErrors(HttpServerRequiredFieldsSchema, values);
+}
+
+export function parseHttpServerOptionalFormValues(
+  values: HttpServerOptionalFields,
+) {
+  return parseObjectErrors(HttpServerOptionalFieldsSchema, values);
 }
 
 export function parseOAuthFormValues(values: OAuthFields) {
@@ -393,32 +475,34 @@ export function parseOAuthFormValues(values: OAuthFields) {
 }
 
 export function renderStdioServerConfig(
-  fields: StdioServerFields,
+  required: StdioServerRequiredFields,
+  optional: StdioServerOptionalFields,
 ): McpServerConfig {
   const config: McpStdioConfig = {
     type: STDIO_TRANSPORT,
-    command: fields.command.trim(),
-    args: splitCommaList(fields.args),
-    env: parseKeyValueList(fields.env),
-    cwd: fields.cwd.trim(),
-    exposure: toExposure(fields.exposure),
-    timeout: toOptionalNumber(fields.timeout),
+    command: required.command.trim(),
+    args: splitArguments(optional.args),
+    env: parseKeyValueList(optional.env),
+    cwd: optional.cwd.trim(),
+    exposure: toExposure(optional.exposure),
+    timeout: toOptionalNumber(optional.timeout),
   };
 
   return removeEmptyValues(config);
 }
 
 export function renderHttpServerConfig(
-  fields: HttpServerFields,
+  required: HttpServerRequiredFields,
+  optional: HttpServerOptionalFields,
   oauth?: OAuthFields,
 ): McpServerConfig {
   const config: McpHttpConfig = {
     type: HTTP_TRANSPORT,
-    url: fields.url.trim(),
-    headers: parseKeyValueList(fields.headers),
+    url: required.url.trim(),
+    headers: parseKeyValueList(optional.headers),
     oauth: oauth ? renderOAuthConfig(oauth) : undefined,
-    exposure: toExposure(fields.exposure),
-    timeout: toOptionalNumber(fields.timeout),
+    exposure: toExposure(optional.exposure),
+    timeout: toOptionalNumber(optional.timeout),
   };
 
   return removeEmptyValues(config);
@@ -427,27 +511,56 @@ export function renderHttpServerConfig(
 export function createStdioServerForm(
   tui: TUI,
   theme: Theme,
-  done: (value: StdioServerFields | null) => void,
-  initialValues: Partial<StdioServerFields> = {},
+  done: (value: StdioServerRequiredFields | null) => void,
+  initialValues: Partial<StdioServerRequiredFields> = {},
 ) {
-  return new Form<StdioServerFields>(
+  return new Form<StdioServerRequiredFields>(
     {
       title: "MCP Server (stdio)",
       fields: [
         new LabelledInput("name", theme, initialValues.name),
         new LabelledInput("command", theme, initialValues.command),
+        new ConfirmationBox(
+          "optionalFields",
+          theme,
+          "Do you want to fill in the optional fields?",
+        ),
+      ],
+      parse: parseStdioServerFormValues,
+      footer: [
+        "* required | space toggles the checkbox",
+        "Enter next/submit | Tab switch field | Esc cancel",
+      ].join("\n"),
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
+}
+
+export function createStdioServerDetailsForm(
+  tui: TUI,
+  theme: Theme,
+  done: (value: StdioServerOptionalFields | null) => void,
+  initialValues: Partial<StdioServerOptionalFields> = {},
+) {
+  return new Form<StdioServerOptionalFields>(
+    {
+      title: "MCP Server (stdio) details",
+      fields: [
         new LabelledInput("args", theme, initialValues.args),
         new LabelledInput("env", theme, initialValues.env),
         new LabelledInput("cwd", theme, initialValues.cwd),
         new LabelledInput("exposure", theme, initialValues.exposure),
         new LabelledInput("timeout", theme, initialValues.timeout),
       ],
-      parse: parseStdioServerFormValues,
+      parse: parseStdioServerOptionalFormValues,
       footer: [
-        "* required | blank optional fields are left out of mcp.json",
-        "args and env are comma separated | env keeps ${VAR} and !command as written",
+        "every field is optional | blank fields are left out of mcp.json",
+        "args are space separated | quote an argument that has spaces",
+        "env is KEY=VALUE pairs separated by commas and keeps ${VAR} and !command as written",
         `exposure: ${EXPOSURES.join(" | ")} | blank keeps pi's default of codemode`,
-        "timeout is in seconds | space toggles the checkbox",
+        "timeout is in seconds",
         "Enter next/submit | Tab switch field | Esc cancel",
       ].join("\n"),
       spacing: 1,
@@ -460,26 +573,58 @@ export function createStdioServerForm(
 export function createHttpServerForm(
   tui: TUI,
   theme: Theme,
-  done: (value: HttpServerFields | null) => void,
-  initialValues: Partial<HttpServerFields> = {},
+  done: (value: HttpServerRequiredFields | null) => void,
+  initialValues: Partial<HttpServerRequiredFields> = {},
 ) {
-  return new Form<HttpServerFields>(
+  return new Form<HttpServerRequiredFields>(
     {
       title: "MCP Server (http)",
       fields: [
         new LabelledInput("name", theme, initialValues.name),
         new LabelledInput("url", theme, initialValues.url),
-        new LabelledInput("headers", theme, initialValues.headers),
-        new LabelledInput("exposure", theme, initialValues.exposure),
-        new LabelledInput("timeout", theme, initialValues.timeout),
-        new ConfirmationBox("confirm", theme, "Configure OAuth for this server?"),
+        new ConfirmationBox(
+          "optionalFields",
+          theme,
+          "Do you want to fill in the optional fields?",
+        ),
+        new ConfirmationBox(
+          "oauthFields",
+          theme,
+          "Configure OAuth for this server?",
+        ),
       ],
       parse: parseHttpServerFormValues,
       footer: [
-        "* required | blank optional fields are left out of mcp.json",
-        "headers are Name=Value pairs separated by commas",
+        "* required | space toggles a checkbox",
+        "Enter next/submit | Tab switch field | Esc cancel",
+      ].join("\n"),
+      spacing: 1,
+    },
+    tui,
+    done,
+  );
+}
+
+export function createHttpServerDetailsForm(
+  tui: TUI,
+  theme: Theme,
+  done: (value: HttpServerOptionalFields | null) => void,
+  initialValues: Partial<HttpServerOptionalFields> = {},
+) {
+  return new Form<HttpServerOptionalFields>(
+    {
+      title: "MCP Server (http) details",
+      fields: [
+        new LabelledInput("headers", theme, initialValues.headers),
+        new LabelledInput("exposure", theme, initialValues.exposure),
+        new LabelledInput("timeout", theme, initialValues.timeout),
+      ],
+      parse: parseHttpServerOptionalFormValues,
+      footer: [
+        "every field is optional | blank fields are left out of mcp.json",
+        "headers are Name=Value pairs separated by commas and keep ${VAR} and !command as written",
         `exposure: ${EXPOSURES.join(" | ")} | blank keeps pi's default of codemode`,
-        "timeout is in seconds | space toggles a checkbox",
+        "timeout is in seconds",
         "Enter next/submit | Tab switch field | Esc cancel",
       ].join("\n"),
       spacing: 1,
@@ -509,7 +654,7 @@ export function createOAuthForm(
       footer: [
         "Every field is optional | leave them blank to let pi register a client itself",
         "callbackUrl must be an http URL on localhost, 127.0.0.1 or [::1]",
-        "Esc cancel keeps the server without oauth",
+        "Esc cancel leaves an existing oauth block untouched and stops the change",
       ].join("\n"),
       spacing: 1,
     },
@@ -543,9 +688,21 @@ export async function handleCreate(
     return;
   }
 
-  const contents = await readMcpFile(deps.fileSystem, deps.getMcpFilePath, scope);
+  const contents = await readMcpFile(
+    deps.fileSystem,
+    deps.getMcpFilePath,
+    scope,
+  );
 
   if (reportFileError(ctx, contents)) {
+    return;
+  }
+
+  if (pickedServer.name in contents.serverConfigs) {
+    ctx.ui.notify(
+      `MCP server '${pickedServer.name}' already exists in ${getScopeLabel(scope)}. Use edit to change it`,
+      "error",
+    );
     return;
   }
 
@@ -557,11 +714,16 @@ export async function handleCreate(
   );
 
   if (!writeResult.success) {
-    ctx.ui.notify(`MCP server creation failed: ${writeResult.error.message}`, "error");
+    ctx.ui.notify(
+      `MCP server creation failed: ${writeResult.error.message}`,
+      "error",
+    );
     return;
   }
 
-  ctx.ui.notify(`Added MCP server '${pickedServer.name}' to ${getScopeLabel(scope)}`);
+  ctx.ui.notify(
+    `Added MCP server '${pickedServer.name}' to ${getScopeLabel(scope)}`,
+  );
   await ctx.reload();
 }
 
@@ -580,13 +742,21 @@ export async function handleEdit(
   }
 
   const filePath = deps.getMcpFilePath(scope);
-  const contents = await readMcpFile(deps.fileSystem, deps.getMcpFilePath, scope);
+  const contents = await readMcpFile(
+    deps.fileSystem,
+    deps.getMcpFilePath,
+    scope,
+  );
 
   if (reportFileError(ctx, contents)) {
     return;
   }
 
-  const serverName = await pickServerName(ctx, filePath, contents.serverConfigs);
+  const serverName = await pickServerName(
+    ctx,
+    filePath,
+    contents.serverConfigs,
+  );
 
   if (!serverName) {
     return;
@@ -623,11 +793,16 @@ export async function handleEdit(
   );
 
   if (!writeResult.success) {
-    ctx.ui.notify(`MCP server edit failed: ${writeResult.error.message}`, "error");
+    ctx.ui.notify(
+      `MCP server edit failed: ${writeResult.error.message}`,
+      "error",
+    );
     return;
   }
 
-  ctx.ui.notify(`Updated MCP server '${serverName}' in ${getScopeLabel(scope)}`);
+  ctx.ui.notify(
+    `Updated MCP server '${serverName}' in ${getScopeLabel(scope)}`,
+  );
   await ctx.reload();
 }
 
@@ -640,7 +815,11 @@ export async function handleDelete(
   announceScope(ctx, scope, deps);
 
   const filePath = deps.getMcpFilePath(scope);
-  const contents = await readMcpFile(deps.fileSystem, deps.getMcpFilePath, scope);
+  const contents = await readMcpFile(
+    deps.fileSystem,
+    deps.getMcpFilePath,
+    scope,
+  );
 
   if (reportFileError(ctx, contents)) {
     return;
@@ -686,7 +865,10 @@ export async function handleDelete(
   );
 
   if (!writeResult.success) {
-    ctx.ui.notify(`MCP server delete failed: ${writeResult.error.message}`, "error");
+    ctx.ui.notify(
+      `MCP server delete failed: ${writeResult.error.message}`,
+      "error",
+    );
     return;
   }
 
@@ -705,7 +887,10 @@ async function editMcpFileInExternalEditor(
   const fileResult = await ensureMcpFileExists(deps.fileSystem, filePath);
 
   if (!fileResult.success) {
-    ctx.ui.notify(`MCP file creation failed: ${fileResult.error.message}`, "error");
+    ctx.ui.notify(
+      `MCP file creation failed: ${fileResult.error.message}`,
+      "error",
+    );
     return;
   }
 
@@ -742,10 +927,7 @@ async function ensureMcpFileExists(
     return { success: false as const, error: directoryResult.error };
   }
 
-  return fileSystem.writeFile(
-    filePath,
-    renderMcpFile({ mcpServers: {} }),
-  );
+  return fileSystem.writeFile(filePath, renderMcpFile({ mcpServers: {} }));
 }
 
 async function pickTransport(ctx: ExtensionCommandContext) {
@@ -805,54 +987,103 @@ async function pickStdioServer(
   ctx: ExtensionCommandContext,
   stored?: { name: string; config: McpStdioConfig },
 ): Promise<PickedServer | undefined> {
-  const fields = await ctx.ui.custom<StdioServerFields | null>(
+  const initialForms =
+    stored && toMcpStdioServerForms(stored.name, stored.config);
+
+  const required = await ctx.ui.custom<StdioServerRequiredFields | null>(
     (tui, theme, _keybindings, done) =>
-      createStdioServerForm(
-        tui,
-        theme,
-        done,
-        stored && toMcpStdioServerFields(stored.name, stored.config),
-      ),
+      createStdioServerForm(tui, theme, done, initialForms?.required),
     formOverlayOptions,
   );
 
-  if (!fields) {
+  if (!required) {
+    return undefined;
+  }
+
+  const optional = required.optionalFields
+    ? await pickStdioOptionalFields(ctx, initialForms?.optional)
+    : emptyStdioOptionalFields();
+
+  if (!optional) {
     return undefined;
   }
 
   return {
-    name: fields.name.trim(),
-    config: renderStdioServerConfig(fields),
+    name: required.name.trim(),
+    config: renderStdioServerConfig(required, optional),
   };
+}
+
+async function pickStdioOptionalFields(
+  ctx: ExtensionCommandContext,
+  initialValues?: StdioServerOptionalFields,
+) {
+  return await ctx.ui.custom<StdioServerOptionalFields | null>(
+    (tui, theme, _keybindings, done) =>
+      createStdioServerDetailsForm(tui, theme, done, initialValues),
+    formOverlayOptions,
+  );
 }
 
 async function pickHttpServer(
   ctx: ExtensionCommandContext,
   stored?: { name: string; config: McpHttpConfig },
 ): Promise<PickedServer | undefined> {
-  const fields = await ctx.ui.custom<HttpServerFields | null>(
+  const initialForms =
+    stored && toMcpHttpServerForms(stored.name, stored.config);
+
+  const required = await ctx.ui.custom<HttpServerRequiredFields | null>(
     (tui, theme, _keybindings, done) =>
-      createHttpServerForm(
-        tui,
-        theme,
-        done,
-        stored && toMcpHttpServerFields(stored.name, stored.config),
-      ),
+      createHttpServerForm(tui, theme, done, initialForms?.required),
     formOverlayOptions,
   );
 
-  if (!fields) {
+  if (!required) {
     return undefined;
   }
 
-  const oauth = fields.confirm
-    ? await pickOAuthFields(ctx, stored?.config.oauth)
-    : undefined;
+  const optional = required.optionalFields
+    ? await pickHttpOptionalFields(ctx, initialForms?.optional)
+    : emptyHttpOptionalFields();
+
+  if (!optional) {
+    return undefined;
+  }
+
+  if (!required.oauthFields) {
+    return {
+      name: required.name.trim(),
+      config: renderHttpServerConfig(required, optional),
+    };
+  }
+
+  const oauth = await pickOAuthFields(ctx, stored?.config.oauth);
+
+  // Cancelling must never drop an oauth block the file already has.
+  if (!oauth) {
+    return stored?.config.oauth === undefined
+      ? {
+          name: required.name.trim(),
+          config: renderHttpServerConfig(required, optional),
+        }
+      : undefined;
+  }
 
   return {
-    name: fields.name.trim(),
-    config: renderHttpServerConfig(fields, oauth),
+    name: required.name.trim(),
+    config: renderHttpServerConfig(required, optional, oauth),
   };
+}
+
+async function pickHttpOptionalFields(
+  ctx: ExtensionCommandContext,
+  initialValues?: HttpServerOptionalFields,
+) {
+  return await ctx.ui.custom<HttpServerOptionalFields | null>(
+    (tui, theme, _keybindings, done) =>
+      createHttpServerDetailsForm(tui, theme, done, initialValues),
+    formOverlayOptions,
+  );
 }
 
 async function pickOAuthFields(
@@ -869,49 +1100,60 @@ async function pickOAuthFields(
 }
 
 /** Map a stored config back onto the form fields, so edit starts from what is there. */
-export function toMcpStdioServerFields(
+export function toMcpStdioServerForms(
   serverName: string,
   serverConfig: McpStdioConfig,
-): StdioServerFields {
-  return {
-    ...toSharedServerFields(serverName, serverConfig),
-    command: serverConfig.command,
-    args: serverConfig.args?.join(", ") ?? "",
+) {
+  const optional = {
+    args: renderArguments(serverConfig.args ?? []),
     env: renderKeyValueList(serverConfig.env),
     cwd: serverConfig.cwd ?? "",
-  };
-}
-
-export function toMcpHttpServerFields(
-  serverName: string,
-  serverConfig: McpHttpConfig,
-): HttpServerFields {
-  return {
-    ...toSharedServerFields(serverName, serverConfig),
-    url: serverConfig.url,
-    headers: renderKeyValueList(serverConfig.headers),
-    confirm: serverConfig.oauth !== undefined,
-  };
-}
-
-export function toMcpServerFields(
-  serverName: string,
-  serverConfig: McpServerConfig,
-): StdioServerFields | HttpServerFields {
-  return "url" in serverConfig
-    ? toMcpHttpServerFields(serverName, serverConfig)
-    : toMcpStdioServerFields(serverName, serverConfig);
-}
-
-function toSharedServerFields(
-  serverName: string,
-  serverConfig: McpStdioConfig | McpHttpConfig,
-) {
-  return {
-    name: serverName,
     exposure: serverConfig.exposure ?? "",
     timeout: renderNumber(serverConfig.timeout),
   };
+
+  return {
+    required: {
+      name: serverName,
+      command: serverConfig.command,
+      optionalFields: hasAnyFilledValue(optional),
+    },
+    optional,
+  };
+}
+
+export function toMcpHttpServerForms(
+  serverName: string,
+  serverConfig: McpHttpConfig,
+) {
+  const optional = {
+    headers: renderKeyValueList(serverConfig.headers),
+    exposure: serverConfig.exposure ?? "",
+    timeout: renderNumber(serverConfig.timeout),
+  };
+
+  return {
+    required: {
+      name: serverName,
+      url: serverConfig.url,
+      optionalFields: hasAnyFilledValue(optional),
+      oauthFields: serverConfig.oauth !== undefined,
+    },
+    optional,
+  };
+}
+
+function emptyStdioOptionalFields(): StdioServerOptionalFields {
+  return { args: "", env: "", cwd: "", exposure: "", timeout: "" };
+}
+
+function emptyHttpOptionalFields(): HttpServerOptionalFields {
+  return { headers: "", exposure: "", timeout: "" };
+}
+
+/** A stored server with nothing optional set should not send the user to the second form. */
+function hasAnyFilledValue(fields: Record<string, string>) {
+  return Object.values(fields).some((value) => value.trim().length > 0);
 }
 
 /** The form needs a string for every field, so an unconfigured oauth block starts blank. */
@@ -1018,7 +1260,10 @@ function renderMcpFile(file: Record<string, unknown>) {
   return `${JSON.stringify(file, null, 2)}\n`;
 }
 
-function reportFileError(ctx: ExtensionCommandContext, contents: McpFileContents) {
+function reportFileError(
+  ctx: ExtensionCommandContext,
+  contents: McpFileContents,
+) {
   if (!contents.fileError) {
     return false;
   }
@@ -1045,6 +1290,26 @@ function isEmptyValue(value: unknown) {
   }
 
   return isRecord(value) && Object.keys(value).length === 0;
+}
+
+function splitArguments(value: string) {
+  return (value.match(ARGUMENT_PATTERN) ?? []).map(
+    (argument) => argument.match(QUOTED_ARGUMENT_PATTERN)?.at(2) ?? argument,
+  );
+}
+
+/**
+ * Every character has to land inside an argument, so a quote that is never closed or a
+ * quote inside an argument is rejected instead of being silently dropped.
+ */
+function isArgsList(value: string) {
+  return value.replace(/\s/g, "") === splitArguments(value).join("");
+}
+
+function renderArguments(args: ReadonlyArray<string>) {
+  return args
+    .map((argument) => (/[\s"']/.test(argument) ? `"${argument}"` : argument))
+    .join(" ");
 }
 
 function splitCommaList(value: string) {
@@ -1081,10 +1346,6 @@ function toOptionalNumber(value: string) {
   return trimmedValue === "" ? undefined : Number(trimmedValue);
 }
 
-function isSeparatedList(value: string) {
-  return value.trim() === "" || value.split(",").every((item) => item.trim() !== "");
-}
-
 function isKeyValueList(value: string, namePattern: RegExp) {
   return splitCommaList(value).every((pair) => {
     const separatorIndex = pair.indexOf("=");
@@ -1103,21 +1364,29 @@ function isExposure(value: string) {
 }
 
 function isHttpUrl(value: string) {
-  if (!URL.canParse(value)) {
+  const url = value.trim();
+
+  if (!URL.canParse(url)) {
     return false;
   }
 
-  return /^https?:$/.test(new URL(value).protocol);
+  return /^https?:$/.test(new URL(url).protocol);
 }
 
 function isLoopbackHttpUrl(value: string) {
-  if (!URL.canParse(value)) {
+  const url = value.trim();
+
+  if (!URL.canParse(url)) {
     return false;
   }
 
-  const url = new URL(value);
+  const loopbackUrl = new URL(url);
 
-  return url.protocol === "http:" && LOOPBACK_HOSTS.includes(url.hostname);
+  // Only plain http is allowed: RFC 8252 redirects a browser to a loopback listener.
+  return (
+    loopbackUrl.protocol === "http:" &&
+    LOOPBACK_HOSTS.includes(loopbackUrl.hostname)
+  );
 }
 
 function getScopeLabel(scope: McpScope) {
@@ -1171,14 +1440,16 @@ export default (pi: ExtensionAPI) => {
     description: "Manage MCP servers in ~/.pi/agent/mcp.json",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("mcp"),
-    handler: async (argument, ctx) => handleSubcommand(pi, argument, ctx, "global"),
+    handler: async (argument, ctx) =>
+      handleSubcommand(pi, argument, ctx, "global"),
   });
 
   pi.registerCommand(LOCAL_COMMAND, {
     description: "Manage MCP servers in this project's .pi/mcp.json",
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("local mcp"),
-    handler: async (argument, ctx) => handleSubcommand(pi, argument, ctx, "local"),
+    handler: async (argument, ctx) =>
+      handleSubcommand(pi, argument, ctx, "local"),
   });
 };
 

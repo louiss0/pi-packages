@@ -19,17 +19,19 @@ import mcpCraft, {
   handleDelete,
   handleEdit,
   parseHttpServerFormValues,
+  parseHttpServerOptionalFormValues,
   parseMcpServerConfig,
   parseOAuthFormValues,
   parseStdioServerFormValues,
+  parseStdioServerOptionalFormValues,
   readMcpFile,
   renderHttpServerConfig,
   renderStdioServerConfig,
+  toMcpHttpServerForms,
   toMcpOAuthFields,
-  toMcpServerFields,
+  toMcpStdioServerForms,
   writeMcpFile,
   type McpCraftDeps,
-  type StdioServerFields,
 } from "./mcp-craft";
 
 const workspace = "/workspace";
@@ -38,23 +40,45 @@ const home = "/test-home";
 const globalPath = join(home, ".pi", "agent", "mcp.json");
 const localPath = join(workspace, ".pi", "mcp.json");
 
-const stdioFields = {
+const stdioRequiredFields = {
   name: "github",
   command: "npx",
-  args: "-y, github-mcp",
+  optionalFields: true,
+};
+
+const stdioOptionalFields = {
+  args: "-y github-mcp",
   env: "GITHUB_TOKEN=${GITHUB_TOKEN}",
   cwd: "",
   exposure: "direct",
   timeout: "30",
 };
 
-const httpFields = {
+const emptyStdioOptionalFields = {
+  args: "",
+  env: "",
+  cwd: "",
+  exposure: "",
+  timeout: "",
+};
+
+const httpRequiredFields = {
   name: "sentry",
   url: "https://mcp.sentry.dev/mcp",
+  optionalFields: true,
+  oauthFields: false,
+};
+
+const httpOptionalFields = {
   headers: "Authorization=Bearer ${SENTRY_TOKEN}",
   exposure: "",
   timeout: "",
-  confirm: false,
+};
+
+const emptyHttpOptionalFields = {
+  headers: "",
+  exposure: "",
+  timeout: "",
 };
 
 const oauthFields = {
@@ -127,7 +151,11 @@ function createExtensionApi() {
       name: string,
       command: Omit<RegisteredCommand, "name" | "sourceInfo">,
     ) => {
-      commands.set(name, { ...command, name, sourceInfo: {} } as RegisteredCommand);
+      commands.set(name, {
+        ...command,
+        name,
+        sourceInfo: {},
+      } as RegisteredCommand);
     },
     registerFlag: (
       name: string,
@@ -221,7 +249,8 @@ describe("extensions/mcp-craft", () => {
     it("rejects a name pi would not accept", () => {
       expect(parseMcpServerConfig("my server", { command: "npx" })).toEqual({
         success: false,
-        error: 'invalid server name "my server" (use letters, digits, "_" and "-")',
+        error:
+          'invalid server name "my server" (use letters, digits, "_" and "-")',
       });
     });
 
@@ -261,7 +290,12 @@ describe("extensions/mcp-craft", () => {
 
       await expect(
         readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
-      ).resolves.toEqual({ file: {}, serverConfigs: {}, servers: {}, errors: [] });
+      ).resolves.toEqual({
+        file: {},
+        serverConfigs: {},
+        servers: {},
+        errors: [],
+      });
     });
 
     it("keeps the servers pi accepts and reports the ones it rejects", async () => {
@@ -306,6 +340,29 @@ describe("extensions/mcp-craft", () => {
       });
     });
 
+    it("stops instead of overwriting when the existing file cannot be read", async () => {
+      const fileSystem = new MemoryFileSystem();
+      const deps = createDeps({ fileSystem });
+      const existingServers = { github: { command: "npx" } };
+
+      await seed(fileSystem, globalPath, existingServers);
+      vi.spyOn(fileSystem, "readFile").mockResolvedValueOnce({
+        success: false,
+        error: new Error("permission denied"),
+      });
+
+      await expect(
+        writeMcpFile(fileSystem, deps.getMcpFilePath, "global", {
+          sentry: { type: "stdio", command: "npx" },
+        }),
+      ).resolves.toMatchObject({ success: false });
+
+      const result = await fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toEqual({
+        mcpServers: existingServers,
+      });
+    });
+
     it("keeps other content in the file", async () => {
       const deps = createDeps({});
 
@@ -329,35 +386,80 @@ describe("extensions/mcp-craft", () => {
   });
 
   describe("form values", () => {
-    it("accepts a complete stdio entry", () => {
-      expect(parseStdioServerFormValues(stdioFields)).toBeUndefined();
+    it("accepts the required stdio fields", () => {
+      expect(parseStdioServerFormValues(stdioRequiredFields)).toBeUndefined();
+    });
+
+    it("rejects a command that is only whitespace", () => {
+      expect(
+        parseStdioServerFormValues({ ...stdioRequiredFields, command: "   " }),
+      ).toMatchObject({ command: expect.any(Array) });
+    });
+
+    it("rejects a name that is only whitespace", () => {
+      expect(
+        parseStdioServerFormValues({ ...stdioRequiredFields, name: "  " }),
+      ).toMatchObject({ name: expect.any(Array) });
+    });
+
+    it("accepts the optional stdio fields", () => {
+      expect(
+        parseStdioServerOptionalFormValues(stdioOptionalFields),
+      ).toBeUndefined();
     });
 
     it("rejects stdio env that is not KEY=VALUE pairs", () => {
       expect(
-        parseStdioServerFormValues({ ...stdioFields, env: "GITHUB_TOKEN" }),
+        parseStdioServerOptionalFormValues({
+          ...stdioOptionalFields,
+          env: "GITHUB_TOKEN",
+        }),
       ).toMatchObject({ env: expect.any(Array) });
+    });
+
+    it("rejects args with an unterminated quote", () => {
+      expect(
+        parseStdioServerOptionalFormValues({
+          ...stdioOptionalFields,
+          args: '-y "github mcp',
+        }),
+      ).toMatchObject({ args: expect.any(Array) });
     });
 
     it("rejects a timeout that is not a positive number of seconds", () => {
       expect(
-        parseStdioServerFormValues({ ...stdioFields, timeout: "-5" }),
+        parseStdioServerOptionalFormValues({
+          ...stdioOptionalFields,
+          timeout: "-5",
+        }),
       ).toMatchObject({ timeout: expect.any(Array) });
     });
 
     it("rejects an exposure pi does not have", () => {
       expect(
-        parseStdioServerFormValues({ ...stdioFields, exposure: "sometimes" }),
+        parseStdioServerOptionalFormValues({
+          ...stdioOptionalFields,
+          exposure: "sometimes",
+        }),
       ).toMatchObject({ exposure: expect.any(Array) });
     });
 
-    it("accepts an http entry with none of the stdio fields", () => {
-      expect(parseHttpServerFormValues(httpFields)).toBeUndefined();
+    it("accepts the required http fields", () => {
+      expect(parseHttpServerFormValues(httpRequiredFields)).toBeUndefined();
+    });
+
+    it("accepts the optional http fields", () => {
+      expect(
+        parseHttpServerOptionalFormValues(httpOptionalFields),
+      ).toBeUndefined();
     });
 
     it("rejects a url that is not http or https", () => {
       expect(
-        parseHttpServerFormValues({ ...httpFields, url: "ftp://example.com" }),
+        parseHttpServerFormValues({
+          ...httpRequiredFields,
+          url: "ftp://example.com",
+        }),
       ).toMatchObject({ url: expect.any(Array) });
     });
 
@@ -371,7 +473,9 @@ describe("extensions/mcp-craft", () => {
 
   describe("config rendering", () => {
     it("writes only the fields a stdio server has", () => {
-      expect(renderStdioServerConfig(stdioFields)).toEqual({
+      expect(
+        renderStdioServerConfig(stdioRequiredFields, stdioOptionalFields),
+      ).toEqual({
         type: "stdio",
         command: "npx",
         args: ["-y", "github-mcp"],
@@ -382,15 +486,59 @@ describe("extensions/mcp-craft", () => {
     });
 
     it("writes only the fields an http server has", () => {
-      expect(renderHttpServerConfig(httpFields)).toEqual({
+      expect(
+        renderHttpServerConfig(httpRequiredFields, httpOptionalFields),
+      ).toEqual({
         type: "http",
         url: "https://mcp.sentry.dev/mcp",
         headers: { Authorization: "Bearer ${SENTRY_TOKEN}" },
       });
     });
 
-    it("adds oauth only when the second form was filled in", () => {
-      expect(renderHttpServerConfig(httpFields, oauthFields)).toMatchObject({
+    it("leaves out the optional fields that were left blank", () => {
+      expect(
+        renderStdioServerConfig(
+          { ...stdioRequiredFields, optionalFields: false },
+          emptyStdioOptionalFields,
+        ),
+      ).toEqual({ type: "stdio", command: "npx" });
+
+      expect(
+        renderHttpServerConfig(
+          { ...httpRequiredFields, optionalFields: false },
+          emptyHttpOptionalFields,
+        ),
+      ).toEqual({ type: "http", url: "https://mcp.sentry.dev/mcp" });
+    });
+
+    it("splits args on spaces so a comma stays part of the argument", () => {
+      expect(
+        renderStdioServerConfig(stdioRequiredFields, {
+          ...stdioOptionalFields,
+          args: "-y github-mcp --header=a,b",
+        }),
+      ).toMatchObject({
+        args: ["-y", "github-mcp", "--header=a,b"],
+      });
+    });
+
+    it("keeps a quoted arg with spaces as one argument", () => {
+      expect(
+        renderStdioServerConfig(stdioRequiredFields, {
+          ...stdioOptionalFields,
+          args: 'playwright --config "my config.json"',
+        }),
+      ).toMatchObject({ args: ["playwright", "--config", "my config.json"] });
+    });
+
+    it("adds oauth only when the third form was filled in", () => {
+      expect(
+        renderHttpServerConfig(
+          httpRequiredFields,
+          httpOptionalFields,
+          oauthFields,
+        ),
+      ).toMatchObject({
         oauth: {
           clientId: "my-client",
           clientSecret: "${CLIENT_SECRET}",
@@ -401,76 +549,106 @@ describe("extensions/mcp-craft", () => {
     });
 
     it("leaves server activity settings to Pi", () => {
-      expect(renderStdioServerConfig(stdioFields)).not.toHaveProperty("enabled");
-      expect(renderHttpServerConfig(httpFields)).not.toHaveProperty("enabled");
+      expect(
+        renderStdioServerConfig(stdioRequiredFields, stdioOptionalFields),
+      ).not.toHaveProperty("enabled");
+      expect(
+        renderHttpServerConfig(httpRequiredFields, httpOptionalFields),
+      ).not.toHaveProperty("enabled");
     });
   });
 
-  describe("toMcpServerFields", () => {
-    it("maps a stored stdio server back onto the form fields", () => {
+  describe("toMcpStdioServerForms", () => {
+    it("maps a stored stdio server back onto both form stages", () => {
       expect(
-        toMcpServerFields("github", {
+        toMcpStdioServerForms("github", {
           type: "stdio",
           command: "npx",
-          args: ["-y", "github-mcp"],
+          args: ["-y", "github-mcp", "--header=a,b"],
           env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
           exposure: "direct",
           timeout: 30,
         }),
       ).toEqual({
-        name: "github",
-        command: "npx",
-        args: "-y, github-mcp",
-        env: "GITHUB_TOKEN=${GITHUB_TOKEN}",
-        cwd: "",
-        exposure: "direct",
-        timeout: "30",
+        required: { name: "github", command: "npx", optionalFields: true },
+        optional: {
+          args: "-y github-mcp --header=a,b",
+          env: "GITHUB_TOKEN=${GITHUB_TOKEN}",
+          cwd: "",
+          exposure: "direct",
+          timeout: "30",
+        },
       });
     });
 
-    it("maps a stored http server back onto the form fields", () => {
+    it("quotes a stored arg that contains a space", () => {
       expect(
-        toMcpServerFields("sentry", {
-          type: "http",
-          url: "https://mcp.sentry.dev/mcp",
-          headers: { Authorization: "Bearer ${SENTRY_TOKEN}" },
-          enabled: false,
+        toMcpStdioServerForms("playwright", {
+          type: "stdio",
+          command: "playwright",
+          args: ["--config", "my config.json"],
         }),
-      ).toEqual({
-        name: "sentry",
-        url: "https://mcp.sentry.dev/mcp",
-        headers: "Authorization=Bearer ${SENTRY_TOKEN}",
-        exposure: "",
-        timeout: "",
-        confirm: false,
+      ).toMatchObject({
+        optional: { args: '--config "my config.json"' },
       });
     });
 
-    it("asks for oauth again when the stored server has it", () => {
+    it("skips the second stage for a server with nothing optional set", () => {
       expect(
-        toMcpServerFields("sentry", {
-          type: "http",
-          url: "https://mcp.sentry.dev/mcp",
-          oauth: { clientId: "my-client" },
+        toMcpStdioServerForms("filesystem", {
+          type: "stdio",
+          command: "npx",
         }),
-      ).toMatchObject({ confirm: true });
+      ).toMatchObject({ required: { optionalFields: false } });
     });
 
     it("round trips a config through the form fields", () => {
       const config: McpServerConfig = {
         type: "stdio",
         command: "npx",
-        args: ["-y", "github-mcp"],
+        args: ["-y", "github-mcp", "--header=a,b"],
         env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
         exposure: "direct",
         timeout: 30,
       };
+      const { required, optional } = toMcpStdioServerForms("github", config);
 
+      expect(renderStdioServerConfig(required, optional)).toEqual(config);
+    });
+  });
+
+  describe("toMcpHttpServerForms", () => {
+    it("maps a stored http server back onto both form stages", () => {
       expect(
-        renderStdioServerConfig(
-          toMcpServerFields("github", config) as StdioServerFields,
-        ),
-      ).toEqual(config);
+        toMcpHttpServerForms("sentry", {
+          type: "http",
+          url: "https://mcp.sentry.dev/mcp",
+          headers: { Authorization: "Bearer ${SENTRY_TOKEN}" },
+          enabled: false,
+        }),
+      ).toEqual({
+        required: {
+          name: "sentry",
+          url: "https://mcp.sentry.dev/mcp",
+          optionalFields: true,
+          oauthFields: false,
+        },
+        optional: {
+          headers: "Authorization=Bearer ${SENTRY_TOKEN}",
+          exposure: "",
+          timeout: "",
+        },
+      });
+    });
+
+    it("asks for oauth again when the stored server has it", () => {
+      expect(
+        toMcpHttpServerForms("sentry", {
+          type: "http",
+          url: "https://mcp.sentry.dev/mcp",
+          oauth: { clientId: "my-client" },
+        }),
+      ).toMatchObject({ required: { oauthFields: true } });
     });
   });
 
@@ -494,7 +672,9 @@ describe("extensions/mcp-craft", () => {
 
   describe("handleCreate", () => {
     it("adds a stdio server to the global file", async () => {
-      const deps = createDeps({ custom: ["stdio", stdioFields] });
+      const deps = createDeps({
+        custom: ["stdio", stdioRequiredFields, stdioOptionalFields],
+      });
 
       await handleCreate(createCommandContext(deps), "global", deps);
 
@@ -506,9 +686,28 @@ describe("extensions/mcp-craft", () => {
       expect(deps.reloads).toBe(1);
     });
 
+    it("adds a stdio server without asking for optional fields", async () => {
+      const deps = createDeps({
+        custom: ["stdio", { ...stdioRequiredFields, optionalFields: false }],
+      });
+
+      await handleCreate(createCommandContext(deps), "global", deps);
+
+      await expect(
+        readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
+      ).resolves.toMatchObject({
+        servers: { github: { type: "stdio", command: "npx" } },
+      });
+    });
+
     it("adds an http server with oauth to the project file", async () => {
       const deps = createDeps({
-        custom: ["http", { ...httpFields, confirm: true }, oauthFields],
+        custom: [
+          "http",
+          { ...httpRequiredFields, oauthFields: true },
+          httpOptionalFields,
+          oauthFields,
+        ],
       });
 
       await handleCreate(createCommandContext(deps), "local", deps);
@@ -526,10 +725,35 @@ describe("extensions/mcp-craft", () => {
       });
     });
 
-    it("keeps the servers already in the file", async () => {
-      const deps = createDeps({ custom: ["stdio", stdioFields] });
+    it("refuses to replace a server that already exists", async () => {
+      const deps = createDeps({
+        custom: ["stdio", stdioRequiredFields, stdioOptionalFields],
+      });
 
-      await seed(deps.fileSystem, globalPath, { sentry: { url: "https://x.dev" } });
+      await seed(deps.fileSystem, globalPath, {
+        github: { command: "npx", args: ["-y", "other"] },
+      });
+
+      await handleCreate(createCommandContext(deps), "global", deps);
+
+      const result = await deps.fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toEqual({
+        mcpServers: { github: { command: "npx", args: ["-y", "other"] } },
+      });
+      expect(deps.notifications).toContain(
+        "MCP server 'github' already exists in your global MCP servers. Use edit to change it",
+      );
+      expect(deps.reloads).toBe(0);
+    });
+
+    it("keeps the servers already in the file", async () => {
+      const deps = createDeps({
+        custom: ["stdio", stdioRequiredFields, stdioOptionalFields],
+      });
+
+      await seed(deps.fileSystem, globalPath, {
+        sentry: { url: "https://x.dev" },
+      });
 
       await handleCreate(createCommandContext(deps), "global", deps);
 
@@ -542,8 +766,31 @@ describe("extensions/mcp-craft", () => {
       expect(Object.keys(contents.servers)).toEqual(["sentry", "github"]);
     });
 
+    it("stops without writing when the file cannot be read", async () => {
+      const deps = createDeps({
+        custom: ["stdio", stdioRequiredFields, stdioOptionalFields],
+      });
+      const existingServers = { github: { command: "npx" } };
+
+      await seed(deps.fileSystem, globalPath, existingServers);
+      vi.spyOn(deps.fileSystem, "readFile").mockResolvedValueOnce({
+        success: false,
+        error: new Error("permission denied"),
+      });
+
+      await handleCreate(createCommandContext(deps), "global", deps);
+
+      const result = await deps.fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toEqual({
+        mcpServers: existingServers,
+      });
+      expect(deps.reloads).toBe(0);
+    });
+
     it("does not overwrite an invalid MCP file", async () => {
-      const deps = createDeps({ custom: ["stdio", stdioFields] });
+      const deps = createDeps({
+        custom: ["stdio", stdioRequiredFields, stdioOptionalFields],
+      });
       const invalidJson = "{ invalid json";
 
       await seed(deps.fileSystem, globalPath, {});
@@ -561,9 +808,9 @@ describe("extensions/mcp-craft", () => {
 
       await handleCreate(createCommandContext(deps), "global", deps);
 
-      await expect(
-        deps.fileSystem.readFile(globalPath),
-      ).resolves.toMatchObject({ success: false });
+      await expect(deps.fileSystem.readFile(globalPath)).resolves.toMatchObject(
+        { success: false },
+      );
       expect(deps.reloads).toBe(0);
     });
   });
@@ -612,7 +859,11 @@ describe("extensions/mcp-craft", () => {
 
     it("replaces one server with the edited form values", async () => {
       const deps = createDeps({
-        custom: ["github", { ...stdioFields, timeout: "90" }],
+        custom: [
+          "github",
+          { ...stdioRequiredFields, optionalFields: true },
+          { ...stdioOptionalFields, timeout: "90" },
+        ],
       });
 
       await seed(deps.fileSystem, globalPath, {
@@ -631,7 +882,11 @@ describe("extensions/mcp-craft", () => {
 
     it("preserves unknown per-server fields when editing a server", async () => {
       const deps = createDeps({
-        custom: ["github", { ...stdioFields, timeout: "90" }],
+        custom: [
+          "github",
+          { ...stdioRequiredFields, optionalFields: true },
+          { ...stdioOptionalFields, timeout: "90" },
+        ],
       });
       const existingConfig = {
         command: "npx",
@@ -654,6 +909,70 @@ describe("extensions/mcp-craft", () => {
             extensionMetadata: { keep: true },
           },
         },
+      });
+    });
+
+    it("keeps an existing oauth block when the oauth form is cancelled", async () => {
+      const deps = createDeps({
+        custom: [
+          "sentry",
+          { ...httpRequiredFields, optionalFields: true, oauthFields: true },
+          httpOptionalFields,
+          null,
+        ],
+      });
+      const storedServer = {
+        url: "https://mcp.sentry.dev/mcp",
+        oauth: { clientId: "my-client" },
+      };
+
+      await seed(deps.fileSystem, globalPath, { sentry: storedServer });
+
+      await handleEdit(createCommandContext(deps), false, "global", deps);
+
+      const result = await deps.fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toMatchObject({
+        mcpServers: { sentry: storedServer },
+      });
+      expect(deps.reloads).toBe(0);
+    });
+
+    it("adds a server without oauth when the oauth form is cancelled", async () => {
+      const deps = createDeps({
+        custom: [
+          "http",
+          { ...httpRequiredFields, optionalFields: false, oauthFields: true },
+          null,
+        ],
+      });
+
+      await handleCreate(createCommandContext(deps), "global", deps);
+
+      await expect(
+        readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
+      ).resolves.toMatchObject({
+        servers: {
+          sentry: { type: "http", url: "https://mcp.sentry.dev/mcp" },
+        },
+      });
+    });
+
+    it("writes nothing when the second form is cancelled", async () => {
+      const deps = createDeps({
+        custom: [
+          "github",
+          { ...stdioRequiredFields, optionalFields: true },
+          null,
+        ],
+      });
+
+      await seed(deps.fileSystem, globalPath, { github: { command: "npx" } });
+
+      await handleEdit(createCommandContext(deps), false, "global", deps);
+
+      const result = await deps.fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toEqual({
+        mcpServers: { github: { command: "npx" } },
       });
     });
 
@@ -701,7 +1020,9 @@ describe("extensions/mcp-craft", () => {
 
       await expect(
         readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
-      ).resolves.toMatchObject({ servers: { sentry: { url: "https://x.dev" } } });
+      ).resolves.toMatchObject({
+        servers: { sentry: { url: "https://x.dev" } },
+      });
     });
 
     it("writes nothing when the selection is empty", async () => {
@@ -714,6 +1035,25 @@ describe("extensions/mcp-craft", () => {
       await expect(
         readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
       ).resolves.toMatchObject({ servers: { github: { command: "npx" } } });
+    });
+
+    it("stops without writing when the file cannot be read", async () => {
+      const deps = createDeps({ custom: [["github"]] });
+      const existingServers = { github: { command: "npx" } };
+
+      await seed(deps.fileSystem, globalPath, existingServers);
+      vi.spyOn(deps.fileSystem, "readFile").mockResolvedValueOnce({
+        success: false,
+        error: new Error("permission denied"),
+      });
+
+      await handleDelete(createCommandContext(deps), "global", deps);
+
+      const result = await deps.fileSystem.readFile(globalPath);
+      expect(JSON.parse(result.success ? result.data : "{}")).toEqual({
+        mcpServers: existingServers,
+      });
+      expect(deps.reloads).toBe(0);
     });
   });
 
@@ -751,19 +1091,19 @@ describe("extensions/mcp-craft", () => {
       expect(notifications[0]).toMatch(/create|edit|delete/);
     });
 
-    it.each(["create", "delete"])(
-      "rejects the edit flag with %s",
-      async (subcommand) => {
-        const { commands, flags } = createExtensionApi();
-        flags.set(EDIT_FLAG, true);
-        const { ctx, notifications } = createSubcommandContext();
+    it.each([
+      "create",
+      "delete",
+    ])("rejects the edit flag with %s", async (subcommand) => {
+      const { commands, flags } = createExtensionApi();
+      flags.set(EDIT_FLAG, true);
+      const { ctx, notifications } = createSubcommandContext();
 
-        await commands.get(GLOBAL_COMMAND)?.handler(subcommand, ctx);
+      await commands.get(GLOBAL_COMMAND)?.handler(subcommand, ctx);
 
-        expect(notifications).toEqual([
-          `Invalid command: --${EDIT_FLAG} can only be used with edit`,
-        ]);
-      },
-    );
+      expect(notifications).toEqual([
+        `Invalid command: --${EDIT_FLAG} can only be used with edit`,
+      ]);
+    });
   });
 });
