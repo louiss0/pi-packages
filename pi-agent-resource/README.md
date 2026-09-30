@@ -110,9 +110,11 @@ Creates, edits, or deletes servers in `~/.pi/agent/mcp.json`.
 
 Runs the same workflows against the current project's `.pi/mcp.json`.
 
-`create` asks for a transport, then opens a validated form. Stdio servers expose command, arguments, environment variables, and working directory. HTTP servers expose a URL and headers, with an optional second form for OAuth settings. Both forms support Pi's exposure setting and a connection timeout. Use Pi's built-in `/mcp` manager to enable or disable servers; form-based edits preserve an existing `enabled` setting.
+`create` asks for a transport, then opens a validated form for the required fields: `name` plus `command` for stdio, or `name` plus `url` for HTTP. A checkbox on that form decides whether a second form is needed for the optional fields. Stdio optional fields are arguments, environment variables, and working directory; HTTP optional fields are headers. Both optional forms add Pi's exposure setting and a connection timeout, and blank optional fields are left out of `mcp.json`. Arguments are space separated, so a comma stays part of the argument it sits in; quote an argument that contains a space (`playwright --config "my config.json"`). Environment variables and headers are `KEY=VALUE` pairs separated by commas, which keeps values such as `Bearer ${TOKEN}` and `!echo Bearer $(gh auth token)` intact. The HTTP form has a second checkbox that opens a third form for OAuth settings.
 
-For valid JSON configs, form-based create, edit, and delete preserve other server entries, unrecognized per-server fields, and unrelated top-level keys in `mcp.json`. If the file is malformed or has no `mcpServers` object, form-based changes stop without overwriting it; use the external-editor flag to repair it.
+`create` refuses to replace a server that already has the chosen name; use `edit` to change it. Use Pi's built-in `/mcp` manager to enable or disable servers; form-based edits preserve an existing `enabled` setting, an existing `oauth` block, and any `toolExposure` overrides.
+
+For valid JSON configs, form-based create, edit, and delete preserve other server entries, unrecognized per-server fields, and unrelated top-level keys in `mcp.json`. If the file is malformed, has no `mcpServers` object, or cannot be read, form-based changes stop without overwriting it; use the external-editor flag to repair it.
 
 ### Flags
 
