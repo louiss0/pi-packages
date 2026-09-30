@@ -1,0 +1,9 @@
+# The formatter and the tests expect LF, so the working tree must not depend on the
+# machine's git line-ending settings.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
