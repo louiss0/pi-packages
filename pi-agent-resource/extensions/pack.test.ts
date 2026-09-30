@@ -188,17 +188,14 @@ describe("Pack", () => {
     const selectionFilePath = "/packs/active-packs.json";
 
     async function writePackMcpConfig(packName: string, content: string) {
-      const filePath = pathResolver.resolvePackPath(
-        join(packName, "mcp.json"),
-      );
+      const filePath = pathResolver.resolvePackPath(join(packName, "mcp.json"));
       await fileSystem.mkdir(dirname(filePath), { recursive: true });
       await fileSystem.writeFile(filePath, content);
     }
 
     it("registers only active pack servers under prefixed names", async () => {
-      const registerMcpServer = vi.fn<
-        (name: string, config: McpServerConfig) => void
-      >();
+      const registerMcpServer =
+        vi.fn<(name: string, config: McpServerConfig) => void>();
       const notify = vi.fn();
 
       await fileSystem.mkdir("/packs", { recursive: true });
@@ -209,7 +206,9 @@ describe("Pack", () => {
       );
       await writePackMcpConfig(
         "inactive",
-        JSON.stringify({ mcpServers: { docs: { url: "https://docs.test/mcp" } } }),
+        JSON.stringify({
+          mcpServers: { docs: { url: "https://docs.test/mcp" } },
+        }),
       );
 
       await registerActivePackMcpServers(
@@ -220,17 +219,19 @@ describe("Pack", () => {
         notify,
       );
 
-      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith("alpha_search", {
-        type: "stdio",
-        command: "npx",
-      });
+      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith(
+        "alpha_search",
+        {
+          type: "stdio",
+          command: "npx",
+        },
+      );
       expect(notify).not.toHaveBeenCalled();
     });
 
     it("reports malformed pack files and continues loading other packs", async () => {
-      const registerMcpServer = vi.fn<
-        (name: string, config: McpServerConfig) => void
-      >();
+      const registerMcpServer =
+        vi.fn<(name: string, config: McpServerConfig) => void>();
       const notify = vi.fn();
 
       await fileSystem.mkdir("/packs", { recursive: true });
@@ -242,7 +243,9 @@ describe("Pack", () => {
       await writePackMcpConfig("broken", "{invalid json");
       await writePackMcpConfig(
         "working",
-        JSON.stringify({ mcpServers: { issues: { url: "https://issues.test/mcp" } } }),
+        JSON.stringify({
+          mcpServers: { issues: { url: "https://issues.test/mcp" } },
+        }),
       );
 
       await registerActivePackMcpServers(
@@ -257,15 +260,12 @@ describe("Pack", () => {
         "working_issues",
         { type: "http", url: "https://issues.test/mcp" },
       );
-      expect(notify).toHaveBeenCalledWith(
-        expect.stringContaining("broken"),
-      );
+      expect(notify).toHaveBeenCalledWith(expect.stringContaining("broken"));
     });
 
     it("reports an entry pi would reject and registers the rest", async () => {
-      const registerMcpServer = vi.fn<
-        (name: string, config: McpServerConfig) => void
-      >();
+      const registerMcpServer =
+        vi.fn<(name: string, config: McpServerConfig) => void>();
       const notify = vi.fn();
 
       await fileSystem.mkdir("/packs", { recursive: true });
@@ -288,10 +288,13 @@ describe("Pack", () => {
         notify,
       );
 
-      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith("alpha_search", {
-        type: "stdio",
-        command: "npx",
-      });
+      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith(
+        "alpha_search",
+        {
+          type: "stdio",
+          command: "npx",
+        },
+      );
       expect(registeredNames).toEqual(new Set(["alpha_search"]));
       expect(notify).toHaveBeenCalledWith(
         expect.stringContaining("legacy SSE transport is not supported"),
@@ -309,18 +312,16 @@ describe("Pack", () => {
       const notify = vi.fn();
 
       await fileSystem.mkdir("/packs", { recursive: true });
-      await savePackSelection(
-        fileSystem,
-        ["alpha", "beta"],
-        selectionFilePath,
-      );
+      await savePackSelection(fileSystem, ["alpha", "beta"], selectionFilePath);
       await writePackMcpConfig(
         "alpha",
         JSON.stringify({ mcpServers: { search: { command: "npx" } } }),
       );
       await writePackMcpConfig(
         "beta",
-        JSON.stringify({ mcpServers: { issues: { url: "https://issues.test/mcp" } } }),
+        JSON.stringify({
+          mcpServers: { issues: { url: "https://issues.test/mcp" } },
+        }),
       );
 
       const registeredNames = await registerActivePackMcpServers(
@@ -346,7 +347,10 @@ describe("Pack", () => {
       ).toEqual(["beta_issues"]);
 
       expect(
-        getStaleMcpServerNames(new Set(["alpha_search"]), new Set(["alpha_search"])),
+        getStaleMcpServerNames(
+          new Set(["alpha_search"]),
+          new Set(["alpha_search"]),
+        ),
       ).toEqual([]);
     });
   });
