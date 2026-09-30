@@ -43,18 +43,69 @@ function getRenderedContentLines(lines: string[]) {
   return lines.filter((line) => line.trim().length > 0);
 }
 
+/**
+ * Pi's Theme reads every color token in its constructor, so a partial set throws. The
+ * `satisfies` keeps these sets exhaustive: a token added upstream fails typecheck here
+ * instead of failing every test at runtime.
+ */
+const themeForegroundColors = {
+  accent: "#00ffff",
+  border: "#888888",
+  borderAccent: "#00ffff",
+  borderMuted: "#888888",
+  success: "#00ff00",
+  error: "#ff0000",
+  warning: "#ffaa00",
+  muted: "#888888",
+  dim: "#888888",
+  text: "#ffffff",
+  thinkingText: "#ffffff",
+  userMessageText: "#ffffff",
+  customMessageText: "#ffffff",
+  customMessageLabel: "#888888",
+  toolTitle: "#ffffff",
+  toolOutput: "#ffffff",
+  mdHeading: "#00ffff",
+  mdLink: "#00ffff",
+  mdLinkUrl: "#888888",
+  mdCode: "#ffffff",
+  mdCodeBlock: "#ffffff",
+  mdCodeBlockBorder: "#888888",
+  mdQuote: "#ffffff",
+  mdQuoteBorder: "#888888",
+  mdHr: "#888888",
+  mdListBullet: "#00ffff",
+  toolDiffAdded: "#00ff00",
+  toolDiffRemoved: "#ff0000",
+  toolDiffContext: "#888888",
+  syntaxComment: "#888888",
+  syntaxKeyword: "#00ffff",
+  syntaxFunction: "#00ffff",
+  syntaxVariable: "#ffffff",
+  syntaxString: "#00ff88",
+  syntaxNumber: "#ffaa00",
+  syntaxType: "#00ffff",
+  syntaxOperator: "#ffffff",
+  syntaxPunctuation: "#888888",
+  thinkingOff: "#888888",
+  thinkingMinimal: "#888888",
+  thinkingLow: "#8888ff",
+  thinkingMedium: "#8888ff",
+  thinkingHigh: "#aa88ff",
+  thinkingXhigh: "#aa88ff",
+} satisfies ConstructorParameters<typeof Theme>[0];
+
+const themeBackgroundColors = {
+  selectedBg: "#333333",
+  userMessageBg: "#222222",
+  customMessageBg: "#222222",
+  toolPendingBg: "#333333",
+  toolSuccessBg: "#333333",
+  toolErrorBg: "#333333",
+} satisfies ConstructorParameters<typeof Theme>[1];
+
 function createTheme() {
-  return new Theme(
-    {
-      accent: "#00ffff",
-      borderAccent: "#00ffff",
-      dim: "#888888",
-      muted: "#888888",
-      warning: "#ffaa00",
-    } as ConstructorParameters<typeof Theme>[0],
-    {} as ConstructorParameters<typeof Theme>[1],
-    "truecolor",
-  );
+  return new Theme(themeForegroundColors, themeBackgroundColors, "truecolor");
 }
 
 function createTui() {
@@ -79,21 +130,6 @@ import {
 } from "./components";
 
 describe("shared/components", () => {
-  function createTheme() {
-    const theme = new Theme(
-      {
-        error: "#ff0000",
-        accent: "#00ffff",
-        dim: "#888888",
-        muted: "#888888",
-        warning: "#ffaa00",
-      } as ConstructorParameters<typeof Theme>[0],
-      {} as ConstructorParameters<typeof Theme>[1],
-      "truecolor",
-    );
-    return theme;
-  }
-
   function createTui() {
     return {
       requestRender: vi.fn(),
