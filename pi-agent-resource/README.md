@@ -122,7 +122,7 @@ Use this boolean flag with `edit` to open the entire `mcp.json` file in `$VISUAL
 
 Pack-affiliated MCP server management is not included in these commands.
 
-For Pi's MCP API and configuration details, see [Pi's MCP API notes](./docs/pi-mcp-api.md) and the [configuration comparison](./docs/mcp-config-comparison.md).
+For Pi's MCP API and configuration details, see [Pi's MCP API notes](../docs/pi-mcp-api.md) and the [configuration comparison](../docs/mcp-config-comparison.md).
 
 ---
 

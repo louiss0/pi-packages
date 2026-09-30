@@ -9,7 +9,6 @@
     "assets",
     "extensions",
     "shared",
-    "docs",
     "README.md",
     "CHANGELOG.md",
     "!**/*.test.ts"
