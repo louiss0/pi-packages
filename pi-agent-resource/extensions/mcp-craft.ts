@@ -36,6 +36,7 @@ import {
   type InferOutput,
 } from "valibot";
 
+import { isNotFoundError, isRecord, parseJson } from "../shared/json";
 import {
   NodeFileSystem,
   type ResourceFileSystem,
@@ -75,18 +76,6 @@ const HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 
 const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
-const FORM_MANAGED_SERVER_FIELDS = new Set([
-  "type",
-  "command",
-  "args",
-  "env",
-  "cwd",
-  "url",
-  "headers",
-  "oauth",
-  "exposure",
-  "timeout",
-]);
 
 export type McpScope = "global" | "local";
 export type McpTransport = typeof STDIO_TRANSPORT | typeof HTTP_TRANSPORT;
@@ -96,6 +85,9 @@ export type McpFilePathResolver = (scope: McpScope) => string;
 type McpStdioConfig = Extract<McpServerConfig, { command: string }>;
 type McpHttpConfig = Extract<McpServerConfig, { url: string }>;
 type McpOAuthConfig = NonNullable<McpHttpConfig["oauth"]>;
+type FilledValues<T> = {
+  [K in keyof T as undefined extends T[K] ? never : K]: T[K];
+};
 
 export interface McpFileContents {
   /** Other top level keys of the file, kept so a write never drops them. */
@@ -214,17 +206,21 @@ export function parseMcpServerConfig(
     };
   }
 
-  const transport = getEntryTransport(value);
-  const result = safeParse(getServerSchema(transport), value);
+  const result = safeParse(
+    "url" in value ? httpServerSchema : stdioServerSchema,
+    value,
+  );
 
   if (!result.success) {
     return { success: false, error: `server "${name}": ${summarize(result.issues)}` };
   }
 
-  return {
-    success: true,
-    config: { ...result.output, type: transport } as McpServerConfig,
-  };
+  // The schema was picked from the entry's own shape, so the output is that transport's.
+  if ("url" in result.output) {
+    return { success: true, config: { ...result.output, type: HTTP_TRANSPORT } };
+  }
+
+  return { success: true, config: { ...result.output, type: STDIO_TRANSPORT } };
 }
 
 export async function readMcpFile(
@@ -373,6 +369,17 @@ export type StdioServerFields = InferOutput<typeof StdioServerFormSchema>;
 export type HttpServerFields = InferOutput<typeof HttpServerFormSchema>;
 export type OAuthFields = InferOutput<typeof OAuthFormSchema>;
 
+/**
+ * The keys a form can write, taken from the form schemas so a field added to a form is
+ * never also dropped on edit. Anything else, such as a hand written `toolExposure`, is
+ * carried over untouched.
+ */
+const FORM_MANAGED_SERVER_FIELDS = new Set([
+  ...Object.keys(StdioServerFormSchema.entries),
+  ...Object.keys(HttpServerFormSchema.entries),
+  "type",
+]);
+
 export function parseStdioServerFormValues(values: StdioServerFields) {
   return parseObjectErrors(StdioServerFormSchema, values);
 }
@@ -388,30 +395,33 @@ export function parseOAuthFormValues(values: OAuthFields) {
 export function renderStdioServerConfig(
   fields: StdioServerFields,
 ): McpServerConfig {
-  // removeEmptyValues drops the optional keys, which leaves a valid config behind.
-  return removeEmptyValues({
+  const config: McpStdioConfig = {
     type: STDIO_TRANSPORT,
     command: fields.command.trim(),
     args: splitCommaList(fields.args),
     env: parseKeyValueList(fields.env),
     cwd: fields.cwd.trim(),
-    exposure: fields.exposure.trim(),
+    exposure: toExposure(fields.exposure),
     timeout: toOptionalNumber(fields.timeout),
-  }) as unknown as McpStdioConfig;
+  };
+
+  return removeEmptyValues(config);
 }
 
 export function renderHttpServerConfig(
   fields: HttpServerFields,
   oauth?: OAuthFields,
 ): McpServerConfig {
-  return removeEmptyValues({
+  const config: McpHttpConfig = {
     type: HTTP_TRANSPORT,
     url: fields.url.trim(),
     headers: parseKeyValueList(fields.headers),
     oauth: oauth ? renderOAuthConfig(oauth) : undefined,
-    exposure: fields.exposure.trim(),
+    exposure: toExposure(fields.exposure),
     timeout: toOptionalNumber(fields.timeout),
-  }) as unknown as McpHttpConfig;
+  };
+
+  return removeEmptyValues(config);
 }
 
 export function createStdioServerForm(
@@ -523,26 +533,27 @@ export async function handleCreate(
     return;
   }
 
-  const fields = await pickServerFields(ctx, transport);
+  const pickedServer =
+    transport === HTTP_TRANSPORT
+      ? await pickHttpServer(ctx)
+      : await pickStdioServer(ctx);
 
-  if (!fields) {
+  if (!pickedServer) {
     ctx.ui.notify("MCP server creation cancelled", "info");
     return;
   }
 
-  const oauth = await pickOAuthFields(ctx, transport, fields);
   const contents = await readMcpFile(deps.fileSystem, deps.getMcpFilePath, scope);
 
   if (reportFileError(ctx, contents)) {
     return;
   }
 
-  const serverName = getServerName(fields);
   const writeResult = await writeMcpFile(
     deps.fileSystem,
     deps.getMcpFilePath,
     scope,
-    { ...contents.serverConfigs, [serverName]: getServerConfig(fields, transport, oauth) },
+    { ...contents.serverConfigs, [pickedServer.name]: pickedServer.config },
   );
 
   if (!writeResult.success) {
@@ -550,7 +561,7 @@ export async function handleCreate(
     return;
   }
 
-  ctx.ui.notify(`Added MCP server '${serverName}' to ${getScopeLabel(scope)}`);
+  ctx.ui.notify(`Added MCP server '${pickedServer.name}' to ${getScopeLabel(scope)}`);
   await ctx.reload();
 }
 
@@ -588,19 +599,16 @@ export async function handleEdit(
     return;
   }
 
-  const transport = getTransport(serverConfig);
-  const fields = await pickServerFields(
-    ctx,
-    transport,
-    toMcpServerFields(serverName, serverConfig),
-  );
+  const pickedServer =
+    "url" in serverConfig
+      ? await pickHttpServer(ctx, { name: serverName, config: serverConfig })
+      : await pickStdioServer(ctx, { name: serverName, config: serverConfig });
 
-  if (!fields) {
+  if (!pickedServer) {
     ctx.ui.notify("MCP server edit cancelled", "info");
     return;
   }
 
-  const oauth = await pickOAuthFields(ctx, transport, fields, serverConfig);
   const writeResult = await writeMcpFile(
     deps.fileSystem,
     deps.getMcpFilePath,
@@ -609,7 +617,7 @@ export async function handleEdit(
       ...contents.serverConfigs,
       [serverName]: preserveUnmanagedServerFields(
         contents.serverConfigs[serverName],
-        getServerConfig(fields, transport, oauth),
+        pickedServer.config,
       ),
     },
   );
@@ -719,11 +727,11 @@ async function ensureMcpFileExists(
   const existingFile = await fileSystem.readFile(filePath);
 
   if (existingFile.success) {
-    return { success: true as const, data: undefined };
+    return { success: true as const };
   }
 
   if (!isNotFoundError(existingFile.error)) {
-    return existingFile;
+    return { success: false as const, error: existingFile.error };
   }
 
   const directoryResult = await fileSystem.mkdir(dirname(filePath), {
@@ -731,17 +739,13 @@ async function ensureMcpFileExists(
   });
 
   if (!directoryResult.success) {
-    return directoryResult;
+    return { success: false as const, error: directoryResult.error };
   }
 
   return fileSystem.writeFile(
     filePath,
     renderMcpFile({ mcpServers: {} }),
   );
-}
-
-function isNotFoundError(error: Error) {
-  return "code" in error && error.code === "ENOENT";
 }
 
 async function pickTransport(ctx: ExtensionCommandContext) {
@@ -792,84 +796,85 @@ async function pickServerName(
   );
 }
 
-async function pickServerFields(
-  ctx: ExtensionCommandContext,
-  transport: McpTransport,
-  initialValues?: StdioServerFields | HttpServerFields,
-) {
-  if (transport === HTTP_TRANSPORT) {
-    return await ctx.ui.custom<HttpServerFields | null>(
-      (tui, theme, _keybindings, done) =>
-        createHttpServerForm(
-          tui,
-          theme,
-          done,
-          initialValues as Partial<HttpServerFields> | undefined,
-        ),
-      formOverlayOptions,
-    );
-  }
+interface PickedServer {
+  name: string;
+  config: McpServerConfig;
+}
 
-  return await ctx.ui.custom<StdioServerFields | null>(
+async function pickStdioServer(
+  ctx: ExtensionCommandContext,
+  stored?: { name: string; config: McpStdioConfig },
+): Promise<PickedServer | undefined> {
+  const fields = await ctx.ui.custom<StdioServerFields | null>(
     (tui, theme, _keybindings, done) =>
       createStdioServerForm(
         tui,
         theme,
         done,
-        initialValues as Partial<StdioServerFields> | undefined,
+        stored && toMcpStdioServerFields(stored.name, stored.config),
       ),
     formOverlayOptions,
   );
+
+  if (!fields) {
+    return undefined;
+  }
+
+  return {
+    name: fields.name.trim(),
+    config: renderStdioServerConfig(fields),
+  };
+}
+
+async function pickHttpServer(
+  ctx: ExtensionCommandContext,
+  stored?: { name: string; config: McpHttpConfig },
+): Promise<PickedServer | undefined> {
+  const fields = await ctx.ui.custom<HttpServerFields | null>(
+    (tui, theme, _keybindings, done) =>
+      createHttpServerForm(
+        tui,
+        theme,
+        done,
+        stored && toMcpHttpServerFields(stored.name, stored.config),
+      ),
+    formOverlayOptions,
+  );
+
+  if (!fields) {
+    return undefined;
+  }
+
+  const oauth = fields.confirm
+    ? await pickOAuthFields(ctx, stored?.config.oauth)
+    : undefined;
+
+  return {
+    name: fields.name.trim(),
+    config: renderHttpServerConfig(fields, oauth),
+  };
 }
 
 async function pickOAuthFields(
   ctx: ExtensionCommandContext,
-  transport: McpTransport,
-  fields: StdioServerFields | HttpServerFields,
-  serverConfig?: McpServerConfig,
+  oauth: McpOAuthConfig | undefined,
 ) {
-  if (transport !== HTTP_TRANSPORT) {
-    return undefined;
-  }
-
-  const oauth = serverConfig && "url" in serverConfig
-    ? serverConfig.oauth
-    : undefined;
-  const wantsOAuth = "confirm" in fields ? fields.confirm : oauth !== undefined;
-
-  if (!wantsOAuth) {
-    return undefined;
-  }
-
-  return (await ctx.ui.custom<OAuthFields | null>(
-    (tui, theme, _keybindings, done) =>
-      createOAuthForm(tui, theme, done, toMcpOAuthFields(oauth)),
-    formOverlayOptions,
-  )) ?? undefined;
+  return (
+    (await ctx.ui.custom<OAuthFields | null>(
+      (tui, theme, _keybindings, done) =>
+        createOAuthForm(tui, theme, done, toMcpOAuthFields(oauth)),
+      formOverlayOptions,
+    )) ?? undefined
+  );
 }
 
 /** Map a stored config back onto the form fields, so edit starts from what is there. */
-export function toMcpServerFields(
+export function toMcpStdioServerFields(
   serverName: string,
-  serverConfig: McpServerConfig,
-): StdioServerFields | HttpServerFields {
-  const sharedValues = {
-    name: serverName,
-    exposure: serverConfig.exposure ?? "",
-    timeout: renderNumber(serverConfig.timeout),
-  };
-
-  if ("url" in serverConfig) {
-    return {
-      ...sharedValues,
-      url: serverConfig.url,
-      headers: renderKeyValueList(serverConfig.headers),
-      confirm: serverConfig.oauth !== undefined,
-    };
-  }
-
+  serverConfig: McpStdioConfig,
+): StdioServerFields {
   return {
-    ...sharedValues,
+    ...toSharedServerFields(serverName, serverConfig),
     command: serverConfig.command,
     args: serverConfig.args?.join(", ") ?? "",
     env: renderKeyValueList(serverConfig.env),
@@ -877,6 +882,39 @@ export function toMcpServerFields(
   };
 }
 
+export function toMcpHttpServerFields(
+  serverName: string,
+  serverConfig: McpHttpConfig,
+): HttpServerFields {
+  return {
+    ...toSharedServerFields(serverName, serverConfig),
+    url: serverConfig.url,
+    headers: renderKeyValueList(serverConfig.headers),
+    confirm: serverConfig.oauth !== undefined,
+  };
+}
+
+export function toMcpServerFields(
+  serverName: string,
+  serverConfig: McpServerConfig,
+): StdioServerFields | HttpServerFields {
+  return "url" in serverConfig
+    ? toMcpHttpServerFields(serverName, serverConfig)
+    : toMcpStdioServerFields(serverName, serverConfig);
+}
+
+function toSharedServerFields(
+  serverName: string,
+  serverConfig: McpStdioConfig | McpHttpConfig,
+) {
+  return {
+    name: serverName,
+    exposure: serverConfig.exposure ?? "",
+    timeout: renderNumber(serverConfig.timeout),
+  };
+}
+
+/** The form needs a string for every field, so an unconfigured oauth block starts blank. */
 export function toMcpOAuthFields(
   oauth: McpOAuthConfig | undefined,
 ): Partial<OAuthFields> {
@@ -890,13 +928,20 @@ export function toMcpOAuthFields(
 }
 
 function renderOAuthConfig(oauth: OAuthFields) {
-  return removeEmptyValues({
+  const config: McpOAuthConfig = {
     clientId: oauth.clientId.trim(),
     clientSecret: oauth.clientSecret.trim(),
     scope: oauth.scope.trim(),
     callbackPort: toOptionalNumber(oauth.callbackPort),
     callbackUrl: oauth.callbackUrl.trim(),
-  });
+  };
+
+  return removeEmptyValues(config);
+}
+
+/** The form only accepts the exposures pi has, and a blank one leaves the choice to pi. */
+function toExposure(value: string) {
+  return EXPOSURES.find((exposure) => exposure === value);
 }
 
 function preserveUnmanagedServerFields(
@@ -916,31 +961,6 @@ function preserveUnmanagedServerFields(
   return { ...unmanagedFields, ...updatedConfig };
 }
 
-function getServerName(fields: StdioServerFields | HttpServerFields) {
-  return fields.name.trim();
-}
-
-function getServerConfig(
-  fields: StdioServerFields | HttpServerFields,
-  transport: McpTransport,
-  oauth?: OAuthFields,
-) {
-  return transport === HTTP_TRANSPORT
-    ? renderHttpServerConfig(fields as HttpServerFields, oauth)
-    : renderStdioServerConfig(fields as StdioServerFields);
-}
-
-function getServerSchema(transport: McpTransport) {
-  return transport === HTTP_TRANSPORT ? httpServerSchema : stdioServerSchema;
-}
-
-function getEntryTransport(value: Record<string, unknown>): McpTransport {
-  return typeof value.url === "string" ? HTTP_TRANSPORT : STDIO_TRANSPORT;
-}
-
-function getTransport(serverConfig: McpServerConfig): McpTransport {
-  return "url" in serverConfig ? HTTP_TRANSPORT : STDIO_TRANSPORT;
-}
 function parseMcpFile(content: string) {
   const parsedJson = parseJson(content);
 
@@ -1007,10 +1027,12 @@ function reportFileError(ctx: ExtensionCommandContext, contents: McpFileContents
   return true;
 }
 
-function removeEmptyValues(values: Record<string, unknown>) {
+/** Drop the keys the form left blank, so a config only carries the fields that were filled in. */
+function removeEmptyValues<T extends object>(values: T): FilledValues<T> {
+  // Object.fromEntries widens the value types, so the shape is restored here.
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => !isEmptyValue(value)),
-  );
+  ) as FilledValues<T>;
 }
 
 function isEmptyValue(value: unknown) {
@@ -1096,18 +1118,6 @@ function isLoopbackHttpUrl(value: string) {
   const url = new URL(value);
 
   return url.protocol === "http:" && LOOPBACK_HOSTS.includes(url.hostname);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseJson(content: string) {
-  try {
-    return { success: true as const, value: JSON.parse(content) as unknown };
-  } catch {
-    return { success: false as const };
-  }
 }
 
 function getScopeLabel(scope: McpScope) {

@@ -42,6 +42,7 @@ import {
   getActivePackPaths,
   getCreatePackResourceSelector,
   getMultiSelectorFactory,
+  getStaleMcpServerNames,
   openExternalEditor,
   promptPackResourceReducer,
   readPackSelection,
@@ -220,6 +221,7 @@ describe("Pack", () => {
       );
 
       expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith("alpha_search", {
+        type: "stdio",
         command: "npx",
       });
       expect(notify).not.toHaveBeenCalled();
@@ -253,21 +255,17 @@ describe("Pack", () => {
 
       expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith(
         "working_issues",
-        { url: "https://issues.test/mcp" },
+        { type: "http", url: "https://issues.test/mcp" },
       );
       expect(notify).toHaveBeenCalledWith(
         expect.stringContaining("broken"),
       );
     });
 
-    it("reports a rejected registration and continues with remaining servers", async () => {
+    it("reports an entry pi would reject and registers the rest", async () => {
       const registerMcpServer = vi.fn<
         (name: string, config: McpServerConfig) => void
-      >((name) => {
-        if (name === "alpha_invalid") {
-          throw new Error("invalid MCP config");
-        }
-      });
+      >();
       const notify = vi.fn();
 
       await fileSystem.mkdir("/packs", { recursive: true });
@@ -290,11 +288,66 @@ describe("Pack", () => {
         notify,
       );
 
-      expect(registerMcpServer).toHaveBeenCalledTimes(2);
+      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith("alpha_search", {
+        type: "stdio",
+        command: "npx",
+      });
       expect(registeredNames).toEqual(new Set(["alpha_search"]));
+      expect(notify).toHaveBeenCalledWith(
+        expect.stringContaining("legacy SSE transport is not supported"),
+      );
+    });
+
+    it("reports a registration pi refuses and keeps the other packs", async () => {
+      const registerMcpServer = vi.fn<
+        (name: string, config: McpServerConfig) => void
+      >((name) => {
+        if (name === "alpha_search") {
+          throw new Error("invalid MCP config");
+        }
+      });
+      const notify = vi.fn();
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(
+        fileSystem,
+        ["alpha", "beta"],
+        selectionFilePath,
+      );
+      await writePackMcpConfig(
+        "alpha",
+        JSON.stringify({ mcpServers: { search: { command: "npx" } } }),
+      );
+      await writePackMcpConfig(
+        "beta",
+        JSON.stringify({ mcpServers: { issues: { url: "https://issues.test/mcp" } } }),
+      );
+
+      const registeredNames = await registerActivePackMcpServers(
+        fileSystem,
+        pathResolver,
+        selectionFilePath,
+        registerMcpServer,
+        notify,
+      );
+
+      expect(registeredNames).toEqual(new Set(["beta_issues"]));
       expect(notify).toHaveBeenCalledWith(
         expect.stringContaining("invalid MCP config"),
       );
+    });
+
+    it("unregisters the servers a dropped pack contributed", () => {
+      expect(
+        getStaleMcpServerNames(
+          new Set(["alpha_search", "beta_issues"]),
+          new Set(["alpha_search"]),
+        ),
+      ).toEqual(["beta_issues"]);
+
+      expect(
+        getStaleMcpServerNames(new Set(["alpha_search"]), new Set(["alpha_search"])),
+      ).toEqual([]);
     });
   });
 

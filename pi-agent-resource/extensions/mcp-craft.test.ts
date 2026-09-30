@@ -3,15 +3,17 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  ExtensionAPI,
   ExtensionCommandContext,
   McpServerConfig,
+  RegisteredCommand,
 } from "@earendil-works/pi-coding-agent";
 
 import {
   MemoryFileSystem,
   type ResourceFileSystem,
 } from "../shared/filesystem";
-import {
+import mcpCraft, {
   createMcpFilePathResolver,
   handleCreate,
   handleDelete,
@@ -109,6 +111,51 @@ async function seed(
 ) {
   await fileSystem.mkdir(dirname(filePath), { recursive: true });
   await fileSystem.writeFile(filePath, JSON.stringify({ mcpServers }));
+}
+
+const EDIT_FLAG = "resource:mcp-craft-edit";
+const GLOBAL_COMMAND = "resource:mcp";
+const LOCAL_COMMAND = "resource:local-mcp";
+
+function createExtensionApi() {
+  const commands = new Map<string, RegisteredCommand>();
+  const flags = new Map<string, boolean>();
+
+  mcpCraft({
+    getFlag: (name: string) => flags.get(name),
+    registerCommand: (
+      name: string,
+      command: Omit<RegisteredCommand, "name" | "sourceInfo">,
+    ) => {
+      commands.set(name, { ...command, name, sourceInfo: {} } as RegisteredCommand);
+    },
+    registerFlag: (
+      name: string,
+      options: { type: "boolean" | "string"; default?: boolean | string },
+    ) => {
+      flags.set(name, options.type === "boolean" && options.default === true);
+    },
+  } as unknown as ExtensionAPI);
+
+  return { commands, flags };
+}
+
+function createSubcommandContext() {
+  const notifications: string[] = [];
+
+  return {
+    ctx: {
+      ui: {
+        custom: async () => null,
+        input: async () => null,
+        notify: (message: string) => notifications.push(message),
+        select: async () => null,
+      },
+      cwd: workspace,
+      reload: async () => undefined,
+    } as unknown as ExtensionCommandContext,
+    notifications,
+  };
 }
 
 describe("extensions/mcp-craft", () => {
@@ -668,5 +715,55 @@ describe("extensions/mcp-craft", () => {
         readMcpFile(deps.fileSystem, deps.getMcpFilePath, "global"),
       ).resolves.toMatchObject({ servers: { github: { command: "npx" } } });
     });
+  });
+
+  describe("extension entry point", () => {
+    it("registers both scope commands and the boolean edit flag", () => {
+      const { commands, flags } = createExtensionApi();
+
+      expect([...commands.keys()]).toEqual([GLOBAL_COMMAND, LOCAL_COMMAND]);
+      expect(flags.get(EDIT_FLAG)).toBe(false);
+    });
+
+    it("completes the subcommands each command accepts", async () => {
+      const { commands } = createExtensionApi();
+
+      for (const commandName of [GLOBAL_COMMAND, LOCAL_COMMAND]) {
+        const completions = await commands
+          .get(commandName)
+          ?.getArgumentCompletions?.("");
+
+        expect(completions?.map((completion) => completion.value)).toEqual([
+          "create",
+          "edit",
+          "delete",
+        ]);
+      }
+    });
+
+    it("rejects an unknown subcommand without opening a form", async () => {
+      const { commands } = createExtensionApi();
+      const { ctx, notifications } = createSubcommandContext();
+
+      await commands.get(GLOBAL_COMMAND)?.handler("rename", ctx);
+
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0]).toMatch(/create|edit|delete/);
+    });
+
+    it.each(["create", "delete"])(
+      "rejects the edit flag with %s",
+      async (subcommand) => {
+        const { commands, flags } = createExtensionApi();
+        flags.set(EDIT_FLAG, true);
+        const { ctx, notifications } = createSubcommandContext();
+
+        await commands.get(GLOBAL_COMMAND)?.handler(subcommand, ctx);
+
+        expect(notifications).toEqual([
+          `Invalid command: --${EDIT_FLAG} can only be used with edit`,
+        ]);
+      },
+    );
   });
 });

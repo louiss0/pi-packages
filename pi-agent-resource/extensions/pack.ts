@@ -15,6 +15,7 @@ import {
 import { Component, SelectItem, TUI } from "@earendil-works/pi-tui";
 import { picklist, safeParse, summarize } from "valibot";
 import { editMarkdownWithExternalEditor } from "../shared/external-editor";
+import { getErrorMessage } from "../shared/json";
 import {
   getPathResolver,
   NodeFileSystem,
@@ -32,6 +33,7 @@ import {
   renderSkillMarkdown,
 } from "../shared/resource-components";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
+import { readMcpFile } from "./mcp-craft";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -176,34 +178,19 @@ export async function registerActivePackMcpServers(
     const filePath = pathResolver.resolvePackPath(
       join(packName, MCP_FILE_NAME),
     );
-    const fileResult = await fileSystem.readFile(filePath);
+    // A pack mcp.json is the same config pi reads, so it is parsed with the same rules.
+    const contents = await readMcpFile(fileSystem, () => filePath, "global");
 
-    if (!fileResult.success) {
-      if (!isNotFoundError(fileResult.error)) {
-        notify(
-          `Could not read MCP config for pack '${packName}': ${fileResult.error.message}`,
-        );
-      }
+    if (contents.fileError) {
+      notify(`Skipping pack '${packName}': ${contents.fileError}`);
       continue;
     }
 
-    let parsedFile: unknown;
-
-    try {
-      parsedFile = JSON.parse(fileResult.data);
-    } catch {
-      notify(`Skipping pack '${packName}': ${MCP_FILE_NAME} is not valid JSON`);
-      continue;
+    for (const error of contents.errors) {
+      notify(`Skipping MCP server in pack '${packName}': ${error}`);
     }
 
-    if (!isRecord(parsedFile) || !isRecord(parsedFile.mcpServers)) {
-      notify(
-        `Skipping pack '${packName}': ${MCP_FILE_NAME} must contain an object-valued "mcpServers"`,
-      );
-      continue;
-    }
-
-    for (const [serverName, config] of Object.entries(parsedFile.mcpServers)) {
+    for (const [serverName, serverConfig] of Object.entries(contents.servers)) {
       const registrationName = `${packName}_${serverName}`;
 
       if (registeredNames.has(registrationName)) {
@@ -212,9 +199,10 @@ export async function registerActivePackMcpServers(
       }
 
       try {
-        registerMcpServer(registrationName, config as McpServerConfig);
+        registerMcpServer(registrationName, serverConfig);
         registeredNames.add(registrationName);
       } catch (error) {
+        // pi throws for a name it will not accept, which is the last line of defence here.
         notify(
           `Skipping MCP server '${registrationName}': ${getErrorMessage(error)}`,
         );
@@ -225,16 +213,15 @@ export async function registerActivePackMcpServers(
   return registeredNames;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNotFoundError(error: Error) {
-  return "code" in error && error.code === "ENOENT";
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
+/**
+ * The names a previous discovery registered that the current selection no longer has.
+ * A pack that was dropped must be unregistered, or its servers stay connected.
+ */
+export function getStaleMcpServerNames(
+  registeredNames: ReadonlySet<string>,
+  currentNames: ReadonlySet<string>,
+) {
+  return [...registeredNames].filter((name) => !currentNames.has(name));
 }
 
 export default function (pi: ExtensionAPI) {
@@ -271,10 +258,11 @@ export default function (pi: ExtensionAPI) {
       (message) => ctx.ui.notify(message, "warning"),
     );
 
-    for (const name of registeredMcpServerNames) {
-      if (!currentMcpServerNames.has(name)) {
-        pi.unregisterMcpServer(name);
-      }
+    for (const staleName of getStaleMcpServerNames(
+      registeredMcpServerNames,
+      currentMcpServerNames,
+    )) {
+      pi.unregisterMcpServer(staleName);
     }
 
     registeredMcpServerNames = currentMcpServerNames;
