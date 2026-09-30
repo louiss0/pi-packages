@@ -17,7 +17,7 @@ import {
   SelectList,
   Spacer,
   Text,
-  TUI,
+  type TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 

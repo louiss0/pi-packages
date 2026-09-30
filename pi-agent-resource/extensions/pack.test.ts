@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+
 const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
   mockCreateExternalEditorFactory: vi.fn(),
 }));
@@ -5,6 +7,7 @@ const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
 import type {
   ExtensionCommandContext,
   KeybindingsManager,
+  McpServerConfig,
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { Component, TUI } from "@earendil-works/pi-tui";
@@ -42,6 +45,7 @@ import {
   openExternalEditor,
   promptPackResourceReducer,
   readPackSelection,
+  registerActivePackMcpServers,
   rootPackResourceReducer,
   savePackSelection,
   skillPackResourceReducer,
@@ -176,6 +180,121 @@ describe("Pack", () => {
         modalEditorOverlayOptions,
       );
       expect(notify).not.toHaveBeenCalledWith(expect.any(String), "error");
+    });
+  });
+
+  describe("pack MCP servers", () => {
+    const selectionFilePath = "/packs/active-packs.json";
+
+    async function writePackMcpConfig(packName: string, content: string) {
+      const filePath = pathResolver.resolvePackPath(
+        join(packName, "mcp.json"),
+      );
+      await fileSystem.mkdir(dirname(filePath), { recursive: true });
+      await fileSystem.writeFile(filePath, content);
+    }
+
+    it("registers only active pack servers under prefixed names", async () => {
+      const registerMcpServer = vi.fn<
+        (name: string, config: McpServerConfig) => void
+      >();
+      const notify = vi.fn();
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(fileSystem, ["alpha"], selectionFilePath);
+      await writePackMcpConfig(
+        "alpha",
+        JSON.stringify({ mcpServers: { search: { command: "npx" } } }),
+      );
+      await writePackMcpConfig(
+        "inactive",
+        JSON.stringify({ mcpServers: { docs: { url: "https://docs.test/mcp" } } }),
+      );
+
+      await registerActivePackMcpServers(
+        fileSystem,
+        pathResolver,
+        selectionFilePath,
+        registerMcpServer,
+        notify,
+      );
+
+      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith("alpha_search", {
+        command: "npx",
+      });
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("reports malformed pack files and continues loading other packs", async () => {
+      const registerMcpServer = vi.fn<
+        (name: string, config: McpServerConfig) => void
+      >();
+      const notify = vi.fn();
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(
+        fileSystem,
+        ["broken", "working"],
+        selectionFilePath,
+      );
+      await writePackMcpConfig("broken", "{invalid json");
+      await writePackMcpConfig(
+        "working",
+        JSON.stringify({ mcpServers: { issues: { url: "https://issues.test/mcp" } } }),
+      );
+
+      await registerActivePackMcpServers(
+        fileSystem,
+        pathResolver,
+        selectionFilePath,
+        registerMcpServer,
+        notify,
+      );
+
+      expect(registerMcpServer).toHaveBeenCalledExactlyOnceWith(
+        "working_issues",
+        { url: "https://issues.test/mcp" },
+      );
+      expect(notify).toHaveBeenCalledWith(
+        expect.stringContaining("broken"),
+      );
+    });
+
+    it("reports a rejected registration and continues with remaining servers", async () => {
+      const registerMcpServer = vi.fn<
+        (name: string, config: McpServerConfig) => void
+      >((name) => {
+        if (name === "alpha_invalid") {
+          throw new Error("invalid MCP config");
+        }
+      });
+      const notify = vi.fn();
+
+      await fileSystem.mkdir("/packs", { recursive: true });
+      await savePackSelection(fileSystem, ["alpha"], selectionFilePath);
+      await writePackMcpConfig(
+        "alpha",
+        JSON.stringify({
+          mcpServers: {
+            invalid: { type: "sse", url: "https://legacy.test/sse" },
+            search: { command: "npx" },
+          },
+        }),
+      );
+
+      const registeredNames = await registerActivePackMcpServers(
+        fileSystem,
+        pathResolver,
+        selectionFilePath,
+        registerMcpServer,
+        notify,
+      );
+
+      expect(registerMcpServer).toHaveBeenCalledTimes(2);
+      expect(registeredNames).toEqual(new Set(["alpha_search"]));
+      expect(notify).toHaveBeenCalledWith(
+        expect.stringContaining("invalid MCP config"),
+      );
     });
   });
 

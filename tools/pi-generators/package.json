@@ -15,6 +15,6 @@
   "generators": "./generators.json",
   "dependencies": {
     "@code-fixer-23/create-pi-package": "^1.2.0",
-    "@nx/devkit": "22.7.0"
+    "@nx/devkit": "catalog:"
   }
 }

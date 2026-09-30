@@ -6,8 +6,8 @@
     "pi-package"
   ],
   "devDependencies": {
-    "typescript": "~6.0.3",
-    "vitest": "latest"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "private": false,
   "publishConfig": {
@@ -29,8 +29,8 @@
     "valibot": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:"
   },
   "pi": {
     "extensions": [

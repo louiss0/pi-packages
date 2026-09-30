@@ -9,6 +9,7 @@
     "assets",
     "extensions",
     "shared",
+    "docs",
     "README.md",
     "CHANGELOG.md",
     "!**/*.test.ts"
@@ -28,23 +29,24 @@
     "access": "public"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.12",
-    "@earendil-works/pi-coding-agent": "^0.78.0",
-    "@earendil-works/pi-tui": "^0.78.0",
-    "@eslint/js": "^10.0.1",
-    "@eslint/json": "^1.2.0",
-    "@nx/eslint": "22.7.1",
-    "@nx/vite": "22.7.1",
-    "@nx/vitest": "22.7.1",
-    "@vitest/coverage-v8": "^4.1.4",
-    "@vitest/ui": "^4.1.4",
-    "eslint": "^10.2.1",
+    "@biomejs/biome": "catalog:",
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:",
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@nx/eslint": "catalog:",
+    "@nx/vite": "catalog:",
+    "@nx/vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "@vitest/ui": "catalog:",
+    "eslint": "catalog:",
     "globals": "^17.5.0",
-    "jiti": "^2.6.1",
-    "nx": "22.7.1",
-    "typescript-eslint": "^8.59.0",
-    "vite": "^8.0.8",
-    "vitest": "^4.1.4"
+    "jiti": "catalog:",
+    "nx": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "pi": {
     "extensions": [
@@ -56,10 +58,10 @@
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
     "valibot": "catalog:",
-    "memfs": "^4.57.2"
+    "memfs": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.78.0",
-    "@earendil-works/pi-tui": "^0.78.0"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:"
   }
 }

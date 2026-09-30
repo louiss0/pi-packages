@@ -32,13 +32,13 @@
     }
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:"
   },
   "devDependencies": {
-    "vitest": "^4.1.4"
+    "vitest": "catalog:"
   }
 }

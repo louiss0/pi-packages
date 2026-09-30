@@ -1,6 +1,6 @@
 # @code-fixer-23/pi-agent-resource
 
-`@code-fixer-23/pi-agent-resource` is a Pi extension package for creating, editing, and organizing Pi resources—agents, prompts, and skills—without leaving the Pi interface. It ships four extensions that cover the full lifecycle of each resource type: form-based creation with validated metadata, external editor integration for rich content, scoped placement in either your global Pi home or the current project directory, and pack management that bundles resources together and teaches Pi how to discover them during a session.
+`@code-fixer-23/pi-agent-resource` is a Pi extension package for creating, editing, and organizing Pi resources—agents, prompts, skills, and MCP servers—without leaving the Pi interface. Its extensions cover the full lifecycle of each resource type: form-based creation with validated metadata, external editor integration for rich content, scoped placement in either your global Pi home or the current project directory, and pack management that bundles resources together and teaches Pi how to discover them during a session.
 
 Every resource type in Pi follows strict layout conventions—correct frontmatter keys, `skills/<name>/SKILL.md` directory nesting, grouped prompt directories with `_index.md`, and so on. This package handles all of that so you can focus on writing the content itself. Each manager provides global and local variants of create, edit, and delete, with the same form and editor workflows in both scopes.
 
@@ -96,9 +96,39 @@ The flag takes precedence over the file. If neither is set, the extension opens 
 
 ---
 
+## MCP Craft
+
+MCP Craft manages standalone MCP servers in Pi's own configuration files. Global servers live in `~/.pi/agent/mcp.json`; project-local servers live in `<project>/.pi/mcp.json` and are loaded by Pi only when the project is trusted.
+
+### Commands
+
+#### `resource:mcp <create|edit|delete>`
+
+Creates, edits, or deletes servers in `~/.pi/agent/mcp.json`.
+
+#### `resource:local-mcp <create|edit|delete>`
+
+Runs the same workflows against the current project's `.pi/mcp.json`.
+
+`create` asks for a transport, then opens a validated form. Stdio servers expose command, arguments, environment variables, and working directory. HTTP servers expose a URL and headers, with an optional second form for OAuth settings. Both forms support Pi's exposure setting and a connection timeout. Use Pi's built-in `/mcp` manager to enable or disable servers; form-based edits preserve an existing `enabled` setting.
+
+For valid JSON configs, form-based create, edit, and delete preserve other server entries, unrecognized per-server fields, and unrelated top-level keys in `mcp.json`. If the file is malformed or has no `mcpServers` object, form-based changes stop without overwriting it; use the external-editor flag to repair it.
+
+### Flags
+
+#### `--resource:mcp-craft-edit`
+
+Use this boolean flag with `edit` to open the entire `mcp.json` file in `$VISUAL` or `$EDITOR` instead of editing one server through a form. It applies to either MCP command and only to `edit`; using it with `create` or `delete` reports an error. If the target file does not exist, MCP Craft creates an empty config before opening it. Existing files are not rewritten before the editor opens.
+
+Pack-affiliated MCP server management is not included in these commands.
+
+For Pi's MCP API and configuration details, see [Pi's MCP API notes](./docs/pi-mcp-api.md) and the [configuration comparison](./docs/mcp-config-comparison.md).
+
+---
+
 ## Pack
 
-The pack extension groups skills and prompts into named bundles under `.pi/packs` and registers those bundles with Pi's resource discovery system. Once a pack is loaded, its contents are available alongside your global and local resources for the duration of the session. Packs can be created with content upfront, populated incrementally, or reorganized by moving individual resources between pack, local, and global scopes.
+The pack extension groups skills and prompts into named bundles under `.pi/packs` and registers those bundles with Pi's resource discovery system. Once a pack is loaded, its contents are available alongside your global and local resources for the duration of the session. Packs can be created with content upfront, populated incrementally, or reorganized by moving individual resources between pack, local, and global scopes. Active packs can also contribute MCP servers from a pack-level `mcp.json` file.
 
 ### Commands
 
@@ -143,6 +173,19 @@ Reloads the current Pi session with a new pack selection. Passing names switches
 ### Features
 
 `pi-agent-resource` provides pack creation, pack editing, and pack session loading for Pi resources. It also keeps the active pack list in the OS temp directory so the same selection can be reused during the current run.
+
+Pack MCP servers are read from `~/.pi/packs/<pack>/mcp.json` for active packs. Add an `mcpServers` object using Pi's normal MCP config shape; each registered server is named `<pack>_<server>` and is added to the current session with `pi.registerMcpServer`. Invalid files or entries are reported and skipped without blocking other pack servers. Pack MCP files are currently managed directly as JSON rather than through a form command:
+
+```json
+{
+  "mcpServers": {
+    "docs": {
+      "url": "https://example.com/mcp",
+      "exposure": "codemode"
+    }
+  }
+}
+```
 
 > [!WARNING] Pack selection only lasts for the current Pi run
 

@@ -1,8 +1,8 @@
 {
   "type": "module",
   "devDependencies": {
-    "typescript": "~6.0.3",
-    "vitest": "latest"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "name": "@code-fixer-23/pi-prompt-form",
   "version": "1.1.13",
@@ -42,7 +42,7 @@
     "valibot": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:"
   }
 }

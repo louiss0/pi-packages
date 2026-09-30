@@ -8,6 +8,7 @@ import {
 import {
   type ExtensionAPI,
   ExtensionCommandContext,
+  type McpServerConfig,
   type KeybindingsManager,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -96,6 +97,7 @@ export async function openExternalEditor(
 }
 
 export const PACK_SELECTION_FILE_NAME = "pi-agent-resource-packs.json";
+const MCP_FILE_NAME = "mcp.json";
 
 export function getPackSelectionFilePath(tempDirectory = tmpdir()) {
   return join(tempDirectory, PACK_SELECTION_FILE_NAME);
@@ -160,7 +162,83 @@ export async function getActivePackPaths(
   };
 }
 
+export async function registerActivePackMcpServers(
+  fileSystem: ResourceFileSystem,
+  pathResolver: Pick<ResourcePathResolver, "resolvePackPath">,
+  selectionFilePath: string,
+  registerMcpServer: (name: string, config: McpServerConfig) => void,
+  notify: (message: string) => void,
+) {
+  const packs = await readPackSelection(fileSystem, selectionFilePath);
+  const registeredNames = new Set<string>();
+
+  for (const packName of packs) {
+    const filePath = pathResolver.resolvePackPath(
+      join(packName, MCP_FILE_NAME),
+    );
+    const fileResult = await fileSystem.readFile(filePath);
+
+    if (!fileResult.success) {
+      if (!isNotFoundError(fileResult.error)) {
+        notify(
+          `Could not read MCP config for pack '${packName}': ${fileResult.error.message}`,
+        );
+      }
+      continue;
+    }
+
+    let parsedFile: unknown;
+
+    try {
+      parsedFile = JSON.parse(fileResult.data);
+    } catch {
+      notify(`Skipping pack '${packName}': ${MCP_FILE_NAME} is not valid JSON`);
+      continue;
+    }
+
+    if (!isRecord(parsedFile) || !isRecord(parsedFile.mcpServers)) {
+      notify(
+        `Skipping pack '${packName}': ${MCP_FILE_NAME} must contain an object-valued "mcpServers"`,
+      );
+      continue;
+    }
+
+    for (const [serverName, config] of Object.entries(parsedFile.mcpServers)) {
+      const registrationName = `${packName}_${serverName}`;
+
+      if (registeredNames.has(registrationName)) {
+        notify(`Skipping duplicate pack MCP server '${registrationName}'`);
+        continue;
+      }
+
+      try {
+        registerMcpServer(registrationName, config as McpServerConfig);
+        registeredNames.add(registrationName);
+      } catch (error) {
+        notify(
+          `Skipping MCP server '${registrationName}': ${getErrorMessage(error)}`,
+        );
+      }
+    }
+  }
+
+  return registeredNames;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNotFoundError(error: Error) {
+  return "code" in error && error.code === "ENOENT";
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function (pi: ExtensionAPI) {
+  let registeredMcpServerNames = new Set<string>();
   const LOAD_PACK_FLAG = "resource:load-pack";
   pi.registerFlag(LOAD_PACK_FLAG, {
     type: "string",
@@ -184,6 +262,22 @@ export default function (pi: ExtensionAPI) {
         }
       }
     }
+
+    const currentMcpServerNames = await registerActivePackMcpServers(
+      fileSystem,
+      pathResolver,
+      selectionPath,
+      (name, config) => pi.registerMcpServer(name, config),
+      (message) => ctx.ui.notify(message, "warning"),
+    );
+
+    for (const name of registeredMcpServerNames) {
+      if (!currentMcpServerNames.has(name)) {
+        pi.unregisterMcpServer(name);
+      }
+    }
+
+    registeredMcpServerNames = currentMcpServerNames;
 
     return getActivePackPaths(fileSystem, pathResolver, selectionPath);
   });
