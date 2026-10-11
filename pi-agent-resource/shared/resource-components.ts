@@ -27,8 +27,6 @@ import {
 
 import { parseObjectErrors } from "./parse";
 
-const agentNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const lowerCommaSeparatedToolsPattern = /^[a-z0-9:-]+(?:\s*,\s*[a-z0-9:-]+)*$/;
 const promptNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const argumentHintPattern =
   /^(?!.*\[[^\]]*\[)(?:\s*(?:<[^<>\s]+>|\[[^\]\s]+\])\s*)*$/;
@@ -37,37 +35,6 @@ const pathLikePattern =
   /^(?:$|~?[/.\\]|[A-Za-z]:[\\/]|\.\.?[\\/]|[^<>:"|?*\r\n]+(?:[\\/][^<>:"|?*\r\n]+)*)$/;
 const commaSeparatedAllowedToolsPattern =
   /^(?:$|[a-z][a-z0-9-]*(?:\s*,\s*[a-z][a-z0-9-]*)*)$/;
-
-const AgentFieldsSchema = object({
-  name: pipe(
-    string(),
-    minLength(1, "Name is required"),
-    maxLength(48, "Name must be 48 characters or fewer"),
-    regex(
-      agentNamePattern,
-      "Name must be lowercase letters, numbers, and dashes only",
-    ),
-  ),
-  description: pipe(
-    string(),
-    minLength(35, "Description must be at least 35 characters"),
-    maxLength(1024, "Description must be 1024 characters or fewer"),
-  ),
-  tools: pipe(
-    string(),
-    minLength(1, "Tools are required"),
-    regex(
-      lowerCommaSeparatedToolsPattern,
-      "Tools must be a lowercase comma-separated list",
-    ),
-  ),
-  model: pipe(
-    string(),
-    minLength(2, "Model must be at least 2 characters"),
-    maxLength(128, "Model must be 128 characters or fewer"),
-    regex(/^[a-z0-9:-]+$/, "Model must be lowercase"),
-  ),
-});
 
 const PromptFieldsSchema = object({
   name: pipe(
@@ -131,48 +98,10 @@ const OptionalSkillFieldsSchema = object({
   ),
 });
 
-export type AgentFields = InferOutput<typeof AgentFieldsSchema>;
 export type PromptFields = InferOutput<typeof PromptFieldsSchema>;
 export type RequiredSkillFields = InferOutput<typeof RequiredSkillFieldsSchema>;
 export type OptionalSkillFields = InferOutput<typeof OptionalSkillFieldsSchema>;
 export type SkillFrontmatterFields = RequiredSkillFields & OptionalSkillFields;
-
-export function parseAgentFormValues(values: AgentFields) {
-  return parseObjectErrors(AgentFieldsSchema, values);
-}
-
-export function createAgentForm(
-  tui: TUI,
-  theme: Theme,
-  done: (value: AgentFields | null) => void,
-) {
-  return new Form<AgentFields>(
-    {
-      title: "Create Agent",
-      fields: [
-        new LabelledInput("name", theme),
-        new LabelledInput("description", theme),
-        new LabelledInput("tools", theme),
-        new LabelledInput("model", theme),
-      ],
-      parse: parseAgentFormValues,
-      footer:
-        "* required | Enter next/submit | Tab switch field | Esc cancel\nUse lowercase values for every field. Separate tools with commas.",
-      spacing: 1,
-    },
-    tui,
-    done,
-  );
-}
-
-export function renderAgentFrontmatter(values: AgentFields) {
-  return [
-    "---",
-    ...Object.entries(values).map(([key, value]) => `${key}: ${value}`),
-    "---",
-    "",
-  ].join("\n");
-}
 
 export function parsePromptFormValues(values: PromptFields) {
   return parseObjectErrors(PromptFieldsSchema, values);

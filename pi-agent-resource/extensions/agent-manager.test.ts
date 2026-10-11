@@ -1,531 +1,153 @@
 import { join } from "node:path";
-const { mockCreateExternalEditorFactory } = vi.hoisted(() => ({
-  mockCreateExternalEditorFactory: vi.fn(),
-}));
-
-import { Form } from "@code-fixer-23/pi-form-components";
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
-import type { ResourcePathResolver } from "../shared/filesystem";
-import { resetDevelopmentExtensionNotice } from "../shared/runtime";
-import { modalEditorOverlayOptions } from "../shared/ui";
+import { renderAgentMarkdown } from "../shared/agent-contracts";
+const { author, filename } = vi.hoisted(() => ({ author: vi.fn(), filename: vi.fn() }));
+vi.mock("../shared/agent-authoring", () => ({ authorAgentDefinition: author, askAgentFilename: filename }));
+vi.mock("node:os", () => ({ homedir: () => "/test-home" }));
+import registerAgentManager, { handleCreate, handleDelete, handleEdit, listAgentChoices, parseAgentCommandArgument } from "./agent-manager";
 
-vi.mock("@code-fixer-23/pi-form-components", async () => {
-  const module = await vi.importActual<
-    typeof import("@code-fixer-23/pi-form-components")
-  >("@code-fixer-23/pi-form-components");
-
-  return {
-    ...module,
-    createExternalEditorFactory: mockCreateExternalEditorFactory,
-  };
-});
-
-vi.mock("@earendil-works/pi-tui", async () => {
-  return vi.importActual<typeof import("@earendil-works/pi-tui")>(
-    "@earendil-works/pi-tui",
-  );
-});
-
-vi.mock("node:os", () => ({
-  homedir: () => "/test-home",
-}));
-
-const TAB_KEY = "\t";
-const ENTER_KEY = "\r";
-
-import registerAgentManager, {
-  createAgentForm,
-  handleCreate,
-  handleDelete,
-  handleEdit,
-  LOCAL_AGENT_DIRECTORY,
-  parseAgentCommandArgument,
-  parseAgentFormValues,
-} from "./agent-manager";
-
-describe("extensions/agent-manager", () => {
-  const localCwd = "/workspace";
-  const testPathResolver = new PathResolver(localCwd, "/test-home");
-  const agentPath = testPathResolver.resolveGlobalAgentPath("oracle.md");
-  const localAgentPath = testPathResolver.resolveLocalAgentPath("oracle.md");
-  let memoryFileSystem: MemoryFileSystem;
-  let pathResolver: ResourcePathResolver;
-
-  function getStubResourceFileSystem() {
-    return memoryFileSystem;
-  }
-
-  function getStubPathResolver() {
-    return pathResolver;
-  }
-
-  function createPathResolverMock() {
-    return {
-      resolvePackPath: vi.fn(),
-      resolvePackSkillPath: vi.fn(),
-      resolvePackAgentPath: vi.fn(),
-      resolvePackPromptPath: vi.fn(),
-      resolveGlobalSkillPath: vi.fn(),
-      resolveLocalSkillPath: vi.fn(),
-      resolveGlobalAgentPath: vi.fn((path) =>
-        testPathResolver.resolveGlobalAgentPath(path),
-      ),
-      resolveLocalAgentPath: vi.fn((path) =>
-        testPathResolver.resolveLocalAgentPath(path),
-      ),
-      resolveGlobalPromptPath: vi.fn(),
-      resolveLocalPromptPath: vi.fn(),
-    } satisfies ResourcePathResolver;
-  }
-
-  function createTheme() {
-    return {
-      fg: (_color: string, text: string) => text,
-    } as unknown as Theme;
-  }
-
-  function createTui() {
-    return {
-      requestRender: vi.fn(),
-      terminal: {
-        rows: 40,
-        columns: 120,
-      },
-    } as unknown as TUI;
-  }
-
+describe("agent manager", () => {
+  const resolver = new PathResolver("/workspace", "/test-home");
+  const path = resolver.resolveGlobalAgentPath("auditor.md");
+  const original = "---\nname: security-review\ndescription: Review security\n---\nOriginal prompt\n";
+  let fs: MemoryFileSystem;
+  const ui = { input: vi.fn(), select: vi.fn(), editor: vi.fn(), notify: vi.fn(), confirm: vi.fn() };
+  const ctx = () => ({ cwd: "/workspace", hasUI: true, ui }) as unknown as ExtensionContext;
+  const options = { runtime: "tintin" as const };
+  const getFs = () => fs;
+  const getResolver = () => resolver;
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
-    memoryFileSystem = new MemoryFileSystem();
-    pathResolver = createPathResolverMock();
-    resetDevelopmentExtensionNotice();
+    fs = new MemoryFileSystem();
+    fs.reset();
+    filename.mockResolvedValue("auditor");
+    author.mockResolvedValue({ frontmatter: { name: "security-review", description: "Security: # careful", model: "anthropic/claude-opus-4-6", tools: ["read", "ext:mcp/search"] }, body: "Inspect auth.\n---\nKeep this delimiter in the prompt." });
+    ui.confirm.mockResolvedValue(true);
+    ui.select.mockImplementation(async (_title: string, labels: string[]) => labels[0]);
+  });
+  afterEach(() => { fs.reset(); vi.unstubAllEnvs(); });
+
+  it("keeps both command names and rejects noninteractive mutation", async () => {
+    const registerCommand = vi.fn();
+    registerAgentManager({ registerCommand } as never);
+    expect(registerCommand.mock.calls.map(([name]) => name)).toEqual(["resource:agent", "resource:local-agent"]);
+    await registerCommand.mock.calls[0][1].handler("create", { hasUI: false, ui });
+    expect(author).not.toHaveBeenCalled();
+    expect(ui.notify).toHaveBeenCalledWith("Agent authoring requires interactive or RPC UI", "error");
+    expect(parseAgentCommandArgument("create")).toMatchObject({ success: true, output: "create" });
+    expect(parseAgentCommandArgument("unknown")).toMatchObject({ success: false });
   });
 
-  afterEach(() => {
-    memoryFileSystem.reset();
+  it("creates safely serialized frontmatter and the complete prompt body", async () => {
+    await handleCreate(ctx(), "global", getFs, getResolver, options);
+    const result = await fs.readFile(path);
+    expect(result).toEqual({ success: true, data: renderAgentMarkdown("tintin", (await author.mock.results[0].value).frontmatter, (await author.mock.results[0].value).body) });
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Definition saved:"), "info");
+    expect(ui.notify).not.toHaveBeenCalledWith("Agent created");
   });
 
-  describe("parseAgentCommandArgument", () => {
-    it("parses the agent subcommand without inline flags", () => {
-      expect(parseAgentCommandArgument("create")).toEqual({
-        success: true,
-        output: "create",
-      });
-    });
+  it("writes project definitions without requiring model/tools pins", async () => {
+    author.mockResolvedValue({ frontmatter: {}, body: "Parent-specific instructions" });
+    await handleCreate(ctx(), "local", getFs, getResolver, options);
+    expect((await fs.readFile(resolver.resolveLocalAgentPath("auditor.md"))).success).toBe(true);
   });
 
-  describe("extension registration", () => {
-    it("registers a dedicated command for local agents", async () => {
-      const registerCommand = vi.fn();
-      const registerFlag = vi.fn();
-      const getFlag = vi.fn();
-      const notify = vi.fn();
-
-      registerAgentManager({ registerCommand, registerFlag, getFlag } as never);
-
-      expect(registerFlag).not.toHaveBeenCalled();
-      expect(registerCommand).toHaveBeenNthCalledWith(
-        1,
-        "resource:agent",
-        expect.objectContaining({
-          description: "This is for managing global agents",
-        }),
-      );
-      expect(registerCommand).toHaveBeenNthCalledWith(
-        2,
-        "resource:local-agent",
-        expect.objectContaining({
-          description: "This is for managing project agents",
-        }),
-      );
-
-      const command = registerCommand.mock.calls[1]?.[1] as {
-        handler: (
-          arg: string,
-          ctx: { cwd: string; ui: { notify: typeof notify } },
-        ) => Promise<void>;
-      };
-      await command.handler("create", {
-        cwd: localCwd,
-        ui: { notify, custom: vi.fn() },
-      } as never);
-
-      expect(notify).toHaveBeenNthCalledWith(
-        1,
-        `Using local agents from ${join(localCwd, LOCAL_AGENT_DIRECTORY)}`,
-        "info",
-      );
-    });
+  it("refuses preexisting files without opening authoring or overwriting", async () => {
+    fs.seed({ [path]: original });
+    await handleCreate(ctx(), "global", getFs, getResolver, options);
+    expect(author).not.toHaveBeenCalled();
+    expect(await fs.readFile(path)).toEqual({ success: true, data: original });
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("already exists"), "error");
   });
 
-  describe("createAgentForm", () => {
-    it("uses the shared form component and required footer", () => {
-      const form = createAgentForm(createTui(), createTheme(), vi.fn());
-      const lines = form.render(100).join("\n");
-
-      expect(form).toBeInstanceOf(Form);
-      expect(lines).toContain("Create Agent");
-      expect(lines).toContain("* required");
-      expect(lines).toContain("Use lowercase values for every field");
-    });
-
-    it("renders the expected errors when invalid values are submitted", () => {
-      const form = createAgentForm(createTui(), createTheme(), vi.fn());
-
-      form.focused = true;
-      form.handleInput("O");
-      form.handleInput("r");
-      form.handleInput("a");
-      form.handleInput("c");
-      form.handleInput("l");
-      form.handleInput("e");
-      form.handleInput(TAB_KEY);
-
-      form.handleInput("s");
-      form.handleInput("h");
-      form.handleInput("o");
-      form.handleInput("r");
-      form.handleInput("t");
-      form.handleInput(TAB_KEY);
-
-      form.handleInput("R");
-      form.handleInput("e");
-      form.handleInput("a");
-      form.handleInput("d");
-      form.handleInput(TAB_KEY);
-
-      form.handleInput("C");
-      form.handleInput(ENTER_KEY);
-
-      const lines = form.render(100).join("\n");
-
-      expect(lines).toContain(
-        "Name must be lowercase letters, numbers, and dashes only",
-      );
-      expect(lines).toContain("Description must be at least 35 characters");
-      expect(lines).toContain("Tools must be a lowercase comma-separated list");
-      expect(lines).toContain("Model must be at least 2 characters");
-      expect(lines).toContain("Model must be lowercase");
-    });
-
-    it("validates later required fields when name is filled first", () => {
-      const form = createAgentForm(createTui(), createTheme(), vi.fn());
-
-      form.focused = true;
-      form.handleInput("o");
-      form.handleInput("r");
-      form.handleInput("a");
-      form.handleInput("c");
-      form.handleInput("l");
-      form.handleInput("e");
-
-      form.handleInput(TAB_KEY);
-      form.handleInput(TAB_KEY);
-      form.handleInput(TAB_KEY);
-      form.handleInput(ENTER_KEY);
-
-      const lines = form.render(100).join("\n");
-
-      expect(lines).not.toContain("Name is required");
-      expect(lines).not.toContain(
-        "Name must be lowercase letters, numbers, and dashes only",
-      );
-      expect(lines).toContain("Description must be at least 35 characters");
-      expect(lines).toContain("Tools are required");
-      expect(lines).toContain("Model must be at least 2 characters");
-    });
+  it("does not create directories or files when authoring is cancelled", async () => {
+    author.mockResolvedValue(undefined);
+    await handleCreate(ctx(), "global", getFs, getResolver, options);
+    expect((await fs.readDirectoryEntries(resolver.resolveGlobalAgentPath())).success).toBe(false);
   });
 
-  describe("parseAgentFormValues", () => {
-    it("validates required agent fields", () => {
-      const errors = parseAgentFormValues({
-        name: "Oracle",
-        description: "too short",
-        tools: "Read, Write",
-        model: "C",
-      });
-
-      expect(errors).toEqual({
-        name: ["Name must be lowercase letters, numbers, and dashes only"],
-        description: ["Description must be at least 35 characters"],
-        tools: ["Tools must be a lowercase comma-separated list"],
-        model: [
-          "Model must be at least 2 characters",
-          "Model must be lowercase",
-        ],
-      });
-    });
+  it("requires coexistence confirmation when both runtimes were detected", async () => {
+    ui.confirm.mockResolvedValue(false);
+    await handleCreate(ctx(), "global", getFs, getResolver, { ...options, detectedRuntimes: ["tintin", "nico"] });
+    expect(ui.confirm).toHaveBeenCalledWith("Shared agent discovery location", expect.stringContaining("ignore unfamiliar permission restrictions"));
+    expect((await fs.readFile(path)).success).toBe(false);
   });
 
-  describe("handleCreate", () => {
-    it("writes the created agent to the global agents directory", async () => {
-      const custom = vi.fn().mockResolvedValueOnce({
-        name: "oracle",
-        description: "made for careful research and deep code review work",
-        tools: "read,write,bash",
-        model: "claude",
-      });
-      const notify = vi.fn();
-
-      await handleCreate(
-        { ui: { custom, notify } } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
-
-      const content = await memoryFileSystem.readFile(agentPath);
-
-      expect(content).toMatchObject({
-        data: expect.stringContaining("name: oracle"),
-        success: true,
-      });
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent created");
-    });
-
-    it("writes the created agent to the project agents directory when local", async () => {
-      const custom = vi.fn().mockResolvedValueOnce({
-        name: "oracle",
-        description: "made for careful research and deep code review work",
-        tools: "read,write,bash",
-        model: "claude",
-      });
-      const notify = vi.fn();
-
-      const localFileSystem = new MemoryFileSystem();
-
-      await handleCreate(
-        { cwd: localCwd, ui: { custom, notify } } as never,
-        "local",
-        () => new MemoryFileSystem(),
-        getStubPathResolver,
-      );
-
-      const content = await localFileSystem.readFile(localAgentPath);
-
-      expect(content).toMatchObject({
-        data: expect.stringContaining("name: oracle"),
-        success: true,
-      });
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent created");
-    });
-
-    it("reports filesystem errors when agent creation fails", async () => {
-      const custom = vi.fn().mockResolvedValueOnce({
-        name: "oracle",
-        description: "made for careful research and deep code review work",
-        tools: "read,write,bash",
-        model: "claude",
-      });
-      const notify = vi.fn();
-      vi.spyOn(memoryFileSystem, "writeFile").mockResolvedValueOnce({
-        error: new Error("write denied"),
-        success: false,
-      });
-
-      await handleCreate(
-        { ui: { custom, notify } } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
-
-      expect(notify).toHaveBeenCalledWith(
-        "Agent creation failed: write denied",
-        "error",
-      );
-      expect(notify).not.toHaveBeenCalledWith("Agent created");
-    });
-
-    it("reports cancellation when agent creation is dismissed", async () => {
-      const notify = vi.fn();
-
-      await handleCreate(
-        {
-          ui: { custom: vi.fn().mockResolvedValueOnce(null), notify },
-        } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
-
-      await expect(memoryFileSystem.readFile(agentPath)).resolves.toMatchObject(
-        {
-          success: false,
-        },
-      );
-      expect(notify).toHaveBeenCalledWith("Agent creation cancelled", "info");
-    });
+  it("asks for a profile when detection is absent", async () => {
+    filename.mockResolvedValue(undefined);
+    await handleCreate(ctx(), "global", getFs, getResolver);
+    expect(ui.select).toHaveBeenCalledWith(expect.stringContaining("detection is absent or ambiguous"), expect.any(Array));
   });
 
-  describe("handleEdit", () => {
-    it("edits the selected global agent", async () => {
-      memoryFileSystem.seed({
-        [agentPath]: "---\nname: oracle\n---\n",
-      });
-      vi.stubEnv("EDITOR", "code");
-      const editorFactory = vi.fn();
-      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi.fn().mockResolvedValueOnce({
-        before: "before",
-        after: "after",
-        changed: true,
-      });
-      const notify = vi.fn();
-      const select = vi.fn().mockResolvedValueOnce("global: oracle");
-
-      await handleEdit(
-        { ui: { custom, notify, select } } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
-
-      expect(select).toHaveBeenCalledWith("Edit Agent", ["global: oracle"]);
-      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
-        "code",
-        agentPath,
-      );
-      expect(custom).toHaveBeenCalledWith(
-        editorFactory,
-        modalEditorOverlayOptions,
-      );
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent edited");
-    });
-
-    it("edits the selected local agent", async () => {
-      const localFileSystem = new MemoryFileSystem();
-      localFileSystem.seed({
-        [localAgentPath]: "---\nname: oracle\n---\n",
-      });
-      vi.stubEnv("VISUAL", "nvim");
-      const editorFactory = vi.fn();
-      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi.fn().mockResolvedValueOnce({
-        before: "before",
-        after: "after",
-        changed: true,
-      });
-      const notify = vi.fn();
-      const select = vi.fn().mockResolvedValueOnce("local: oracle");
-
-      await handleEdit(
-        { cwd: localCwd, ui: { custom, notify, select } } as never,
-        "local",
-        () => new MemoryFileSystem(),
-        getStubPathResolver,
-      );
-
-      expect(select).toHaveBeenCalledWith("Edit Agent", ["local: oracle"]);
-      expect(mockCreateExternalEditorFactory).toHaveBeenCalledWith(
-        "nvim",
-        localAgentPath,
-      );
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent edited");
-    });
-
-    it("reports external editor errors when agent editing fails", async () => {
-      memoryFileSystem.seed({
-        [agentPath]: "---\nname: oracle\n---\n",
-      });
-      vi.stubEnv("EDITOR", "code");
-      const editorFactory = vi.fn();
-      mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
-      const custom = vi.fn().mockResolvedValueOnce(new Error("editor crashed"));
-      const notify = vi.fn();
-      const select = vi.fn().mockResolvedValueOnce("global: oracle");
-
-      await handleEdit(
-        { ui: { custom, notify, select } } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
-
-      expect(notify).toHaveBeenCalledWith("editor crashed", "error");
-      expect(notify).not.toHaveBeenCalledWith("Agent edited");
-    });
+  it("leaves a file unchanged when known fields are not edited", async () => {
+    fs.seed({ [path]: original });
+    author.mockImplementation(async (_ui, _runtime, initial) => initial);
+    await handleEdit(ctx(), "global", getFs, getResolver, options);
+    expect(await fs.readFile(path)).toEqual({ success: true, data: original });
+    expect(ui.notify).toHaveBeenCalledWith("Definition unchanged", "info");
   });
 
-  describe("handleDelete", () => {
-    it("deletes the selected global agent", async () => {
-      memoryFileSystem.seed({
-        [agentPath]: "---\nname: oracle\n---\n",
-      });
-      const select = vi.fn().mockResolvedValueOnce("global: oracle");
-      const notify = vi.fn();
+  it.each(["unexpected: true", "model: [bad]", "name: first\nname: duplicate"]) ("refuses structured editing of invalid or unknown fields: %s", async (fields) => {
+    const content = `---\n${fields}\n---\nKeep this body`;
+    fs.seed({ [path]: content });
+    await handleEdit(ctx(), "global", getFs, getResolver, options);
+    expect(author).not.toHaveBeenCalled();
+    expect(await fs.readFile(path)).toEqual({ success: true, data: content });
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Agent edit failed"), "error");
+  });
 
-      await handleDelete(
-        { ui: { notify, select } } as never,
-        "global",
-        getStubResourceFileSystem,
-        getStubPathResolver,
-      );
+  it("edits metadata without renaming the underlying file", async () => {
+    fs.seed({ [path]: original });
+    await handleEdit(ctx(), "global", getFs, getResolver, options);
+    expect((await fs.readFile(path)).success).toBe(true);
+    expect((await fs.readFile(resolver.resolveGlobalAgentPath("security-review.md"))).success).toBe(false);
+  });
 
-      await expect(memoryFileSystem.readFile(agentPath)).resolves.toMatchObject(
-        {
-          success: false,
-        },
-      );
-      expect(select).toHaveBeenCalledWith("Delete Agent", ["global: oracle"]);
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveGlobalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveLocalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent deleted");
+  it("refuses to overwrite changes made during structured editing", async () => {
+    fs.seed({ [path]: original });
+    author.mockImplementation(async () => {
+      await fs.writeFile(path, "external change");
+      return { frontmatter: { name: "changed" }, body: "changed" };
     });
+    await handleEdit(ctx(), "global", getFs, getResolver, options);
+    expect(await fs.readFile(path)).toEqual({ success: true, data: "external change" });
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("changed outside"), "error");
+  });
 
-    it("deletes the selected local agent", async () => {
-      const localFileSystem = new MemoryFileSystem();
-      localFileSystem.seed({
-        [localAgentPath]: "---\nname: oracle\n---\n",
-      });
-      const select = vi.fn().mockResolvedValueOnce("local: oracle");
-      const notify = vi.fn();
+  it("requires explicit delete confirmation", async () => {
+    fs.seed({ [path]: original });
+    ui.confirm.mockResolvedValue(false);
+    await handleDelete(ctx(), "global", getFs, getResolver, options);
+    expect((await fs.readFile(path)).success).toBe(true);
+    ui.confirm.mockResolvedValue(true);
+    await handleDelete(ctx(), "global", getFs, getResolver, options);
+    expect((await fs.readFile(path)).success).toBe(false);
+  });
 
-      await handleDelete(
-        { cwd: localCwd, ui: { notify, select } } as never,
-        "local",
-        () => new MemoryFileSystem(),
-        getStubPathResolver,
-      );
+  it("lists only files, uses runtime identity and includes distinguishing source paths", async () => {
+    fs.seed({ [path]: original, [resolver.resolveGlobalAgentPath("notes.txt")]: "notes", [resolver.resolveGlobalAgentPath("security-review.md")]: original });
+    await fs.mkdir(resolver.resolveGlobalAgentPath("folder.md"), { recursive: true });
+    const choices = await listAgentChoices("global", "tintin", fs, resolver);
+    expect(choices).toHaveLength(2);
+    expect(choices.every((choice) => choice.label.includes("security-review"))).toBe(true);
+    expect(new Set(choices.map((choice) => choice.label)).size).toBe(2);
+  });
 
-      await expect(
-        localFileSystem.readFile(localAgentPath),
-      ).resolves.toMatchObject({
-        success: false,
-      });
-      expect(select).toHaveBeenCalledWith("Delete Agent", ["local: oracle"]);
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith();
-      expect(pathResolver.resolveLocalAgentPath).toHaveBeenCalledWith(
-        "oracle.md",
-      );
-      expect(pathResolver.resolveGlobalAgentPath).not.toHaveBeenCalled();
-      expect(notify).toHaveBeenCalledWith("Agent deleted");
+  it("recurses for Nico, skips chains, and includes legacy project files", async () => {
+    fs.seed({
+      [resolver.resolveLocalAgentPath("nested/scout.md")]: "---\nname: scout\ndescription: Recon\npackage: analysis\n---\nInspect code",
+      [resolver.resolveLocalAgentPath("flow.chain.md")]: "not an agent",
+      [join("/workspace", ".agents", "legacy.md")]: "---\nname: legacy\ndescription: Recon\n---\nInspect code",
     });
+    const choices = await listAgentChoices("local", "nico", fs, resolver);
+    expect(choices).toHaveLength(2);
+    expect(choices.some((choice) => choice.label.includes("analysis.scout"))).toBe(true);
+    expect(choices.some((choice) => choice.label.includes("legacy"))).toBe(true);
+  });
+
+  it("does not turn a permissions error into an empty list", async () => {
+    vi.spyOn(fs, "readDirectoryEntries").mockResolvedValue({ success: false, error: new Error("permission denied") });
+    await expect(listAgentChoices("global", "tintin", fs, resolver)).rejects.toThrow("permission denied");
   });
 });
