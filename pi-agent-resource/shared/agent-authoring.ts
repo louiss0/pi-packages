@@ -1,0 +1,178 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  AGENT_PROFILES,
+  validateAgentFrontmatter,
+  type AgentFieldDefinition,
+  type AgentFrontmatter,
+  type AgentRuntime,
+  type AgentValue,
+  type AgentValueKind,
+} from "./agent-contracts";
+
+type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm">;
+type ValueEdit = { value: AgentValue } | { remove: true };
+const BASIC_KEYS = new Set(["name", "description", "model", "tools"]);
+const FINISH = "Done";
+const BACK = "Back";
+const OMIT = "Omit (use runtime default)";
+
+export function isSafeAgentFilename(value: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value) &&
+    !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(value);
+}
+
+export async function askAgentFilename(ui: UI): Promise<string | undefined> {
+  for (;;) {
+    const value = await ui.input("Agent filename (without .md; independent of runtime name)");
+    if (value === undefined) return undefined;
+    if (isSafeAgentFilename(value)) return value;
+    ui.notify("Use 1–128 letters, numbers, dashes or underscores; no paths or reserved device names", "error");
+  }
+}
+
+function summary(value: AgentValue | undefined): string {
+  if (value === undefined) return "omitted";
+  const text = JSON.stringify(value);
+  return text.length > 90 ? `${text.slice(0, 87)}…` : text;
+}
+
+async function editList(ui: UI, key: string, initial: AgentValue): Promise<AgentValue[] | undefined> {
+  const values: AgentValue[] = Array.isArray(initial) ? [...initial] : [];
+  for (;;) {
+    const labels = values.map((value, index) => `${index + 1}. ${summary(value)}`);
+    const choice = await ui.select(`${key} — ordered list (Done with no items saves [])`, [...labels, "Add item", FINISH]);
+    if (choice === undefined) return undefined;
+    if (choice === FINISH) return values;
+    if (choice === "Add item") {
+      const value = await ui.input(`${key}: new text item`);
+      if (value !== undefined) values.push(value);
+    } else {
+      const index = labels.indexOf(choice);
+      if (index < 0) continue;
+      const action = await ui.select(`${key}[${index}]`, ["Edit item", "Remove item", BACK]);
+      if (action === "Remove item") values.splice(index, 1);
+      if (action === "Edit item") {
+        const value = await ui.input(`${key}[${index}]`, String(values[index]));
+        if (value !== undefined) values[index] = value;
+      }
+    }
+  }
+}
+
+const OPEN_KINDS: readonly AgentValueKind[] = ["string", "boolean", "integer", "list", "map", "null"];
+
+async function editMap(ui: UI, field: AgentFieldDefinition, initial: AgentValue): Promise<AgentFrontmatter | undefined> {
+  const values: AgentFrontmatter = initial !== null && typeof initial === "object" && !Array.isArray(initial) ? structuredClone(initial) : {};
+  const children = field.children ?? [];
+  for (;;) {
+    const definitions = [...children];
+    if (field.openMap) {
+      for (const key of Object.keys(values)) {
+        if (!definitions.some((definition) => definition.key === key)) {
+          definitions.push({ key, group: field.group, description: "Provider-specific option", kinds: OPEN_KINDS, openMap: true });
+        }
+      }
+    }
+    const labels = definitions.map((child) => `${child.key}: ${summary(values[child.key])}`);
+    const choice = await ui.select(`${field.key} — structured mapping`, [...labels, ...(field.openMap ? ["Add key"] : []), FINISH]);
+    if (choice === undefined) return undefined;
+    if (choice === FINISH) return values;
+    let definition = definitions[labels.indexOf(choice)];
+    if (choice === "Add key") {
+      const key = await ui.input(`${field.key}: option name`);
+      if (!key || ["__proto__", "constructor", "prototype"].includes(key)) continue;
+      definition = { key, group: field.group, description: "Provider-specific option", kinds: OPEN_KINDS, openMap: true };
+    }
+    if (!definition) continue;
+    const result = await editField(ui, definition, values[definition.key]);
+    if (!result) continue;
+    if ("remove" in result) delete values[definition.key];
+    else Object.defineProperty(values, definition.key, { value: result.value, writable: true, enumerable: true, configurable: true });
+  }
+}
+
+async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValue | undefined): Promise<ValueEdit | undefined> {
+  const kind = await ui.select(`${field.key}: ${field.description}\nCurrent: ${summary(initial)}`, [OMIT, ...field.kinds, BACK]);
+  if (kind === undefined || kind === BACK) return undefined;
+  if (kind === OMIT) return { remove: true };
+  if (kind === "null") return { value: null };
+  if (kind === "boolean") {
+    const choice = await ui.select(`${field.key}: boolean`, ["true", "false"]);
+    return choice === undefined ? undefined : { value: choice === "true" };
+  }
+  if (kind === "integer") {
+    for (;;) {
+      const text = await ui.input(`${field.key}: integer`, typeof initial === "number" ? String(initial) : "");
+      if (text === undefined) return undefined;
+      const value = Number(text);
+      if (/^-?\d+$/.test(text) && Number.isSafeInteger(value)) return { value };
+      ui.notify("Enter a safe integer", "error");
+    }
+  }
+  if (kind === "list") {
+    const value = await editList(ui, field.key, initial ?? []);
+    return value === undefined ? undefined : { value };
+  }
+  if (kind === "map") {
+    const value = await editMap(ui, field, initial ?? {});
+    return value === undefined ? undefined : { value };
+  }
+  if (kind === "string") {
+    // Empty text is an explicit string, not omission. Lists have their own editor.
+    const value = field.choices
+      ? await ui.select(`${field.key}: value`, [...field.choices])
+      : await ui.input(`${field.key}: text (empty is explicit)`, typeof initial === "string" ? initial : "");
+    return value === undefined ? undefined : { value };
+  }
+  return undefined;
+}
+
+async function editGroup(ui: UI, fields: readonly AgentFieldDefinition[], values: AgentFrontmatter, title: string) {
+  for (;;) {
+    const labels = fields.map((field) => `${field.key}: ${summary(values[field.key])}`);
+    const choice = await ui.select(title, [...labels, BACK]);
+    if (choice === undefined || choice === BACK) return;
+    const field = fields[labels.indexOf(choice)];
+    if (!field) continue;
+    const result = await editField(ui, field, values[field.key]);
+    if (!result) continue;
+    if ("remove" in result) delete values[field.key];
+    else values[field.key] = result.value;
+  }
+}
+
+export async function authorAgentDefinition(
+  ui: UI,
+  runtime: AgentRuntime,
+  initial: { frontmatter: AgentFrontmatter; body: string },
+): Promise<{ frontmatter: AgentFrontmatter; body: string } | undefined> {
+  const profile = AGENT_PROFILES[runtime];
+  const frontmatter = structuredClone(initial.frontmatter);
+  let body = initial.body;
+  ui.notify(`${profile.label}: omitted settings use this runtime's native defaults. A tool allowlist does not load its provider; nested delegation can expand capabilities. This manager does not enforce runtime permissions.`, "info");
+  for (;;) {
+    const action = await ui.select(`${profile.label} — agent definition`, ["Basic settings", "Advanced settings", "Prompt body", "Review and save", "Cancel"]);
+    if (action === undefined || action === "Cancel") return undefined;
+    if (action === "Basic settings") await editGroup(ui, profile.fields.filter((field) => BASIC_KEYS.has(field.key)), frontmatter, "Basic settings");
+    if (action === "Advanced settings") {
+      const fields = profile.fields.filter((field) => !BASIC_KEYS.has(field.key));
+      const groups = [...new Set(fields.map((field) => field.group))];
+      const group = await ui.select("Advanced settings — choose a section", [...groups, BACK]);
+      if (group !== undefined && group !== BACK) await editGroup(ui, fields.filter((field) => field.group === group), frontmatter, group);
+    }
+    if (action === "Prompt body") {
+      const edited = await ui.editor("Agent system prompt (Markdown body only)", body);
+      if (edited !== undefined) body = edited;
+    }
+    if (action === "Review and save") {
+      const errors = validateAgentFrontmatter(runtime, frontmatter);
+      if (errors.length) {
+        ui.notify(errors.join("\n"), "error");
+        continue;
+      }
+      if (!body.trim() && !await ui.confirm("Empty system prompt", "Save an intentionally empty prompt? Replace-mode agents will have no authored system instructions.")) continue;
+      const preview = Object.entries(frontmatter).map(([key, value]) => `${key}: ${summary(value)}`).join("\n") || "All frontmatter settings omitted (native defaults)";
+      if (await ui.confirm("Save agent definition", `${profile.label}\n${preview}\nPrompt: ${body.length} characters\nThis saves a definition only; runtime loading/execution is separate.`)) return { frontmatter, body };
+    }
+  }
+}

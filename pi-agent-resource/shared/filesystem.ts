@@ -1,4 +1,8 @@
+import { randomUUID } from "node:crypto";
 import {
+  link as nodeLink,
+  rename as nodeRename,
+  stat as nodeStat,
   mkdir as nodeMkdir,
   readdir as nodeReaddir,
   readFile as nodeReadFile,
@@ -6,13 +10,17 @@ import {
   writeFile as nodeWriteFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 import { fs as memoryFs, vol } from "memfs";
 
 export type ResourceDirectoryEntry = {
   name: string;
   isDirectory(): boolean;
+  isFile?(): boolean;
 };
+
+export type ResourceWriteOptions = { exclusive?: boolean; atomic?: boolean };
 
 export type ResourceResult<T> =
   | {
@@ -36,7 +44,7 @@ export interface ResourceFileSystem {
   readFile(path: string): Promise<ResourceResult<string>>;
   removeDirectory(path: string): Promise<ResourceResult<void>>;
   removeFile(path: string): Promise<ResourceResult<void>>;
-  writeFile(path: string, content: string): Promise<ResourceResult<void>>;
+  writeFile(path: string, content: string, options?: ResourceWriteOptions): Promise<ResourceResult<void>>;
 }
 
 export interface ResourcePathResolver {
@@ -90,11 +98,15 @@ export class PathResolver implements ResourcePathResolver {
   }
 
   resolveGlobalAgentPath(path = "") {
-    return this.#resolveGlobalResourcePath(this.#agentFolder, path);
+    const configured = process.env.PI_CODING_AGENT_DIR;
+    const agentDirectory = configured
+      ? configured.replace(/^~(?=$|[\\/])/, this.#homePath)
+      : join(this.#homePath, CONFIG_DIR_NAME, "agent");
+    return this.#resolvePath(join(agentDirectory, this.#agentFolder), path);
   }
 
   resolveLocalAgentPath(path = "") {
-    return this.#resolveLocalResourcePath(this.#agentFolder, path);
+    return this.#resolvePath(join(this.#cwd, CONFIG_DIR_NAME, this.#agentFolder), path);
   }
 
   resolveGlobalPromptPath(path = "") {
@@ -177,10 +189,23 @@ export class NodeFileSystem implements ResourceFileSystem {
   removeFile(path: string) {
     return getResourceResult(() => nodeRm(path, { force: true }));
   }
-  writeFile(path: string, content: string) {
-    return getResourceResult(() =>
-      nodeWriteFile(path, content, { encoding: "utf-8" }),
-    );
+  writeFile(path: string, content: string, options: ResourceWriteOptions = {}) {
+    return getResourceResult(async () => {
+      if (!options.atomic) {
+        await nodeWriteFile(path, content, { encoding: "utf-8", flag: options.exclusive ? "wx" : "w" });
+        return;
+      }
+      const temporary = join(dirname(path), `.resource-${randomUUID()}.tmp`);
+      let mode = 0o600;
+      if (!options.exclusive) mode = (await nodeStat(path)).mode;
+      try {
+        await nodeWriteFile(temporary, content, { encoding: "utf-8", flag: "wx", mode });
+        if (options.exclusive) await nodeLink(temporary, path);
+        else await nodeRename(temporary, path);
+      } finally {
+        await nodeRm(temporary, { force: true });
+      }
+    });
   }
 }
 
@@ -231,6 +256,7 @@ export class MemoryFileSystem implements ResourceFileSystem {
         directoryEntries.push({
           name: entry.name.toString(),
           isDirectory: () => entry.isDirectory(),
+          isFile: () => entry.isFile(),
         });
 
         return directoryEntries;
@@ -258,9 +284,9 @@ export class MemoryFileSystem implements ResourceFileSystem {
   removeFile(path: string): Promise<ResourceResult<void>> {
     return getResourceResult(() => memoryFs.promises.rm(path, { force: true }));
   }
-  writeFile(path: string, content: string): Promise<ResourceResult<void>> {
+  writeFile(path: string, content: string, options: ResourceWriteOptions = {}): Promise<ResourceResult<void>> {
     return getResourceResult(() =>
-      memoryFs.promises.writeFile(path, content, { encoding: "utf8" }),
+      memoryFs.promises.writeFile(path, content, { encoding: "utf8", flag: options.exclusive ? "wx" : "w" }),
     );
   }
 }

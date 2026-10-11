@@ -56,8 +56,9 @@
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
+    "memfs": "catalog:",
     "valibot": "catalog:",
-    "memfs": "catalog:"
+    "yaml": "catalog:"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",

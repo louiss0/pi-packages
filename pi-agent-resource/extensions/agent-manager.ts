@@ -1,178 +1,132 @@
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
-import { createExternalEditorFactory } from "@code-fixer-23/pi-form-components";
-
-import {
-  getPathResolver,
-  NodeFileSystem,
-  type ResourceFileSystem,
-  type ResourcePathResolver,
-} from "../shared/filesystem";
-import {
-  createAgentForm,
-  type AgentFields,
-  parseAgentFormValues,
-  renderAgentFrontmatter,
-} from "../shared/resource-components";
+import { basename, dirname, join, relative } from "node:path";
+import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { askAgentFilename, authorAgentDefinition } from "../shared/agent-authoring";
+import { AGENT_PROFILES, agentIdentity, parseAgentMarkdown, renderAgentMarkdown, type AgentRuntime } from "../shared/agent-contracts";
+import { detectAgentRuntimes, type AgentResourceSource } from "../shared/agent-runtime-detection";
+import { getPathResolver, NodeFileSystem, type ResourceFileSystem, type ResourcePathResolver } from "../shared/filesystem";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
-import {
-  getFilterSubcommandArgumentCompletionFromStringUsingSubLabel,
-  SubCommands,
-} from "../shared/subcommands";
-import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
+import { getFilterSubcommandArgumentCompletionFromStringUsingSubLabel, SubCommands } from "../shared/subcommands";
 
 const extensionName = "agent-manager";
-const PI_DIRECTORY_NAME = ".pi";
-const AGENT_DIRECTORY_NAME = "agent";
-const AGENTS_DIRECTORY_NAME = "agents";
-const LOCAL_AGENT_COMMAND_NAME = "resource:local-agent";
-
-export const GLOBAL_AGENT_DIRECTORY = join(
-  homedir(),
-  PI_DIRECTORY_NAME,
-  AGENT_DIRECTORY_NAME,
-  AGENTS_DIRECTORY_NAME,
-);
-export const LOCAL_AGENT_DIRECTORY = join(
-  PI_DIRECTORY_NAME,
-  AGENTS_DIRECTORY_NAME,
-);
+export const GLOBAL_AGENT_DIRECTORY = join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), CONFIG_DIR_NAME, "agent"), "agents");
+export const LOCAL_AGENT_DIRECTORY = join(CONFIG_DIR_NAME, "agents");
 type AgentScope = "global" | "local";
-type AgentChoice = {
-  path: string;
-  label: string;
-};
-
 type GetResourceFileSystem = (rootPath?: string) => ResourceFileSystem;
 type GetPathResolver = (cwd?: string) => ResourcePathResolver;
-
-export { createAgentForm, parseAgentFormValues };
+export interface AgentAuthoringOptions {
+  runtime?: AgentRuntime;
+  detectedRuntimes?: readonly AgentRuntime[];
+  sources?: readonly AgentResourceSource[];
+}
+export interface AgentChoice { path: string; label: string }
 
 export function parseAgentCommandArgument(argument: string) {
-  const subcommandResult = SubCommands.parse(argument.trim());
-
-  if (!subcommandResult.success) {
-    return {
-      success: false as const,
-      errorMessage: subcommandResult.errorMessage,
-    };
-  }
-
-  return {
-    success: true as const,
-    output: subcommandResult.output,
-  };
-}
-
-async function handleAgentCommand(
-  arg: string,
-  ctx: ExtensionContext,
-  scope: AgentScope,
-) {
-  notifyWhenUsingDevelopmentExtension(extensionName, ctx);
-  const result = parseAgentCommandArgument(arg);
-  if (!result.success) {
-    ctx.ui.notify(`Invalid command: ${result.errorMessage}`, "error");
-    return;
-  }
-
-  if (scope === "local") {
-    const cwd = ctx.cwd || process.cwd();
-    ctx.ui.notify(
-      `Using local agents from ${join(cwd, LOCAL_AGENT_DIRECTORY)}`,
-      "info",
-    );
-  }
-
-  switch (result.output) {
-    case "create":
-      await handleCreate(ctx, scope);
-      break;
-    case "edit":
-      await handleEdit(ctx, scope);
-      break;
-    case "delete":
-      await handleDelete(ctx, scope);
-      break;
-  }
+  const result = SubCommands.parse(argument.trim());
+  return result.success ? { success: true as const, output: result.output } : { success: false as const, errorMessage: result.errorMessage };
 }
 
 export default (pi: ExtensionAPI) => {
-  pi.registerCommand("resource:agent", {
-    description: "This is for managing global agents",
-    getArgumentCompletions:
-      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
-    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "global"),
-  });
-
-  pi.registerCommand(LOCAL_AGENT_COMMAND_NAME, {
-    description: "This is for managing project agents",
-    getArgumentCompletions:
-      getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
-    handler: async (arg, ctx) => handleAgentCommand(arg, ctx, "local"),
-  });
+  for (const scope of ["global", "local"] as const) {
+    pi.registerCommand(scope === "global" ? "resource:agent" : "resource:local-agent", {
+      description: scope === "global" ? "This is for managing global agents" : "This is for managing project agents",
+      getArgumentCompletions: getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("agent"),
+      handler: async (argument, ctx) => {
+        notifyWhenUsingDevelopmentExtension(extensionName, ctx);
+        const parsed = parseAgentCommandArgument(argument);
+        if (!parsed.success) { ctx.ui.notify(`Invalid command: ${parsed.errorMessage}`, "error"); return; }
+        if (!ctx.hasUI) { ctx.ui.notify("Agent authoring requires interactive or RPC UI", "error"); return; }
+        const options: AgentAuthoringOptions = { sources: [...(pi.getAllTools?.() ?? []), ...(pi.getCommands?.() ?? [])] };
+        const handler = { create: handleCreate, edit: handleEdit, delete: handleDelete }[parsed.output];
+        await handler(ctx, scope, undefined, undefined, options);
+      },
+    });
+  }
 };
+
+function missing(error: Error): boolean {
+  return "code" in error && error.code === "ENOENT";
+}
+
+function report(ctx: ExtensionContext, action: string, error: unknown) {
+  ctx.ui.notify(`${action}: ${error instanceof Error ? error.message : String(error)}`, "error");
+}
+
+async function selectRuntime(ctx: ExtensionContext, options: AgentAuthoringOptions) {
+  const detected = options.detectedRuntimes ?? await detectAgentRuntimes(options.sources ?? []);
+  const runtime = options.runtime ?? (detected.length === 1 ? detected[0] : undefined);
+  if (runtime) {
+    ctx.ui.notify(`Authoring profile: ${AGENT_PROFILES[runtime].label} (selection does not isolate discovery)`, "info");
+    return { runtime, detected };
+  }
+  const runtimes = ["tintin", "nico"] as const;
+  const labels = runtimes.map((id) => AGENT_PROFILES[id].label);
+  const selected = await ctx.ui.select("Choose agent runtime — detection is absent or ambiguous", labels);
+  const chosen = runtimes[labels.indexOf(selected ?? "")];
+  return chosen ? { runtime: chosen, detected } : undefined;
+}
+
+async function confirmCoexistence(ctx: ExtensionContext, detected: readonly AgentRuntime[]) {
+  return detected.length < 2 || await ctx.ui.confirm("Shared agent discovery location", "Both Pi subagent runtimes are detected. The other runtime can also discover this file and ignore unfamiliar permission restrictions. A profile is not an isolation boundary. Save intentionally?");
+}
+
+function rootFor(scope: AgentScope, resolver: ResourcePathResolver) {
+  return scope === "local" ? resolver.resolveLocalAgentPath() : resolver.resolveGlobalAgentPath();
+}
+
+async function getResources(ctx: ExtensionContext, scope: AgentScope, runtime: AgentRuntime, getFileSystem: GetResourceFileSystem, getResolver: GetPathResolver) {
+  const cwd = ctx.cwd || process.cwd();
+  let resolver = getResolver(cwd);
+  const fs = getFileSystem(rootFor(scope, resolver));
+  // Nico discovers the nearest project .pi/.agents directory, not necessarily task cwd.
+  if (scope === "local" && runtime === "nico") {
+    let directory = cwd;
+    while (directory !== homedir()) {
+      const entries = await fs.readDirectoryEntries(directory);
+      if (!entries.success) {
+        if (!missing(entries.error)) throw entries.error;
+      } else if (entries.data.some((entry) => entry.isDirectory() && [CONFIG_DIR_NAME, ".agents"].includes(entry.name))) {
+        resolver = getResolver(directory);
+        break;
+      }
+      const parent = dirname(directory);
+      if (parent === directory) break;
+      directory = parent;
+    }
+  }
+  const root = rootFor(scope, resolver);
+  ctx.ui.notify(`Using ${scope === "local" ? "project" : "user"} agent definitions from ${root}`, "info");
+  return { fs, resolver, root };
+}
 
 export async function handleCreate(
   ctx: ExtensionContext,
   scope: AgentScope = "global",
   getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
+  options: AgentAuthoringOptions = {},
 ) {
-  const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(cwd, LOCAL_AGENT_DIRECTORY)
-      : GLOBAL_AGENT_DIRECTORY,
-  );
-  const pathResolver = getResolver(cwd);
-  const agentRootPath =
-    scope === "local"
-      ? pathResolver.resolveLocalAgentPath()
-      : pathResolver.resolveGlobalAgentPath();
-  const values = await ctx.ui.custom<AgentFields | null>(
-    (tui, theme, _keyboard, done) => createAgentForm(tui, theme, done),
-    formOverlayOptions,
-  );
-
-  if (!values) {
-    ctx.ui.notify("Agent creation cancelled", "info");
-    return;
-  }
-
-  const filePath =
-    scope === "local"
-      ? pathResolver.resolveLocalAgentPath(`${values.name}.md`)
-      : pathResolver.resolveGlobalAgentPath(`${values.name}.md`);
-
-  const directoryResult = await fileSystem.mkdir(agentRootPath, {
-    recursive: true,
-  });
-  if (!directoryResult.success) {
-    ctx.ui.notify(
-      getFileSystemErrorMessage("Agent creation failed", directoryResult.error),
-      "error",
-    );
-    return;
-  }
-
-  const writeResult = await fileSystem.writeFile(
-    filePath,
-    renderAgentFrontmatter(values),
-  );
-  if (!writeResult.success) {
-    ctx.ui.notify(
-      getFileSystemErrorMessage("Agent creation failed", writeResult.error),
-      "error",
-    );
-    return;
-  }
-
-  ctx.ui.notify("Agent created");
+  try {
+    const selection = await selectRuntime(ctx, options);
+    if (!selection) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
+    const { runtime, detected } = selection;
+    const { fs, root } = await getResources(ctx, scope, runtime, getFileSystem, getResolver);
+    const filename = await askAgentFilename(ctx.ui);
+    if (filename === undefined) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
+    const path = join(root, `${filename}.md`);
+    const existing = await fs.readFile(path);
+    if (existing.success) { ctx.ui.notify("Agent file already exists; use edit instead. Nothing was overwritten.", "error"); return; }
+    if (!missing(existing.error)) throw existing.error;
+    const definition = await authorAgentDefinition(ctx.ui, runtime, { frontmatter: runtime === "nico" ? { name: filename } : {}, body: "" });
+    if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
+    const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);
+    const directory = await fs.mkdir(root, { recursive: true });
+    if (!directory.success) throw directory.error;
+    // Atomic exclusive publication also closes the check/write collision window.
+    const result = await fs.writeFile(path, content, { exclusive: true, atomic: true });
+    if (!result.success) throw result.error;
+    ctx.ui.notify(`Definition saved: ${path}. Reload the subagent runtime to refresh its catalog; this does not launch an agent.`, "info");
+  } catch (error) { report(ctx, "Agent creation failed", error); }
 }
 
 export async function handleEdit(
@@ -180,54 +134,30 @@ export async function handleEdit(
   scope: AgentScope = "global",
   getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
+  options: AgentAuthoringOptions = {},
 ) {
-  const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(cwd, LOCAL_AGENT_DIRECTORY)
-      : GLOBAL_AGENT_DIRECTORY,
-  );
-  const pathResolver = getResolver(cwd);
-  const agent = await pickAgent(
-    ctx,
-    "Edit Agent",
-    scope,
-    fileSystem,
-    pathResolver,
-  );
-
-  if (!agent) {
-    ctx.ui.notify("Agent editing cancelled", "info");
-    return;
-  }
-
-  const readResult = await fileSystem.readFile(agent.path);
-  if (!readResult.success) {
-    ctx.ui.notify(
-      getFileSystemErrorMessage("Agent edit failed", readResult.error),
-      "error",
-    );
-    return;
-  }
-
-  const editor = process.env.VISUAL || process.env.EDITOR;
-
-  if (!editor) {
-    ctx.ui.notify("Set $VISUAL or $EDITOR to edit agents", "error");
-    return;
-  }
-
-  const result = await ctx.ui.custom<Error | { changed: boolean }>(
-    createExternalEditorFactory(editor, agent.path),
-    modalEditorOverlayOptions,
-  );
-
-  if (result instanceof Error) {
-    ctx.ui.notify(result.message, "error");
-    return;
-  }
-
-  ctx.ui.notify("Agent edited");
+  try {
+    const selection = await selectRuntime(ctx, options);
+    if (!selection) { ctx.ui.notify("Agent editing cancelled", "info"); return; }
+    const { runtime, detected } = selection;
+    const { fs, resolver } = await getResources(ctx, scope, runtime, getFileSystem, getResolver);
+    const agent = await pickAgent(ctx, "Edit Agent", scope, runtime, fs, resolver);
+    if (!agent) { ctx.ui.notify("Agent editing cancelled", "info"); return; }
+    const before = await fs.readFile(agent.path);
+    if (!before.success) throw before.error;
+    // Unknown or malformed fields fail before any form or prompt edit can mutate the file.
+    const parsed = parseAgentMarkdown(runtime, before.data);
+    const definition = await authorAgentDefinition(ctx.ui, runtime, parsed);
+    if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent editing cancelled", "info"); return; }
+    if (JSON.stringify(definition) === JSON.stringify(parsed)) { ctx.ui.notify("Definition unchanged", "info"); return; }
+    const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);
+    const current = await fs.readFile(agent.path);
+    if (!current.success) throw current.error;
+    if (current.data !== before.data) throw new Error("Agent changed outside this editor; reopen it. Nothing was overwritten.");
+    const result = await fs.writeFile(agent.path, content, { atomic: true });
+    if (!result.success) throw result.error;
+    ctx.ui.notify(`Definition saved: ${agent.path}. Reload the subagent runtime to refresh its catalog.`, "info");
+  } catch (error) { report(ctx, "Agent edit failed", error); }
 }
 
 export async function handleDelete(
@@ -235,93 +165,54 @@ export async function handleDelete(
   scope: AgentScope = "global",
   getFileSystem: GetResourceFileSystem = () => new NodeFileSystem(),
   getResolver: GetPathResolver = getPathResolver,
+  options: AgentAuthoringOptions = {},
 ) {
-  const cwd = ctx.cwd || process.cwd();
-  const fileSystem = getFileSystem(
-    scope === "local"
-      ? join(cwd, LOCAL_AGENT_DIRECTORY)
-      : GLOBAL_AGENT_DIRECTORY,
-  );
-  const pathResolver = getResolver(cwd);
-  const agent = await pickAgent(
-    ctx,
-    "Delete Agent",
-    scope,
-    fileSystem,
-    pathResolver,
-  );
-
-  if (!agent) {
-    ctx.ui.notify("Agent deleting cancelled", "info");
-    return;
-  }
-
-  const deleteResult = await fileSystem.removeFile(agent.path);
-  if (!deleteResult.success) {
-    ctx.ui.notify(
-      getFileSystemErrorMessage("Agent delete failed", deleteResult.error),
-      "error",
-    );
-    return;
-  }
-
-  ctx.ui.notify("Agent deleted");
+  try {
+    const selection = await selectRuntime(ctx, options);
+    if (!selection) { ctx.ui.notify("Agent deletion cancelled", "info"); return; }
+    const { fs, resolver } = await getResources(ctx, scope, selection.runtime, getFileSystem, getResolver);
+    const agent = await pickAgent(ctx, "Delete Agent", scope, selection.runtime, fs, resolver);
+    if (!agent || !await ctx.ui.confirm("Delete agent definition", `Delete ${agent.path}? A lower-priority definition with the same runtime identity may become active.`)) { ctx.ui.notify("Agent deletion cancelled", "info"); return; }
+    const result = await fs.removeFile(agent.path);
+    if (!result.success) throw result.error;
+    ctx.ui.notify("Agent definition deleted; reload the subagent runtime to refresh its catalog", "info");
+  } catch (error) { report(ctx, "Agent deletion failed", error); }
 }
 
-function getFileSystemErrorMessage(action: string, error: unknown) {
-  if (error instanceof Error) {
-    return `${action}: ${error.message}`;
-  }
-
-  return action;
+async function pickAgent(ctx: ExtensionContext, title: string, scope: AgentScope, runtime: AgentRuntime, fs: ResourceFileSystem, resolver: ResourcePathResolver) {
+  const choices = await listAgentChoices(scope, runtime, fs, resolver);
+  if (!choices.length) { ctx.ui.notify("No agent definition files found", "info"); return undefined; }
+  const selected = await ctx.ui.select(title, choices.map((choice) => choice.label));
+  return choices.find((choice) => choice.label === selected);
 }
 
-async function pickAgent(
-  ctx: ExtensionContext,
-  title: string,
-  scope: AgentScope,
-  fileSystem: ResourceFileSystem,
-  pathResolver: ResourcePathResolver,
-) {
-  const choices = await listAgentChoices(scope, fileSystem, pathResolver);
-
-  if (choices.length === 0) {
-    ctx.ui.notify("No agents found", "info");
-    return null;
-  }
-
-  const selectedLabel = await ctx.ui.select(
-    title,
-    choices.map((choice) => choice.label),
-  );
-
-  if (!selectedLabel) {
-    return null;
-  }
-
-  return choices.find((choice) => choice.label === selectedLabel) ?? null;
-}
-
-async function listAgentChoices(
-  scope: AgentScope,
-  fileSystem: ResourceFileSystem,
-  pathResolver: ResourcePathResolver,
-) {
-  const agentRootPath =
-    scope === "local"
-      ? pathResolver.resolveLocalAgentPath()
-      : pathResolver.resolveGlobalAgentPath();
-  const namesResult = await fileSystem.readDirectoryNames(agentRootPath);
-
-  if (!namesResult.success) {
-    return [];
-  }
-
-  return namesResult.data.map((name) => ({
-    path:
-      scope === "local"
-        ? pathResolver.resolveLocalAgentPath(name)
-        : pathResolver.resolveGlobalAgentPath(name),
-    label: `${scope}: ${basename(name, ".md")}`,
-  })) satisfies AgentChoice[];
+export async function listAgentChoices(scope: AgentScope, runtime: AgentRuntime, fs: ResourceFileSystem, resolver: ResourcePathResolver): Promise<AgentChoice[]> {
+  const primary = rootFor(scope, resolver);
+  const roots = [primary];
+  if (scope === "local") roots.push(join(dirname(dirname(primary)), ".agents", ...(runtime === "tintin" ? ["agents"] : [])));
+  const choices: AgentChoice[] = [];
+  const seen = new Set<string>();
+  const walk = async (directory: string, root: string) => {
+    if (seen.has(directory)) return;
+    seen.add(directory);
+    const result = await fs.readDirectoryEntries(directory);
+    if (!result.success) { if (missing(result.error)) return; throw result.error; }
+    for (const entry of result.data.sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) { if (AGENT_PROFILES[runtime].recursive) await walk(path, root); continue; }
+      if (entry.isFile && !entry.isFile()) continue;
+      if (!entry.name.endsWith(".md") || (runtime === "nico" && entry.name.endsWith(".chain.md"))) continue;
+      const file = await fs.readFile(path);
+      let identity = basename(entry.name, ".md");
+      let status = "";
+      if (!file.success) status = ` [unreadable: ${file.error.message}]`;
+      else {
+        try { identity = agentIdentity(runtime, parseAgentMarkdown(runtime, file.data).frontmatter, basename(entry.name, ".md")); }
+        catch (error) { status = ` [not editable: ${error instanceof Error ? error.message : String(error)}]`; }
+      }
+      choices.push({ path, label: `${scope}: ${identity} — ${root}/${relative(root, path)}${status}` });
+    }
+  };
+  for (const root of roots) await walk(root, root);
+  return choices;
 }
