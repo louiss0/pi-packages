@@ -41,6 +41,7 @@
     "eslint": "catalog:",
     "globals": "^17.5.0",
     "jiti": "catalog:",
+    "js-yaml": "^5.4.3",
     "nx": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
