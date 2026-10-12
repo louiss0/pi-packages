@@ -3,6 +3,15 @@ import type { AgentFrontmatter } from "./agent-contracts";
 
 export const DEFAULT_AGENT_TOOLS = "read,write,edit";
 
+// Format a tool name from the catalog as a proper selector for runtime loading.
+// If the name contains any character that is not a lowercase letter,
+// digit, dash, or underscore, prefix it with 'ext:' so that the Tintin
+// loader treats it as an extension selector rather than a plain builtin name.
+export function formatToolName(name: string): string {
+  if (!/^[a-z0-9\-]+$/.test(name)) return `ext:${name}`;
+  return name;
+}
+
 // Runtime loaders split tools on commas; Pi and its extensions may register
 // underscores, paths and selector prefixes. Keep the CSV boundaries and refuse
 // uppercase, but do not require a tool to exist in this parent Pi session.

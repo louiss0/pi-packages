@@ -10,7 +10,7 @@ import {
   type AgentValue,
   type AgentValueKind,
 } from "./agent-contracts";
-import { createAvailableToolSchema, validateAgentSavePolicy } from "./agent-save-policy";
+import { createAvailableToolSchema, validateAgentSavePolicy, formatToolName } from "./agent-save-policy";
 
 type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm">;
 type ValueEdit = { value: AgentValue } | { remove: true };
@@ -107,8 +107,9 @@ async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValu
     ui.notify("Pi's registered tools are suggestions; child agents may need runtime-specific ext: or mcp: selectors.", "info");
     const selected = await ui.select("Choose a registered Pi tool", [...toolCatalog.options].sort());
     if (selected === undefined || !safeParse(toolCatalog, selected).success) return undefined;
+    const formatted = formatToolName(selected);
     const existing = typeof initial === "string" ? initial.split(",").map((value) => value.trim()).filter(Boolean) : [];
-    if (!existing.includes(selected)) existing.push(selected);
+    if (!existing.includes(formatted)) existing.push(formatted);
     return { value: existing.join(",") };
   }
   if (kind === "null") return { value: null };
