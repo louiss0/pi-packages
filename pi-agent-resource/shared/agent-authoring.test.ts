@@ -8,7 +8,8 @@ function uiWith(choices: Array<string | undefined>, inputs: Array<string | undef
     editor: vi.fn(async () => "Write a focused report.\nKeep Markdown."),
     notify: vi.fn(),
     confirm: vi.fn(async () => true),
-  };
+    custom: vi.fn(async () => undefined) as any,
+  } as any;
 }
 
 describe("structured agent authoring", () => {

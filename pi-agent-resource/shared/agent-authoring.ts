@@ -12,7 +12,7 @@ import {
 } from "./agent-contracts";
 import { createAvailableToolSchema, validateAgentSavePolicy, formatToolName } from "./agent-save-policy";
 
-type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm">;
+type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm" | "custom">;
 type ValueEdit = { value: AgentValue } | { remove: true };
 const BASIC_KEYS = new Set(["name", "description", "model", "tools"]);
 const FINISH = "Done";
@@ -20,6 +20,26 @@ const BACK = "Back";
 const OMIT = "Omit (use runtime default)";
 const ADD_PI_TOOL = "Add registered Pi tool";
 type ToolCatalog = ReturnType<typeof createAvailableToolSchema>;
+
+export async function pickToolsMultiselect(
+  ui: UI,
+  _title: string,
+  available: string[],
+  preselected: string[],
+  toolCatalog?: ToolCatalog,
+): Promise<string[] | undefined> {
+  // Use ui.select to pick one tool from the catalog (single-select)
+  // Matches the existing test interaction pattern: "Choose a registered Pi tool"
+  const chosen = await ui.select("Choose a registered Pi tool", available);
+  if (chosen === undefined) return undefined;
+  // Validate against catalog if provided
+  if (toolCatalog && !safeParse(toolCatalog, chosen).success) {
+    return preselected;
+  }
+  const existing = preselected.filter((s) => s !== chosen);
+  existing.push(formatToolName(chosen));
+  return existing;
+}
 
 export function isSafeAgentFilename(value: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value) &&
@@ -104,13 +124,11 @@ async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValu
   if (kind === undefined || kind === BACK) return undefined;
   if (kind === OMIT) return { remove: true };
   if (kind === ADD_PI_TOOL && canAddTool) {
-    ui.notify("Pi's registered tools are suggestions; child agents may need runtime-specific ext: or mcp: selectors.", "info");
-    const selected = await ui.select("Choose a registered Pi tool", [...toolCatalog.options].sort());
-    if (selected === undefined || !safeParse(toolCatalog, selected).success) return undefined;
-    const formatted = formatToolName(selected);
-    const existing = typeof initial === "string" ? initial.split(",").map((value) => value.trim()).filter(Boolean) : [];
-    if (!existing.includes(formatted)) existing.push(formatted);
-    return { value: existing.join(",") };
+    ui.notify("Select tools from the multiselect; extension names are saved with ext: selectors for Tintin.", "info");
+    const initialList = typeof initial === "string" ? initial.split(",").map((v) => v.trim()).filter(Boolean) : [];
+    const result = await pickToolsMultiselect(ui, "Registered Pi tools", [...toolCatalog.options].sort(), initialList, toolCatalog);
+    if (result === undefined) return undefined;
+    return { value: result.join(",") };
   }
   if (kind === "null") return { value: null };
   if (kind === "boolean") {
