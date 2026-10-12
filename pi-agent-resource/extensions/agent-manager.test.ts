@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
-import { renderAgentMarkdown } from "../shared/agent-contracts";
+import { parseAgentMarkdown, renderAgentMarkdown, type AgentFrontmatter } from "../shared/agent-contracts";
 const { author, filename } = vi.hoisted(() => ({ author: vi.fn(), filename: vi.fn() }));
 vi.mock("../shared/agent-authoring", () => ({ authorAgentDefinition: author, askAgentFilename: filename }));
 vi.mock("node:os", () => ({ homedir: () => "/test-home" }));
@@ -45,6 +45,50 @@ describe("agent manager", () => {
     expect(result).toEqual({ success: true, data: renderAgentMarkdown("tintin", (await author.mock.results[0].value).frontmatter, (await author.mock.results[0].value).body) });
     expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Definition saved:"), "info");
     expect(ui.notify).not.toHaveBeenCalledWith("Agent created");
+  });
+
+  describe("agent definition serialization", () => {
+    it.each(["tintin", "nico"] as const)("saves %s definitions readable by the selected contract", async (runtime) => {
+      const definition: { frontmatter: AgentFrontmatter; body: string } = {
+        frontmatter: runtime === "nico"
+          ? { name: "security-review", description: "Security review", tools: "read, mcp:github/search_repositories", memory: { scope: "project", path: "reviewer" } }
+          : { name: "security-review", description: "Security review", tools: ["read", "grep"], persist_session: false },
+        body: "Inspect auth.\n---\nPreserve prompt delimiters.",
+      };
+      author.mockResolvedValue(definition);
+      await handleCreate(ctx(), "global", getFs, getResolver, { runtime });
+      const saved = await fs.readFile(path);
+      expect(saved.success).toBe(true);
+      if (!saved.success) throw saved.error;
+      expect(saved.data).toBe(renderAgentMarkdown(runtime, definition.frontmatter, definition.body));
+      expect(parseAgentMarkdown(runtime, saved.data)).toEqual(definition);
+      expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Definition saved:"), "info");
+    });
+
+    it("preserves structured metadata and prompt content through an edit", async () => {
+      const definition = { frontmatter: { name: "security-review", description: "Audit #1", tools: ["read", "grep"], extensions: false }, body: "Inspect auth.\n---\nKeep this line." };
+      fs.seed({ [path]: renderAgentMarkdown("tintin", definition.frontmatter, definition.body) });
+      author.mockImplementation(async (_ui, runtime, initial) => {
+        expect(runtime).toBe("tintin");
+        expect(initial).toEqual(definition);
+        return { frontmatter: { ...initial.frontmatter, description: "Audit #2" }, body: initial.body };
+      });
+      await handleEdit(ctx(), "global", getFs, getResolver, options);
+      const saved = await fs.readFile(path);
+      expect(saved.success).toBe(true);
+      if (!saved.success) throw saved.error;
+      expect(parseAgentMarkdown("tintin", saved.data)).toEqual({
+        frontmatter: { ...definition.frontmatter, description: "Audit #2" },
+        body: definition.body,
+      });
+    });
+
+    it("rejects invalid authored frontmatter before creating a file", async () => {
+      author.mockResolvedValue({ frontmatter: { name: "security-review", tools: ["read"], unexpected: true }, body: "Prompt" });
+      await handleCreate(ctx(), "global", getFs, getResolver, options);
+      expect((await fs.readFile(path)).success).toBe(false);
+      expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Agent creation failed"), "error");
+    });
   });
 
   it("writes project definitions without requiring model/tools pins", async () => {
