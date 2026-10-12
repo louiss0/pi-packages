@@ -157,13 +157,19 @@ async function editMap(ui: UI, field: AgentFieldDefinition, initial: AgentValue)
 }
 
 async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValue | undefined, toolCatalog?: ToolCatalog): Promise<ValueEdit | undefined> {
-  const canAddTool = field.key === "tools" && toolCatalog && toolCatalog.options.length > 0;
-  // The contract reads legacy list/null values, but new tools saves require CSV text.
-  const kinds = field.key === "tools" ? field.kinds.filter((value) => value === "string") : field.kinds;
-  const kind = await ui.select(`${field.key}: ${field.description}\nCurrent: ${summary(initial)}`, [OMIT, ...(canAddTool ? [ADD_PI_TOOL] : []), ...kinds, BACK]);
+  // Special case: tools field uses a MultiSelect form component (not CSV text input)
+  if (field.key === "tools" && toolCatalog && toolCatalog.options.length > 0) {
+    const initialList = typeof initial === "string" ? initial.split(",").map((v) => v.trim()).filter(Boolean) : [];
+    const result = await pickToolsMultiselect(ui, field.description || "Tools", [...toolCatalog.options].sort(), initialList, toolCatalog);
+    if (result === undefined) return undefined;
+    return { value: result.join(",") };
+  }
+
+  const kinds = field.kinds;
+  const kind = await ui.select(`${field.key}: ${field.description}\nCurrent: ${summary(initial)}`, [OMIT, ...kinds, BACK]);
   if (kind === undefined || kind === BACK) return undefined;
   if (kind === OMIT) return { remove: true };
-  if (kind === ADD_PI_TOOL && canAddTool) {
+  if (kind === ADD_PI_TOOL && field.key === "tools" && toolCatalog && toolCatalog.options.length > 0) {
     ui.notify("Select tools from the multiselect; extension names are saved with ext: selectors for Tintin.", "info");
     const initialList = typeof initial === "string" ? initial.split(",").map((v) => v.trim()).filter(Boolean) : [];
     const result = await pickToolsMultiselect(ui, "Registered Pi tools", [...toolCatalog.options].sort(), initialList, toolCatalog);
