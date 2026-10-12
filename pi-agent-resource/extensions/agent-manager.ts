@@ -4,7 +4,7 @@ import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@eare
 import { askAgentFilename, authorAgentDefinition } from "../shared/agent-authoring";
 import { AGENT_PROFILES, agentIdentity, parseAgentMarkdown, renderAgentMarkdown, type AgentRuntime, type AgentFrontmatter } from "../shared/agent-contracts";
 import { detectAgentRuntimes, type AgentResourceSource } from "../shared/agent-runtime-detection";
-import { validateAgentSavePolicy } from "../shared/agent-save-policy";
+import { DEFAULT_AGENT_TOOLS, validateAgentSavePolicy } from "../shared/agent-save-policy";
 import { getPathResolver, NodeFileSystem, type ResourceFileSystem, type ResourcePathResolver } from "../shared/filesystem";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import { getFilterSubcommandArgumentCompletionFromStringUsingSubLabel, SubCommands } from "../shared/subcommands";
@@ -19,6 +19,7 @@ export interface AgentAuthoringOptions {
   runtime?: AgentRuntime;
   detectedRuntimes?: readonly AgentRuntime[];
   sources?: readonly AgentResourceSource[];
+  availableToolNames?: readonly string[];
 }
 export interface AgentChoice { path: string; label: string }
 
@@ -37,7 +38,11 @@ export default (pi: ExtensionAPI) => {
         const parsed = parseAgentCommandArgument(argument);
         if (!parsed.success) { ctx.ui.notify(`Invalid command: ${parsed.errorMessage}`, "error"); return; }
         if (!ctx.hasUI) { ctx.ui.notify("Agent authoring requires interactive or RPC UI", "error"); return; }
-        const options: AgentAuthoringOptions = { sources: [...(pi.getAllTools?.() ?? []), ...(pi.getCommands?.() ?? [])] };
+        const registeredTools = pi.getAllTools?.() ?? [];
+        const options: AgentAuthoringOptions = {
+          sources: [...registeredTools, ...(pi.getCommands?.() ?? [])],
+          availableToolNames: registeredTools.filter((tool) => tool.exposure !== "hidden").map((tool) => tool.name),
+        };
         const handler = { create: handleCreate, edit: handleEdit, delete: handleDelete }[parsed.output];
         await handler(ctx, scope, undefined, undefined, options);
       },
@@ -123,7 +128,10 @@ export async function handleCreate(
     const existing = await fs.readFile(path);
     if (existing.success) { ctx.ui.notify("Agent file already exists; use edit instead. Nothing was overwritten.", "error"); return; }
     if (!missing(existing.error)) throw existing.error;
-    const definition = await authorAgentDefinition(ctx.ui, runtime, { frontmatter: runtime === "nico" ? { name: filename } : {}, body: "" });
+    const definition = await authorAgentDefinition(ctx.ui, runtime, {
+      frontmatter: runtime === "nico" ? { name: filename, tools: DEFAULT_AGENT_TOOLS } : { tools: DEFAULT_AGENT_TOOLS },
+      body: "",
+    }, options.availableToolNames);
     if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
     assertAgentSavePolicy(definition.frontmatter);
     const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);
@@ -154,7 +162,7 @@ export async function handleEdit(
     if (!before.success) throw before.error;
     // Unknown or malformed fields fail before any form or prompt edit can mutate the file.
     const parsed = parseAgentMarkdown(runtime, before.data);
-    const definition = await authorAgentDefinition(ctx.ui, runtime, parsed);
+    const definition = await authorAgentDefinition(ctx.ui, runtime, parsed, options.availableToolNames);
     if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent editing cancelled", "info"); return; }
     if (JSON.stringify(definition) === JSON.stringify(parsed)) { ctx.ui.notify("Definition unchanged", "info"); return; }
     assertAgentSavePolicy(definition.frontmatter);

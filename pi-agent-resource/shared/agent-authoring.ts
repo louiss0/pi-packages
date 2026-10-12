@@ -1,4 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { safeParse } from "valibot";
 import {
   AGENT_PROFILES,
   renderAgentMarkdown,
@@ -9,7 +10,7 @@ import {
   type AgentValue,
   type AgentValueKind,
 } from "./agent-contracts";
-import { validateAgentSavePolicy } from "./agent-save-policy";
+import { createAvailableToolSchema, validateAgentSavePolicy } from "./agent-save-policy";
 
 type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm">;
 type ValueEdit = { value: AgentValue } | { remove: true };
@@ -17,6 +18,8 @@ const BASIC_KEYS = new Set(["name", "description", "model", "tools"]);
 const FINISH = "Done";
 const BACK = "Back";
 const OMIT = "Omit (use runtime default)";
+const ADD_PI_TOOL = "Add registered Pi tool";
+type ToolCatalog = ReturnType<typeof createAvailableToolSchema>;
 
 export function isSafeAgentFilename(value: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value) &&
@@ -93,10 +96,21 @@ async function editMap(ui: UI, field: AgentFieldDefinition, initial: AgentValue)
   }
 }
 
-async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValue | undefined): Promise<ValueEdit | undefined> {
-  const kind = await ui.select(`${field.key}: ${field.description}\nCurrent: ${summary(initial)}`, [OMIT, ...field.kinds, BACK]);
+async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValue | undefined, toolCatalog?: ToolCatalog): Promise<ValueEdit | undefined> {
+  const canAddTool = field.key === "tools" && toolCatalog && toolCatalog.options.length > 0;
+  // The contract reads legacy list/null values, but new tools saves require CSV text.
+  const kinds = field.key === "tools" ? field.kinds.filter((value) => value === "string") : field.kinds;
+  const kind = await ui.select(`${field.key}: ${field.description}\nCurrent: ${summary(initial)}`, [OMIT, ...(canAddTool ? [ADD_PI_TOOL] : []), ...kinds, BACK]);
   if (kind === undefined || kind === BACK) return undefined;
   if (kind === OMIT) return { remove: true };
+  if (kind === ADD_PI_TOOL && canAddTool) {
+    ui.notify("Pi's registered tools are suggestions; child agents may need runtime-specific ext: or mcp: selectors.", "info");
+    const selected = await ui.select("Choose a registered Pi tool", [...toolCatalog.options].sort());
+    if (selected === undefined || !safeParse(toolCatalog, selected).success) return undefined;
+    const existing = typeof initial === "string" ? initial.split(",").map((value) => value.trim()).filter(Boolean) : [];
+    if (!existing.includes(selected)) existing.push(selected);
+    return { value: existing.join(",") };
+  }
   if (kind === "null") return { value: null };
   if (kind === "boolean") {
     const choice = await ui.select(`${field.key}: boolean`, ["true", "false"]);
@@ -129,14 +143,14 @@ async function editField(ui: UI, field: AgentFieldDefinition, initial: AgentValu
   return undefined;
 }
 
-async function editGroup(ui: UI, fields: readonly AgentFieldDefinition[], values: AgentFrontmatter, title: string) {
+async function editGroup(ui: UI, fields: readonly AgentFieldDefinition[], values: AgentFrontmatter, title: string, toolCatalog?: ToolCatalog) {
   for (;;) {
     const labels = fields.map((field) => `${field.key}: ${summary(values[field.key])}`);
     const choice = await ui.select(title, [...labels, BACK]);
     if (choice === undefined || choice === BACK) return;
     const field = fields[labels.indexOf(choice)];
     if (!field) continue;
-    const result = await editField(ui, field, values[field.key]);
+    const result = await editField(ui, field, values[field.key], toolCatalog);
     if (!result) continue;
     if ("remove" in result) delete values[field.key];
     else values[field.key] = result.value;
@@ -147,15 +161,17 @@ export async function authorAgentDefinition(
   ui: UI,
   runtime: AgentRuntime,
   initial: { frontmatter: AgentFrontmatter; body: string },
+  availableToolNames: readonly string[] = [],
 ): Promise<{ frontmatter: AgentFrontmatter; body: string } | undefined> {
   const profile = AGENT_PROFILES[runtime];
+  const toolCatalog = createAvailableToolSchema(availableToolNames);
   const frontmatter = structuredClone(initial.frontmatter);
   let body = initial.body;
   ui.notify(`${profile.label}: name, description, tools and model must pass authoring validation; other omitted settings use runtime defaults. A tool allowlist does not load its provider; nested delegation can expand capabilities. This manager does not enforce runtime permissions.`, "info");
   for (;;) {
     const action = await ui.select(`${profile.label} — agent definition`, ["Basic settings", "Advanced settings", "Prompt body", "Review and save", "Cancel"]);
     if (action === undefined || action === "Cancel") return undefined;
-    if (action === "Basic settings") await editGroup(ui, profile.fields.filter((field) => BASIC_KEYS.has(field.key)), frontmatter, "Basic settings");
+    if (action === "Basic settings") await editGroup(ui, profile.fields.filter((field) => BASIC_KEYS.has(field.key)), frontmatter, "Basic settings", toolCatalog);
     if (action === "Advanced settings") {
       const fields = profile.fields.filter((field) => !BASIC_KEYS.has(field.key));
       const groups = [...new Set(fields.map((field) => field.group))];

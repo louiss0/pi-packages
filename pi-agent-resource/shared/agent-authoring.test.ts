@@ -47,12 +47,23 @@ describe("structured agent authoring", () => {
   it.each([
     [{ name: "Mixed", description: "Review the code thoroughly and report any problems", tools: "read,grep", model: "claude" }, "Name must be lowercase"],
     [{ name: "reviewer", description: "short", tools: "read,grep", model: "claude" }, "Description must be at least 35"],
-    [{ name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "Read,write", model: "claude" }, "Tools must be a lowercase"],
+    [{ name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "Read,write", model: "claude" }, "Tools must be a comma-separated"],
     [{ name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "read,grep", model: "Claude" }, "Model must be lowercase"],
   ])("rejects an invalid essential field on save", async (frontmatter, message) => {
     const ui = uiWith(["Review and save", "Cancel"]);
     expect(await authorAgentDefinition(ui, "tintin", { frontmatter, body: "Prompt" })).toBeUndefined();
     expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining(message), "error");
+  });
+  it("offers registered Pi tools through a Valibot-backed catalog without overriding manual choices", async () => {
+    const ui = uiWith(["Basic settings", 'tools: "read,grep"', "Add registered Pi tool", "write", "Back", "Review and save"]);
+    const result = await authorAgentDefinition(ui, "nico", { frontmatter: essentials, body: "Prompt" }, ["read", "write", "Uppercase", "write"]);
+    expect(result?.frontmatter.tools).toBe("read,grep,write");
+    expect(ui.select).toHaveBeenCalledWith("Choose a registered Pi tool", ["read", "write"]);
+  });
+  it("does not accept an arbitrary value returned by the catalog picker", async () => {
+    const ui = uiWith(["Basic settings", 'tools: "read,grep"', "Add registered Pi tool", "not_registered", "Back", "Review and save"]);
+    const result = await authorAgentDefinition(ui, "tintin", { frontmatter: essentials, body: "Prompt" }, ["read", "write"]);
+    expect(result?.frontmatter.tools).toBe("read,grep");
   });
   it("requires a separate intentional-empty-prompt confirmation", async () => {
     const ui = uiWith(["Review and save", "Cancel"]);

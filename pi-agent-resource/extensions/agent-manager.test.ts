@@ -41,6 +41,16 @@ describe("agent manager", () => {
     expect(parseAgentCommandArgument("unknown")).toMatchObject({ success: false });
   });
 
+  it.each(["tintin", "nico"] as const)("prefills new %s agents with read,write,edit and passes the Pi catalog", async (runtime) => {
+    author.mockResolvedValue(undefined);
+    await handleCreate(ctx(), "global", getFs, getResolver, { runtime, availableToolNames: ["read", "write", "edit", "echo_session"] });
+    expect(author).toHaveBeenCalledWith(ui, runtime, {
+      frontmatter: runtime === "nico" ? { name: "auditor", tools: "read,write,edit" } : { tools: "read,write,edit" },
+      body: "",
+    }, ["read", "write", "edit", "echo_session"]);
+    expect((await fs.readFile(path)).success).toBe(false);
+  });
+
   it("creates safely serialized frontmatter and the complete prompt body", async () => {
     await handleCreate(ctx(), "global", getFs, getResolver, options);
     const result = await fs.readFile(path);
@@ -130,7 +140,10 @@ describe("agent manager", () => {
   it("leaves legacy definitions readable when no changes are saved", async () => {
     const legacy = "---\nname: MixedCase\ndescription: Brief\n---\nOriginal prompt\n";
     fs.seed({ [path]: legacy });
-    author.mockImplementation(async (_ui, _runtime, initial) => initial);
+    author.mockImplementation(async (_ui, _runtime, initial) => {
+      expect(initial.frontmatter.tools).toBeUndefined();
+      return initial;
+    });
     await handleEdit(ctx(), "global", getFs, getResolver, options);
     expect(await fs.readFile(path)).toEqual({ success: true, data: legacy });
     expect(ui.notify).toHaveBeenCalledWith("Definition unchanged", "info");
@@ -277,6 +290,32 @@ describe("agent manager", () => {
       expect(discovered.agents.find((agent) => agent.name === "reviewer")?.allowedAgents).toEqual(["scout"]);
     });
 
+    it("passes lowercase underscores and runtime selector paths to real loaders", async () => {
+      const essentials = { name: "reviewer", description: "Review security issues in the codebase", model: "claude" };
+      const nico = await discoverNico(renderAgentMarkdown("nico", {
+        ...essentials, tools: "read,echo_session,mcp:github/search",
+      }, "Review code."));
+      expect(nico.agentDiagnostics ?? []).toEqual([]);
+      expect(nico.agents.find((agent) => agent.name === "reviewer")).toMatchObject({
+        tools: ["read", "echo_session"], mcpDirectTools: ["github/search"],
+      });
+
+      const directory = mkdtempSync(join(tmpdir(), "pi-agent-tintin-"));
+      try {
+        const agentsDir = join(directory, ".pi", "agents");
+        mkdirSync(agentsDir, { recursive: true });
+        writeFileSync(join(agentsDir, "reviewer.md"), renderAgentMarkdown("tintin", {
+          ...essentials, tools: "read,ext:my-extension/my_tool",
+        }, "Review code."));
+        const { loadCustomAgents } = await import("../node_modules/@tintinweb/pi-subagents/src/custom-agents");
+        expect(loadCustomAgents(directory, true).get("reviewer")).toMatchObject({
+          builtinToolNames: ["read"], extSelectors: ["ext:my-extension/my_tool"],
+        });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
     it("refuses an empty list that Nico's loader treats as a literal selector", async () => {
       const raw = "---\nname: reviewer\ndescription: Review security issues in the codebase\ntools: read,grep\nmodel: claude\nextensions: []\n---\nInspect auth.";
       const discovered = await discoverNico(raw);
@@ -293,10 +332,11 @@ describe("agent manager", () => {
         const frontmatter = {
           name: "security-review",
           description: "Review security issues in the codebase",
-          tools: "read,grep",
           model: "claude",
         };
-        author.mockResolvedValue({ frontmatter, body: "Inspect auth and report findings." });
+        author.mockImplementation(async (_ui, _runtime, initial) => ({
+          frontmatter: { ...initial.frontmatter, ...frontmatter }, body: "Inspect auth and report findings.",
+        }));
         await handleCreate(ctx(), "global", getFs, getResolver, { runtime });
         const saved = await fs.readFile(path);
         expect(saved.success).toBe(true);
@@ -311,7 +351,7 @@ describe("agent manager", () => {
           expect(loadCustomAgents(directory, true).get("security-review")).toMatchObject({
             name: frontmatter.name,
             description: frontmatter.description,
-            builtinToolNames: ["read", "grep"],
+            builtinToolNames: ["read", "write", "edit"],
             model: frontmatter.model,
             systemPrompt: "Inspect auth and report findings.",
           });
@@ -323,7 +363,7 @@ describe("agent manager", () => {
           expect(discovered.agents.find((agent) => agent.name === "security-review")).toMatchObject({
             name: frontmatter.name,
             description: frontmatter.description,
-            tools: ["read", "grep"],
+            tools: ["read", "write", "edit"],
             model: frontmatter.model,
             systemPrompt: "Inspect auth and report findings.",
           });
