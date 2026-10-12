@@ -13,5 +13,5 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["extensions/**/*.ts", "shared/**/*.ts", "test/**/*.ts"]
+  "include": ["extensions/**/*.ts", "shared/**/*.ts"]
 }
