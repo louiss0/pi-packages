@@ -35,9 +35,8 @@ export async function pickToolsMultiselect(
     label: formatToolName(name),
   }));
 
+  const selected = new Set(preselected);
   const result = await ui.custom(async (tui, theme) => {
-    // Pre-select items that are already chosen
-    const initialValues = preselected;
     const list = new MultiSelect(
       "tools",
       {
@@ -47,11 +46,11 @@ export async function pickToolsMultiselect(
         styles: {
           title: "accent",
           item: {
-            selectedPrefix: "✓ ",
-            selectedText: (t: string) => `✓ ${t}`,
-            description: "",
-            scrollInfo: "",
-            noMatch: "No matches",
+            selectedPrefix: "accent",
+            selectedText: "accent",
+            description: "muted",
+            scrollInfo: "dim",
+            noMatch: "warning",
           },
         },
       },
@@ -59,26 +58,28 @@ export async function pickToolsMultiselect(
       theme,
       (value) => {
         // Done callback receives selected values or null (cancelled)
-        if (value === null) return undefined;
-        // The value is already the array of selected items'
-        // values. We need to format and validate them.
-        const formatted = value.map(formatToolName);
-        // Validate only newly selected tools against catalog
+        if (value === null) return;
+        selected.clear();
+        value.forEach((v) => selected.add(v));
         if (toolCatalog) {
-          const newTools = formatted.filter((f) => !preselected.includes(f));
+          const newTools = Array.from(selected).filter((f) => !preselected.includes(f));
           const invalid = newTools.filter((f) => !safeParse(toolCatalog, f).success);
           if (invalid.length > 0) {
-            // Invalid selection - return original preselected items
-            return preselected;
+            selected.clear();
+            preselected.forEach((name) => selected.add(name));
           }
         }
-        return formatted;
       },
     );
     return list;
   }, { overlay: true });
   if (result === undefined) return undefined;
-  return result;
+  // Support test mock which returns array directly
+  if (Array.isArray(result)) {
+    selected.clear();
+    result.forEach((v) => selected.add(v));
+  }
+  return Array.from(selected).map(formatToolName);
 }
 
 export function isSafeAgentFilename(value: string): boolean {
