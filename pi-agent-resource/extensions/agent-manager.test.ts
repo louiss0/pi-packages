@@ -47,7 +47,7 @@ describe("agent manager", () => {
     expect(author).toHaveBeenCalledWith(ui, runtime, {
       frontmatter: runtime === "nico" ? { name: "auditor", tools: "read,write,edit" } : { tools: "read,write,edit" },
       body: "",
-    }, ["read", "write", "edit", "echo_session"]);
+    }, ["read", "write", "edit", "echo_session"], "create");
     expect((await fs.readFile(path)).success).toBe(false);
   });
 

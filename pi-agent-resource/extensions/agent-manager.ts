@@ -131,7 +131,7 @@ export async function handleCreate(
     const definition = await authorAgentDefinition(ctx.ui, runtime, {
       frontmatter: runtime === "nico" ? { name: filename, tools: DEFAULT_AGENT_TOOLS } : { tools: DEFAULT_AGENT_TOOLS },
       body: "",
-    }, options.availableToolNames);
+    }, options.availableToolNames, "create");
     if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
     assertAgentSavePolicy(definition.frontmatter);
     const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);

@@ -162,26 +162,37 @@ export async function authorAgentDefinition(
   runtime: AgentRuntime,
   initial: { frontmatter: AgentFrontmatter; body: string },
   availableToolNames: readonly string[] = [],
+  mode: "create" | "edit" = "edit",
 ): Promise<{ frontmatter: AgentFrontmatter; body: string } | undefined> {
   const profile = AGENT_PROFILES[runtime];
   const toolCatalog = createAvailableToolSchema(availableToolNames);
   const frontmatter = structuredClone(initial.frontmatter);
   let body = initial.body;
+  let bodyStepOpened = false;
+  const editBody = async () => {
+    bodyStepOpened = true;
+    const edited = await ui.editor("Agent system prompt (Markdown body only)", body);
+    if (edited !== undefined) body = edited;
+  };
   ui.notify(`${profile.label}: name, description, tools and model must pass authoring validation; other omitted settings use runtime defaults. A tool allowlist does not load its provider; nested delegation can expand capabilities. This manager does not enforce runtime permissions.`, "info");
   for (;;) {
     const action = await ui.select(`${profile.label} — agent definition`, ["Basic settings", "Advanced settings", "Prompt body", "Review and save", "Cancel"]);
     if (action === undefined || action === "Cancel") return undefined;
-    if (action === "Basic settings") await editGroup(ui, profile.fields.filter((field) => BASIC_KEYS.has(field.key)), frontmatter, "Basic settings", toolCatalog);
+    if (action === "Basic settings") {
+      await editGroup(ui, profile.fields.filter((field) => BASIC_KEYS.has(field.key)), frontmatter, "Basic settings", toolCatalog);
+      if (mode === "create" && !bodyStepOpened) {
+        const errors = validateAgentSavePolicy(frontmatter);
+        if (errors.length) ui.notify(errors.join("\n"), "error");
+        else await editBody();
+      }
+    }
     if (action === "Advanced settings") {
       const fields = profile.fields.filter((field) => !BASIC_KEYS.has(field.key));
       const groups = [...new Set(fields.map((field) => field.group))];
       const group = await ui.select("Advanced settings — choose a section", [...groups, BACK]);
       if (group !== undefined && group !== BACK) await editGroup(ui, fields.filter((field) => field.group === group), frontmatter, group);
     }
-    if (action === "Prompt body") {
-      const edited = await ui.editor("Agent system prompt (Markdown body only)", body);
-      if (edited !== undefined) body = edited;
-    }
+    if (action === "Prompt body") await editBody();
     if (action === "Review and save") {
       const errors = [...validateAgentSavePolicy(frontmatter), ...validateAgentFrontmatter(runtime, frontmatter)];
       if (errors.length) {
@@ -194,6 +205,7 @@ export async function authorAgentDefinition(
         ui.notify(error instanceof Error ? error.message : String(error), "error");
         continue;
       }
+      if (mode === "create" && !bodyStepOpened) await editBody();
       if (!body.trim() && !await ui.confirm("Empty system prompt", "Save an intentionally empty prompt? Replace-mode agents will have no authored system instructions.")) continue;
       const preview = Object.entries(frontmatter).map(([key, value]) => `${key}: ${summary(value)}`).join("\n") || "All frontmatter settings omitted (native defaults)";
       if (await ui.confirm("Save agent definition", `${profile.label}\n${preview}\nPrompt: ${body.length} characters\nThis saves a definition only; runtime loading/execution is separate.`)) return { frontmatter, body };

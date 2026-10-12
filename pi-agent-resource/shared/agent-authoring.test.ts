@@ -65,6 +65,32 @@ describe("structured agent authoring", () => {
     const result = await authorAgentDefinition(ui, "tintin", { frontmatter: essentials, body: "Prompt" }, ["read", "write"]);
     expect(result?.frontmatter.tools).toBe("read,grep");
   });
+  it("opens the Markdown body automatically after valid basic settings on create", async () => {
+    const ui = uiWith(["Basic settings", "Back", "Review and save"]);
+    const result = await authorAgentDefinition(ui, "tintin", { frontmatter: essentials, body: "" }, [], "create");
+    expect(result?.body).toBe("Write a focused report.\nKeep Markdown.");
+    expect(ui.editor).toHaveBeenCalledExactlyOnceWith("Agent system prompt (Markdown body only)", "");
+  });
+  it("does not open step two until the basic save policy passes", async () => {
+    const ui = uiWith(["Basic settings", "Back", "Cancel"]);
+    expect(await authorAgentDefinition(ui, "nico", { frontmatter: {}, body: "" }, [], "create")).toBeUndefined();
+    expect(ui.editor).not.toHaveBeenCalled();
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Name is required"), "error");
+  });
+  it("opens the body before review even when creation skips the basic menu", async () => {
+    const ui = uiWith(["Review and save"]);
+    const result = await authorAgentDefinition(ui, "nico", { frontmatter: essentials, body: "" }, [], "create");
+    expect(ui.editor).toHaveBeenCalledOnce();
+    expect(result?.body).toBe("Write a focused report.\nKeep Markdown.");
+  });
+  it("can revisit metadata without reopening the body, and edits remain menu-driven", async () => {
+    const creating = uiWith(["Basic settings", "Back", "Basic settings", "Back", "Review and save"]);
+    await authorAgentDefinition(creating, "tintin", { frontmatter: essentials, body: "" }, [], "create");
+    expect(creating.editor).toHaveBeenCalledOnce();
+    const editing = uiWith(["Basic settings", "Back", "Review and save"]);
+    await authorAgentDefinition(editing, "tintin", { frontmatter: essentials, body: "Existing prompt" }, [], "edit");
+    expect(editing.editor).not.toHaveBeenCalled();
+  });
   it("requires a separate intentional-empty-prompt confirmation", async () => {
     const ui = uiWith(["Review and save", "Cancel"]);
     ui.confirm.mockResolvedValue(false);
