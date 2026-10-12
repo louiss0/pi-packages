@@ -11,6 +11,7 @@ import {
   type AgentValueKind,
 } from "./agent-contracts";
 import { createAvailableToolSchema, validateAgentSavePolicy, formatToolName } from "./agent-save-policy";
+import { MultiSelect } from "@code-fixer-23/pi-form-components";
 
 type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm" | "custom">;
 type ValueEdit = { value: AgentValue } | { remove: true };
@@ -23,22 +24,61 @@ type ToolCatalog = ReturnType<typeof createAvailableToolSchema>;
 
 export async function pickToolsMultiselect(
   ui: UI,
-  _title: string,
+  title: string,
   available: string[],
   preselected: string[],
   toolCatalog?: ToolCatalog,
 ): Promise<string[] | undefined> {
-  // Use ui.select to pick one tool from the catalog (single-select)
-  // Matches the existing test interaction pattern: "Choose a registered Pi tool"
-  const chosen = await ui.select("Choose a registered Pi tool", available);
-  if (chosen === undefined) return undefined;
-  // Validate against catalog if provided
-  if (toolCatalog && !safeParse(toolCatalog, chosen).success) {
-    return preselected;
-  }
-  const existing = preselected.filter((s) => s !== chosen);
-  existing.push(formatToolName(chosen));
-  return existing;
+  // Build a MultiSelect form field and embed it in a form via ui.custom
+  const items = available.map((name) => ({
+    value: name,
+    label: formatToolName(name),
+  }));
+
+  const result = await ui.custom(async (tui, theme) => {
+    // Pre-select items that are already chosen
+    const initialValues = preselected;
+    const list = new MultiSelect(
+      "tools",
+      {
+        title: title || "Choose tools",
+        items,
+        itemChoiceStyle: "checkbox" as const,
+        styles: {
+          title: "accent",
+          item: {
+            selectedPrefix: "✓ ",
+            selectedText: (t: string) => `✓ ${t}`,
+            description: "",
+            scrollInfo: "",
+            noMatch: "No matches",
+          },
+        },
+      },
+      tui,
+      theme,
+      (value) => {
+        // Done callback receives selected values or null (cancelled)
+        if (value === null) return undefined;
+        // The value is already the array of selected items'
+        // values. We need to format and validate them.
+        const formatted = value.map(formatToolName);
+        // Validate only newly selected tools against catalog
+        if (toolCatalog) {
+          const newTools = formatted.filter((f) => !preselected.includes(f));
+          const invalid = newTools.filter((f) => !safeParse(toolCatalog, f).success);
+          if (invalid.length > 0) {
+            // Invalid selection - return original preselected items
+            return preselected;
+          }
+        }
+        return formatted;
+      },
+    );
+    return list;
+  }, { overlay: true });
+  if (result === undefined) return undefined;
+  return result;
 }
 
 export function isSafeAgentFilename(value: string): boolean {

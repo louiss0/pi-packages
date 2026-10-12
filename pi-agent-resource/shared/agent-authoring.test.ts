@@ -8,7 +8,7 @@ function uiWith(choices: Array<string | undefined>, inputs: Array<string | undef
     editor: vi.fn(async () => "Write a focused report.\nKeep Markdown."),
     notify: vi.fn(),
     confirm: vi.fn(async () => true),
-    custom: vi.fn(async () => undefined) as any,
+    custom: vi.fn(async <T>() => undefined as T),
   } as any;
 }
 
@@ -56,10 +56,11 @@ describe("structured agent authoring", () => {
     expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining(message), "error");
   });
   it("offers registered Pi tools through a Valibot-backed catalog without overriding manual choices", async () => {
-    const ui = uiWith(["Basic settings", 'tools: "read,grep"', "Add registered Pi tool", "write", "Back", "Review and save"]);
+    const ui = uiWith(["Basic settings", 'tools: "read,grep"', "Add registered Pi tool", "Back", "Review and save"]);
+    // Mock multiselect to add "write" to existing selection
+    ui.custom.mockImplementation(async () => ["read", "grep", "write"]);
     const result = await authorAgentDefinition(ui, "nico", { frontmatter: essentials, body: "Prompt" }, ["read", "write", "Uppercase", "write"]);
     expect(result?.frontmatter.tools).toBe("read,grep,write");
-    expect(ui.select).toHaveBeenCalledWith("Choose a registered Pi tool", ["read", "write"]);
   });
   it("does not accept an arbitrary value returned by the catalog picker", async () => {
     const ui = uiWith(["Basic settings", 'tools: "read,grep"', "Add registered Pi tool", "not_registered", "Back", "Review and save"]);
