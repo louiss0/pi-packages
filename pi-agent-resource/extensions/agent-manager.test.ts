@@ -1,16 +1,18 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MemoryFileSystem, PathResolver } from "../shared/filesystem";
 import { parseAgentMarkdown, renderAgentMarkdown, type AgentFrontmatter } from "../shared/agent-contracts";
 const { author, filename } = vi.hoisted(() => ({ author: vi.fn(), filename: vi.fn() }));
 vi.mock("../shared/agent-authoring", () => ({ authorAgentDefinition: author, askAgentFilename: filename }));
-vi.mock("node:os", () => ({ homedir: () => "/test-home" }));
+vi.mock("node:os", async (importOriginal) => ({ ...await importOriginal<typeof import("node:os")>(), homedir: () => "/test-home" }));
 import registerAgentManager, { handleCreate, handleDelete, handleEdit, listAgentChoices, parseAgentCommandArgument } from "./agent-manager";
 
 describe("agent manager", () => {
   const resolver = new PathResolver("/workspace", "/test-home");
   const path = resolver.resolveGlobalAgentPath("auditor.md");
-  const original = "---\nname: security-review\ndescription: Review security\n---\nOriginal prompt\n";
+  const original = "---\nname: security-review\ndescription: Review security issues in the codebase\ntools: read,grep\nmodel: claude\n---\nOriginal prompt\n";
   let fs: MemoryFileSystem;
   const ui = { input: vi.fn(), select: vi.fn(), editor: vi.fn(), notify: vi.fn(), confirm: vi.fn() };
   const ctx = () => ({ cwd: "/workspace", hasUI: true, ui }) as unknown as ExtensionContext;
@@ -22,7 +24,7 @@ describe("agent manager", () => {
     fs = new MemoryFileSystem();
     fs.reset();
     filename.mockResolvedValue("auditor");
-    author.mockResolvedValue({ frontmatter: { name: "security-review", description: "Security: # careful", model: "anthropic/claude-opus-4-6", tools: ["read", "ext:mcp/search"] }, body: "Inspect auth.\n---\nKeep this delimiter in the prompt." });
+    author.mockResolvedValue({ frontmatter: { name: "security-review", description: "Review security issues in the codebase", model: "claude", tools: "read,grep" }, body: "Inspect auth.\n---\nKeep this delimiter in the prompt." });
     ui.confirm.mockResolvedValue(true);
     ui.select.mockImplementation(async (_title: string, labels: string[]) => labels[0]);
   });
@@ -51,8 +53,8 @@ describe("agent manager", () => {
     it.each(["tintin", "nico"] as const)("saves %s definitions readable by the selected contract", async (runtime) => {
       const definition: { frontmatter: AgentFrontmatter; body: string } = {
         frontmatter: runtime === "nico"
-          ? { name: "security-review", description: "Security review", tools: "read, mcp:github/search_repositories", memory: { scope: "project", path: "reviewer" } }
-          : { name: "security-review", description: "Security review", tools: ["read", "grep"], persist_session: false },
+          ? { name: "security-review", description: "Review security issues in the codebase", tools: "read,grep", model: "claude", memory: { scope: "project", path: "reviewer" } }
+          : { name: "security-review", description: "Review security issues in the codebase", tools: "read,grep", model: "claude", persist_session: false },
         body: "Inspect auth.\n---\nPreserve prompt delimiters.",
       };
       author.mockResolvedValue(definition);
@@ -66,19 +68,19 @@ describe("agent manager", () => {
     });
 
     it("preserves structured metadata and prompt content through an edit", async () => {
-      const definition = { frontmatter: { name: "security-review", description: "Audit #1", tools: ["read", "grep"], extensions: false }, body: "Inspect auth.\n---\nKeep this line." };
+      const definition = { frontmatter: { name: "security-review", description: "Audit code and report any security issues found", tools: "read,grep", model: "claude", extensions: false }, body: "Inspect auth.\n---\nKeep this line." };
       fs.seed({ [path]: renderAgentMarkdown("tintin", definition.frontmatter, definition.body) });
       author.mockImplementation(async (_ui, runtime, initial) => {
         expect(runtime).toBe("tintin");
         expect(initial).toEqual(definition);
-        return { frontmatter: { ...initial.frontmatter, description: "Audit #2" }, body: initial.body };
+        return { frontmatter: { ...initial.frontmatter, description: "Audit code and report serious security issues" }, body: initial.body };
       });
       await handleEdit(ctx(), "global", getFs, getResolver, options);
       const saved = await fs.readFile(path);
       expect(saved.success).toBe(true);
       if (!saved.success) throw saved.error;
       expect(parseAgentMarkdown("tintin", saved.data)).toEqual({
-        frontmatter: { ...definition.frontmatter, description: "Audit #2" },
+        frontmatter: { ...definition.frontmatter, description: "Audit code and report serious security issues" },
         body: definition.body,
       });
     });
@@ -91,10 +93,11 @@ describe("agent manager", () => {
     });
   });
 
-  it("writes project definitions without requiring model/tools pins", async () => {
+  it("rejects project definitions without the four essential fields", async () => {
     author.mockResolvedValue({ frontmatter: {}, body: "Parent-specific instructions" });
     await handleCreate(ctx(), "local", getFs, getResolver, options);
-    expect((await fs.readFile(resolver.resolveLocalAgentPath("auditor.md"))).success).toBe(true);
+    expect((await fs.readFile(resolver.resolveLocalAgentPath("auditor.md"))).success).toBe(false);
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Tools are required"), "error");
   });
 
   it("refuses preexisting files without opening authoring or overwriting", async () => {
@@ -124,12 +127,22 @@ describe("agent manager", () => {
     expect(ui.select).toHaveBeenCalledWith(expect.stringContaining("detection is absent or ambiguous"), expect.any(Array));
   });
 
-  it("leaves a file unchanged when known fields are not edited", async () => {
-    fs.seed({ [path]: original });
+  it("leaves legacy definitions readable when no changes are saved", async () => {
+    const legacy = "---\nname: MixedCase\ndescription: Brief\n---\nOriginal prompt\n";
+    fs.seed({ [path]: legacy });
     author.mockImplementation(async (_ui, _runtime, initial) => initial);
     await handleEdit(ctx(), "global", getFs, getResolver, options);
-    expect(await fs.readFile(path)).toEqual({ success: true, data: original });
+    expect(await fs.readFile(path)).toEqual({ success: true, data: legacy });
     expect(ui.notify).toHaveBeenCalledWith("Definition unchanged", "info");
+  });
+
+  it("refuses changed edits that still omit essential fields", async () => {
+    const legacy = "---\nname: reviewer\ndescription: Brief\n---\nOriginal prompt\n";
+    fs.seed({ [path]: legacy });
+    author.mockImplementation(async (_ui, _runtime, initial) => ({ ...initial, body: "Updated prompt" }));
+    await handleEdit(ctx(), "global", getFs, getResolver, options);
+    expect(await fs.readFile(path)).toEqual({ success: true, data: legacy });
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Tools are required"), "error");
   });
 
   it.each(["unexpected: true", "model: [bad]", "name: first\nname: duplicate"]) ("refuses structured editing of invalid or unknown fields: %s", async (fields) => {
@@ -152,7 +165,7 @@ describe("agent manager", () => {
     fs.seed({ [path]: original });
     author.mockImplementation(async () => {
       await fs.writeFile(path, "external change");
-      return { frontmatter: { name: "changed" }, body: "changed" };
+      return { frontmatter: { name: "changed", description: "Review code and report potential issues thoroughly", tools: "read", model: "claude" }, body: "changed" };
     });
     await handleEdit(ctx(), "global", getFs, getResolver, options);
     expect(await fs.readFile(path)).toEqual({ success: true, data: "external change" });
@@ -193,5 +206,131 @@ describe("agent manager", () => {
   it("does not turn a permissions error into an empty list", async () => {
     vi.spyOn(fs, "readDirectoryEntries").mockResolvedValue({ success: false, error: new Error("permission denied") });
     await expect(listAgentChoices("global", "tintin", fs, resolver)).rejects.toThrow("permission denied");
+  });
+
+  describe("pinned upstream agent loaders (Tintin 0.19.0, Nico 0.77.0)", () => {
+    async function discoverNico(markdown: string) {
+      const directory = mkdtempSync(join(tmpdir(), "pi-agent-nico-"));
+      try {
+        const agentsDir = join(directory, ".pi", "agents");
+        mkdirSync(agentsDir, { recursive: true });
+        writeFileSync(join(agentsDir, "auditor.md"), markdown);
+        const { discoverAgents } = await import("../node_modules/pi-subagents/src/agents/agents.js");
+        return discoverAgents(directory, "project", undefined, { globalNpmRoot: null });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+
+    it("distinguishes loader-required fields from the stricter authoring policy", async () => {
+      const minimalNico = await discoverNico("---\nname: reviewer\ndescription: A shorter runtime-valid description\n---\nReview code.");
+      expect(minimalNico.agentDiagnostics ?? []).toEqual([]);
+      expect(minimalNico.agents.find((agent) => agent.name === "reviewer")).toMatchObject({ description: "A shorter runtime-valid description" });
+      expect(minimalNico.agents.find((agent) => agent.name === "reviewer")?.tools).toBeUndefined();
+      expect(minimalNico.agents.find((agent) => agent.name === "reviewer")?.model).toBeUndefined();
+      const missingDescription = await discoverNico("---\nname: reviewer\n---\nReview code.");
+      expect(missingDescription.agents.some((agent) => agent.name === "reviewer" && agent.filePath?.endsWith("auditor.md"))).toBe(false);
+
+      const directory = mkdtempSync(join(tmpdir(), "pi-agent-tintin-"));
+      try {
+        const agentsDir = join(directory, ".pi", "agents");
+        mkdirSync(agentsDir, { recursive: true });
+        writeFileSync(join(agentsDir, "reviewer.md"), "---\nname: reviewer\n---\nReview code.");
+        const { loadCustomAgents } = await import("../node_modules/@tintinweb/pi-subagents/src/custom-agents");
+        const loaded = loadCustomAgents(directory, true).get("reviewer");
+        expect(loaded).toMatchObject({ name: "reviewer", description: "reviewer", model: undefined });
+        expect(loaded?.builtinToolNames?.length).toBeGreaterThan(0);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("loads Nico structured budget metadata without parser diagnostics", async () => {
+      const markdown = renderAgentMarkdown("nico", {
+        name: "reviewer", description: "Review security issues in the codebase",
+        tools: "read,grep", model: "claude",
+        toolBudget: { hard: 12, soft: 8, block: ["bash"] },
+      }, "Inspect auth and report findings.");
+      const discovered = await discoverNico(markdown);
+      expect(discovered.agentDiagnostics ?? []).toEqual([]);
+      expect(discovered.agents.find((agent) => agent.name === "reviewer")?.toolBudget).toEqual({ hard: 12, soft: 8, block: ["bash"] });
+    });
+
+    it("loads Nico JSON Schema metadata through its JSON parser", async () => {
+      const schema = { type: "object", properties: { status: { type: "string" } } };
+      const markdown = renderAgentMarkdown("nico", {
+        name: "reviewer", description: "Review security issues in the codebase",
+        tools: "read,grep", model: "claude", outputSchema: schema,
+      }, "Inspect auth.");
+      const discovered = await discoverNico(markdown);
+      expect(discovered.agentDiagnostics ?? []).toEqual([]);
+      expect(discovered.agents.find((agent) => agent.name === "reviewer")?.outputSchema).toEqual(schema);
+    });
+
+    it("loads Nico list-valued selectors without retaining YAML item quotes", async () => {
+      const markdown = renderAgentMarkdown("nico", {
+        name: "reviewer", description: "Review security issues in the codebase",
+        tools: "read,grep", model: "claude", allowedAgents: ["scout"],
+      }, "Inspect auth.");
+      const discovered = await discoverNico(markdown);
+      expect(discovered.agentDiagnostics ?? []).toEqual([]);
+      expect(discovered.agents.find((agent) => agent.name === "reviewer")?.allowedAgents).toEqual(["scout"]);
+    });
+
+    it("refuses an empty list that Nico's loader treats as a literal selector", async () => {
+      const raw = "---\nname: reviewer\ndescription: Review security issues in the codebase\ntools: read,grep\nmodel: claude\nextensions: []\n---\nInspect auth.";
+      const discovered = await discoverNico(raw);
+      expect(discovered.agents.find((agent) => agent.name === "reviewer")?.extensions).toEqual(["[]"]);
+      expect(() => renderAgentMarkdown("nico", {
+        name: "reviewer", description: "Review security issues in the codebase",
+        tools: "read,grep", model: "claude", extensions: [],
+      }, "Inspect auth.")).toThrow('extensions: Nico reads an empty YAML list as the literal selector "[]"');
+    });
+
+    it.each(["tintin", "nico"] as const)("loads manager-authored %s definitions from a project", async (runtime) => {
+      const directory = mkdtempSync(join(tmpdir(), "pi-agent-loader-"));
+      try {
+        const frontmatter = {
+          name: "security-review",
+          description: "Review security issues in the codebase",
+          tools: "read,grep",
+          model: "claude",
+        };
+        author.mockResolvedValue({ frontmatter, body: "Inspect auth and report findings." });
+        await handleCreate(ctx(), "global", getFs, getResolver, { runtime });
+        const saved = await fs.readFile(path);
+        expect(saved.success).toBe(true);
+        if (!saved.success) throw saved.error;
+        const agentsDir = join(directory, ".pi", "agents");
+        mkdirSync(agentsDir, { recursive: true });
+        writeFileSync(join(agentsDir, "auditor.md"), saved.data);
+
+        if (runtime === "tintin") {
+          // Direct loader import avoids activating the upstream extension.
+          const { loadCustomAgents } = await import("../node_modules/@tintinweb/pi-subagents/src/custom-agents");
+          expect(loadCustomAgents(directory, true).get("security-review")).toMatchObject({
+            name: frontmatter.name,
+            description: frontmatter.description,
+            builtinToolNames: ["read", "grep"],
+            model: frontmatter.model,
+            systemPrompt: "Inspect auth and report findings.",
+          });
+        } else {
+          // Nico's exported discovery applies its real profile conversion.
+          const { discoverAgents } = await import("../node_modules/pi-subagents/src/agents/agents.js");
+          const discovered = discoverAgents(directory, "project", undefined, { globalNpmRoot: null });
+          expect(discovered.agentDiagnostics ?? []).toEqual([]);
+          expect(discovered.agents.find((agent) => agent.name === "security-review")).toMatchObject({
+            name: frontmatter.name,
+            description: frontmatter.description,
+            tools: ["read", "grep"],
+            model: frontmatter.model,
+            systemPrompt: "Inspect auth and report findings.",
+          });
+        }
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
   });
 });

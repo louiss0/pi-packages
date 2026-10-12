@@ -12,6 +12,12 @@ function uiWith(choices: Array<string | undefined>, inputs: Array<string | undef
 }
 
 describe("structured agent authoring", () => {
+  const essentials: AgentFrontmatter = {
+    name: "reviewer",
+    description: "Review the code thoroughly and report any problems",
+    tools: "read,grep",
+    model: "claude",
+  };
   it.each(["../escape", "a/b", "a\\b", ".hidden", "nul", "COM1", "a.md", "", "name:plugin"]) ("rejects unsafe filename %s", (name) => {
     expect(isSafeAgentFilename(name)).toBe(false);
   });
@@ -25,34 +31,51 @@ describe("structured agent authoring", () => {
     expect(ui.notify).toHaveBeenCalled();
     expect(await askAgentFilename(uiWith([], [undefined]))).toBeUndefined();
   });
-  it("leaves model and tool defaults omitted and edits Markdown without $EDITOR", async () => {
+  it.each(["tintin", "nico"] as const)("requires the four essential fields before saving %s", async (runtime) => {
+    const ui = uiWith(["Review and save", "Cancel"]);
+    expect(await authorAgentDefinition(ui, runtime, { frontmatter: {}, body: "Prompt" })).toBeUndefined();
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Name is required"), "error");
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining("Tools are required"), "error");
+  });
+  it("edits Markdown without $EDITOR when essentials are valid", async () => {
     const ui = uiWith(["Prompt body", "Review and save"]);
-    const result = await authorAgentDefinition(ui, "tintin", { frontmatter: {}, body: "" });
-    expect(result).toEqual({ frontmatter: {}, body: "Write a focused report.\nKeep Markdown." });
+    const frontmatter = { name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "read,grep", model: "claude" };
+    const result = await authorAgentDefinition(ui, "tintin", { frontmatter, body: "" });
+    expect(result).toEqual({ frontmatter, body: "Write a focused report.\nKeep Markdown." });
     expect(ui.editor).toHaveBeenCalledWith(expect.stringContaining("Markdown body only"), "");
+  });
+  it.each([
+    [{ name: "Mixed", description: "Review the code thoroughly and report any problems", tools: "read,grep", model: "claude" }, "Name must be lowercase"],
+    [{ name: "reviewer", description: "short", tools: "read,grep", model: "claude" }, "Description must be at least 35"],
+    [{ name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "Read,write", model: "claude" }, "Tools must be a lowercase"],
+    [{ name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "read,grep", model: "Claude" }, "Model must be lowercase"],
+  ])("rejects an invalid essential field on save", async (frontmatter, message) => {
+    const ui = uiWith(["Review and save", "Cancel"]);
+    expect(await authorAgentDefinition(ui, "tintin", { frontmatter, body: "Prompt" })).toBeUndefined();
+    expect(ui.notify).toHaveBeenCalledWith(expect.stringContaining(message), "error");
   });
   it("requires a separate intentional-empty-prompt confirmation", async () => {
     const ui = uiWith(["Review and save", "Cancel"]);
     ui.confirm.mockResolvedValue(false);
-    expect(await authorAgentDefinition(ui, "tintin", { frontmatter: {}, body: "" })).toBeUndefined();
+    expect(await authorAgentDefinition(ui, "tintin", { frontmatter: { name: "reviewer", description: "Review the code thoroughly and report any problems", tools: "read", model: "claude" }, body: "" })).toBeUndefined();
     expect(ui.confirm).toHaveBeenCalledWith("Empty system prompt", expect.any(String));
   });
-  it("edits a typed list without treating [] as omission", async () => {
-    const ui = uiWith(["Basic settings", "tools: omitted", "list", "Done", "Back", "Review and save"]);
-    const result = await authorAgentDefinition(ui, "tintin", { frontmatter: {}, body: "Prompt" });
-    expect(result?.frontmatter).toEqual({ tools: [] });
+  it("edits an optional typed list without treating [] as omission", async () => {
+    const ui = uiWith(["Advanced settings", "Context", "skills: omitted", "list", "Done", "Back", "Review and save"]);
+    const result = await authorAgentDefinition(ui, "tintin", { frontmatter: essentials, body: "Prompt" });
+    expect(result?.frontmatter).toEqual({ ...essentials, skills: [] });
   });
   it("allows explicit false without turning it into native defaults", async () => {
     const field = AGENT_PROFILES.tintin.fields.find((field) => field.key === "enabled");
     if (!field) throw new Error("enabled contract missing");
     const ui = uiWith(["Advanced settings", field.group, "enabled: omitted", "boolean", "false", "Back", "Review and save"]);
-    expect((await authorAgentDefinition(ui, "tintin", { frontmatter: {}, body: "Prompt" }))?.frontmatter).toEqual({ enabled: false });
+    expect((await authorAgentDefinition(ui, "tintin", { frontmatter: essentials, body: "Prompt" }))?.frontmatter).toEqual({ ...essentials, enabled: false });
   });
-  it("omits a setting only when explicitly requested", async () => {
-    const initial: AgentFrontmatter = { model: "anthropic/claude-opus-4-6" };
-    const ui = uiWith(["Basic settings", 'model: "anthropic/claude-opus-4-6"', "Omit (use runtime default)", "Back", "Review and save"]);
-    expect((await authorAgentDefinition(ui, "tintin", { frontmatter: initial, body: "Prompt" }))?.frontmatter).toEqual({});
-    expect(initial).toEqual({ model: "anthropic/claude-opus-4-6" });
+  it("omits an optional setting only when explicitly requested", async () => {
+    const initial: AgentFrontmatter = { ...essentials, skills: "review" };
+    const ui = uiWith(["Advanced settings", "Context", 'skills: "review"', "Omit (use runtime default)", "Back", "Review and save"]);
+    expect((await authorAgentDefinition(ui, "tintin", { frontmatter: initial, body: "Prompt" }))?.frontmatter).toEqual(essentials);
+    expect(initial).toEqual({ ...essentials, skills: "review" });
   });
   it("cancellation never mutates the initial definition", async () => {
     const initial = { frontmatter: { name: "original" }, body: "Prompt" };

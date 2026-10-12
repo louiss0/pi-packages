@@ -11,6 +11,7 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@code-fixer-23/pi-generators": "workspace:*",
+    "@earendil-works/pi-ai": "0.99.1",
     "@earendil-works/pi-coding-agent": "catalog:",
     "@earendil-works/pi-tui": "catalog:",
     "@eslint/js": "catalog:",

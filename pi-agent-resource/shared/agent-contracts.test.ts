@@ -434,7 +434,6 @@ max_turns: 30`),
   it.each([
     null,
     "",
-    [],
     "read, mcp:github/search",
     ["read", "mcp:github/search"],
   ] satisfies AgentValue[])("retains Nico simple list value %j", (tools) => {
@@ -447,6 +446,11 @@ max_turns: 30`),
       parseAgentMarkdown("nico", renderAgentMarkdown("nico", frontmatter, ""))
         .frontmatter,
     ).toEqual(frontmatter);
+  });
+  it("reads legacy Nico empty lists without re-emitting them as literal selectors", () => {
+    const legacy = parseAgentMarkdown("nico", markdown("name: scout\ndescription: Recon\nextensions: []"));
+    expect(legacy.frontmatter.extensions).toEqual([]);
+    expect(() => renderAgentMarkdown("nico", legacy.frontmatter, legacy.body)).toThrow('extensions: Nico reads an empty YAML list as the literal selector "[]"');
   });
   it("accepts comma scalar and YAML block/flow lists without normalization", () => {
     const frontmatter = parseAgentMarkdown(

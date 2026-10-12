@@ -21,9 +21,11 @@ The agent manager creates and maintains agent definition files in either your gl
 
 Manages agents in `~/.pi/agent/agents`.
 
-`create` opens a validated form collecting `name`, `description`, `tools` (comma-separated), and `model`. The name must be lowercase, the tools list is checked for valid formatting, and model values are constrained to a lowercase format before anything is written. Once the form passes, the extension writes a properly structured markdown file with the correct frontmatter.
+`create` selects a Tintin or Nico authoring profile and edits metadata and the Markdown prompt in Pi. Before saving, it requires `name` (lowercase letters, numbers and dashes, up to 48 characters), `description` (35–1024 characters), `tools` (a lowercase comma-separated string), and `model` (2–128 lowercase letters, numbers, colons or dashes). Other supported fields are optional. These are authoring rules, not a claim that either subagent runtime requires those four fields. The extension writes validated frontmatter but does not load or execute the agent.
 
-`edit` presents a list of existing global agents. After you select one, the file opens in your external editor using `$VISUAL` or `$EDITOR` (checked in that order). The extension requires one of those variables to be set.
+`edit` presents existing global agent definitions and opens the same structured metadata and Pi prompt editor. It does not require `$VISUAL` or `$EDITOR`. Unchanged legacy definitions remain readable; changed definitions must pass the four-field save validation. The authoring rules intentionally exclude provider/model paths and slash-containing tool selectors even where a loader accepts them.
+
+For Nico definitions, the manager emits structured `toolBudget` and `outputSchema` as inline JSON and simple selector lists as unquoted YAML block lists. It refuses empty top-level lists because Nico reads `[]` as a literal selector; omit the field or use empty text instead. The extension tests these boundaries against the pinned Tintin 0.19.0 and Nico 0.77.0 loaders.
 
 `delete` shows the same selection list and removes the chosen file.
 

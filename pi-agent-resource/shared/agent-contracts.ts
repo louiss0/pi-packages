@@ -1247,15 +1247,40 @@ export function renderAgentMarkdown(
   body: string,
 ): string {
   assertFrontmatter(runtime, frontmatter);
-  // Quote strings, not booleans/null/numbers. In particular on, true, #hex,
-  // :high and multiline/comment/colon-containing strings retain their types.
-  const header = stringify(frontmatter, {
-    defaultStringType: "QUOTE_DOUBLE",
-    defaultKeyType: "PLAIN",
+  // Nico's loader reads flat fields as strings, not YAML. A top-level [] is
+  // treated as a literal selector, while structured JSON fields are parsed
+  // with JSON.parse; never silently save a different runtime configuration.
+  if (runtime === "nico") {
+    for (const [key, value] of Object.entries(frontmatter)) {
+      if (Array.isArray(value) && value.length === 0)
+        throw new Error(`${key}: Nico reads an empty YAML list as the literal selector "[]"; omit the field or use empty text.`);
+    }
+  }
+  // Quote ordinary strings, not booleans/null/numbers. In particular on,
+  // true, #hex and multiline strings retain their types on YAML roundtrip.
+  const options = {
+    defaultStringType: "QUOTE_DOUBLE" as const,
+    defaultKeyType: "PLAIN" as const,
     blockQuote: false,
     lineWidth: 0,
     aliasDuplicateObjects: false,
-  });
+  };
+  const header = Object.entries(frontmatter).map(([key, value]) => {
+    if (runtime === "nico" && Array.isArray(value)) {
+      const items = value.map((item) => {
+        const plain = typeof item === "string"
+          ? stringify(item, { ...options, defaultStringType: "PLAIN" }).trimEnd()
+          : "";
+        if (!plain || plain !== item || plain.includes(",") || plain.includes("\n"))
+          throw new Error(`${key}: Nico list items must be plain, comma-free strings; use comma-separated text or omit this field.`);
+        return `  - ${plain}\n`;
+      });
+      return `${key}:\n${items.join("")}`;
+    }
+    if (runtime === "nico" && (key === "toolBudget" || key === "outputSchema") && isRecord(value))
+      return `${key}: ${JSON.stringify(value)}\n`;
+    return stringify({ [key]: value }, options);
+  }).join("");
   return `---\n${header}---\n${body}`;
 }
 

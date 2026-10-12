@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   AGENT_PROFILES,
+  renderAgentMarkdown,
   validateAgentFrontmatter,
   type AgentFieldDefinition,
   type AgentFrontmatter,
@@ -8,6 +9,7 @@ import {
   type AgentValue,
   type AgentValueKind,
 } from "./agent-contracts";
+import { validateAgentSavePolicy } from "./agent-save-policy";
 
 type UI = Pick<ExtensionContext["ui"], "select" | "input" | "editor" | "notify" | "confirm">;
 type ValueEdit = { value: AgentValue } | { remove: true };
@@ -149,7 +151,7 @@ export async function authorAgentDefinition(
   const profile = AGENT_PROFILES[runtime];
   const frontmatter = structuredClone(initial.frontmatter);
   let body = initial.body;
-  ui.notify(`${profile.label}: omitted settings use this runtime's native defaults. A tool allowlist does not load its provider; nested delegation can expand capabilities. This manager does not enforce runtime permissions.`, "info");
+  ui.notify(`${profile.label}: name, description, tools and model must pass authoring validation; other omitted settings use runtime defaults. A tool allowlist does not load its provider; nested delegation can expand capabilities. This manager does not enforce runtime permissions.`, "info");
   for (;;) {
     const action = await ui.select(`${profile.label} — agent definition`, ["Basic settings", "Advanced settings", "Prompt body", "Review and save", "Cancel"]);
     if (action === undefined || action === "Cancel") return undefined;
@@ -165,9 +167,15 @@ export async function authorAgentDefinition(
       if (edited !== undefined) body = edited;
     }
     if (action === "Review and save") {
-      const errors = validateAgentFrontmatter(runtime, frontmatter);
+      const errors = [...validateAgentSavePolicy(frontmatter), ...validateAgentFrontmatter(runtime, frontmatter)];
       if (errors.length) {
         ui.notify(errors.join("\n"), "error");
+        continue;
+      }
+      try {
+        renderAgentMarkdown(runtime, frontmatter, body);
+      } catch (error) {
+        ui.notify(error instanceof Error ? error.message : String(error), "error");
         continue;
       }
       if (!body.trim() && !await ui.confirm("Empty system prompt", "Save an intentionally empty prompt? Replace-mode agents will have no authored system instructions.")) continue;

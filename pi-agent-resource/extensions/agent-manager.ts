@@ -2,8 +2,9 @@ import { homedir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { askAgentFilename, authorAgentDefinition } from "../shared/agent-authoring";
-import { AGENT_PROFILES, agentIdentity, parseAgentMarkdown, renderAgentMarkdown, type AgentRuntime } from "../shared/agent-contracts";
+import { AGENT_PROFILES, agentIdentity, parseAgentMarkdown, renderAgentMarkdown, type AgentRuntime, type AgentFrontmatter } from "../shared/agent-contracts";
 import { detectAgentRuntimes, type AgentResourceSource } from "../shared/agent-runtime-detection";
+import { validateAgentSavePolicy } from "../shared/agent-save-policy";
 import { getPathResolver, NodeFileSystem, type ResourceFileSystem, type ResourcePathResolver } from "../shared/filesystem";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
 import { getFilterSubcommandArgumentCompletionFromStringUsingSubLabel, SubCommands } from "../shared/subcommands";
@@ -50,6 +51,11 @@ function missing(error: Error): boolean {
 
 function report(ctx: ExtensionContext, action: string, error: unknown) {
   ctx.ui.notify(`${action}: ${error instanceof Error ? error.message : String(error)}`, "error");
+}
+
+function assertAgentSavePolicy(frontmatter: AgentFrontmatter) {
+  const errors = validateAgentSavePolicy(frontmatter);
+  if (errors.length) throw new Error(errors.join("\n"));
 }
 
 async function selectRuntime(ctx: ExtensionContext, options: AgentAuthoringOptions) {
@@ -119,6 +125,7 @@ export async function handleCreate(
     if (!missing(existing.error)) throw existing.error;
     const definition = await authorAgentDefinition(ctx.ui, runtime, { frontmatter: runtime === "nico" ? { name: filename } : {}, body: "" });
     if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent creation cancelled", "info"); return; }
+    assertAgentSavePolicy(definition.frontmatter);
     const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);
     const directory = await fs.mkdir(root, { recursive: true });
     if (!directory.success) throw directory.error;
@@ -150,6 +157,7 @@ export async function handleEdit(
     const definition = await authorAgentDefinition(ctx.ui, runtime, parsed);
     if (!definition || !await confirmCoexistence(ctx, detected)) { ctx.ui.notify("Agent editing cancelled", "info"); return; }
     if (JSON.stringify(definition) === JSON.stringify(parsed)) { ctx.ui.notify("Definition unchanged", "info"); return; }
+    assertAgentSavePolicy(definition.frontmatter);
     const content = renderAgentMarkdown(runtime, definition.frontmatter, definition.body);
     const current = await fs.readFile(agent.path);
     if (!current.success) throw current.error;
