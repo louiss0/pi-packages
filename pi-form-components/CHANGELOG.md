@@ -1,3 +1,14 @@
+## 3.2.0 (2026-10-13)
+
+### 🚀 Features
+
+- **pi-form-components:** expose reusable form state APIs ([251e786](https://github.com/louiss0/pi-packages/commit/251e786))
+- **pi-form-components:** support embedded multiselect fields ([454c73b](https://github.com/louiss0/pi-packages/commit/454c73b))
+
+### ❤️ Thank You
+
+- openhands
+
 ## 3.1.7 (2026-09-30)
 
 ### 🚀 Features

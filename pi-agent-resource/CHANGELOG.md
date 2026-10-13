@@ -1,3 +1,31 @@
+## 4.2.0 (2026-10-13)
+
+### 🚀 Features
+
+- **pi-agent-resource:** use directly fillable agent forms ([35da68b](https://github.com/louiss0/pi-packages/commit/35da68b))
+- **pi-agent-resource:** add advanced section forms ([2b8cbad](https://github.com/louiss0/pi-packages/commit/2b8cbad))
+- **pi-agent-resource:** fix test mocking for MultiSelect integration ([ae1e10a](https://github.com/louiss0/pi-packages/commit/ae1e10a))
+- **pi-agent-resource:** use MultiSelect form field for agent tools ([2e85e05](https://github.com/louiss0/pi-packages/commit/2e85e05))
+- **pi-agent-resource:** integrate pi-form-components MultiSelect for agent tool picker ([d17341b](https://github.com/louiss0/pi-packages/commit/d17341b))
+- **pi-agent-resource:** open agent prompt after metadata ([3f393c1](https://github.com/louiss0/pi-packages/commit/3f393c1))
+- **pi-agent-resource:** suggest Pi tools and prefill agent defaults ([44006f2](https://github.com/louiss0/pi-packages/commit/44006f2))
+
+### 🩹 Fixes
+
+- **pi-agent-resource:** resolve authoring lint errors ([e6a6766](https://github.com/louiss0/pi-packages/commit/e6a6766))
+- **pi-agent-resource:** implement proper multiselect tool selection with Tintin compatibility ([082860c](https://github.com/louiss0/pi-packages/commit/082860c))
+- **pi-agent-resource:** format Pi catalog tools as Tintin selectors ([05fec9b](https://github.com/louiss0/pi-packages/commit/05fec9b))
+- **pi-agent-resource:** enforce agent save rules and verify upstream loaders ([8aaed59](https://github.com/louiss0/pi-packages/commit/8aaed59))
+- **agent-resource:** replace fabricated loader conformance tests ([30e27ce](https://github.com/louiss0/pi-packages/commit/30e27ce))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.2.0
+
+### ❤️ Thank You
+
+- openhands
+
 ## 4.1.0 (2026-09-30)
 
 ### 🚀 Features

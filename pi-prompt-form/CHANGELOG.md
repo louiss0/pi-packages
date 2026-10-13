@@ -1,3 +1,17 @@
+## 1.1.15 (2026-10-13)
+
+### 🩹 Fixes
+
+- **pi-prompt-form:** focus the first argument field ([0ec0507](https://github.com/louiss0/pi-packages/commit/0ec0507))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.2.0
+
+### ❤️ Thank You
+
+- openhands
+
 ## 1.1.14 (2026-09-30)
 
 ### 🚀 Features
