@@ -341,6 +341,14 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     return this.#selectedValues.join(",");
   }
 
+  /** Replace checked values without discarding the highlighted item. */
+  setValues(values: ReadonlyArray<T[number]["value"]>): void {
+    this.#selectedValues = [...new Set(values)].filter((value) =>
+      this.#items.some((item) => item.value === value),
+    );
+    this.#syncSelectList();
+  }
+
   #createSelectList() {
     const selectList = new SelectList(
       this.#getRenderedItems(),
@@ -442,6 +450,7 @@ export interface FormTui {
 
 type PickerOptions<T extends string> = {
   items: Array<T>;
+  initialValue?: T;
   itemLimit: number;
   title?: string;
   helpText?: string;
@@ -549,6 +558,7 @@ export class Picker<T extends string> implements FormComponent {
 
     this.#syncSelectList();
     this.#syncFilter();
+    if (config.initialValue !== undefined) this.setValue(config.initialValue);
   }
 
   render(width: number) {
@@ -582,6 +592,20 @@ export class Picker<T extends string> implements FormComponent {
 
   get value() {
     return this.#selectedValue ?? "";
+  }
+
+  setValue(value: T): void {
+    const index = this.#items.indexOf(value);
+    if (index < 0) throw new Error(`Unknown picker value: ${value}`);
+    this.#Filter.value = "";
+    this.#selectedIndex = index;
+    this.#visibleCount = Math.max(this.#visibleCount, index + 1);
+    this.#syncSelectList();
+    this.#syncFilter();
+  }
+
+  capturesInput(data: string): boolean {
+    return matchesKey(data, Key.up) || matchesKey(data, Key.down);
   }
 
   handleInput(data: string) {
@@ -749,7 +773,7 @@ export class LabelledInput extends Container implements FormComponent {
     super();
     this.#name = name;
     this.#labelText = new Text(name);
-    this.#input.setValue(initialValue);
+    this.setValue(initialValue);
     this.addChild(this.#labelText);
     this.addChild(this.#input);
     this.addChild(this.#errorText);
@@ -788,6 +812,11 @@ export class LabelledInput extends Container implements FormComponent {
 
   get value() {
     return this.#input.getValue();
+  }
+
+  setValue(value: string): void {
+    this.#input.setValue(value);
+    this.#input.handleInput("\x05");
   }
 
   handleInput(value: string) {
@@ -830,6 +859,10 @@ export class ConfirmationBox extends Container implements FormComponent {
 
   clearError() {
     this.#errorText.setText("");
+  }
+
+  setValue(value: boolean): void {
+    this.#value = value;
   }
 
   confirm() {
@@ -884,6 +917,8 @@ export interface FormOptions<
   parse: Parse<T>;
   footer?: string;
   spacing?: number;
+  /** Observe user value changes, not focus movement or programmatic resets. */
+  onFieldChange?: (name: string, value: string | number | boolean) => void;
 }
 
 export class Form<T extends Record<string, string | number | boolean>>
@@ -898,6 +933,7 @@ export class Form<T extends Record<string, string | number | boolean>>
   #title: string;
   #footer: string;
   #parse: Parse<T>;
+  #onFieldChange?: FormOptions<T>["onFieldChange"];
 
   constructor(
     options: FormOptions<T>,
@@ -909,6 +945,7 @@ export class Form<T extends Record<string, string | number | boolean>>
     this.#title = options.title;
     this.#footer = options.footer ?? "";
     this.#parse = options.parse;
+    this.#onFieldChange = options.onFieldChange;
 
     this.#fields = options.fields;
     this.#spacing = options.spacing ?? 2;
@@ -957,9 +994,7 @@ export class Form<T extends Record<string, string | number | boolean>>
 
     const activeField = this.#fields[this.#activeFieldIndex];
     if (activeField?.capturesInput?.(data)) {
-      activeField.handleInput(data);
-      this.#revalidateFields();
-      this.tui.requestRender();
+      this.#handleFieldInput(data);
       return;
     }
 
@@ -986,7 +1021,17 @@ export class Form<T extends Record<string, string | number | boolean>>
       return;
     }
 
-    this.#fields[this.#activeFieldIndex]?.handleInput(data);
+    this.#handleFieldInput(data);
+  }
+
+  #handleFieldInput(data: string) {
+    const field = this.#fields[this.#activeFieldIndex];
+    if (field) {
+      const before = field.value;
+      field.handleInput(data);
+      if (field.value !== before)
+        this.#onFieldChange?.(field.name, field.value);
+    }
     this.#revalidateFields();
     this.tui.requestRender();
   }
