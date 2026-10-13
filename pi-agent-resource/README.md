@@ -79,6 +79,16 @@ Manages global skills in `~/.pi/agent/skills/<name>/SKILL.md`.
 
 Runs the same lifecycle against `.pi/skills/<name>/SKILL.md` in the current project. Useful for repository-scoped skills that ship with the codebase.
 
+#### `resource:skill:invocation`
+
+Opens a combined checkbox list of the skills loaded in the current Pi session, including global, project-local, `.agents`, package, and explicitly configured skills. Each entry shows its scope and file path; disabled skills are already checked. This uses `MultiSelect` from `pi-form-components` and requires TUI mode.
+
+- **Checked** sets `disable-model-invocation: true`: the skill is hidden from automatic model selection but remains available through `/skill:name`.
+- **Unchecked** allows automatic model selection (`disable-model-invocation: false`).
+- Use **↑↓** to navigate and **Space** to toggle. **Enter** saves changed skill files and automatically reloads the current session once. **Esc** discards staged changes without writing or reloading.
+
+Changes persist in each skill's own frontmatter, preserving its other metadata, comments, and Markdown body. Unreadable or unsupported/malformed frontmatter is reported and skipped. Files changed while the list was open are not overwritten; reopen the command to retry. Save failures are reported individually, and any successfully saved changes are still reloaded. Package updates may replace edits made to package-provided skills. Skills excluded from Pi's loaded resource catalog (for example, losing name collisions) are not shown.
+
 ### Flags
 
 #### `--external-skill-editor`

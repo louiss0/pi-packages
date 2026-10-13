@@ -520,6 +520,7 @@ describe("skill manager handlers", () => {
     memoryFileSystem.seed({
       [skillPath]: "existing skill content",
     });
+    vi.stubEnv("VISUAL", "");
     vi.stubEnv("EDITOR", "code");
     const editorFactory = vi.fn();
     mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);

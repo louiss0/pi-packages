@@ -32,6 +32,7 @@ import {
   type SkillFrontmatterFields,
 } from "../shared/resource-components";
 import { notifyWhenUsingDevelopmentExtension } from "../shared/runtime";
+import { handleSkillInvocation } from "../shared/skill-invocation-controls";
 import {
   getFilterSubcommandArgumentCompletionFromStringUsingSubLabel,
   SubCommands,
@@ -511,5 +512,13 @@ export default (pi: ExtensionAPI) => {
     getArgumentCompletions:
       getFilterSubcommandArgumentCompletionFromStringUsingSubLabel("skill"),
     handler: async (arg, ctx) => handleSkillCommand(pi, arg, ctx, "local"),
+  });
+
+  pi.registerCommand("resource:skill:invocation", {
+    description:
+      "Toggle automatic model invocation for global and local skills",
+    handler: async (_arg, ctx) => {
+      await handleSkillInvocation(ctx, pi.getCommands());
+    },
   });
 };
