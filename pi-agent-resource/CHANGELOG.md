@@ -1,3 +1,20 @@
+# 5.0.0 (2026-10-13)
+
+### 🚀 Features
+
+- ⚠️  **pi-agent-resource:** add pack-first skill invocation toggle ([ccf90da](https://github.com/louiss0/pi-packages/commit/ccf90da))
+- **pi-agent-resource:** toggle skill model invocation ([3e0147c](https://github.com/louiss0/pi-packages/commit/3e0147c))
+
+### ⚠️  Breaking Changes
+
+- **pi-agent-resource:** add pack-first skill invocation toggle  ([ccf90da](https://github.com/louiss0/pi-packages/commit/ccf90da))
+  new subcommand added to resource:pack:skill
+  Closes pack-toggle-invocation
+
+### ❤️ Thank You
+
+- openhands
+
 ## 4.2.0 (2026-10-13)
 
 ### 🚀 Features
