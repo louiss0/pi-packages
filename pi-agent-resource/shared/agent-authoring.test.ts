@@ -1,21 +1,15 @@
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Mock } from "vitest";
-import { AGENT_PROFILES, type AgentFrontmatter } from "./agent-contracts";
-import {
-  askAgentFilename,
-  authorAgentDefinition,
-  isSafeAgentFilename,
-} from "./agent-authoring";
+import { authorAgentDefinition, isSafeAgentFilename } from "./agent-authoring";
+import type { AgentFrontmatter } from "./agent-contracts";
 
-function uiWith(
-  choices: Array<string | undefined>,
-  inputs: Array<string | undefined> = [],
-) {
+function uiWith(choices: Array<string | undefined> = []) {
   return {
     select: vi.fn(async () => choices.shift()),
-    input: vi.fn(async () => inputs.shift()),
-    editor: vi.fn(async () => "Write a focused report.\nKeep Markdown."),
+    editor: vi.fn(
+      async (): Promise<string | undefined> =>
+        "Write a focused report.\nKeep Markdown.",
+    ),
     notify: vi.fn(),
     confirm: vi.fn(async () => true),
     custom: vi.fn(async <T>() => undefined as T) as Mock<
@@ -24,14 +18,20 @@ function uiWith(
       ExtensionContext["ui"]["custom"],
   };
 }
+const essentials: AgentFrontmatter = {
+  name: "reviewer",
+  description: "Review the code thoroughly and report any problems",
+  tools: "read,grep",
+  model: "claude",
+};
+function metadata(
+  frontmatter: AgentFrontmatter = essentials,
+  advanced = false,
+) {
+  return { frontmatter, advanced, filename: "reviewer" };
+}
 
-describe("structured agent authoring", () => {
-  const essentials: AgentFrontmatter = {
-    name: "reviewer",
-    description: "Review the code thoroughly and report any problems",
-    tools: "read,grep",
-    model: "claude",
-  };
+describe("form-based agent authoring", () => {
   it.each([
     "../escape",
     "a/b",
@@ -42,166 +42,55 @@ describe("structured agent authoring", () => {
     "a.md",
     "",
     "name:plugin",
-  ])("rejects unsafe filename %s", (name) => {
-    expect(isSafeAgentFilename(name)).toBe(false);
-  });
-  it("keeps filenames independent of dispatch names", () => {
-    expect(isSafeAgentFilename("blubb")).toBe(true);
+  ])("rejects unsafe filename %s", (name) =>
+    expect(isSafeAgentFilename(name)).toBe(false));
+  it("keeps safe filenames independent of dispatch names", () => {
     expect(isSafeAgentFilename("Mixed_Case-1")).toBe(true);
-  });
-  it("retries invalid filename input and supports cancellation", async () => {
-    const ui = uiWith([], ["../no", "valid"]);
-    expect(await askAgentFilename(ui)).toBe("valid");
-    expect(ui.notify).toHaveBeenCalled();
-    expect(await askAgentFilename(uiWith([], [undefined]))).toBeUndefined();
   });
   it.each([
     "tintin",
     "nico",
-  ] as const)("requires the four essential fields before saving %s", async (runtime) => {
-    const ui = uiWith(["Review and save", "Cancel"]);
-    expect(
-      await authorAgentDefinition(ui, runtime, {
-        frontmatter: {},
-        body: "Prompt",
-      }),
-    ).toBeUndefined();
-    expect(ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Name is required"),
-      "error",
-    );
-    expect(ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Tools are required"),
-      "error",
-    );
-  });
-  it("edits Markdown without $EDITOR when essentials are valid", async () => {
-    const ui = uiWith(["Prompt body", "Review and save"]);
-    const frontmatter = {
-      name: "reviewer",
-      description: "Review the code thoroughly and report any problems",
-      tools: "read,grep",
-      model: "claude",
-    };
-    const result = await authorAgentDefinition(ui, "tintin", {
-      frontmatter,
-      body: "",
-    });
-    expect(result).toEqual({
-      frontmatter,
-      body: "Write a focused report.\nKeep Markdown.",
-    });
-    expect(ui.editor).toHaveBeenCalledWith(
-      expect.stringContaining("Markdown body only"),
-      "",
-    );
-  });
-  it.each([
-    [
-      {
-        name: "Mixed",
-        description: "Review the code thoroughly and report any problems",
-        tools: "read,grep",
-        model: "claude",
-      },
-      "Name must be lowercase",
-    ],
-    [
-      {
-        name: "reviewer",
-        description: "short",
-        tools: "read,grep",
-        model: "claude",
-      },
-      "Description must be at least 35",
-    ],
-    [
-      {
-        name: "reviewer",
-        description: "Review the code thoroughly and report any problems",
-        tools: "Read,write",
-        model: "claude",
-      },
-      "Tools must be a comma-separated",
-    ],
-    [
-      {
-        name: "reviewer",
-        description: "Review the code thoroughly and report any problems",
-        tools: "read,grep",
-        model: "Claude",
-      },
-      "Model must be lowercase",
-    ],
-  ])("rejects an invalid essential field on save", async (frontmatter, message) => {
-    const ui = uiWith(["Review and save", "Cancel"]);
-    expect(
-      await authorAgentDefinition(ui, "tintin", {
-        frontmatter,
-        body: "Prompt",
-      }),
-    ).toBeUndefined();
-    expect(ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining(message),
-      "error",
-    );
-  });
-  it("offers registered Pi tools through a Valibot-backed catalog without overriding manual choices", async () => {
-    const ui = uiWith([
-      "Basic settings",
-      'tools: "read,grep"',
-      "Add registered Pi tool",
-      "Back",
-      "Review and save",
-    ]);
-    // Mock multiselect to add "write" to existing selection
-    ui.custom.mockImplementation(async () => ["read", "grep", "write"]);
+  ] as const)("starts %s creation with the metadata form, then opens the prompt automatically", async (runtime) => {
+    const ui = uiWith();
+    ui.custom.mockResolvedValueOnce(metadata());
     const result = await authorAgentDefinition(
       ui,
-      "nico",
-      { frontmatter: essentials, body: "Prompt" },
-      ["read", "write", "Uppercase", "write"],
-    );
-    expect(result?.frontmatter.tools).toBe("read,grep,write");
-  });
-  it("does not accept an arbitrary value returned by the catalog picker", async () => {
-    const ui = uiWith([
-      "Basic settings",
-      'tools: "read,grep"',
-      "Add registered Pi tool",
-      "not_registered",
-      "Back",
-      "Review and save",
-    ]);
-    const result = await authorAgentDefinition(
-      ui,
-      "tintin",
-      { frontmatter: essentials, body: "Prompt" },
-      ["read", "write"],
-    );
-    expect(result?.frontmatter.tools).toBe("read,grep");
-  });
-  it("opens the Markdown body automatically after valid basic settings on create", async () => {
-    const ui = uiWith(["Basic settings", "Back", "Review and save"]);
-    const result = await authorAgentDefinition(
-      ui,
-      "tintin",
-      { frontmatter: essentials, body: "" },
-      [],
+      runtime,
+      { frontmatter: {}, body: "" },
+      ["read", "write", "edit"],
       "create",
     );
-    expect(result?.body).toBe("Write a focused report.\nKeep Markdown.");
+    expect(result).toEqual({
+      frontmatter: essentials,
+      body: "Write a focused report.\nKeep Markdown.",
+      filename: "reviewer",
+    });
+    expect(ui.custom).toHaveBeenCalledOnce();
+    expect(ui.select).not.toHaveBeenCalled();
     expect(ui.editor).toHaveBeenCalledExactlyOnceWith(
       "Agent system prompt (Markdown body only)",
       "",
     );
+    expect(ui.custom.mock.invocationCallOrder[0]).toBeLessThan(
+      ui.editor.mock.invocationCallOrder[0],
+    );
   });
-  it("does not open step two until the basic save policy passes", async () => {
-    const ui = uiWith(["Basic settings", "Back", "Cancel"]);
+  it.each([
+    [{ ...essentials, name: "Mixed" }, "Name must be lowercase"],
+    [
+      { ...essentials, description: "short" },
+      "Description must be at least 35",
+    ],
+    [{ ...essentials, tools: "Read,write" }, "Tools must be a comma-separated"],
+    [{ ...essentials, model: "Claude" }, "Model must be lowercase"],
+    [{}, "Tools are required"],
+  ])("does not open the prompt until the essentials are valid", async (frontmatter, message) => {
+    const ui = uiWith();
+    ui.custom.mockResolvedValueOnce(metadata(frontmatter));
     expect(
       await authorAgentDefinition(
         ui,
-        "nico",
+        "tintin",
         { frontmatter: {}, body: "" },
         [],
         "create",
@@ -209,150 +98,32 @@ describe("structured agent authoring", () => {
     ).toBeUndefined();
     expect(ui.editor).not.toHaveBeenCalled();
     expect(ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Name is required"),
+      expect.stringContaining(message),
       "error",
     );
   });
-  it("opens the body before review even when creation skips the basic menu", async () => {
-    const ui = uiWith(["Review and save"]);
-    const result = await authorAgentDefinition(
-      ui,
-      "nico",
-      { frontmatter: essentials, body: "" },
-      [],
-      "create",
-    );
-    expect(ui.editor).toHaveBeenCalledOnce();
-    expect(result?.body).toBe("Write a focused report.\nKeep Markdown.");
-  });
-  it("can revisit metadata without reopening the body, and edits remain menu-driven", async () => {
-    const creating = uiWith([
-      "Basic settings",
-      "Back",
-      "Basic settings",
-      "Back",
-      "Review and save",
-    ]);
-    await authorAgentDefinition(
-      creating,
-      "tintin",
-      { frontmatter: essentials, body: "" },
-      [],
-      "create",
-    );
-    expect(creating.editor).toHaveBeenCalledOnce();
-    const editing = uiWith(["Basic settings", "Back", "Review and save"]);
-    await authorAgentDefinition(
-      editing,
-      "tintin",
-      { frontmatter: essentials, body: "Existing prompt" },
-      [],
-      "edit",
-    );
-    expect(editing.editor).not.toHaveBeenCalled();
-  });
-  it("requires a separate intentional-empty-prompt confirmation", async () => {
-    const ui = uiWith(["Review and save", "Cancel"]);
-    ui.confirm.mockResolvedValue(false);
-    expect(
-      await authorAgentDefinition(ui, "tintin", {
-        frontmatter: {
-          name: "reviewer",
-          description: "Review the code thoroughly and report any problems",
-          tools: "read",
-          model: "claude",
-        },
-        body: "",
-      }),
-    ).toBeUndefined();
-    expect(ui.confirm).toHaveBeenCalledWith(
-      "Empty system prompt",
-      expect.any(String),
-    );
-  });
-  it("edits an optional typed list without treating [] as omission", async () => {
-    const ui = uiWith(["Advanced settings", "Context", "Review and save"]);
-    ui.custom.mockResolvedValue({ ...essentials, skills: [] });
+  it("fills advanced sections before opening the prompt, with no field/type menus", async () => {
+    const ui = uiWith(["Identity", "Done"]);
+    ui.custom
+      .mockResolvedValueOnce(metadata(essentials, true))
+      .mockResolvedValueOnce({ ...essentials, enabled: false });
     const result = await authorAgentDefinition(ui, "tintin", {
       frontmatter: essentials,
       body: "Prompt",
     });
-    expect(result?.frontmatter).toEqual({ ...essentials, skills: [] });
-    expect(ui.custom).toHaveBeenCalledOnce();
-    expect(ui.select).toHaveBeenCalledTimes(3);
-    expect(ui.input).not.toHaveBeenCalled();
-  });
-  it("allows explicit false without turning it into native defaults", async () => {
-    const field = AGENT_PROFILES.tintin.fields.find(
-      (field) => field.key === "enabled",
+    expect(result?.frontmatter).toEqual({ ...essentials, enabled: false });
+    expect(ui.custom).toHaveBeenCalledTimes(2);
+    expect(ui.select).toHaveBeenCalledTimes(2);
+    expect(ui.custom.mock.invocationCallOrder[1]).toBeLessThan(
+      ui.editor.mock.invocationCallOrder[0],
     );
-    if (!field) throw new Error("enabled contract missing");
-    const ui = uiWith(["Advanced settings", field.group, "Review and save"]);
-    ui.custom.mockResolvedValue({ ...essentials, enabled: false });
-    expect(
-      (
-        await authorAgentDefinition(ui, "tintin", {
-          frontmatter: essentials,
-          body: "Prompt",
-        })
-      )?.frontmatter,
-    ).toEqual({ ...essentials, enabled: false });
-    expect(ui.select).toHaveBeenCalledTimes(3);
   });
-  it("omits an optional setting only when explicitly requested", async () => {
-    const initial: AgentFrontmatter = { ...essentials, skills: "review" };
-    const ui = uiWith(["Advanced settings", "Context", "Review and save"]);
-    ui.custom.mockResolvedValue(essentials);
-    expect(
-      (
-        await authorAgentDefinition(ui, "tintin", {
-          frontmatter: initial,
-          body: "Prompt",
-        })
-      )?.frontmatter,
-    ).toEqual(essentials);
-    expect(initial).toEqual({ ...essentials, skills: "review" });
-  });
-  it("uses the actual section form and its completion callback, without field/type menus", async () => {
-    const ui = uiWith(["Advanced settings", "Identity", "Review and save"]);
-    const tui = {
-      requestRender: vi.fn(),
-      terminal: { rows: 80, columns: 100 },
-    } as unknown as TUI;
-    const theme = {
-      fg: (_color: string, text: string) => text,
-      bold: (text: string) => text,
-    } as unknown as Theme;
-    ui.custom.mockImplementation(async (factory) => {
-      let result: unknown;
-      const form = await factory(
-        tui,
-        theme,
-        {} as Parameters<typeof factory>[2],
-        (value) => {
-          result = value;
-        },
-      );
-      ["\t", "\t", " ", " ", "\r"].forEach((key) => form.handleInput?.(key));
-      return result;
-    });
-    expect(
-      (
-        await authorAgentDefinition(ui, "tintin", {
-          frontmatter: essentials,
-          body: "Prompt",
-        })
-      )?.frontmatter,
-    ).toEqual({ ...essentials, enabled: false });
-    expect(ui.select).toHaveBeenCalledTimes(3);
-    expect(ui.input).not.toHaveBeenCalled();
-    expect(ui.custom).toHaveBeenCalledOnce();
-  });
-
-  it("cancelling an advanced section leaves all settings unchanged", async () => {
+  it("keeps existing settings when an optional section is cancelled", async () => {
+    const ui = uiWith(["Identity", "Done"]);
     const initial = { ...essentials, enabled: false };
-    const ui = uiWith(["Advanced settings", "Identity", "Review and save"]);
-    ui.custom.mockResolvedValue(null);
+    ui.custom
+      .mockResolvedValueOnce(metadata(initial, true))
+      .mockResolvedValueOnce(null);
     expect(
       (
         await authorAgentDefinition(ui, "tintin", {
@@ -361,20 +132,92 @@ describe("structured agent authoring", () => {
         })
       )?.frontmatter,
     ).toEqual(initial);
-    expect(ui.select).toHaveBeenCalledTimes(3);
   });
-  it("cancellation never mutates the initial definition", async () => {
-    const initial = { frontmatter: { name: "original" }, body: "Prompt" };
+  it("omits advanced settings only when the section form returns them omitted", async () => {
+    const ui = uiWith(["Context", "Done"]);
+    const initial = { ...essentials, skills: "review" };
+    ui.custom
+      .mockResolvedValueOnce(metadata(initial, true))
+      .mockResolvedValueOnce(essentials);
     expect(
-      await authorAgentDefinition(
-        uiWith(["Prompt body", "Cancel"]),
-        "tintin",
-        initial,
-      ),
+      (
+        await authorAgentDefinition(ui, "tintin", {
+          frontmatter: initial,
+          body: "Prompt",
+        })
+      )?.frontmatter,
+    ).toEqual(essentials);
+    expect(initial.skills).toBe("review");
+  });
+  it("cancels when the metadata form or the prompt editor is dismissed", async () => {
+    expect(
+      await authorAgentDefinition(uiWith(), "tintin", {
+        frontmatter: essentials,
+        body: "Prompt",
+      }),
     ).toBeUndefined();
-    expect(initial).toEqual({
-      frontmatter: { name: "original" },
-      body: "Prompt",
-    });
+    const ui = uiWith();
+    ui.custom.mockResolvedValueOnce(metadata());
+    ui.editor.mockResolvedValueOnce(undefined);
+    expect(
+      await authorAgentDefinition(ui, "tintin", {
+        frontmatter: essentials,
+        body: "Prompt",
+      }),
+    ).toBeUndefined();
+    expect(ui.confirm).not.toHaveBeenCalled();
+  });
+  it("requires an intentional-empty-prompt confirmation", async () => {
+    const ui = uiWith();
+    ui.custom.mockResolvedValueOnce(metadata());
+    ui.editor.mockResolvedValueOnce("");
+    ui.confirm.mockResolvedValueOnce(false);
+    expect(
+      await authorAgentDefinition(ui, "tintin", {
+        frontmatter: essentials,
+        body: "Prompt",
+      }),
+    ).toBeUndefined();
+    expect(ui.confirm).toHaveBeenCalledExactlyOnceWith(
+      "Empty system prompt",
+      expect.any(String),
+    );
+  });
+  it("returns to the metadata form when review is declined", async () => {
+    const ui = uiWith();
+    ui.custom
+      .mockResolvedValueOnce(metadata())
+      .mockResolvedValueOnce(metadata());
+    ui.confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    expect(
+      await authorAgentDefinition(ui, "tintin", {
+        frontmatter: essentials,
+        body: "Prompt",
+      }),
+    ).toBeDefined();
+    expect(ui.custom).toHaveBeenCalledTimes(2);
+    expect(ui.editor).toHaveBeenCalledTimes(2);
+  });
+  it("keeps unchanged legacy definitions readable but rejects changed legacy prompts", async () => {
+    const initial = {
+      frontmatter: { name: "MixedCase", description: "Brief" },
+      body: "Original prompt",
+    };
+    const unchanged = uiWith();
+    unchanged.custom.mockResolvedValueOnce(metadata(initial.frontmatter));
+    unchanged.editor.mockResolvedValueOnce(initial.body);
+    expect(await authorAgentDefinition(unchanged, "tintin", initial)).toEqual(
+      initial,
+    );
+    const changed = uiWith();
+    changed.custom.mockResolvedValueOnce(metadata(initial.frontmatter));
+    expect(
+      await authorAgentDefinition(changed, "tintin", initial),
+    ).toBeUndefined();
+    expect(changed.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Tools are required"),
+      "error",
+    );
+    expect(initial.body).toBe("Original prompt");
   });
 });

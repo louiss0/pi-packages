@@ -1,13 +1,12 @@
+import { ConfirmationBox } from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { Component, Focusable, TUI } from "@earendil-works/pi-tui";
 import { createAgentAdvancedForm } from "./agent-advanced-form";
 import {
   AGENT_PROFILES,
-  type AgentFieldDefinition,
   type AgentFrontmatter,
   type AgentRuntime,
 } from "./agent-contracts";
-
 const theme = {
   fg: (_color: string, text: string) => text,
   bold: (text: string) => text,
@@ -22,82 +21,84 @@ const essentials: AgentFrontmatter = {
   tools: "read,grep",
   model: "claude",
 };
-const ENTER = "\r";
-const TAB = "\t";
-const SPACE = " ";
-const NEXT_MODE = "\0";
-const RESET = "\x12";
-const NEST = "\x1b[1;3C";
-const LEAVE = "\x1b[1;3D";
-const NEXT_CHILD = "\x1b[1;3B";
-
-function fixture(
-  runtime: AgentRuntime,
-  names: string[],
-  initial: AgentFrontmatter = essentials,
-) {
+function fixture(runtime: AgentRuntime, names: string[], initial = essentials) {
   const fields = names.map((name) => {
     const field = AGENT_PROFILES[runtime].fields.find(
-      (candidate) => candidate.key === name,
+      (field) => field.key === name,
     );
-    if (!field) throw new Error(`Missing field: ${name}`);
+    if (!field) throw new Error(name);
     return field;
   });
   const done = vi.fn();
-  const form = createAgentAdvancedForm(
-    tui,
-    theme,
-    runtime,
-    "Test section",
-    fields,
-    initial,
+  return {
+    form: createAgentAdvancedForm(
+      tui,
+      theme,
+      runtime,
+      "Test",
+      fields,
+      initial,
+      done,
+    ),
     done,
-  );
-  return { form, done };
+  };
 }
-function keys(form: ReturnType<typeof fixture>["form"], ...inputs: string[]) {
-  inputs.forEach((input) => form.handleInput?.(input));
+function keys(form: Component, ...keys: string[]) {
+  keys.forEach((key) => form.handleInput?.(key));
+}
+function focus(form: Component, name: string) {
+  for (let count = 0; count < 150; count++) {
+    if (
+      form.render(100).some((line) => {
+        const text = line.trim().replace(/^>\s+\[[ x]\]\s+/, "› ");
+        const prefix = `› ${name}`;
+        return (
+          text === prefix ||
+          text.startsWith(`${prefix}:`) ||
+          text.startsWith(`${prefix} (`)
+        );
+      })
+    )
+      return;
+    keys(form, "\t");
+  }
+  throw new Error(`No directly fillable field ${name}`);
+}
+function submit(form: Component & Focusable) {
+  // Form submits with Enter on its final field. Walk forward until the footer
+  // transition is reached; callers stop as soon as their callback fires.
+  keys(form, "\r");
 }
 
-describe("advanced agent section forms", () => {
-  it("renders every section for both runtimes without asking for storage types", () => {
-    for (const runtime of ["tintin", "nico"] as const) {
-      const groups = new Set(
-        AGENT_PROFILES[runtime].fields.map((field) => field.group),
-      );
-      for (const group of groups) {
-        const definitions = AGENT_PROFILES[runtime].fields.filter(
-          (field) =>
-            field.group === group &&
-            !["name", "description", "tools", "model"].includes(field.key),
-        );
-        const form = createAgentAdvancedForm(
-          tui,
-          theme,
-          runtime,
-          group,
-          definitions,
-          essentials,
-          vi.fn(),
-        );
-        const output = form.render(80).join("\n");
-        expect(output).toContain(`Advanced settings — ${group}`);
-        definitions.forEach((field) =>
-          expect(output).toContain(`${field.key}: Use runtime default`),
-        );
-        expect(output).not.toContain("Current:");
-        expect(() => form.render(24)).not.toThrow();
-      }
-    }
+describe("directly fillable advanced section forms", () => {
+  it("shows numeric, text and nested inputs immediately, without activation shortcuts", () => {
+    const { form } = fixture("nico", [
+      "timeoutMs",
+      "machine",
+      "memory",
+      "toolBudget",
+    ]);
+    const output = form.render(100).join("\n");
+    for (const name of [
+      "timeoutMs",
+      "machine",
+      "memory.scope",
+      "memory.path",
+      "toolBudget.hard",
+      "toolBudget.soft",
+    ])
+      expect(output).toContain(name);
+    expect(output).not.toContain("Ctrl+Space");
+    expect(output).not.toContain("Custom settings");
+    expect(output).not.toContain("Alt+");
   });
-
-  it("edits booleans, choices and integer inputs together, with no type dialog", () => {
+  it("fills multiple fields using only typing, value selection and Tab", () => {
     const { form, done } = fixture("tintin", [
       "enabled",
       "thinking",
       "max_turns",
     ]);
-    keys(form, SPACE, SPACE, TAB, SPACE, TAB, "12", ENTER);
+    keys(form, " ", " ", "\t", " ", "\t", "12", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
       enabled: false,
@@ -105,8 +106,34 @@ describe("advanced agent section forms", () => {
       max_turns: 12,
     });
   });
-
-  it("preserves omitted fields, explicit null, false, empty text and empty lists", () => {
+  it("uses the library ConfirmationBox for boolean fields", () => {
+    const render = vi.spyOn(ConfirmationBox.prototype, "render");
+    try {
+      const { form, done } = fixture("tintin", ["enabled"]);
+      expect(form.render(100).join("\n")).toContain("[ ] enabled");
+      expect(render.mock.contexts[0]).toBeInstanceOf(ConfirmationBox);
+      keys(form, " ");
+      expect(form.render(100).join("\n")).toContain("[x] enabled");
+      keys(form, " ", "\r");
+      expect(done).toHaveBeenCalledExactlyOnceWith({
+        ...essentials,
+        enabled: false,
+      });
+    } finally {
+      render.mockRestore();
+    }
+  });
+  it("leaves untouched optional checkboxes omitted", () => {
+    const { form, done } = fixture("tintin", ["enabled"]);
+    keys(form, "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith(essentials);
+  });
+  it("leaves blank optional inputs omitted", () => {
+    const { form, done } = fixture("tintin", ["session_dir", "max_turns"]);
+    keys(form, "\t", "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith(essentials);
+  });
+  it("preserves legacy explicit null, false, empty text and empty lists on a no-op", () => {
     const initial = {
       ...essentials,
       enabled: false,
@@ -116,66 +143,24 @@ describe("advanced agent section forms", () => {
     };
     const { form, done } = fixture(
       "tintin",
-      ["enabled", "color", "display_name", "exclude_extensions", "max_turns"],
+      ["enabled", "color", "display_name", "exclude_extensions"],
       initial,
     );
-    keys(form, ENTER, ENTER, ENTER, ENTER, ENTER);
+    focus(form, "exclude_extensions");
+    submit(form);
     expect(done).toHaveBeenCalledExactlyOnceWith(initial);
-    expect(initial).toEqual({
-      ...essentials,
-      enabled: false,
-      color: null,
-      display_name: "",
-      exclude_extensions: [],
-    });
   });
-
-  it("can reset an existing optional field without deleting other settings", () => {
-    const initial = { ...essentials, enabled: false, max_turns: 5 };
-    const { form, done } = fixture("tintin", ["enabled"], initial);
-    keys(form, RESET, ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith({
+  it("removes an optional input when its existing text is cleared", () => {
+    const { form, done } = fixture("tintin", ["session_dir"], {
       ...essentials,
-      max_turns: 5,
+      session_dir: "sessions",
     });
-    expect(initial.enabled).toBe(false);
+    keys(form, "\x15", "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith(essentials);
   });
-
-  it("offers inheritance behavior and saves an intentional empty selection", () => {
-    const inherit = fixture("tintin", ["skills"]);
-    keys(inherit.form, NEXT_MODE, NEXT_MODE, ENTER);
-    expect(inherit.done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      skills: true,
-    });
-    const empty = fixture("tintin", ["skills"]);
-    keys(empty.form, NEXT_MODE, ENTER);
-    expect(empty.done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      skills: [],
-    });
-  });
-
-  it("uses Nico's supported empty-text representation for an intentional empty selection", () => {
+  it("fills list entries immediately and supports multiline cursor navigation", () => {
     const { form, done } = fixture("nico", ["defaultReads"]);
-    keys(form, NEXT_MODE, ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      defaultReads: "",
-    });
-  });
-
-  it("edits string lists one entry per line instead of selecting list/string types", () => {
-    const { form, done } = fixture("nico", ["defaultReads"]);
-    keys(form, "README.md", "\x1b\r", "CONTEXT.md", ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      defaultReads: ["README.md", "CONTEXT.md"],
-    });
-  });
-
-  it("moves the multiline cursor with arrows without switching to another form field", () => {
-    const { form, done } = fixture("nico", ["defaultReads"]);
+    focus(form, "defaultReads");
     keys(
       form,
       "README.md",
@@ -184,116 +169,135 @@ describe("advanced agent section forms", () => {
       "\x1b[A",
       "\x01",
       "prefix-",
-      ENTER,
+      "\r",
     );
     expect(done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
       defaultReads: ["prefix-README.md", "CONTEXT.md"],
     });
   });
-
-  it("preserves existing list storage on an unchanged save", () => {
+  it("offers meaningful inheritance values without requiring them before entering names", () => {
+    const { form, done } = fixture("tintin", ["skills"]);
+    focus(form, "skills");
+    keys(form, "review", "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      skills: ["review"],
+    });
+    const inherit = fixture("tintin", ["skills"]);
+    keys(inherit.form, " ", "\t", "\r");
+    expect(inherit.done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      skills: true,
+    });
+  });
+  it("preserves existing CSV list representations when nothing changed", () => {
     const initial = { ...essentials, skills: "review,diagnose" };
     const { form, done } = fixture("tintin", ["skills"], initial);
-    keys(form, ENTER);
+    focus(form, "skills");
+    submit(form);
     expect(done).toHaveBeenCalledExactlyOnceWith(initial);
   });
-
-  it("embeds nested settings in the form and validates their requirements", () => {
+  it("makes nested settings ordinary form fields navigable with Tab", () => {
     const { form, done } = fixture("nico", ["toolBudget"]);
-    keys(form, NEXT_MODE, NEST, "10", NEXT_CHILD, "5", LEAVE, ENTER);
+    keys(form, "10", "\t", "5");
+    focus(form, "toolBudget.block");
+    keys(form, "write", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
-      toolBudget: { hard: 10, soft: 5 },
+      toolBudget: { hard: 10, soft: 5, block: ["write"] },
     });
   });
-
-  it("allows specific blocked tools instead of restricting a list to its scalar wildcard shorthand", () => {
-    const initial = { ...essentials, toolBudget: { hard: 10, block: "*" } };
-    const { form, done } = fixture("nico", ["toolBudget"], initial);
-    keys(
-      form,
-      NEST,
-      NEXT_CHILD,
-      NEXT_CHILD,
-      NEXT_MODE,
-      "\x15",
-      "write",
-      LEAVE,
-      ENTER,
-    );
-    expect(done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      toolBudget: { hard: 10, block: ["write"] },
-    });
-  });
-
-  it("keeps the form open for invalid numbers and revalidates corrections", () => {
+  it("validates numbers and keeps the form open for corrections", () => {
     const { form, done } = fixture("tintin", ["max_turns"]);
-    keys(form, "not a number", ENTER);
+    keys(form, "wrong", "\r");
     expect(done).not.toHaveBeenCalled();
-    expect(form.render(80).join("\n")).toContain("Enter a safe whole number");
-    keys(form, "\x15", "-1", ENTER);
+    expect(form.render(100).join("\n")).toContain("safe whole number");
+    keys(form, "\x15", "-1", "\r");
     expect(done).not.toHaveBeenCalled();
-    expect(form.render(80).join("\n")).toContain("must be non-negative");
-    keys(form, "\x15", "0", ENTER);
+    expect(form.render(100).join("\n")).toContain("must be non-negative");
+    keys(form, "\x15", "0", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
       max_turns: 0,
     });
   });
-
-  it("validates cross-field rules before applying a section", () => {
+  it("validates cross-field limits before applying the section", () => {
     const { form, done } = fixture("nico", ["toolBudget"], {
       ...essentials,
       toolBudget: { hard: 10, soft: 20 },
     });
-    keys(form, ENTER);
+    focus(form, "toolBudget.block");
+    submit(form);
     expect(done).not.toHaveBeenCalled();
-    expect(form.render(80).join("\n")).toContain(
-      "soft: must be <= toolBudget.hard",
-    );
+    expect(form.render(100).join("\n")).toContain("soft: must be <=");
   });
-
-  it("edits arbitrary structured settings without a type-selection question", () => {
-    const initial = {
+  it("embeds enumerated-list checkboxes in the same form", () => {
+    const { form, done } = fixture("nico", ["acceptance"], {
       ...essentials,
-      outputSchema: {
-        type: "object",
-        properties: { status: { type: "string" } },
+      acceptance: { level: "checked" },
+    });
+    focus(form, "acceptance.evidence");
+    keys(form, " ", "\x1b[B", " ");
+    expect(form.render(100).join("\n")).toContain("[x] tests-added");
+    focus(form, "acceptance.reason");
+    submit(form);
+    expect(done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      acceptance: {
+        level: "checked",
+        evidence: ["changed-files", "tests-added"],
       },
-    };
-    const { form, done } = fixture("nico", ["outputSchema"], initial);
-    keys(form, ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith(initial);
-    expect(form.render(80).join("\n")).toContain("Structured settings (JSON)");
+    });
   });
-
-  it("rejects invalid JSON without throwing from rendering or Form value collection", () => {
+  it("fills structured collections as JSON in an already visible field", () => {
+    const { form, done } = fixture("nico", ["acceptance"], {
+      ...essentials,
+      acceptance: { level: "checked" },
+    });
+    focus(form, "acceptance.verify");
+    keys(form, '[{"id":"test","command":"pnpm test"}]');
+    focus(form, "acceptance.reason");
+    submit(form);
+    expect(done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      acceptance: {
+        level: "checked",
+        verify: [{ id: "test", command: "pnpm test" }],
+      },
+    });
+  });
+  it("edits arbitrary mappings directly as JSON, without a type question", () => {
     const { form, done } = fixture("nico", ["permissions"]);
-    keys(form, NEXT_MODE, "\x15", "{bad", ENTER);
+    keys(form, '{"write":"deny"}', "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      permissions: { write: "deny" },
+    });
+  });
+  it("rejects invalid JSON without throwing during rendering or value collection", () => {
+    const { form, done } = fixture("nico", ["permissions"]);
+    keys(form, "{bad", "\r");
     expect(done).not.toHaveBeenCalled();
-    expect(form.render(80).join("\n")).toContain("Enter valid JSON");
+    expect(form.render(100).join("\n")).toContain("Enter valid JSON");
   });
-
-  it("cancels the whole section without mutating the initial frontmatter", () => {
-    const initial = { ...essentials, enabled: true };
+  it("cancels without changing the initial definition", () => {
+    const initial = { ...essentials, enabled: false };
     const { form, done } = fixture("tintin", ["enabled"], initial);
-    keys(form, NEXT_MODE, "\x1b");
+    keys(form, " ", "\x1b");
     expect(done).toHaveBeenCalledExactlyOnceWith(null);
-    expect(initial.enabled).toBe(true);
+    expect(initial.enabled).toBe(false);
   });
-
-  it("keeps the active control visible when the section exceeds the terminal height", () => {
-    const smallTui = {
+  it("keeps focused fields visible in a small terminal", () => {
+    const small = {
       requestRender: vi.fn(),
-      terminal: { rows: 24, columns: 80 },
+      terminal: { rows: 24, columns: 100 },
     } as unknown as TUI;
     const fields = AGENT_PROFILES.tintin.fields.filter(
       (field) => field.group === "Execution",
     );
     const form = createAgentAdvancedForm(
-      smallTui,
+      small,
       theme,
       "tintin",
       "Execution",
@@ -301,82 +305,8 @@ describe("advanced agent section forms", () => {
       essentials,
       vi.fn(),
     );
-    expect(form.render(80).length).toBeLessThanOrEqual(19);
-    expect(form.render(80).join("\n")).toContain("› max_turns");
-    fields.slice(1).forEach(() => keys(form, TAB));
-    const output = form.render(80);
-    expect(output.length).toBeLessThanOrEqual(19);
-    expect(output.join("\n")).toContain("› isolated");
-    expect(output.join("\n")).toContain("Enter next/apply");
-    keys(form, TAB);
-    expect(form.render(80).join("\n")).toContain("› max_turns");
-  });
-
-  it("keeps validation feedback visible when the invalid field is offscreen", () => {
-    const smallTui = {
-      requestRender: vi.fn(),
-      terminal: { rows: 24, columns: 80 },
-    } as unknown as TUI;
-    const fields = AGENT_PROFILES.tintin.fields.filter(
-      (field) => field.group === "Execution",
-    );
-    const done = vi.fn();
-    const form = createAgentAdvancedForm(
-      smallTui,
-      theme,
-      "tintin",
-      "Execution",
-      fields,
-      { ...essentials, max_turns: -1 },
-      done,
-    );
-    fields.forEach(() => keys(form, ENTER));
-    expect(done).not.toHaveBeenCalled();
-    expect(form.render(80).join("\n")).toContain("must be non-negative");
-    expect(form.render(80).length).toBeLessThanOrEqual(19);
-  });
-
-  it("preserves nested false values and structured collection entries on a no-op", () => {
-    const initial: AgentFrontmatter = {
-      ...essentials,
-      acceptance: {
-        level: "checked",
-        preserveStagedIndex: true,
-        criteria: [
-          { id: "tests", must: "Pass tests", evidence: ["commands-run"] },
-        ],
-        review: { agent: "reviewer", required: false },
-      },
-    };
-    const { form, done } = fixture("nico", ["acceptance"], initial);
-    keys(form, ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith(initial);
-    expect(form.render(80).join("\n")).toContain("criteria: Specific entries");
-  });
-
-  it("uses checkbox selections for enumerated list entries", () => {
-    const definition: AgentFieldDefinition = {
-      key: "skills",
-      group: "Context",
-      description: "Choose skills",
-      kinds: ["list"],
-      choices: ["review", "diagnose"],
-    };
-    const done = vi.fn();
-    const form = createAgentAdvancedForm(
-      tui,
-      theme,
-      "tintin",
-      "Context",
-      [definition],
-      essentials,
-      done,
-    );
-    keys(form, NEXT_MODE, SPACE, "\x1b[C", SPACE, ENTER);
-    expect(done).toHaveBeenCalledExactlyOnceWith({
-      ...essentials,
-      skills: ["review", "diagnose"],
-    });
-    expect(form.render(80).join("\n")).toContain("[x] diagnose");
+    focus(form, "isolated");
+    expect(form.render(100).length).toBeLessThanOrEqual(19);
+    expect(form.render(100).join("\n")).toContain("[ ] isolated");
   });
 });
