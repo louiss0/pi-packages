@@ -104,6 +104,42 @@ describe("createPromptArgumentsForm", () => {
     expect(renderedForm).toContain("project");
     expect(renderedForm).toContain("notes");
   });
+
+  it("focuses the first argument and submits through the supplied callback", () => {
+    const done = vi.fn();
+    const form = createPromptArgumentsForm({
+      commandName: "release",
+      argumentFields: [
+        { name: "project", required: true, position: 1, initialValue: "" },
+      ],
+      tui: createTui(),
+      theme: createTheme(),
+      done,
+    });
+
+    expect(form.focused).toBe(true);
+    form.handleInput("pkg");
+    form.handleInput("\r");
+
+    expect(done).toHaveBeenCalledExactlyOnceWith({ project: "pkg" });
+  });
+
+  it("cancels through the supplied callback", () => {
+    const done = vi.fn();
+    const form = createPromptArgumentsForm({
+      commandName: "release",
+      argumentFields: [
+        { name: "project", required: true, position: 1, initialValue: "" },
+      ],
+      tui: createTui(),
+      theme: createTheme(),
+      done,
+    });
+
+    form.handleInput("\x1b");
+
+    expect(done).toHaveBeenCalledExactlyOnceWith(null);
+  });
 });
 
 describe("buildPromptInvocation", () => {

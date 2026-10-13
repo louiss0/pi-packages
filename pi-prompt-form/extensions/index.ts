@@ -234,7 +234,7 @@ export function createPromptArgumentsForm({
 }: PromptArgumentsFormOptions) {
   const schema = createPromptArgumentsSchema(argumentFields);
 
-  return new Form<Record<string, string>>(
+  const form = new Form<Record<string, string>>(
     {
       title: `Fill /${commandName}`,
       fields: argumentFields.map(
@@ -249,6 +249,9 @@ export function createPromptArgumentsForm({
     tui,
     done,
   );
+  form.focused = true;
+
+  return form;
 }
 
 function createPromptArgumentsSchema(argumentFields: PromptArgumentField[]) {
