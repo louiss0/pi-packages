@@ -40,8 +40,7 @@ function keys(form: Component, ...data: string[]) {
   data.forEach((key) => form.handleInput?.(key));
 }
 function submit(form: Component) {
-  for (let index = 0; index < 4; index++)
-    keys(form, "\t");
+  for (let index = 0; index < 4; index++) keys(form, "\t");
   keys(form, "\r");
 }
 
@@ -122,17 +121,17 @@ describe("subagent metadata form", () => {
       advanced: false,
     });
   });
-  it.each(["../escape", "nul"])(
-    "rejects an unsafe name-derived filename: %s",
-    (name) => {
-      const { form, done } = fixture({ ...essentials, name });
-      submit(form);
-      expect(done).not.toHaveBeenCalled();
-      expect(form.render(100).join("\n")).toContain(
-        "Name must be safe for a filename",
-      );
-    },
-  );
+  it.each([
+    "../escape",
+    "nul",
+  ])("rejects an unsafe name-derived filename: %s", (name) => {
+    const { form, done } = fixture({ ...essentials, name });
+    submit(form);
+    expect(done).not.toHaveBeenCalled();
+    expect(form.render(100).join("\n")).toContain(
+      "Name must be safe for a filename",
+    );
+  });
   it("lets tool arrows navigate the embedded multiselect instead of changing fields", () => {
     const { form, done } = fixture();
     keys(form, "\t", "\t", "\t", "\x1b[B", " ", "\t", "\r");

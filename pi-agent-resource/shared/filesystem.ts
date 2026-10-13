@@ -44,7 +44,11 @@ export interface ResourceFileSystem {
   readFile(path: string): Promise<ResourceResult<string>>;
   removeDirectory(path: string): Promise<ResourceResult<void>>;
   removeFile(path: string): Promise<ResourceResult<void>>;
-  writeFile(path: string, content: string, options?: ResourceWriteOptions): Promise<ResourceResult<void>>;
+  writeFile(
+    path: string,
+    content: string,
+    options?: ResourceWriteOptions,
+  ): Promise<ResourceResult<void>>;
 }
 
 export interface ResourcePathResolver {
@@ -106,7 +110,10 @@ export class PathResolver implements ResourcePathResolver {
   }
 
   resolveLocalAgentPath(path = "") {
-    return this.#resolvePath(join(this.#cwd, CONFIG_DIR_NAME, this.#agentFolder), path);
+    return this.#resolvePath(
+      join(this.#cwd, CONFIG_DIR_NAME, this.#agentFolder),
+      path,
+    );
   }
 
   resolveGlobalPromptPath(path = "") {
@@ -192,14 +199,21 @@ export class NodeFileSystem implements ResourceFileSystem {
   writeFile(path: string, content: string, options: ResourceWriteOptions = {}) {
     return getResourceResult(async () => {
       if (!options.atomic) {
-        await nodeWriteFile(path, content, { encoding: "utf-8", flag: options.exclusive ? "wx" : "w" });
+        await nodeWriteFile(path, content, {
+          encoding: "utf-8",
+          flag: options.exclusive ? "wx" : "w",
+        });
         return;
       }
       const temporary = join(dirname(path), `.resource-${randomUUID()}.tmp`);
       let mode = 0o600;
       if (!options.exclusive) mode = (await nodeStat(path)).mode;
       try {
-        await nodeWriteFile(temporary, content, { encoding: "utf-8", flag: "wx", mode });
+        await nodeWriteFile(temporary, content, {
+          encoding: "utf-8",
+          flag: "wx",
+          mode,
+        });
         if (options.exclusive) await nodeLink(temporary, path);
         else await nodeRename(temporary, path);
       } finally {
@@ -284,9 +298,16 @@ export class MemoryFileSystem implements ResourceFileSystem {
   removeFile(path: string): Promise<ResourceResult<void>> {
     return getResourceResult(() => memoryFs.promises.rm(path, { force: true }));
   }
-  writeFile(path: string, content: string, options: ResourceWriteOptions = {}): Promise<ResourceResult<void>> {
+  writeFile(
+    path: string,
+    content: string,
+    options: ResourceWriteOptions = {},
+  ): Promise<ResourceResult<void>> {
     return getResourceResult(() =>
-      memoryFs.promises.writeFile(path, content, { encoding: "utf8", flag: options.exclusive ? "wx" : "w" }),
+      memoryFs.promises.writeFile(path, content, {
+        encoding: "utf8",
+        flag: options.exclusive ? "wx" : "w",
+      }),
     );
   }
 }

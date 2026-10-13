@@ -1253,7 +1253,9 @@ export function renderAgentMarkdown(
   if (runtime === "nico") {
     for (const [key, value] of Object.entries(frontmatter)) {
       if (Array.isArray(value) && value.length === 0)
-        throw new Error(`${key}: Nico reads an empty YAML list as the literal selector "[]"; omit the field or use empty text.`);
+        throw new Error(
+          `${key}: Nico reads an empty YAML list as the literal selector "[]"; omit the field or use empty text.`,
+        );
     }
   }
   // Quote ordinary strings, not booleans/null/numbers. In particular on,
@@ -1265,22 +1267,39 @@ export function renderAgentMarkdown(
     lineWidth: 0,
     aliasDuplicateObjects: false,
   };
-  const header = Object.entries(frontmatter).map(([key, value]) => {
-    if (runtime === "nico" && Array.isArray(value)) {
-      const items = value.map((item) => {
-        const plain = typeof item === "string"
-          ? stringify(item, { ...options, defaultStringType: "PLAIN" }).trimEnd()
-          : "";
-        if (!plain || plain !== item || plain.includes(",") || plain.includes("\n"))
-          throw new Error(`${key}: Nico list items must be plain, comma-free strings; use comma-separated text or omit this field.`);
-        return `  - ${plain}\n`;
-      });
-      return `${key}:\n${items.join("")}`;
-    }
-    if (runtime === "nico" && (key === "toolBudget" || key === "outputSchema") && isRecord(value))
-      return `${key}: ${JSON.stringify(value)}\n`;
-    return stringify({ [key]: value }, options);
-  }).join("");
+  const header = Object.entries(frontmatter)
+    .map(([key, value]) => {
+      if (runtime === "nico" && Array.isArray(value)) {
+        const items = value.map((item) => {
+          const plain =
+            typeof item === "string"
+              ? stringify(item, {
+                  ...options,
+                  defaultStringType: "PLAIN",
+                }).trimEnd()
+              : "";
+          if (
+            !plain ||
+            plain !== item ||
+            plain.includes(",") ||
+            plain.includes("\n")
+          )
+            throw new Error(
+              `${key}: Nico list items must be plain, comma-free strings; use comma-separated text or omit this field.`,
+            );
+          return `  - ${plain}\n`;
+        });
+        return `${key}:\n${items.join("")}`;
+      }
+      if (
+        runtime === "nico" &&
+        (key === "toolBudget" || key === "outputSchema") &&
+        isRecord(value)
+      )
+        return `${key}: ${JSON.stringify(value)}\n`;
+      return stringify({ [key]: value }, options);
+    })
+    .join("");
   return `---\n${header}---\n${body}`;
 }
 

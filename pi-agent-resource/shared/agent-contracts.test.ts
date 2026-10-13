@@ -448,9 +448,16 @@ max_turns: 30`),
     ).toEqual(frontmatter);
   });
   it("reads legacy Nico empty lists without re-emitting them as literal selectors", () => {
-    const legacy = parseAgentMarkdown("nico", markdown("name: scout\ndescription: Recon\nextensions: []"));
+    const legacy = parseAgentMarkdown(
+      "nico",
+      markdown("name: scout\ndescription: Recon\nextensions: []"),
+    );
     expect(legacy.frontmatter.extensions).toEqual([]);
-    expect(() => renderAgentMarkdown("nico", legacy.frontmatter, legacy.body)).toThrow('extensions: Nico reads an empty YAML list as the literal selector "[]"');
+    expect(() =>
+      renderAgentMarkdown("nico", legacy.frontmatter, legacy.body),
+    ).toThrow(
+      'extensions: Nico reads an empty YAML list as the literal selector "[]"',
+    );
   });
   it("accepts comma scalar and YAML block/flow lists without normalization", () => {
     const frontmatter = parseAgentMarkdown(
