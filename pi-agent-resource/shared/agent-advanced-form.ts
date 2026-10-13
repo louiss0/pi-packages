@@ -15,8 +15,9 @@ import {
   type AgentValue,
 } from "./agent-contracts";
 import {
-  AgentChoiceField,
-  AgentInputField,
+  createAgentChoiceField,
+  createAgentInputField,
+  type AgentFieldBinding,
   type ValueChoice,
 } from "./agent-form-fields";
 import { agentFormViewport } from "./agent-form-viewport";
@@ -42,6 +43,7 @@ export function createAgentAdvancedForm(
 ): Component & Focusable {
   const fields: FormComponent[] = [];
   const owners = new Map<string, string>();
+  const changeHandlers = new Map<string, () => void>();
   function build(
     definition: AgentFieldDefinition,
     path: string,
@@ -57,27 +59,20 @@ export function createAgentAdvancedForm(
         theme,
         `${path}${value === undefined ? " (leave untouched for runtime default)" : ""}`,
       );
-      if (value === true) checkbox.confirm();
+      checkbox.setValue(value === true);
       fields.push(checkbox);
       owners.set(checkbox.name, path);
       let touched = false;
       let omitted = false;
-      // Reuse the library's checkbox and input behavior. Only observe changes
-      // here to distinguish an untouched optional field from explicit false.
-      const handleInput = checkbox.handleInput.bind(checkbox);
-      checkbox.handleInput = (data) => {
-        const before = checkbox.value;
-        handleInput(data);
-        if (checkbox.value !== before) {
-          touched = true;
-          omitted = false;
-          onChange();
-        }
-      };
+      changeHandlers.set(path, () => {
+        touched = true;
+        omitted = false;
+        onChange();
+      });
       return {
         changed: () => touched,
         reset: () => {
-          if (checkbox.value) checkbox.toggle();
+          checkbox.setValue(false);
           touched = true;
           omitted = true;
         },
@@ -89,9 +84,12 @@ export function createAgentAdvancedForm(
             : structuredClone(value),
       };
     }
-    let input: AgentInputField | undefined;
-    let selector: AgentChoiceField | undefined;
+    let input: AgentFieldBinding | undefined;
+    let selector: AgentFieldBinding | undefined;
     let list: FormComponent | undefined;
+    let listChanged = false;
+    let listOmitted = false;
+    let resetList = () => {};
     const children: Array<{ key: string; node: Node }> = [];
     const changed = () => {
       selector?.reset();
@@ -128,19 +126,21 @@ export function createAgentAdvancedForm(
     )
       choices.push({ label: "No entries", value: [] });
     if (choices.length > 1) {
-      selector = new AgentChoiceField(
+      selector = createAgentChoiceField(
+        tui,
+        theme,
         `${path}${definition.kinds.includes("list") || definition.kinds.includes("map") || (definition.kinds.includes("string") && !definition.choices) || definition.kinds.includes("integer") ? " behavior" : ""}`,
         choices,
         value,
-        theme,
         () => {
           input?.reset();
           children.forEach(({ node }) => node.reset());
           onChange();
         },
       );
-      fields.push(selector);
-      owners.set(selector.name, path);
+      fields.push(selector.component);
+      owners.set(selector.component.name, path);
+      changeHandlers.set(selector.component.name, selector.handleChange);
     }
     if (
       definition.kinds.includes("map") &&
@@ -166,7 +166,7 @@ export function createAgentAdvancedForm(
       const initialValues = Array.isArray(value)
         ? value.filter((item): item is string => typeof item === "string")
         : [];
-      list = new MultiSelect(
+      const control = new MultiSelect(
         path,
         {
           items: definition.choices.map((value) => ({ value, label: value })),
@@ -177,8 +177,19 @@ export function createAgentAdvancedForm(
         theme,
         () => {},
       );
-      fields.push(list);
-      owners.set(list.name, path);
+      list = control;
+      fields.push(control);
+      owners.set(control.name, path);
+      changeHandlers.set(control.name, () => {
+        listChanged = true;
+        listOmitted = false;
+        changed();
+      });
+      resetList = () => {
+        control.setValues([]);
+        listChanged = true;
+        listOmitted = true;
+      };
     } else if (
       definition.kinds.includes("integer") ||
       definition.kinds.includes("list") ||
@@ -194,31 +205,32 @@ export function createAgentAdvancedForm(
             : definition.kinds.includes("integer")
               ? "number"
               : "text";
-      input = new AgentInputField(
+      input = createAgentInputField(
+        tui,
+        theme,
         path,
         kind,
         value,
-        tui,
-        theme,
         changed,
         definition.description,
       );
-      fields.push(input);
-      owners.set(input.name, path);
+      fields.push(input.component);
+      owners.set(input.component.name, path);
+      changeHandlers.set(input.component.name, input.handleChange);
     }
-    const listInitial = list?.value;
     const isChanged = (): boolean =>
       Boolean(
         input?.changed ||
           selector?.changed ||
           children.some(({ node }) => node.changed()) ||
-          (list && list.value !== listInitial),
+          listChanged,
       );
     return {
       changed: isChanged,
       reset: () => {
         input?.reset();
         selector?.reset();
+        resetList();
         children.forEach(({ node }) => node.reset());
       },
       read: () => {
@@ -239,7 +251,12 @@ export function createAgentAdvancedForm(
           });
           return entries.length ? Object.fromEntries(entries) : undefined;
         }
-        if (list) return list.value ? String(list.value).split(",") : undefined;
+        if (list)
+          return listOmitted
+            ? undefined
+            : list.value
+              ? String(list.value).split(",")
+              : [];
         return input?.readValue();
       },
     };
@@ -308,7 +325,7 @@ export function createAgentAdvancedForm(
     }
     return { candidate, errors };
   }
-  const form = new Form<Record<string, string>>(
+  const form = new Form<Record<string, string | boolean>>(
     {
       title: `Advanced settings — ${title}`,
       fields,
@@ -320,6 +337,7 @@ export function createAgentAdvancedForm(
       footer:
         "Tab switch field | Enter next/apply | Esc cancel section\nLeave optional inputs blank for runtime defaults | Shift+Enter newline",
       spacing: 1,
+      onFieldChange: (name) => changeHandlers.get(name)?.(),
     },
     tui,
     (values) => done(values === null ? null : collect().candidate),

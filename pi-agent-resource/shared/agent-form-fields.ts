@@ -1,8 +1,11 @@
-import type { FormComponent } from "@code-fixer-23/pi-form-components";
+import {
+  LabelledInput,
+  Picker,
+  type FormComponent,
+} from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   Editor,
-  Input,
   Key,
   matchesKey,
   Text,
@@ -11,113 +14,136 @@ import {
 import type { AgentValue } from "./agent-contracts";
 
 export type ValueChoice = { label: string; value: AgentValue | undefined };
+export type AgentFieldBinding = {
+  component: FormComponent;
+  changed: boolean;
+  handleChange(): void;
+  reset(): void;
+  readValue(): AgentValue | undefined;
+};
 
-/** A directly usable value selector; never asks for a storage type. */
-export class AgentChoiceField implements FormComponent {
-  private index = 0;
-  private focused = false;
-  private readonly error = new Text("");
-  changed = false;
-  constructor(
-    readonly name: string,
-    private choices: readonly ValueChoice[],
-    initial: AgentValue | undefined,
-    private theme: Theme,
-    private onChange: () => void = () => {},
-  ) {
-    const index = choices.findIndex((choice) => choice.value === initial);
-    if (index >= 0) this.index = index;
-  }
-  get value(): string {
-    return String(this.index);
-  }
-  readValue() {
-    return this.choices[this.index].value;
-  }
-  reset() {
-    this.index = 0;
-    this.changed = true;
-  }
-  capturesInput(data: string) {
-    return matchesKey(data, Key.up) || matchesKey(data, Key.down);
-  }
-  setFocused(value: boolean) {
-    this.focused = value;
-  }
-  setError(messages: string[]) {
-    this.error.setText(this.theme.fg("error", messages.join("\n")));
-  }
-  clearError() {
-    this.error.setText("");
-  }
-  invalidate() {
-    this.error.invalidate();
-  }
-  handleInput(data: string) {
-    const direction =
-      matchesKey(data, Key.up) || matchesKey(data, Key.left)
-        ? -1
-        : matchesKey(data, Key.down) ||
-            matchesKey(data, Key.right) ||
-            matchesKey(data, Key.space)
-          ? 1
-          : 0;
-    if (direction) {
-      this.index =
-        (this.index + direction + this.choices.length) % this.choices.length;
-      this.changed = true;
-      this.onChange();
-    }
-  }
-  render(width: number) {
-    return [
-      ...new Text(
-        this.theme.fg(
-          "accent",
-          `${this.focused ? "›" : " "} ${this.name}: ${this.choices[this.index].label}  (←→/Space)`,
-        ),
-      ).render(width),
-      ...this.error.render(width),
-    ];
-  }
+/** Domain value mapping only: the library owns selection and rendering. */
+export function createAgentChoiceField(
+  tui: TUI,
+  theme: Theme,
+  name: string,
+  choices: readonly ValueChoice[],
+  initial: AgentValue | undefined,
+  onChange: () => void,
+): AgentFieldBinding {
+  const component = new Picker(
+    name,
+    {
+      items: choices.map((choice) => choice.label),
+      itemLimit: 3,
+      initialValue: (
+        choices.find((choice) => choice.value === initial) ?? choices[0]
+      ).label,
+      helpText: "↑↓ select value | Type to filter | Tab next field",
+    },
+    theme,
+    tui,
+    () => {},
+  );
+  const binding: AgentFieldBinding = {
+    component,
+    changed: false,
+    handleChange: () => {
+      binding.changed = true;
+      onChange();
+    },
+    reset: () => {
+      component.setValue(choices[0].label);
+      binding.changed = true;
+    },
+    readValue: () => {
+      const choice = choices.find((choice) => choice.label === component.value);
+      if (!choice) throw new Error("Select one of the available values");
+      return choice.value;
+    },
+  };
+  return binding;
 }
 
-/** Text, number, list and JSON inputs are visible and editable immediately. */
-export class AgentInputField implements FormComponent {
-  private readonly input = new Input();
+/** Text and numeric inputs reuse LabelledInput; only multiline needs an adapter. */
+export function createAgentInputField(
+  tui: TUI,
+  theme: Theme,
+  name: string,
+  kind: "text" | "number" | "entries" | "json",
+  initial: AgentValue | undefined,
+  onChange: () => void,
+  description: string,
+): AgentFieldBinding {
+  const text =
+    kind === "json"
+      ? initial === undefined || initial === null
+        ? ""
+        : JSON.stringify(initial, null, 2)
+      : kind === "entries"
+        ? Array.isArray(initial)
+          ? initial.join("\n")
+          : typeof initial === "string"
+            ? initial
+                .split(",")
+                .map((item) => item.trim())
+                .join("\n")
+            : ""
+        : typeof initial === "string" || typeof initial === "number"
+          ? String(initial)
+          : "";
+  const component =
+    kind === "entries" || kind === "json"
+      ? new AgentMultilineField(name, kind, text, tui, theme, description)
+      : new LabelledInput(name, theme, text);
+  const binding: AgentFieldBinding = {
+    component,
+    changed: false,
+    handleChange: () => {
+      binding.changed = true;
+      onChange();
+    },
+    reset: () => {
+      component.setValue("");
+      binding.changed = true;
+    },
+    readValue: () => {
+      if (!binding.changed) return initial;
+      const text = component.value;
+      if (text === "") return undefined;
+      if (kind === "text") return text;
+      if (kind === "entries") return text.split(/\r?\n/);
+      if (kind === "number") {
+        const number = Number(text);
+        if (!/^-?\d+$/.test(text) || !Number.isSafeInteger(number))
+          throw new Error("Enter a safe whole number");
+        return number;
+      }
+      try {
+        return JSON.parse(text) as AgentValue;
+      } catch (error) {
+        throw new Error("Enter valid JSON for these structured settings", {
+          cause: error,
+        });
+      }
+    },
+  };
+  return binding;
+}
+
+/** The form library has no multiline field; adapt Pi's Editor, not a new input. */
+class AgentMultilineField implements FormComponent {
   private readonly editor: Editor;
   private readonly error = new Text("");
   private focused = false;
-  private readonly initialText: string;
-  changed = false;
   constructor(
     readonly name: string,
-    private kind: "text" | "number" | "entries" | "json",
-    private initial: AgentValue | undefined,
+    private kind: "entries" | "json",
+    initialText: string,
     tui: TUI,
     private theme: Theme,
-    private onChange: () => void = () => {},
-    private description = "",
+    private description: string,
   ) {
-    this.initialText =
-      kind === "json"
-        ? initial === undefined || initial === null
-          ? ""
-          : JSON.stringify(initial, null, 2)
-        : kind === "entries"
-          ? Array.isArray(initial)
-            ? initial.join("\n")
-            : typeof initial === "string"
-              ? initial
-                  .split(",")
-                  .map((item) => item.trim())
-                  .join("\n")
-              : ""
-          : typeof initial === "string" || typeof initial === "number"
-            ? String(initial)
-            : "";
-    this.input.setValue(this.initialText);
-    this.input.handleInput("\x05");
     this.editor = new Editor(tui, {
       borderColor: (text) => theme.fg("borderAccent", text),
       selectList: {
@@ -128,50 +154,20 @@ export class AgentInputField implements FormComponent {
         noMatch: (text) => theme.fg("warning", text),
       },
     });
-    this.editor.setText(this.initialText);
-  }
-  private get multiline() {
-    return this.kind === "entries" || this.kind === "json";
+    this.editor.setText(initialText);
   }
   get value(): string {
-    return this.multiline
-      ? this.editor.getExpandedText()
-      : this.input.getValue();
+    return this.editor.getExpandedText();
   }
-  reset() {
-    this.input.setValue("");
-    this.editor.setText("");
-    this.changed = true;
-  }
-  readValue(): AgentValue | undefined {
-    if (!this.changed) return this.initial;
-    const text = this.value;
-    if (text === "") return undefined;
-    if (this.kind === "text") return text;
-    if (this.kind === "entries") return text.split(/\r?\n/);
-    if (this.kind === "number") {
-      const number = Number(text);
-      if (!/^-?\d+$/.test(text) || !Number.isSafeInteger(number))
-        throw new Error("Enter a safe whole number");
-      return number;
-    }
-    try {
-      return JSON.parse(text) as AgentValue;
-    } catch (error) {
-      throw new Error("Enter valid JSON for these structured settings", {
-        cause: error,
-      });
-    }
+  setValue(value: string) {
+    this.editor.setText(value);
   }
   capturesInput(data: string) {
-    return (
-      this.multiline && (matchesKey(data, Key.up) || matchesKey(data, Key.down))
-    );
+    return matchesKey(data, Key.up) || matchesKey(data, Key.down);
   }
   setFocused(value: boolean) {
     this.focused = value;
-    this.input.focused = value && !this.multiline;
-    this.editor.focused = value && this.multiline;
+    this.editor.focused = value;
   }
   setError(messages: string[]) {
     this.error.setText(this.theme.fg("error", messages.join("\n")));
@@ -180,27 +176,18 @@ export class AgentInputField implements FormComponent {
     this.error.setText("");
   }
   invalidate() {
-    this.input.invalidate();
     this.editor.invalidate();
     this.error.invalidate();
   }
   handleInput(data: string) {
-    const before = this.value;
-    if (this.multiline) this.editor.handleInput(data);
-    else this.input.handleInput(data);
-    if (before !== this.value) {
-      this.changed = true;
-      this.onChange();
-    }
+    this.editor.handleInput(data);
   }
   render(width: number) {
-    const label = `${this.focused ? "›" : " "} ${this.name}${this.kind === "entries" ? " (one entry per line)" : this.kind === "json" ? " (JSON)" : ""}`;
+    const label = `${this.focused ? "›" : " "} ${this.name} (${this.kind === "entries" ? "one entry per line" : "JSON"})`;
     return [
       ...new Text(this.theme.fg("accent", label)).render(width),
       ...new Text(this.theme.fg("dim", this.description)).render(width),
-      ...(this.multiline
-        ? this.editor.render(width)
-        : this.input.render(width)),
+      ...this.editor.render(width),
       ...this.error.render(width),
     ];
   }

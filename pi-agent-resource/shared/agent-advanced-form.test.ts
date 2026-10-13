@@ -1,4 +1,8 @@
-import { ConfirmationBox } from "@code-fixer-23/pi-form-components";
+import {
+  ConfirmationBox,
+  LabelledInput,
+  Picker,
+} from "@code-fixer-23/pi-form-components";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, Focusable, TUI } from "@earendil-works/pi-tui";
 import { createAgentAdvancedForm } from "./agent-advanced-form";
@@ -98,7 +102,7 @@ describe("directly fillable advanced section forms", () => {
       "thinking",
       "max_turns",
     ]);
-    keys(form, " ", " ", "\t", " ", "\t", "12", "\r");
+    keys(form, " ", " ", "\t", "\x1b[B", "\t", "12", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
       enabled: false,
@@ -111,7 +115,11 @@ describe("directly fillable advanced section forms", () => {
     try {
       const { form, done } = fixture("tintin", ["enabled"]);
       expect(form.render(100).join("\n")).toContain("[ ] enabled");
-      expect(render.mock.contexts[0]).toBeInstanceOf(ConfirmationBox);
+      const checkbox = render.mock.contexts[0];
+      expect(checkbox).toBeInstanceOf(ConfirmationBox);
+      if (!(checkbox instanceof ConfirmationBox))
+        throw new Error("Expected the library checkbox");
+      expect(Object.hasOwn(checkbox, "handleInput")).toBe(false);
       keys(form, " ");
       expect(form.render(100).join("\n")).toContain("[x] enabled");
       keys(form, " ", "\r");
@@ -122,6 +130,54 @@ describe("directly fillable advanced section forms", () => {
     } finally {
       render.mockRestore();
     }
+  });
+  it("reuses library inputs and pickers rather than rendering replacements", () => {
+    const inputRender = vi.spyOn(LabelledInput.prototype, "render");
+    const pickerRender = vi.spyOn(Picker.prototype, "render");
+    try {
+      const { form, done } = fixture("tintin", ["thinking", "max_turns"]);
+      form.render(100);
+      expect(pickerRender.mock.contexts[0]).toBeInstanceOf(Picker);
+      expect(inputRender.mock.contexts[0]).toBeInstanceOf(LabelledInput);
+      keys(form, "\x1b[B", "\t", "12", "\r");
+      expect(done).toHaveBeenCalledExactlyOnceWith({
+        ...essentials,
+        thinking: "off",
+        max_turns: 12,
+      });
+    } finally {
+      inputRender.mockRestore();
+      pickerRender.mockRestore();
+    }
+  });
+  it("requires a real picker choice instead of treating an unmatched filter as omission", () => {
+    const { form, done } = fixture("tintin", ["thinking"]);
+    keys(form, "z", "z", "\r");
+    expect(done).not.toHaveBeenCalled();
+    expect(form.render(100).join("\n")).toContain(
+      "Select one of the available values",
+    );
+    keys(form, "\x15", "\x1b[B", "\r");
+    expect(done).toHaveBeenCalledExactlyOnceWith({
+      ...essentials,
+      thinking: "off",
+    });
+  });
+  it("clears every nested control when restoring runtime defaults", () => {
+    const initial = {
+      ...essentials,
+      acceptance: {
+        level: "checked",
+        evidence: ["commands-run"],
+        reason: "Explain the decision",
+      },
+    };
+    const { form, done } = fixture("nico", ["acceptance"], initial);
+    keys(form, "\x1b[B", "\x1b[A");
+    focus(form, "acceptance.reason");
+    submit(form);
+    expect(done).toHaveBeenCalledExactlyOnceWith(essentials);
+    expect(initial.acceptance.evidence).toEqual(["commands-run"]);
   });
   it("leaves untouched optional checkboxes omitted", () => {
     const { form, done } = fixture("tintin", ["enabled"]);
@@ -185,7 +241,7 @@ describe("directly fillable advanced section forms", () => {
       skills: ["review"],
     });
     const inherit = fixture("tintin", ["skills"]);
-    keys(inherit.form, " ", "\t", "\r");
+    keys(inherit.form, "\x1b[B", "\t", "\r");
     expect(inherit.done).toHaveBeenCalledExactlyOnceWith({
       ...essentials,
       skills: true,
