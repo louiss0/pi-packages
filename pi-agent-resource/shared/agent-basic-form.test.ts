@@ -39,8 +39,8 @@ function fixture(
 function keys(form: Component, ...data: string[]) {
   data.forEach((key) => form.handleInput?.(key));
 }
-function submit(form: Component, mode: "create" | "edit" = "create") {
-  for (let index = 0; index < (mode === "create" ? 5 : 4); index++)
+function submit(form: Component) {
+  for (let index = 0; index < 4; index++)
     keys(form, "\t");
   keys(form, "\r");
 }
@@ -57,6 +57,7 @@ describe("subagent metadata form", () => {
       "Include advanced settings",
     ])
       expect(output).toContain(field);
+    expect(output.toLowerCase()).not.toContain("filename");
     for (const tool of ["read", "write", "edit"])
       expect(output).toContain(`[x] ${tool}`);
   });
@@ -71,7 +72,6 @@ describe("subagent metadata form", () => {
       "claude",
       "\t",
       "\t",
-      "\t",
       "\r",
     );
     expect(done).toHaveBeenCalledExactlyOnceWith({
@@ -80,18 +80,19 @@ describe("subagent metadata form", () => {
       advanced: false,
     });
   });
-  it("allows a different safe filename as an optional field in the same form", () => {
-    const { form, done } = fixture();
-    keys(form, "\t", "\t", "\t", "\t", "Mixed_Case-1", "\t", "\r");
+  it("derives the filename from the agent name", () => {
+    const initial = { ...essentials, name: "code-reviewer" };
+    const { form, done } = fixture(initial);
+    submit(form);
     expect(done).toHaveBeenCalledExactlyOnceWith({
-      frontmatter: essentials,
-      filename: "Mixed_Case-1",
+      frontmatter: initial,
+      filename: "code-reviewer",
       advanced: false,
     });
   });
   it("opens optional advanced settings only when the checkbox is selected", () => {
     const { form, done } = fixture();
-    keys(form, "\t", "\t", "\t", "\t", "\t", " ", "\r");
+    keys(form, "\t", "\t", "\t", "\t", " ", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       frontmatter: essentials,
       filename: "reviewer",
@@ -113,7 +114,6 @@ describe("subagent metadata form", () => {
       "claude",
       "\t",
       "\t",
-      "\t",
       "\r",
     );
     expect(done).toHaveBeenCalledExactlyOnceWith({
@@ -122,15 +122,20 @@ describe("subagent metadata form", () => {
       advanced: false,
     });
   });
-  it("rejects an unsafe filename before completing the metadata form", () => {
-    const { form, done } = fixture();
-    keys(form, "\t", "\t", "\t", "\t", "../escape", "\t", "\r");
-    expect(done).not.toHaveBeenCalled();
-    expect(form.render(100).join("\n")).toContain("safe filename");
-  });
+  it.each(["../escape", "nul"])(
+    "rejects an unsafe name-derived filename: %s",
+    (name) => {
+      const { form, done } = fixture({ ...essentials, name });
+      submit(form);
+      expect(done).not.toHaveBeenCalled();
+      expect(form.render(100).join("\n")).toContain(
+        "Name must be safe for a filename",
+      );
+    },
+  );
   it("lets tool arrows navigate the embedded multiselect instead of changing fields", () => {
     const { form, done } = fixture();
-    keys(form, "\t", "\t", "\t", "\x1b[B", " ", "\t", "\t", "\r");
+    keys(form, "\t", "\t", "\t", "\x1b[B", " ", "\t", "\r");
     expect(done).toHaveBeenCalledExactlyOnceWith({
       frontmatter: { ...essentials, tools: "read,edit" },
       filename: "reviewer",
@@ -163,7 +168,6 @@ describe("subagent metadata form", () => {
       "\x1b[B",
       " ",
       "\t",
-      "\t",
       "\r",
     );
     const extra =
@@ -181,7 +185,7 @@ describe("subagent metadata form", () => {
       tools: "read,ext:absent/tool",
     };
     const { form, done } = fixture(initial, "tintin", "edit");
-    submit(form, "edit");
+    submit(form);
     expect(done).toHaveBeenCalledExactlyOnceWith({
       frontmatter: initial,
       filename: undefined,

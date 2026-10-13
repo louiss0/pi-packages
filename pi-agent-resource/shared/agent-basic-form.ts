@@ -29,7 +29,6 @@ export function createAgentBasicForm(
   available: readonly string[],
   mode: "create" | "edit",
   done: (value: AgentBasicValues | null) => void,
-  initialFilename = "",
   includeAdvanced = false,
 ): Component & Focusable {
   const initialText = (key: string) =>
@@ -81,15 +80,6 @@ export function createAgentBasicForm(
     new LabelledInput("description", theme, initialText("description")),
     new LabelledInput("model", theme, initialText("model")),
     tools,
-    ...(mode === "create"
-      ? [
-          new LabelledInput(
-            "filename (optional; defaults to name)",
-            theme,
-            initialFilename,
-          ),
-        ]
-      : []),
     advanced,
   ];
   type Raw = Record<string, string | boolean>;
@@ -106,12 +96,7 @@ export function createAgentBasicForm(
     }
     return {
       frontmatter,
-      filename:
-        mode === "create"
-          ? String(
-              values["filename (optional; defaults to name)"] || values.name,
-            )
-          : undefined,
+      filename: mode === "create" ? String(values.name) : undefined,
       advanced: Boolean(values.advanced),
     };
   }
@@ -139,14 +124,14 @@ export function createAgentBasicForm(
           !isSafeAgentFilename(result.filename)
         ) {
           const message =
-            "Use a safe filename: letters, numbers, dashes or underscores; no paths or reserved device names";
-          errors["filename (optional; defaults to name)"] = [message];
+            "Name must be safe for a filename: letters, numbers, dashes or underscores; no paths or reserved device names";
+          (errors.name ??= []).push(message);
           messages.push(message);
         }
         return messages.length ? errors : undefined;
       },
       footer:
-        "Tab switch field | Enter next/continue | Esc cancel\nTools: ↑↓ navigate, Space toggle | Optional filename may be left blank",
+        "Tab switch field | Enter next/continue | Esc cancel\nTools: ↑↓ navigate, Space toggle",
       spacing: 1,
     },
     tui,

@@ -58,7 +58,6 @@ export async function authorAgentDefinition(
           availableToolNames,
           mode,
           done,
-          filename,
           includeAdvanced,
         ),
       modalEditorOverlayOptions,
