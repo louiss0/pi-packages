@@ -38,7 +38,6 @@ export async function authorAgentDefinition(
   const profile = AGENT_PROFILES[runtime];
   let frontmatter = structuredClone(initial.frontmatter);
   let body = initial.body;
-  let filename = "";
   let includeAdvanced = false;
   const unchangedMetadata = () =>
     mode === "edit" &&
@@ -64,7 +63,7 @@ export async function authorAgentDefinition(
     );
     if (!metadata) return undefined;
     frontmatter = structuredClone(metadata.frontmatter);
-    filename = metadata.filename ?? "";
+    const filename = metadata.filename ?? "";
     includeAdvanced = metadata.advanced;
     const essentialErrors = unchangedMetadata()
       ? []

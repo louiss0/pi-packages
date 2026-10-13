@@ -996,7 +996,10 @@ function validateNico(fm: AgentFrontmatter, errors: string[]): void {
     if (
       typeof fm.machine === "string" &&
       (fm.machine.trim().length > 128 ||
-        /[\u0000-\u001f\u007f]/u.test(fm.machine))
+        Array.from(fm.machine).some((character) => {
+          const code = character.charCodeAt(0);
+          return code <= 0x1f || code === 0x7f;
+        }))
     )
       errors.push(
         "machine: use at most 128 characters without control characters.",

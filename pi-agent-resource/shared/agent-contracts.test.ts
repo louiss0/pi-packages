@@ -866,6 +866,24 @@ describe("structured acceptance", () => {
 
 describe("runner, machine and launcher contracts", () => {
   it.each([
+    ...Array.from({ length: 32 }, (_, code) => code),
+    0x7f,
+  ])("rejects ASCII control code %i in machine names", (code) => {
+    expect(
+      diagnostics("nico", { machine: `work${String.fromCharCode(code)}mac` }),
+    ).toMatch(/control characters/);
+  });
+  it.each([
+    0x20, 0x7e, 0x80,
+  ])("accepts non-control code %i in machine names", (code) => {
+    expect(
+      validateAgentFrontmatter(
+        "nico",
+        fm("nico", { machine: `work${String.fromCharCode(code)}mac` }),
+      ),
+    ).toEqual([]);
+  });
+  it.each([
     [{}, "runner.type"],
     [{ type: "unknown" }, "one of"],
     [{ type: "pi", command: "node" }, "not supported"],
