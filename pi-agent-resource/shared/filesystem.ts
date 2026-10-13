@@ -18,6 +18,7 @@ export type ResourceDirectoryEntry = {
   name: string;
   isDirectory(): boolean;
   isFile?(): boolean;
+  isSymbolicLink?(): boolean;
 };
 
 export type ResourceWriteOptions = { exclusive?: boolean; atomic?: boolean };
@@ -182,7 +183,9 @@ export class NodeFileSystem implements ResourceFileSystem {
   readDirectoryNames(path: string) {
     return getResourceResult(() => nodeReaddir(path));
   }
-  readDirectoryEntries(path: string) {
+  readDirectoryEntries(
+    path: string,
+  ): Promise<ResourceResult<ResourceDirectoryEntry[]>> {
     return getResourceResult(() => nodeReaddir(path, { withFileTypes: true }));
   }
   readFile(path: string): Promise<ResourceResult<string>> {
@@ -271,6 +274,7 @@ export class MemoryFileSystem implements ResourceFileSystem {
           name: entry.name.toString(),
           isDirectory: () => entry.isDirectory(),
           isFile: () => entry.isFile(),
+          isSymbolicLink: () => entry.isSymbolicLink(),
         });
 
         return directoryEntries;

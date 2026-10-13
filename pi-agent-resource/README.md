@@ -156,13 +156,14 @@ Manages pack containers.
 
 `delete` opens a multi-select list of existing packs and removes all selected pack directories in one run.
 
-#### `resource:pack:skill <create|edit|delete|move-local|move-local-to-pack|move-global|move-global-to-pack>`
+#### `resource:pack:skill <create|edit|delete|invocation|move-local|move-local-to-pack|move-global|move-global-to-pack>`
 
 Manages skills inside packs and moves them between locations.
 
 - `create` adds a new skill to a chosen pack using the same staged required-then-optional metadata flow as the skill manager.
 - `edit` opens the packed skill in the external editor.
 - `delete` removes the skill from the selected pack.
+- `invocation` opens a searchable `pi-form-components` pack picker, then a checkbox list of that pack's skills. Installed packs are available whether or not they are loaded in the current session. Existing `disable-model-invocation: true` skills are preselected; checked means manual `/skill:name` invocation only. Use **Space** to toggle and **Enter** to save and reload once, or **Esc** at either step to cancel. Only the chosen pack's skill files are changed; the active pack selection is not changed, and unloaded packs stay unloaded. Skills use Pi's discovery rules, including nested `SKILL.md` directories and standalone Markdown skills in the pack's `skills` root. Invalid skills and save failures are reported; other metadata and Markdown content are preserved.
 - `move-local` extracts the skill from a pack and places it in the project's local skill directory, removing it from the pack.
 - `move-local-to-pack` imports a local skill into a chosen pack, removing it from the local directory.
 - `move-global` extracts the skill from a pack and promotes it to the global skill store.

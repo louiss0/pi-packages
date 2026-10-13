@@ -34,6 +34,7 @@ import {
 } from "../shared/resource-components";
 import { formOverlayOptions, modalEditorOverlayOptions } from "../shared/ui";
 import { readMcpFile } from "./mcp-craft";
+import { handlePackSkillInvocation } from "../shared/pack-skill-invocation";
 
 const PACK_LABEL = "pack";
 const ROOT_PACK_COMMAND = `resource:${PACK_LABEL}`;
@@ -66,6 +67,11 @@ const packManagementCommands = [
 const packResourceCommands = picklist([
   ...packOrginaizationCommands,
   ...packManagementCommands,
+]);
+
+const packSkillCommands = picklist([
+  ...packResourceCommands.options,
+  "invocation",
 ]);
 
 type PackResourceCommand = (typeof packResourceCommands.options)[number];
@@ -409,7 +415,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand(`${ROOT_PACK_COMMAND}:${SKILL_COMMAND}`, {
     description: "Manage skills in packs",
     getArgumentCompletions: (argumentPrefix) => {
-      return packResourceCommands.options
+      return packSkillCommands.options
         .filter((option) => option.startsWith(argumentPrefix))
         .map((value) => {
           const capitalizedValue =
@@ -422,9 +428,13 @@ export default function (pi: ExtensionAPI) {
         });
     },
     handler: async (arg, ctx) => {
-      const result = safeParse(packResourceCommands, arg);
+      const result = safeParse(packSkillCommands, arg);
       if (!result.success) {
         return ctx.ui.notify(summarize(result.issues), "error");
+      }
+      if (result.output === "invocation") {
+        await handlePackSkillInvocation(ctx);
+        return;
       }
 
       await skillPackResourceReducer(result.output, {

@@ -10,11 +10,37 @@ import {
 } from "./skill-invocation";
 import { modalEditorOverlayOptions } from "./ui";
 
+export type SkillInvocationTarget = { path: string; label: string };
+
 /** Manage the skills Pi actually loaded, including package and .agents skills. */
 export async function handleSkillInvocation(
   ctx: ExtensionCommandContext,
   commands: ReturnType<ExtensionAPI["getCommands"]>,
   fileSystem: ResourceFileSystem = new NodeFileSystem(),
+): Promise<void> {
+  const targets = commands
+    .filter((command) => command.source === "skill")
+    .map((command) => {
+      const scope =
+        command.sourceInfo.scope === "user"
+          ? "global"
+          : command.sourceInfo.scope === "project"
+            ? "local"
+            : "temporary";
+      return {
+        path: command.sourceInfo.path,
+        label: `${command.name.replace(/^skill:/, "")} (${scope})`,
+      };
+    });
+  await handleSkillInvocationTargets(ctx, targets, fileSystem);
+}
+
+/** Shared checkbox/save workflow for loaded skills or skills in an installed pack. */
+export async function handleSkillInvocationTargets(
+  ctx: ExtensionCommandContext,
+  targets: readonly SkillInvocationTarget[],
+  fileSystem: ResourceFileSystem = new NodeFileSystem(),
+  title = "Skill model invocation",
 ): Promise<void> {
   if (ctx.mode !== "tui") {
     ctx.ui.notify("Skill invocation settings require TUI mode", "error");
@@ -27,23 +53,16 @@ export async function handleSkillInvocation(
     disabled: boolean;
   }[] = [];
   const seen = new Set<string>();
-  for (const command of commands) {
-    if (command.source !== "skill" || seen.has(command.sourceInfo.path))
-      continue;
-    const path = command.sourceInfo.path;
+  for (const target of targets) {
+    if (seen.has(target.path)) continue;
+    const path = target.path;
     seen.add(path);
     try {
       const result = await fileSystem.readFile(path);
       if (!result.success) throw result.error;
-      const scope =
-        command.sourceInfo.scope === "user"
-          ? "global"
-          : command.sourceInfo.scope === "project"
-            ? "local"
-            : "temporary";
       skills.push({
         path,
-        label: `${command.name.replace(/^skill:/, "")} (${scope})`,
+        label: target.label,
         content: result.data,
         disabled: isSkillModelInvocationDisabled(result.data),
       });
@@ -63,7 +82,7 @@ export async function handleSkillInvocation(
   const selected = await ctx.ui.custom<string[] | null>(
     (tui, theme, _kb, done) => {
       const list = new MultiSelect(
-        "Skill model invocation",
+        title,
         {
           title:
             "Checked = disable-model-invocation: true (manual /skill:name only)\n↑↓ navigate | Space toggle | Enter save and reload | Esc cancel",
