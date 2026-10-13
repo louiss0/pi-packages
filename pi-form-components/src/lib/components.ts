@@ -26,6 +26,8 @@ export interface FormComponent extends Component {
   setError(messages: string[]): void;
   clearError(): void;
   handleInput(data: string): void;
+  /** Keys owned by this control rather than the surrounding form. */
+  capturesInput?(data: string): boolean;
   readonly name: string;
   readonly value: string | number | boolean;
 }
@@ -145,6 +147,8 @@ class ExternalEditorPopUp extends Container {
 export type MultiSelectConfig<T extends ReadonlyArray<SelectItem>> = {
   title?: string;
   items: T;
+  initialValues?: ReadonlyArray<T[number]["value"]>;
+  itemLimit?: number;
   spacing?: number;
   itemChoiceStyle?: ItemChoiceStyle;
   styles?: {
@@ -173,6 +177,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   implements FormComponent
 {
   #items: T;
+  #itemLimit: number;
   #name: string;
   // MultiSelect owns checked state here. SelectList is only used to render
   // item rows, so MultiSelect also owns the highlighted index.
@@ -227,6 +232,10 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     super();
     this.#name = name;
     this.#items = config.items;
+    this.#itemLimit = Math.max(1, config.itemLimit ?? config.items.length);
+    this.#selectedValues = [...new Set(config.initialValues ?? [])].filter(
+      (value) => config.items.some((item) => item.value === value),
+    );
     this.#tui = tui;
     this.#theme = theme;
     this.#done = done;
@@ -298,9 +307,11 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
     }
   }
 
+  capturesInput(data: string): boolean {
+    return matchesKey(data, Key.up) || matchesKey(data, Key.down);
+  }
+
   override invalidate(): void {
-    this.#selectedValues = [];
-    this.#selectedIndex = 0;
     this.#labelText.invalidate();
     this.#errorText.invalidate();
     this.#syncSelectList();
@@ -333,7 +344,7 @@ export class MultiSelect<const T extends ReadonlyArray<SelectItem>>
   #createSelectList() {
     const selectList = new SelectList(
       this.#getRenderedItems(),
-      this.#items.length,
+      this.#itemLimit,
       {
         selectedPrefix: (text) =>
           this.#theme.fg(this.#styles.item.selectedPrefix, text),
@@ -941,6 +952,14 @@ export class Form<T extends Record<string, string | number | boolean>>
   handleInput(data: string): void {
     if (matchesKey(data, Key.escape)) {
       this.done(null);
+      return;
+    }
+
+    const activeField = this.#fields[this.#activeFieldIndex];
+    if (activeField?.capturesInput?.(data)) {
+      activeField.handleInput(data);
+      this.#revalidateFields();
+      this.tui.requestRender();
       return;
     }
 
