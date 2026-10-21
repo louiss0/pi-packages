@@ -65,7 +65,7 @@ vi.mock("#src/lifecycle/create-subagent-session", async () => {
   return { ...actual, createSubagentSession: vi.fn() };
 });
 
-import subagentsExtension from "#extension";
+import subagentsExtension from "../extensions/index";
 import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
 import { getSubagentsService } from "#src/service/service";
 import {

@@ -10,7 +10,7 @@ vi.mock("#src/lifecycle/create-subagent-session", async () => {
   };
 });
 
-import subagentsExtension from "#extension";
+import subagentsExtension from "../extensions/index";
 import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
 import {
   createMockSession,

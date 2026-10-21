@@ -9,7 +9,6 @@ export default defineConfig({
     alias: {
       "#src": path.resolve(dirname, "src"),
       "#test": path.resolve(dirname, "test"),
-      "#extension": path.resolve(dirname, "extensions/index.ts"),
     },
   },
   test: {

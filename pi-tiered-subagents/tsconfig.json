@@ -18,8 +18,7 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "paths": {
       "#src/*": ["./src/*"],
-      "#test/*": ["./test/*"],
-      "#extension": ["./extensions/index.ts"]
+      "#test/*": ["./test/*"]
     }
   },
   "include": ["src/**/*.ts", "extensions/**/*.ts"]
