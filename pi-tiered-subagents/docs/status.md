@@ -12,11 +12,11 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | --- | --- |
 | Source material | [`@gotgenes/pi-subagents`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 (MIT, © Chris Lasher), itself a friendly fork of [`@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents) |
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
-| Runtime code | `src/` — 73 files, 13.7k lines |
+| Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 88 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 90 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2181 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2150 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -32,6 +32,52 @@ architecture record it draws on is upstream's
 [architecture.md](architecture/architecture.md) and
 [decision records](decisions/), kept as provenance rather than as decisions
 adopted for this derivative.
+
+## The agent-definition domain
+
+`src/agents/` is the new domain: the model of a definition, the layering rules,
+the shipped specialists, the file loader, and the registry that answers "which
+agent is this?".
+
+| Module | What it owns |
+| --- | --- |
+| `src/agents/definition.ts` | The definition model, the layering vocabulary (not specified / explicit / cleared / empty), the tool selection, and the child's tool list |
+| `src/agents/shipped.ts` | The five shipped specialists, with their exact tool lists and standing instructions |
+| `src/agents/loader.ts` | Reading a definition file, and reporting a duplicate identifier |
+| `src/agents/registry.ts` | The three layers, their merge, and the selection that rejects an unknown or disabled agent |
+| `src/agents/invocation.ts` | The precedence between a request and a definition |
+
+The layering vocabulary is small on purpose: a field a layer does not mention
+is inherited, an explicit value replaces, `null` clears an inherited optional
+setting, and an empty list stays empty. Lists are never concatenated, and a
+body is either inherited (empty) or replaced (non-empty).
+
+### What the definitions do now
+
+| Area | Stories | State |
+| --- | --- | --- |
+| Five scoped specialists | 6–24 | Done. `explore`, `worker`, `reviewer`, `debug`, `researcher`, with the exact tool lists the specification names. |
+| Normalized identifiers, display names, duplicate reporting | 25–27 | Done. |
+| Layered definitions: shipped → global → trusted project | 28, 37 | Done. A project the operator has not trusted contributes nothing. |
+| Omission inherits, explicit replaces, null clears, empty stays empty | 29–32 | Done. |
+| The body is the standing instructions | 33–34 | Done. |
+| Unknown and disabled agents are rejected, never redirected | 36 | Done at both doors. |
+| Tool inheritance from the parent's active tools | 38–43 | Done. The parent's active tools are captured with the request, so a queued child runs with the selection the request was made under. |
+| Fresh conversation except for `debug` | 44 | Done. |
+| Parent-only orchestration instructions excluded from children | 47 | Done by upstream's inherited-identity cut, which the single prompt shape keeps. |
+| Request-time capture of the parent's tools | 48 | Done. |
+| Background by default, foreground on request | 49 | Done. |
+
+### Deliberate departures from upstream's shape
+
+Recorded in [adr/](adr/):
+
+- [0004](adr/0004-ship-five-specialists.md) — five specialists replace
+  upstream's `general-purpose`, `Explore`, and `Plan`.
+- [0005](adr/0005-one-definition-shape.md) — no `prompt_mode`, no `locked`; a
+  definition has one prompt shape and the request always wins.
+- [0006](adr/0006-background-by-default.md) — the background is the default
+  for both doors.
 
 ## Inherited behaviour, now characterized
 
@@ -80,6 +126,10 @@ The recovered suite pins the behaviour this derivative must preserve:
    keybinding manager rather than hard-coding Pi 1.0.0's defaults.
 5. **The inherited lint rules are scoped to this package.** See
    [adr/0003](adr/0003-scope-the-inherited-lint-rules-to-this-package.md).
+6. **The role set, the definition shape, and the background default changed.**
+   See [adr/0004](adr/0004-ship-five-specialists.md),
+   [adr/0005](adr/0005-one-definition-shape.md), and
+   [adr/0006](adr/0006-background-by-default.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -111,13 +161,12 @@ covers.
 
 | Area | Stories | Notes |
 | --- | --- | --- |
-| Five scoped specialists (`explore`, `worker`, `reviewer`, `debug`, `researcher`) | 6–24 | The registry still ships upstream's `general-purpose`, `Explore`, `Plan`. |
-| Layered agent definitions, `inherit` tool selection, unknown/disabled rejection | 25–42, 45–47 | Upstream's registry replaces definitions wholesale and resolves unknown types to `general-purpose`. |
+| Layered agent definitions, `inherit` tool selection, unknown/disabled rejection | 25–42, 45–47 | Done — see the agent-definition domain above. |
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | New domain; the removed `src/tier/**` experiment is not a starting point. |
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Upstream validates the level at the door and otherwise inherits the parent's. |
-| Request-time snapshots, capability-based workspace scheduling | 48, 52–54 | Upstream captures a parent snapshot but schedules on a single concurrency limiter. |
+| Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
-| Shared configuration resolver for both launch doors | 80–82 | The two doors still resolve separately. |
+| Shared configuration resolver for both launch doors | 80–82 | The two doors still resolve separately, though both now answer through the same registry. |
 | Resolved model/thinking facts in the launch and result presentation | 74 | Not surfaced yet. |
 | A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 

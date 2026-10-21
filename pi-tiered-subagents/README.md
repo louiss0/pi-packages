@@ -4,10 +4,11 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,181-test characterization suite against Pi 1.3.0.
-> The specified features — the five specialists, layered definitions, family-aware
-> model routing, reasoning defaults, capability-based scheduling, and the shared
-> settings backend — are **not implemented yet**. See
+> typechecks, and passes a 2,150-test characterization suite against Pi 1.3.0.
+> The five scoped specialists, the layered agent definitions, the inherited tool
+> selection, and the rejection of unknown agents are **done**. Family-aware model
+> routing, reasoning defaults, capability-based scheduling, and the shared
+> settings backend are **not implemented yet**. See
 > [docs/status.md](docs/status.md) for the verified state and what is still owed.
 
 ## Install
@@ -66,26 +67,34 @@ v25.0.1, which is itself a friendly fork of
 
 ## Agent definitions
 
-Shipped definitions live in `src/config/default-agents.ts`; user definitions are
-Markdown files with frontmatter, discovered in the global agent directory
-(`~/.pi/agent/agents/*.md`) and in a project (`.pi/agents/*.md`). Project
-definitions override global ones, which override the shipped ones.
+Shipped specialists: `explore`, `worker`, `reviewer`, `debug`, and
+`researcher`. Each has an exact tool list; `worker` and `debug` inherit the
+parent's active tools instead, and `debug` starts from the parent's
+conversation.
+
+Operator and project definitions are Markdown files with frontmatter, whose
+body is the agent's standing instructions. They are discovered in the global
+agent directory (`~/.pi/agent/agents/*.md`) and in a project
+(`.pi/agents/*.md`); a project's files are read only when Pi has granted the
+project trust.
 
 ```markdown
 ---
-name: reviewer
 display_name: Reviewer
 description: Independent assessment of a scoped change
 tools: read, grep, find
+model: anthropic/claude-sonnet-5
+thinking: medium
 ---
 
 Assess the change against the stated requirements. Report findings, do not
 claim checks you did not run.
 ```
 
-> The definition layering, the five scoped specialists, and the `inherit` tool
-> selection described in the specification are pending — see
-> [docs/status.md](docs/status.md).
+A file refines the layer below it field by field: a setting it does not
+mention is inherited, an explicit value replaces, `null` clears an inherited
+model or thinking choice, and `tools: []` means no tools at all.
+`tools: inherit` takes the parent's active tools.
 
 ## Development
 
