@@ -11,6 +11,7 @@ import {
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
+  McpExposure,
   McpServerConfig,
   Theme,
 } from "@earendil-works/pi-coding-agent";
@@ -64,13 +65,18 @@ const HTTP_TRANSPORT = "http";
 const subcommands = picklist(["create", "edit", "delete"] as const);
 type Subcommand = (typeof subcommands.options)[number];
 
+/**
+ * The exposures Pi accepts, in the order the form offers them.
+ *
+ * Typed against Pi's own `McpExposure`, so an exposure Pi drops fails the build
+ * here instead of producing a config Pi rejects.
+ */
 const EXPOSURES = [
   "codemode",
-  "codemode-deferred",
   "deferred",
   "direct",
   "hidden",
-] as const;
+] as const satisfies readonly McpExposure[];
 
 const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;

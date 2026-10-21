@@ -199,6 +199,8 @@ describe("extensions/prompt-manager", () => {
 
   describe("handleCreate", () => {
     it("writes the created prompt after the external editor submits", async () => {
+      // $VISUAL wins over $EDITOR, so it is cleared for the $EDITOR case.
+      vi.stubEnv("VISUAL", "");
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
@@ -298,6 +300,7 @@ describe("extensions/prompt-manager", () => {
       memoryFileSystem.seed({
         [promptPath]: "---\nname: create-react-component\n---\n",
       });
+      vi.stubEnv("VISUAL", "");
       vi.stubEnv("EDITOR", "code");
       const editorFactory = vi.fn();
       mockCreateExternalEditorFactory.mockReturnValueOnce(editorFactory);
