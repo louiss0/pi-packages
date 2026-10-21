@@ -20,6 +20,8 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     getSystemPrompt: () => "parent system prompt",
     model: { id: "claude-sonnet" },
     modelRegistry: { find: vi.fn(), getAvailable: vi.fn(() => []) },
+    getActiveTools: () => ["read", "bash"],
+    isProjectTrusted: () => true,
     sessionManager: { getBranch: vi.fn(() => []) },
     ...overrides,
   } as unknown as ExtensionContext;

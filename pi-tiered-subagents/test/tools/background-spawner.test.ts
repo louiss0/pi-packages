@@ -19,7 +19,7 @@ function makeConfig(
   overrides: Parameters<typeof createResolvedSpawnConfig>[0] = {},
 ) {
   return createResolvedSpawnConfig({
-    displayName: "General-purpose",
+    displayName: "Worker",
     prompt: "do something",
     description: "bg task",
     runInBackground: true,
@@ -196,11 +196,13 @@ describe("spawnBackground", () => {
     const result = spawnBackground(
       manager,
       makeParams({
-        config: makeConfig({ fellBack: true, rawType: "unknown-type" }),
+        config: makeConfig({
+          notes: ["Note: max_turns 1 is below the minimum."],
+        }),
       }),
     );
     expect(textOf(result)).toMatch(
-      /^Note: Unknown agent type "unknown-type" — using general-purpose\.\n\nAgent (started|queued) in background\./,
+      /^Note: max_turns 1 is below the minimum\.\n\nAgent (started|queued) in background\./,
     );
   });
 
@@ -229,7 +231,7 @@ describe("spawnBackground", () => {
       expect(textOf(result)).toBe(
         "Agent started in background.\n" +
           "Agent ID: bg-3\n" +
-          "Type: General-purpose\n" +
+          "Type: Worker\n" +
           "Description: bg task\n" +
           "Output file: /sessions/bg.jsonl\n" +
           "\nYou will be notified when this agent completes.\n" +
@@ -237,9 +239,9 @@ describe("spawnBackground", () => {
           "Do not duplicate this agent's work.",
       );
       expect(result.details).toEqual({
-        displayName: "General-purpose",
+        displayName: "Worker",
         description: "bg task",
-        subagentType: "general-purpose",
+        subagentType: "worker",
         modelName: undefined,
         tags: undefined,
         toolUses: 0,
@@ -269,7 +271,7 @@ describe("spawnBackground", () => {
       expect(textOf(result)).toBe(
         "Agent queued in background.\n" +
           "Agent ID: bg-2\n" +
-          "Type: General-purpose\n" +
+          "Type: Worker\n" +
           "Description: bg task\n" +
           "Position: queued (max 4 concurrent)\n" +
           "\nYou will be notified when this agent completes.\n" +

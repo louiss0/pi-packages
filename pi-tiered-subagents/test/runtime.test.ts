@@ -28,6 +28,7 @@ function makeSessionCtx(overrides?: Partial<SessionContext>): SessionContext {
     model: undefined,
     modelRegistry: { find: () => undefined, getAll: () => [] },
     getSystemPrompt: () => "test prompt",
+    isProjectTrusted: () => true,
     sessionManager: {
       getSessionFile: () => "/sessions/test.jsonl",
       getSessionId: () => "test-session-id",
@@ -101,7 +102,12 @@ describe("SubagentRuntime context query methods", () => {
     runtime.setSessionContext(ctx);
     mockBuildParentSnapshot.mockReturnValueOnce(STUB_SNAPSHOT);
     const result = runtime.buildSnapshot(true);
-    expect(mockBuildParentSnapshot).toHaveBeenCalledWith(ctx, true, undefined);
+    expect(mockBuildParentSnapshot).toHaveBeenCalledWith(
+      ctx,
+      true,
+      undefined,
+      [],
+    );
     expect(result).toBe(STUB_SNAPSHOT);
   });
 
@@ -111,7 +117,12 @@ describe("SubagentRuntime context query methods", () => {
     runtime.setSessionContext(ctx);
     mockBuildParentSnapshot.mockReturnValueOnce(STUB_SNAPSHOT);
     runtime.buildSnapshot(false);
-    expect(mockBuildParentSnapshot).toHaveBeenCalledWith(ctx, false, undefined);
+    expect(mockBuildParentSnapshot).toHaveBeenCalledWith(
+      ctx,
+      false,
+      undefined,
+      [],
+    );
   });
 
   describe("prompt-options capture", () => {
@@ -127,7 +138,12 @@ describe("SubagentRuntime context query methods", () => {
 
       runtime.buildSnapshot(false);
 
-      expect(mockBuildParentSnapshot).toHaveBeenCalledWith(ctx, false, options);
+      expect(mockBuildParentSnapshot).toHaveBeenCalledWith(
+        ctx,
+        false,
+        options,
+        [],
+      );
     });
 
     it("keeps only the most recent capture", () => {
@@ -141,7 +157,12 @@ describe("SubagentRuntime context query methods", () => {
 
       runtime.buildSnapshot(false);
 
-      expect(mockBuildParentSnapshot).toHaveBeenCalledWith(ctx, false, latest);
+      expect(mockBuildParentSnapshot).toHaveBeenCalledWith(
+        ctx,
+        false,
+        latest,
+        [],
+      );
     });
   });
 

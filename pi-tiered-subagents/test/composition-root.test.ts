@@ -92,6 +92,7 @@ function makePi() {
       sendMessage: vi.fn(),
       exec: vi.fn(),
       getAllTools: vi.fn((): { name: string }[] => []),
+      getActiveTools: vi.fn((): string[] => []),
     } as any,
     tools,
     handlers,
@@ -155,6 +156,7 @@ function makeSessionStartCtx(
       getBranch: vi.fn(() => []),
     },
     getSystemPrompt: vi.fn(() => "parent prompt"),
+    isProjectTrusted: vi.fn(() => true),
   } as any;
 }
 
@@ -178,7 +180,7 @@ async function captureSessionFactoryIO(parentRegistry: unknown) {
     {
       prompt: "hi",
       description: "child",
-      subagent_type: "general-purpose",
+      subagent_type: "worker",
       run_in_background: true,
     },
     undefined,
@@ -287,7 +289,7 @@ describe("composition root: widget activation", () => {
 
     // The reported path: a command handler spawning through the published
     // service, so nothing in the parent loop ever emits a tool call.
-    getSubagentsService()!.spawn("general-purpose", "hi", {
+    getSubagentsService()!.spawn("worker", "hi", {
       description: "child",
     });
 
@@ -312,7 +314,7 @@ describe("composition root: widget activation", () => {
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
 
-    getSubagentsService()!.spawn("general-purpose", "hi", {
+    getSubagentsService()!.spawn("worker", "hi", {
       description: "child",
     });
     await vi.advanceTimersByTimeAsync(300);
@@ -376,7 +378,7 @@ describe("composition root: widget teardown", () => {
       {},
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
-    getSubagentsService()!.spawn("general-purpose", "hi", {
+    getSubagentsService()!.spawn("worker", "hi", {
       description: "child",
     });
     await vi.advanceTimersByTimeAsync(300);
@@ -443,7 +445,7 @@ describe("composition root: prompt-inheritance wiring", () => {
       {
         prompt: "hi",
         description: "child",
-        subagent_type: "general-purpose",
+        subagent_type: "worker",
         run_in_background: true,
       },
       undefined,
@@ -545,7 +547,7 @@ describe("composition root: parent tool list", () => {
       {
         prompt: "hi",
         description: "child",
-        subagent_type: "general-purpose",
+        subagent_type: "worker",
         run_in_background: true,
       },
       undefined,

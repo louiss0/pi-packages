@@ -15,7 +15,7 @@ import {
   TuiMainScreen,
 } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { SubagentManager } from "#src/lifecycle/subagent-manager";
 import { AgentWidget, type UICtx } from "#src/ui/agent-widget";
 import { createTestSubagent } from "#test/helpers/make-subagent";
@@ -82,7 +82,7 @@ function animateUnderRealRenderer(opts: {
   const manager = { listAgents: () => records } as unknown as SubagentManager;
   const widget = new AgentWidget(
     manager,
-    new AgentTypeRegistry(() => new Map()),
+    new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
   );
 
   const tui = new TuiMainScreen(
@@ -205,7 +205,7 @@ describe("AgentWidget cadence under Pi's real renderers", () => {
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentTypeRegistry(() => new Map()),
+      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
     );
     const theme = {
       fg: (_: string, text: string) => text,

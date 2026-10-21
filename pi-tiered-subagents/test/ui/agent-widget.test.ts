@@ -1,6 +1,6 @@
 import type { TuiMode } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { SubagentManager } from "#src/lifecycle/subagent-manager";
 import type { CompactionInfo } from "#src/types";
@@ -78,7 +78,9 @@ function makeWidget(
   const manager = {
     listAgents: () => agents.map((a) => ({ isBackground: true, ...a })),
   } as unknown as SubagentManager;
-  const registry = new AgentTypeRegistry(() => new Map());
+  const registry = new AgentRegistry(() => ({
+    global: { definitions: [], errors: [] },
+  }));
   const widget = new AgentWidget(manager, registry);
   const setWidget = vi.fn<UICtx["setWidget"]>();
   const setStatus = vi.fn<UICtx["setStatus"]>();
@@ -266,7 +268,9 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     const manager = {
       listAgents: () => [record],
     } as unknown as SubagentManager;
-    const registry = new AgentTypeRegistry(() => new Map());
+    const registry = new AgentRegistry(() => ({
+      global: { definitions: [], errors: [] },
+    }));
     const widget = new AgentWidget(manager, registry);
 
     let renderFn:
@@ -306,7 +310,7 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentTypeRegistry(() => new Map()),
+      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
     );
 
     let renderFn:
@@ -339,7 +343,7 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentTypeRegistry(() => new Map()),
+      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
     );
 
     let renderFn:
@@ -537,7 +541,9 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
 describe("AgentWidget — background-only filtering", () => {
   function setup(records: Subagent[]) {
     const manager = { listAgents: () => records } as unknown as SubagentManager;
-    const registry = new AgentTypeRegistry(() => new Map());
+    const registry = new AgentRegistry(() => ({
+      global: { definitions: [], errors: [] },
+    }));
     const widget = new AgentWidget(manager, registry);
     const setWidgetCalls: unknown[] = [];
     let renderFn:
@@ -708,7 +714,7 @@ describe("AgentWidget — animation cadence", () => {
     const manager = { listAgents } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentTypeRegistry(() => new Map()),
+      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
     );
     widget.setUICtx({
       setStatus: () => {},

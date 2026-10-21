@@ -43,6 +43,8 @@ function makePi() {
         }),
       },
       appendEntry: vi.fn(),
+      getAllTools: vi.fn((): { name: string }[] => []),
+      getActiveTools: vi.fn((): string[] => []),
       sendMessage: vi.fn(() => {
         throw new Error("stale extension context");
       }),
@@ -81,6 +83,7 @@ function makeHeadlessCtx() {
       getBranch: vi.fn(() => []),
     },
     getSystemPrompt: vi.fn(() => "parent prompt"),
+    isProjectTrusted: vi.fn(() => true),
   } as any;
 }
 
@@ -111,7 +114,7 @@ describe("print mode background notifications", () => {
       {
         prompt: "reply done",
         description: "tiny child",
-        subagent_type: "general-purpose",
+        subagent_type: "worker",
         run_in_background: true,
       },
       undefined,

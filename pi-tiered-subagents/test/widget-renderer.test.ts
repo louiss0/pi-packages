@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { Theme } from "#src/ui/display";
 import type { WidgetAgent } from "#src/ui/widget-renderer";
 import {
@@ -17,12 +17,14 @@ function stubTheme(): Theme {
   };
 }
 
-const testRegistry = new AgentTypeRegistry(() => new Map());
+const testRegistry = new AgentRegistry(() => ({
+  global: { definitions: [], errors: [] },
+}));
 
 function makeAgent(overrides: Partial<WidgetAgent> = {}): WidgetAgent {
   return {
     id: "agent-1",
-    type: "general-purpose",
+    type: "worker",
     status: "completed",
     description: "test task",
     toolUses: 5,
@@ -68,8 +70,8 @@ describe("renderFinishedLine", () => {
 
     // Success icon
     expect(line).toContain("[success:✓]");
-    // Display name (general-purpose type displayName → "Agent"; tool name is now "subagent")
-    expect(line).toContain("[dim:Agent]");
+    // Display name (worker type displayName → "Agent"; tool name is now "subagent")
+    expect(line).toContain("[dim:Worker]");
     // Description
     expect(line).toContain("[dim:test task]");
     // Tool uses
@@ -210,7 +212,7 @@ describe("renderRunningLines", () => {
 
     // Header contains spinner frame, bold name, description
     expect(header).toContain("[accent:⠋]");
-    expect(header).toContain("**Agent**");
+    expect(header).toContain("**Worker**");
     expect(header).toContain("[muted:test task]");
     // Stats: turn count
     expect(header).toContain("↻2≤10");
@@ -280,14 +282,14 @@ describe("model tag", () => {
     });
     const [header] = renderRunningLines(agent, testRegistry, 0, theme);
     expect(header).toContain(
-      "**Agent** [dim:(twin)] [dim:[anthropic/claude-sonnet-5]]  [muted:test task]",
+      "**Worker** [dim:[anthropic/claude-sonnet-5]]  [muted:test task]",
     );
   });
 
   it("follows the finished agent's name and mode", () => {
     const line = renderFinishedLine(makeAgent({ model }), testRegistry, theme);
     expect(line).toContain(
-      "[dim:Agent] [dim:(twin)] [dim:[anthropic/claude-sonnet-5]]  [dim:test task]",
+      "[dim:Worker] [dim:[anthropic/claude-sonnet-5]]  [dim:test task]",
     );
   });
 
@@ -299,8 +301,8 @@ describe("model tag", () => {
       theme,
     );
     const line = renderFinishedLine(makeAgent(), testRegistry, theme);
-    expect(header).toContain("**Agent** [dim:(twin)]  [muted:test task]");
-    expect(line).toContain("[dim:Agent] [dim:(twin)]  [dim:test task]");
+    expect(header).toContain("**Worker**  [muted:test task]");
+    expect(line).toContain("[dim:Worker]  [dim:test task]");
   });
 });
 
@@ -339,7 +341,7 @@ describe("renderWidgetLines", () => {
     expect(lines[0]).toContain("Agents");
     // Header line with └─ (last item uses └─ not ├─)
     expect(lines[1]).toContain("└─");
-    expect(lines[1]).toContain("**Agent**");
+    expect(lines[1]).toContain("**Worker**");
     // Activity line — uses space indent (not │) since it's the last agent
     expect(lines[2]).not.toContain("│");
     expect(lines[2]).toContain("⎿");
@@ -375,7 +377,7 @@ describe("renderWidgetLines", () => {
     // finished line (1 line)
     expect(lines[1]).toContain("[success:\u2713]");
     // running header (1 line) + activity (1 line)
-    expect(lines[2]).toContain("**Agent**");
+    expect(lines[2]).toContain("**Worker**");
     expect(lines[3]).toContain("\u23bf");
     // queued line (last item, uses └─)
     expect(lines[4]).toContain("\u2514\u2500");

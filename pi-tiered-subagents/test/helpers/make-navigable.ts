@@ -10,7 +10,7 @@ export function makeNavigable(
 ): NavigableSubagent {
   return {
     id: "agent-1",
-    type: "general-purpose",
+    type: "worker",
     description: "Test task",
     status: "completed",
     startedAt: 1000,

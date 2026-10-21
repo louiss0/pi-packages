@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { PersistedRunSummary } from "#src/persisted-record";
 import type { AgentSessionEvent, SessionMessage } from "#src/types";
 import {
@@ -11,7 +11,9 @@ import {
 } from "#src/ui/session-navigation";
 import { makeNavigable } from "#test/helpers/make-navigable";
 
-const registry = new AgentTypeRegistry(() => new Map());
+const registry = new AgentRegistry(() => ({
+  global: { definitions: [], errors: [] },
+}));
 
 describe("listNavigableAgents", () => {
   it("returns an empty list for no agents", () => {
@@ -41,7 +43,7 @@ describe("listNavigableAgents", () => {
       "/tasks/released-1.jsonl",
     );
     expect(entry.label).toBe(
-      "Agent (Investigate the bug) · 3 tools · completed · 3.0s · session released (snapshot)",
+      "Worker (Investigate the bug) · 3 tools · completed · 3.0s · session released (snapshot)",
     );
   });
 
@@ -56,7 +58,7 @@ describe("listNavigableAgents", () => {
 
   it("builds a label with name, description, tool count, status, and duration", () => {
     const record = makeNavigable({
-      type: "general-purpose",
+      type: "worker",
       description: "Investigate the bug",
       toolUses: 3,
       status: "completed",
@@ -64,22 +66,21 @@ describe("listNavigableAgents", () => {
       completedAt: 4000,
     });
     const [entry] = listNavigableAgents([record], registry, []);
-    // getDisplayName resolves "general-purpose" against the empty registry to its fallback display name.
+    // getDisplayName resolves "worker" against the empty registry to its fallback display name.
     expect(entry.label).toBe(
-      "Agent (Investigate the bug) · 3 tools · completed · 3.0s",
+      "Worker (Investigate the bug) · 3 tools · completed · 3.0s",
     );
   });
 
   describe("heading", () => {
     it("names a live entry's agent, mode, and task", () => {
       const record = makeNavigable({
-        type: "general-purpose",
+        type: "worker",
         description: "Investigate the bug",
       });
       const [entry] = listNavigableAgents([record], registry, []);
       expect(entry.heading).toEqual({
-        name: "Agent",
-        modeLabel: "twin",
+        name: "Worker",
         description: "Investigate the bug",
       });
     });
@@ -92,8 +93,7 @@ describe("listNavigableAgents", () => {
       });
       const [entry] = listNavigableAgents([released], registry, []);
       expect(entry.heading).toEqual({
-        name: "Agent",
-        modeLabel: "twin",
+        name: "Worker",
         description: "Investigate the bug",
       });
     });
@@ -106,7 +106,6 @@ describe("listNavigableAgents", () => {
       );
       expect(entry.heading).toEqual({
         name: "Explore",
-        modeLabel: undefined,
         description: "Find auth files",
       });
     });
@@ -141,12 +140,11 @@ describe("listNavigableAgents", () => {
           kind: "snapshot",
           outputFile: "/tasks/earlier.jsonl",
           heading: {
-            name: "Agent",
-            modeLabel: "twin",
+            name: "Worker",
             description: "Earlier task",
           },
           label:
-            "Agent (Earlier task) · 7 tools · completed · 3.0s · session released (snapshot)",
+            "Worker (Earlier task) · 7 tools · completed · 3.0s · session released (snapshot)",
         },
       ]);
     });
@@ -174,7 +172,7 @@ function persistedRun(
 ): PersistedRunSummary {
   return {
     id: "earlier",
-    type: "general-purpose",
+    type: "worker",
     description: "Earlier task",
     status: "completed",
     startedAt: 1000,

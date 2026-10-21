@@ -1,19 +1,19 @@
 import { vi } from "vitest";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinition } from "#src/agents/definition";
+import { defaultDefinition } from "#src/agents/definition";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { AssemblerIO } from "#src/session/session-config";
-import type { AgentConfig, PromptInheritance, ShellExec } from "#src/types";
+import type { PromptInheritance, ShellExec } from "#src/types";
 import { createMockSession } from "#test/helpers/mock-session";
 
-/** Default AgentConfig returned by createAgentLookup. Matches the Explore stub used in factory tests. */
-const DEFAULT_AGENT_CONFIG: AgentConfig = {
-  name: "Explore",
+/** Default definition returned by createAgentLookup. */
+const DEFAULT_AGENT_DEFINITION: AgentDefinition = {
+  ...defaultDefinition("explore", "shipped"),
+  displayName: "Explore",
   description: "Explore",
-  toolNames: ["read"],
-  systemPrompt: "You are Explore.",
-  promptMode: "replace",
-  inheritContext: false,
-  runInBackground: false,
+  instructions: "You are Explore.",
+  tools: { kind: "explicit", names: ["read"] },
 };
 
 /**
@@ -65,23 +65,23 @@ export function createSubagentSessionIO() {
 }
 
 /**
- * Shared AgentConfigLookup stub.
+ * Shared registry stub.
  *
- * Returns the default Explore config (same as the static mock used in the
- * createSubagentSession tests). Pass a partial config to override specific fields.
- *
- * Tests that need per-test config mutation (create-subagent-session-extension-tools)
- * keep their local mutable wrapper and use DEFAULT_AGENT_CONFIG as a starting
- * point if needed.
+ * Returns the default definition (same as the static mock used in the
+ * createSubagentSession tests). Pass a partial definition to override fields.
  */
-export function createAgentLookup(configOverrides?: Partial<AgentConfig>) {
-  const config: AgentConfig = { ...DEFAULT_AGENT_CONFIG, ...configOverrides };
-  return {
-    resolveAgentConfig: vi.fn((_type: string): AgentConfig => config),
-    getToolNamesForType: vi.fn(
-      (_type: string): string[] => config.toolNames ?? ["read"],
-    ),
+export function createAgentLookup(
+  definitionOverrides?: Partial<AgentDefinition>,
+) {
+  const definition: AgentDefinition = {
+    ...DEFAULT_AGENT_DEFINITION,
+    ...definitionOverrides,
   };
+  return {
+    select: vi.fn((_type: string) => ({ ok: true as const, definition })),
+    find: vi.fn((_type: string) => definition),
+    list: vi.fn(() => [definition]),
+  } satisfies AgentDefinitionLookup;
 }
 
 /**
@@ -98,7 +98,7 @@ export function createAgentLookup(configOverrides?: Partial<AgentConfig>) {
 export function createSubagentSessionDeps(overrides?: {
   io?: ReturnType<typeof createSubagentSessionIO>;
   exec?: ShellExec;
-  registry?: AgentConfigLookup;
+  registry?: AgentDefinitionLookup;
   lifecycle?: ReturnType<typeof createChildLifecycleMock>;
   resolvePromptInheritance?: (
     provider: string | undefined,
@@ -135,8 +135,8 @@ export function createChildLifecycleMock() {
   };
 }
 
-/** The default agent config, exported for tests that build mutable wrappers around it. */
-export { DEFAULT_AGENT_CONFIG };
+/** The default agent definition, exported for tests that build mutable wrappers around it. */
+export { DEFAULT_AGENT_DEFINITION };
 
 /**
  * Shared mock session for createSubagentSession tests.

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AgentConfig } from "#src/types";
+import type { AgentDefinition } from "#src/agents/definition";
 import {
   createAgentLookup,
   createFactorySession,
@@ -59,7 +59,7 @@ describe("createSubagentSessionIO", () => {
     const io = createSubagentSessionIO();
     io.assemblerIO.buildAgentPrompt.mockReturnValue("custom prompt");
     const result = io.assemblerIO.buildAgentPrompt(
-      { name: "Explore", systemPrompt: "", promptMode: "replace" },
+      { name: "explore", instructions: "" },
       "/cwd",
       { isGitRepo: false, branch: "", platform: "linux" },
     );
@@ -78,38 +78,44 @@ describe("createSubagentSessionIO", () => {
 });
 
 describe("createAgentLookup", () => {
-  it("resolveAgentConfig returns the default Explore config", () => {
+  it("select returns the default definition", () => {
     const lookup = createAgentLookup();
-    const config = lookup.resolveAgentConfig("Explore");
-    expect(config.name).toBe("Explore");
-    expect(config.promptMode).toBe("replace");
+    const selection = lookup.select("explore");
+    expect(selection.ok).toBe(true);
+    if (selection.ok) {
+      expect(selection.definition.id).toBe("explore");
+      expect(selection.definition.instructions).toBe("You are Explore.");
+    }
   });
 
-  it("default config toolNames includes 'read'", () => {
+  it("default definition selects the read tool", () => {
     const lookup = createAgentLookup();
-    const config = lookup.resolveAgentConfig("Explore");
-    expect(config.toolNames).toContain("read");
+    const selection = lookup.select("explore");
+    expect(selection.ok && selection.definition.tools).toEqual({
+      kind: "explicit",
+      names: ["read"],
+    });
   });
 
-  it("getToolNamesForType returns ['read'] by default", () => {
-    const lookup = createAgentLookup();
-    expect(lookup.getToolNamesForType("Explore")).toEqual(["read"]);
-  });
-
-  it("accepts a partial config override", () => {
-    const override: Partial<AgentConfig> = { name: "Custom", maxTurns: 7 };
+  it("accepts a partial definition override", () => {
+    const override: Partial<AgentDefinition> = {
+      displayName: "Custom",
+      maxTurns: 7,
+    };
     const lookup = createAgentLookup(override);
-    const config = lookup.resolveAgentConfig("Custom");
-    expect(config.name).toBe("Custom");
-    expect(config.maxTurns).toBe(7);
+    const selection = lookup.select("explore");
+    expect(selection.ok && selection.definition.displayName).toBe("Custom");
+    expect(selection.ok && selection.definition.maxTurns).toBe(7);
     // other defaults still present
-    expect(config.promptMode).toBe("replace");
+    expect(selection.ok && selection.definition.instructions).toBe(
+      "You are Explore.",
+    );
   });
 
-  it("resolveAgentConfig and getToolNamesForType are vi.fn() stubs", () => {
+  it("select and find are vi.fn() stubs", () => {
     const lookup = createAgentLookup();
-    expect(lookup.resolveAgentConfig.mock).toBeDefined();
-    expect(lookup.getToolNamesForType.mock).toBeDefined();
+    expect(lookup.select.mock).toBeDefined();
+    expect(lookup.find.mock).toBeDefined();
   });
 });
 

@@ -481,7 +481,9 @@ describe("createSubagentSession — the core's own child tools", () => {
         createSubagentSessionDeps({
           io,
           exec,
-          registry: createAgentLookup({ toolNames: [] }),
+          registry: createAgentLookup({
+            tools: { kind: "explicit", names: [] },
+          }),
         }),
       );
 
@@ -596,7 +598,10 @@ describe("createSubagentSession — Pi built-in extensions", () => {
         io,
         exec,
         registry: createAgentLookup({
-          toolNames: ["read", "codemode", "mcp__github__get_issue"],
+          tools: {
+            kind: "explicit",
+            names: ["read", "codemode", "mcp__github__get_issue"],
+          },
         }),
       }),
     );
@@ -628,7 +633,9 @@ describe("createSubagentSession — MCP tool patterns", () => {
     return createSubagentSessionDeps({
       io,
       exec,
-      registry: createAgentLookup({ toolNames }),
+      registry: createAgentLookup({
+        tools: { kind: "explicit", names: toolNames },
+      }),
       listParentToolNames: () => parentTools,
     });
   }

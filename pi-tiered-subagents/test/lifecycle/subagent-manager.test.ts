@@ -7,7 +7,7 @@ import {
   type Mock,
   vi,
 } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
@@ -25,7 +25,8 @@ import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationManager } from "#src/observation/notification";
 import type { RunConfig } from "#src/runtime";
 import { GetResultTool } from "#src/tools/get-result-tool";
-import type { AgentConfig, Subagent } from "#src/types";
+import type { AgentDefinition } from "#src/agents/definition";
+import type { Subagent } from "#src/types";
 import {
   makeWorkspace,
   makeWorkspaceProvider,
@@ -57,32 +58,28 @@ function defaultFactory(): SessionFactory {
   );
 }
 
-function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
-  return {
-    name: "test-agent",
-    description: "Test agent",
-    toolNames: ["read", "grep"],
-    systemPrompt: "You are a test agent.",
-    promptMode: "replace",
-    inheritContext: false,
-    runInBackground: false,
-    ...overrides,
-  };
+/** Registry with the shipped specialists only. */
+function defaultRegistry(): AgentRegistry {
+  return new AgentRegistry(() => ({ global: { definitions: [], errors: [] } }));
 }
 
-/** Registry with default agents only. */
-function defaultRegistry(): AgentTypeRegistry {
-  return new AgentTypeRegistry(() => new Map());
-}
-
-/** Registry with a single custom agent override, keyed by its canonical name. */
+/** Registry with a single custom agent, keyed by its canonical identifier. */
 function registryWith(
   name: string,
-  overrides: Partial<AgentConfig>,
-): AgentTypeRegistry {
-  return new AgentTypeRegistry(
-    () => new Map([[name, makeAgentConfig({ name, ...overrides })]]),
-  );
+  overrides: Partial<AgentDefinition>,
+): AgentRegistry {
+  return new AgentRegistry(() => ({
+    global: {
+      definitions: [
+        {
+          id: name,
+          patch: overrides,
+          path: `${name}.md`,
+        },
+      ],
+      errors: [],
+    },
+  }));
 }
 
 /** Test helper: construct an SubagentManager with injected stubs. */
@@ -96,7 +93,7 @@ function createManager(overrides?: {
     unconsumedSessionRetentionMinutes: number;
   };
   baseCwd?: string;
-  registry?: AgentTypeRegistry;
+  registry?: AgentRegistry;
 }) {
   const createSubagentSession: SessionFactory =
     overrides?.createSubagentSession ?? defaultFactory();
@@ -129,7 +126,7 @@ function createManager(overrides?: {
 
 /** Spawn a background agent using STUB_SNAPSHOT. */
 function spawnBg(mgr: SubagentManager, prompt = "test", desc = prompt) {
-  return mgr.spawn(STUB_SNAPSHOT, "general-purpose", prompt, {
+  return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
     background: { kind: "explicit", isBackground: true },
   });
@@ -137,7 +134,7 @@ function spawnBg(mgr: SubagentManager, prompt = "test", desc = prompt) {
 
 /** Spawn a foreground agent using STUB_SNAPSHOT. */
 function spawnFg(mgr: SubagentManager, prompt = "test", desc = prompt) {
-  return mgr.spawnAndWait(STUB_SNAPSHOT, "general-purpose", prompt, {
+  return mgr.spawnAndWait(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
   });
 }
@@ -149,7 +146,7 @@ function spawnBgWithToolCall(
   prompt = "test",
   desc = prompt,
 ) {
-  return mgr.spawn(STUB_SNAPSHOT, "general-purpose", prompt, {
+  return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
     background: { kind: "explicit", isBackground: true },
     parentSession: { toolCallId },
@@ -226,53 +223,53 @@ describe("SubagentManager", () => {
           background: { kind: "explicit", isBackground: true },
         });
 
-        expect(manager.getRecord(id)!.type).toBe("Explore");
+        expect(manager.getRecord(id)!.type).toBe("explore");
       });
 
-      it("falls back to general-purpose for an unknown type", () => {
+      it("rejects an unknown type rather than running another role", () => {
         ({ manager } = createManager());
 
-        const id = manager.spawn(STUB_SNAPSHOT, "no-such-agent", "test", {
-          description: "d",
-          background: { kind: "explicit", isBackground: true },
-        });
-
-        expect(manager.getRecord(id)!.type).toBe("general-purpose");
+        expect(() =>
+          manager.spawn(STUB_SNAPSHOT, "no-such-agent", "test", {
+            description: "d",
+            background: { kind: "explicit", isBackground: true },
+          }),
+        ).toThrow('Unknown agent type "no-such-agent"');
       });
 
       it("throws for a known-but-disabled type", () => {
         ({ manager } = createManager({
-          registry: registryWith("Plan", { enabled: false }),
+          registry: registryWith("planner", { enabled: false }),
         }));
 
         expect(() =>
-          manager.spawn(STUB_SNAPSHOT, "Plan", "test", {
+          manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
             background: { kind: "explicit", isBackground: true },
           }),
-        ).toThrow('Agent type "Plan" is disabled');
+        ).toThrow('Agent "planner" is disabled');
       });
 
       it("reports the canonical casing in the disabled-agent error for case-insensitive input", () => {
         ({ manager } = createManager({
-          registry: registryWith("Plan", { enabled: false }),
+          registry: registryWith("planner", { enabled: false }),
         }));
 
         expect(() =>
-          manager.spawn(STUB_SNAPSHOT, "plan", "test", {
+          manager.spawn(STUB_SNAPSHOT, "PLANNER", "test", {
             description: "d",
             background: { kind: "explicit", isBackground: true },
           }),
-        ).toThrow('Agent type "Plan" is disabled');
+        ).toThrow('Agent "planner" is disabled');
       });
 
       it("does not create a record for a rejected spawn", () => {
         ({ manager } = createManager({
-          registry: registryWith("Plan", { enabled: false }),
+          registry: registryWith("planner", { enabled: false }),
         }));
 
         expect(() =>
-          manager.spawn(STUB_SNAPSHOT, "Plan", "test", {
+          manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
             background: { kind: "explicit", isBackground: true },
           }),
@@ -379,19 +376,19 @@ describe("SubagentManager", () => {
           { description: "d" },
         );
 
-        expect(record.type).toBe("Explore");
+        expect(record.type).toBe("explore");
       });
 
       it("rejects for a known-but-disabled type", async () => {
         ({ manager } = createManager({
-          registry: registryWith("Plan", { enabled: false }),
+          registry: registryWith("planner", { enabled: false }),
         }));
 
         await expect(
-          manager.spawnAndWait(STUB_SNAPSHOT, "Plan", "test", {
+          manager.spawnAndWait(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
           }),
-        ).rejects.toThrow('Agent type "Plan" is disabled');
+        ).rejects.toThrow('Agent "planner" is disabled');
       });
     });
 
@@ -441,7 +438,7 @@ describe("SubagentManager", () => {
 
         const record = await manager.spawnAndWait(
           STUB_SNAPSHOT,
-          "general-purpose",
+          "worker",
           "test",
           {
             description: "d",
@@ -936,7 +933,7 @@ describe("SubagentManager", () => {
           observer: { onSubagentCreated: onCreated },
         }));
 
-        const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test agent",
           background: { kind: "explicit", isBackground: true },
         });
@@ -953,7 +950,7 @@ describe("SubagentManager", () => {
           observer: { onSubagentCreated: onCreated },
         }));
 
-        await manager.spawnAndWait(STUB_SNAPSHOT, "general-purpose", "test", {
+        await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "foreground agent",
         });
 
@@ -988,7 +985,7 @@ describe("SubagentManager", () => {
           },
         }));
 
-        const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "bg agent",
           background: { kind: "explicit", isBackground: true },
         });
@@ -1013,7 +1010,7 @@ describe("SubagentManager", () => {
       it("forwards onSessionCreated from spawn options observer to Agent", async () => {
         const received: { agent: Subagent | undefined } = { agent: undefined };
 
-        const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test",
           background: { kind: "explicit", isBackground: true },
           observer: {
@@ -1031,7 +1028,7 @@ describe("SubagentManager", () => {
       it("forwards onSessionCreated for foreground agents", async () => {
         const received: { agent: Subagent | undefined } = { agent: undefined };
 
-        await manager.spawnAndWait(STUB_SNAPSHOT, "general-purpose", "test", {
+        await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "fg",
           observer: {
             onSessionCreated: (agent) => {
@@ -1041,7 +1038,7 @@ describe("SubagentManager", () => {
         });
 
         expect(received.agent).toBeDefined();
-        expect(received.agent!.type).toBe("general-purpose");
+        expect(received.agent!.type).toBe("worker");
       });
     });
 
@@ -1065,7 +1062,7 @@ describe("SubagentManager", () => {
       it("toolCallId is undefined when absent", () => {
         ({ manager } = createManager());
 
-        const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "bg",
           background: { kind: "explicit", isBackground: true },
         });
@@ -1702,7 +1699,7 @@ describe("SubagentManager", () => {
         const { factory } = createSessionFactory();
         ({ manager } = createManager({ createSubagentSession: factory }));
 
-        manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+        manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test",
           background: { kind: "explicit", isBackground: true },
           parentSession: {
@@ -1882,7 +1879,7 @@ describe("SubagentManager", () => {
         })),
       });
 
-      const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+      const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
         description: "held agent",
         background: { kind: "explicit", isBackground: true },
       });

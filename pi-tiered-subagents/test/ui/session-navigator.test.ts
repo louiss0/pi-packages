@@ -10,7 +10,7 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { SessionMessage } from "#src/types";
 import {
   type EntryHeading,
@@ -27,7 +27,9 @@ import {
 import { makeNavigable } from "#test/helpers/make-navigable";
 import { fakeSource, mockTui } from "#test/helpers/transcript-fixtures";
 
-const registry = new AgentTypeRegistry(() => new Map());
+const registry = new AgentRegistry(() => ({
+  global: { definitions: [], errors: [] },
+}));
 
 // Pi's per-entry components read the global interactive theme; Pi initializes it
 // at startup before any command runs. Tests must initialize it explicitly.
@@ -59,7 +61,6 @@ function ansiTheme() {
 
 const DEFAULT_HEADING: EntryHeading = {
   name: "Explore",
-  modeLabel: undefined,
   description: "Find auth files",
 };
 
@@ -222,7 +223,6 @@ describe("TranscriptPane", () => {
           source,
           heading: {
             name: "Agent",
-            modeLabel: "twin",
             description: "Refactor the auth module",
           },
         });
@@ -251,7 +251,6 @@ describe("TranscriptPane", () => {
   describe("header rule", () => {
     const heading: EntryHeading = {
       name: "Agent",
-      modeLabel: "twin",
       description: "Refactor auth",
     };
     const headerAt = (
@@ -267,7 +266,7 @@ describe("TranscriptPane", () => {
 
     it("names the agent, its mode, its task, its model, and its thinking level", () => {
       expect(headerAt(80)).toBe(
-        `── Agent (twin)  Refactor auth · anthropic/claude-sonnet-5 • high ${"─".repeat(14)}`,
+        `── Agent  Refactor auth · anthropic/claude-sonnet-5 • high ${"─".repeat(21)}`,
       );
     });
 
@@ -285,12 +284,12 @@ describe("TranscriptPane", () => {
 
     it("drops the task first as the width shrinks", () => {
       expect(headerAt(55)).toBe(
-        `── Agent (twin) · anthropic/claude-sonnet-5 • high ${"─".repeat(4)}`,
+        `── Agent · anthropic/claude-sonnet-5 • high ${"─".repeat(11)}`,
       );
     });
 
     it("drops the model next, keeping the agent's name", () => {
-      expect(headerAt(30)).toBe(`── Agent (twin) ${"─".repeat(14)}`);
+      expect(headerAt(30)).toBe(`── Agent ${"─".repeat(21)}`);
     });
   });
 
@@ -331,7 +330,7 @@ describe("TranscriptPane", () => {
       // Pi binds the top/bottom keys as "ctrl+home"/"ctrl+end" by default, so
       // the hints need a width that fits the longer names.
       const footer = footerAt(100);
-      expect(footer.startsWith("── 3 lines · 100% ─")).toBe(true);
+      expect(footer.startsWith("── 3 lines · 100% ")).toBe(true);
       expect(
         footer.endsWith(
           ` ↑↓ scroll · ${hintFor("tui.altScreen.pageUp")}/${hintFor("tui.altScreen.pageDown")}` +
@@ -721,7 +720,7 @@ describe("SessionNavigatorHandler", () => {
     const record = makeNavigable({ agentMessages: messages });
     const [label] = (() => {
       // The handler labels entries identically to listNavigableAgents.
-      return ["Agent (Test task) · 2 tools · completed · 3.0s"];
+      return ["Worker (Test task) · 2 tools · completed · 3.0s"];
     })();
     const ui = makeUI(label);
 
@@ -739,11 +738,11 @@ describe("SessionNavigatorHandler", () => {
   });
 
   it("heads the pane with the picked agent's name and task", async () => {
-    const ui = makeUI("Agent (Test task) · 2 tools · completed · 3.0s");
+    const ui = makeUI("Worker (Test task) · 2 tools · completed · 3.0s");
     await handleWith(ui, [makeNavigable()]);
     expect(
       stripAnsi(renderCapturedPane(ui)[0] ?? "").startsWith(
-        "── Agent (twin)  Test task ",
+        "── Worker  Test task ",
       ),
     ).toBe(true);
   });
@@ -751,7 +750,7 @@ describe("SessionNavigatorHandler", () => {
   it("mounts the transcript outside Pi's overlay compositor", async () => {
     // Regular-mode overlays are composited into the buffer that backs scrollback,
     // so an overlay mount bakes the pane's chrome into terminal history (#733).
-    const ui = makeUI("Agent (Test task) · 2 tools · completed · 3.0s");
+    const ui = makeUI("Worker (Test task) · 2 tools · completed · 3.0s");
 
     await handleWith(ui, [makeNavigable()]);
 
@@ -831,7 +830,7 @@ describe("SessionNavigatorHandler", () => {
       outputFile: "/tasks/e1.jsonl",
     });
     const ui = makeUI(
-      "Agent (Old task) · 5 tools · completed · 3.0s · session released (snapshot)",
+      "Worker (Old task) · 5 tools · completed · 3.0s · session released (snapshot)",
     );
 
     await handleWith(ui, [released], { readFile });
@@ -849,7 +848,7 @@ describe("SessionNavigatorHandler", () => {
       customType: "subagents:record",
       data: {
         id: "e1",
-        type: "general-purpose",
+        type: "worker",
         description: "Old task",
         status: "completed",
         result: "done",
@@ -860,7 +859,7 @@ describe("SessionNavigatorHandler", () => {
       },
     };
     const label =
-      "Agent (Old task) · 5 tools · completed · 3.0s · session released (snapshot)";
+      "Worker (Old task) · 5 tools · completed · 3.0s · session released (snapshot)";
 
     it("offers the runs the session recorded", async () => {
       const ui = makeUI(undefined);
@@ -901,7 +900,7 @@ describe("SessionNavigatorHandler", () => {
       outputFile: "/tasks/e1.jsonl",
     });
     const ui = makeUI(
-      "Agent (Old task) · 5 tools · completed · 3.0s · session released (snapshot)",
+      "Worker (Old task) · 5 tools · completed · 3.0s · session released (snapshot)",
     );
 
     await handleWith(ui, [released], { readFile });

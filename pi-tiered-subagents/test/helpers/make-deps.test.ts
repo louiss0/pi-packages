@@ -54,11 +54,9 @@ describe("createToolDeps", () => {
       expect(createToolDeps().settings.maxConcurrent).toBe(4);
     });
 
-    it("registry accepts agent type lookups without throwing", () => {
+    it("registry answers agent type lookups without throwing", () => {
       const { registry } = createToolDeps();
-      expect(() =>
-        registry.resolveAgentConfig("general-purpose"),
-      ).not.toThrow();
+      expect(() => registry.select("worker")).not.toThrow();
     });
   });
 

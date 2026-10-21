@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  type AgentDefinition,
+  defaultDefinition,
+} from "#src/agents/definition";
 import type { TypeListRegistry } from "#src/tools/helpers";
 import {
   buildAgentGuidelines,
@@ -13,23 +17,24 @@ import { createTestSubagent } from "#test/helpers/make-subagent";
 
 /** Build a minimal TypeListRegistry stub for tests. */
 function makeRegistry(opts: {
-  defaults?: string[];
-  users?: string[];
-  resolve?: (name: string) => {
-    description: string;
-    model: string | undefined;
-    enabled?: boolean;
-    toolGuideline?: string;
-  };
+  definitions?: Partial<AgentDefinition>[];
 }): TypeListRegistry {
-  return {
-    getDefaultAgentNames: () => opts.defaults ?? [],
-    getUserAgentNames: () => opts.users ?? [],
-    resolveAgentConfig: (name: string) =>
+  const definitions = (opts.definitions ?? []).map(
+    (definition) =>
       ({
-        ...(opts.resolve?.(name) ?? { description: "", model: undefined }),
-      }) as ReturnType<TypeListRegistry["resolveAgentConfig"]>,
-    getToolNamesForType: () => [],
+        ...defaultDefinition(definition.id ?? "agent", "shipped"),
+        ...definition,
+      }) as AgentDefinition,
+  );
+  return {
+    select: (id: string) => {
+      const definition = definitions.find((d) => d.id === id);
+      return definition
+        ? { ok: true as const, definition }
+        : { ok: false as const, error: `Unknown agent type "${id}".` };
+    },
+    find: (id: string) => definitions.find((d) => d.id === id),
+    list: () => definitions,
   };
 }
 
@@ -113,28 +118,35 @@ describe("getModelLabelFromConfig", () => {
 });
 
 describe("buildTypeListText", () => {
-  it("lists default agents with their descriptions", () => {
+  it("lists the shipped specialists with their descriptions", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose"],
-      resolve: () => ({
-        description: "General purpose agent",
-        model: undefined,
-      }),
+      definitions: [
+        {
+          id: "worker",
+          displayName: "Worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
-    expect(result).toContain("- general-purpose: General purpose agent");
+    expect(result).toContain("- worker: Implements a scoped change");
+    expect(result).toContain("Specialists:");
   });
 
-  it("includes model suffix for default agents that have a model set", () => {
+  it("includes model suffix for agents that have a model set", () => {
     const registry = makeRegistry({
-      defaults: ["Explore"],
-      resolve: () => ({
-        description: "Fast explorer",
-        model: "anthropic/claude-haiku-4-5",
-      }),
+      definitions: [
+        {
+          id: "explore",
+          description: "Fast explorer",
+          model: "anthropic/claude-haiku-4-5",
+          origin: "shipped",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
-    expect(result).toContain("- Explore: Fast explorer (claude-haiku-4-5)");
+    expect(result).toContain("- explore: Fast explorer (claude-haiku-4-5)");
   });
 
   it("includes agentDir in the trailing hint line", () => {
@@ -143,128 +155,142 @@ describe("buildTypeListText", () => {
     expect(result).toContain("/home/user/.pi");
   });
 
-  it("adds Custom agents section when user agents are present", () => {
+  it("adds a Custom agents section when a file-defined agent is present", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose"],
-      users: ["my-agent"],
-      resolve: (name) =>
-        name === "general-purpose"
-          ? { description: "General purpose", model: undefined }
-          : { description: "My custom agent", model: undefined },
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+        {
+          id: "my-agent",
+          description: "My custom agent",
+          origin: "global",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
     expect(result).toContain("Custom agents:");
     expect(result).toContain("- my-agent: My custom agent");
   });
 
-  it("excludes disabled agents from the default agents list", () => {
+  it("excludes disabled agents from the list", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose", "Plan"],
-      resolve: (name) =>
-        name === "Plan"
-          ? { description: "Planning agent", model: undefined, enabled: false }
-          : { description: "General purpose agent", model: undefined },
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+        {
+          id: "disabled",
+          description: "Disabled agent",
+          enabled: false,
+          origin: "shipped",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
-    expect(result).toContain("- general-purpose: General purpose agent");
-    expect(result).not.toContain("Plan");
+    expect(result).toContain("- worker: Implements a scoped change");
+    expect(result).not.toContain("disabled");
   });
 
-  it("excludes disabled agents from the custom agents list", () => {
+  it("omits the Custom agents section when no file-defined agents exist", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose"],
-      users: ["my-agent", "disabled-custom"],
-      resolve: (name) =>
-        name === "disabled-custom"
-          ? {
-              description: "disabled custom agent",
-              model: undefined,
-              enabled: false,
-            }
-          : { description: "My custom agent", model: undefined },
-    });
-    const result = buildTypeListText(registry, "/home/.pi");
-    expect(result).toContain("- my-agent: My custom agent");
-    expect(result).not.toContain("disabled-custom");
-  });
-
-  it("omits Custom agents section when no user agents exist", () => {
-    const registry = makeRegistry({
-      defaults: ["general-purpose"],
-      resolve: () => ({ description: "General purpose", model: undefined }),
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
     expect(result).not.toContain("Custom agents:");
   });
 
-  it("omits the Default agents header when no default agents exist", () => {
+  it("omits the Specialists header when no shipped agents exist", () => {
     const registry = makeRegistry({
-      users: ["my-agent"],
-      resolve: () => ({ description: "My custom agent", model: undefined }),
+      definitions: [
+        {
+          id: "my-agent",
+          description: "My custom agent",
+          origin: "global",
+        },
+      ],
     });
     const result = buildTypeListText(registry, "/home/.pi");
-    expect(result).not.toContain("Default agents:");
+    expect(result).not.toContain("Specialists:");
   });
 });
 
 describe("buildAgentGuidelines", () => {
-  it("returns the enabled default agents' guideline lines in registry order", () => {
+  it("names the shipped specialists and what they are for", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose", "Explore", "Plan"],
-      resolve: (name) => ({
-        description: `${name} agent`,
-        model: undefined,
-        toolGuideline: `- Use ${name} for stuff.`,
-      }),
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+        {
+          id: "reviewer",
+          description: "Reviews a scoped change",
+          origin: "shipped",
+        },
+      ],
     });
     expect(buildAgentGuidelines(registry)).toEqual([
-      "- Use general-purpose for stuff.",
-      "- Use Explore for stuff.",
-      "- Use Plan for stuff.",
+      "- Use worker for: Implements a scoped change",
+      "- Use reviewer for: Reviews a scoped change",
     ]);
   });
 
-  it("omits a disabled default agent's guideline line", () => {
+  it("omits a disabled specialist's guideline line", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose", "Explore"],
-      resolve: (name) => ({
-        description: `${name} agent`,
-        model: undefined,
-        enabled: name === "Explore" ? false : undefined,
-        toolGuideline: `- Use ${name} for stuff.`,
-      }),
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          origin: "shipped",
+        },
+        {
+          id: "reviewer",
+          description: "Reviews a scoped change",
+          enabled: false,
+          origin: "shipped",
+        },
+      ],
     });
     expect(buildAgentGuidelines(registry)).toEqual([
-      "- Use general-purpose for stuff.",
+      "- Use worker for: Implements a scoped change",
     ]);
   });
 
-  it("omits default agents that declare no guideline", () => {
+  it("names no file-defined agent, because the caller already sees it listed", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose", "custom-default"],
-      resolve: (name) => ({
-        description: `${name} agent`,
-        model: undefined,
-        toolGuideline:
-          name === "general-purpose"
-            ? "- Use general-purpose for stuff."
-            : undefined,
-      }),
+      definitions: [
+        {
+          id: "my-agent",
+          description: "My custom agent",
+          origin: "global",
+        },
+      ],
     });
-    expect(buildAgentGuidelines(registry)).toEqual([
-      "- Use general-purpose for stuff.",
-    ]);
+    expect(buildAgentGuidelines(registry)).toEqual([]);
   });
 
-  it("returns an empty array when all default agents are disabled", () => {
+  it("returns an empty array when every specialist is disabled", () => {
     const registry = makeRegistry({
-      defaults: ["general-purpose", "Explore"],
-      resolve: (name) => ({
-        description: `${name} agent`,
-        model: undefined,
-        enabled: false,
-        toolGuideline: `- Use ${name} for stuff.`,
-      }),
+      definitions: [
+        {
+          id: "worker",
+          description: "Implements a scoped change",
+          enabled: false,
+          origin: "shipped",
+        },
+      ],
     });
     expect(buildAgentGuidelines(registry)).toEqual([]);
   });

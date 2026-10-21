@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { createResolvedSpawnConfig } from "#test/helpers/make-spawn-config";
 
 describe("createResolvedSpawnConfig", () => {
-  it("produces a foreground-shaped config by default", () => {
+  it("produces a background-shaped config by default", () => {
     expect(createResolvedSpawnConfig()).toEqual({
       identity: {
-        subagentType: "general-purpose",
-        rawType: "general-purpose",
-        fellBack: false,
-        displayName: "Agent",
+        subagentType: "worker",
+        rawType: "worker",
+        displayName: "Worker",
+        definition: expect.any(Object),
       },
       notes: [],
       execution: {
@@ -18,20 +18,14 @@ describe("createResolvedSpawnConfig", () => {
         effectiveMaxTurns: undefined,
         thinking: undefined,
         inheritContext: false,
-        runInBackground: false,
-        agentInvocation: {
-          thinking: undefined,
-          maxTurns: undefined,
-          inheritContext: false,
-          runInBackground: false,
-        },
+        runInBackground: true,
       },
       presentation: {
         agentTags: [],
         detailBase: {
-          displayName: "Agent",
+          displayName: "Worker",
           description: "task",
-          subagentType: "general-purpose",
+          subagentType: "worker",
           modelName: undefined,
           tags: undefined,
         },
@@ -51,31 +45,21 @@ describe("createResolvedSpawnConfig", () => {
     expect(config.execution.description).toBe("bg task");
   });
 
-  it("mirrors runInBackground into agentInvocation", () => {
+  it("mirrors runInBackground into the execution", () => {
     const config = createResolvedSpawnConfig({ runInBackground: true });
     expect(config.execution.runInBackground).toBe(true);
-    expect(config.execution.agentInvocation.runInBackground).toBe(true);
   });
 
-  it("defaults rawType to subagentType but keeps an explicit fallback rawType", () => {
-    expect(createResolvedSpawnConfig().identity.rawType).toBe(
-      "general-purpose",
-    );
-    const fallback = createResolvedSpawnConfig({
-      fellBack: true,
-      rawType: "unknown-type",
+  it("defaults rawType to subagentType but keeps an explicit rawType", () => {
+    expect(createResolvedSpawnConfig().identity.rawType).toBe("worker");
+    const explicit = createResolvedSpawnConfig({
+      rawType: "other-type",
     });
-    expect(fallback.identity.fellBack).toBe(true);
-    expect(fallback.identity.rawType).toBe("unknown-type");
+    expect(explicit.identity.rawType).toBe("other-type");
   });
 
-  it("derives the unknown-type note from fellBack and rawType", () => {
-    expect(
-      createResolvedSpawnConfig({ fellBack: true, rawType: "unknown-type" })
-        .notes,
-    ).toEqual([
-      'Note: Unknown agent type "unknown-type" — using general-purpose.',
-    ]);
+  it("carries no notes by default", () => {
+    expect(createResolvedSpawnConfig().notes).toEqual([]);
   });
 
   it("mirrors displayName, description, subagentType, and model into presentation.detailBase", () => {

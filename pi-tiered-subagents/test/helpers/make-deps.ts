@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import { AgentRegistry } from "#src/agents/registry";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
@@ -12,8 +12,10 @@ import { makeModel } from "./make-model";
 import { createTestSubagent, type TestSubagentOptions } from "./make-subagent";
 import { STUB_SNAPSHOT } from "./stub-ctx";
 
-/** Minimal registry with no user agents — sufficient for tool tests that don't exercise agent-type lookup. */
-const defaultRegistry = new AgentTypeRegistry(() => new Map());
+/** Minimal registry with the shipped specialists and no files. */
+const defaultRegistry = new AgentRegistry(() => ({
+  global: { definitions: [], errors: [] },
+}));
 
 /**
  * Fixture shape returned by `createToolDeps`.
@@ -25,7 +27,7 @@ export type AgentToolFixture = {
   /** Mock runtime satisfying `AgentToolRuntime` (context queries). */
   runtime: AgentToolRuntime;
   settings: AgentToolSettings;
-  registry: AgentTypeRegistry;
+  registry: AgentRegistry;
   agentDir: string;
 };
 
@@ -112,28 +114,23 @@ export function mockResumeRefusal(
 }
 
 /**
- * Build a tool fixture whose named built-in default agents are disabled.
- * Overlays a same-named user config with `enabled: false` onto each default,
- * so the registry keeps the name but excludes it from the enabled surface.
+ * Build a tool fixture whose named specialists are disabled.
+ *
+ * A definition file that disables an agent refines the shipped one, so the
+ * registry keeps the identifier and drops it from the enabled surface.
  */
 export function createToolDepsWithDisabledBuiltInAgents(
   ...names: string[]
 ): AgentToolFixture {
-  const registry = new AgentTypeRegistry(
-    () =>
-      new Map(
-        names.map((name) => [
-          name,
-          {
-            name,
-            description: "disabled built-in agent",
-            promptMode: "append" as const,
-            systemPrompt: "",
-            isDefault: true,
-            enabled: false,
-          },
-        ]),
-      ),
-  );
+  const registry = new AgentRegistry(() => ({
+    global: {
+      definitions: names.map((name) => ({
+        id: name,
+        patch: { enabled: false },
+        path: `${name}.md`,
+      })),
+      errors: [],
+    },
+  }));
   return createToolDeps({ registry });
 }

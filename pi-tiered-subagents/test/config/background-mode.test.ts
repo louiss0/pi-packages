@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   type BackgroundRequest,
   resolveBackgroundMode,
-} from "#src/config/invocation-config";
+} from "#src/agents/invocation";
 
 describe("resolveBackgroundMode", () => {
   describe("an explicit request", () => {
-    it("is honored when the agent config declares nothing", () => {
+    it("is honored when the definition declares nothing", () => {
       const request: BackgroundRequest = {
         kind: "explicit",
         isBackground: true,
@@ -14,7 +14,7 @@ describe("resolveBackgroundMode", () => {
       expect(resolveBackgroundMode({}, request)).toBe(true);
     });
 
-    it("wins over a contradicting agent config", () => {
+    it("wins over a contradicting definition", () => {
       const request: BackgroundRequest = {
         kind: "explicit",
         isBackground: false,
@@ -24,7 +24,7 @@ describe("resolveBackgroundMode", () => {
       );
     });
 
-    it("wins over an agreeing agent config too", () => {
+    it("wins over an agreeing definition too", () => {
       const request: BackgroundRequest = {
         kind: "explicit",
         isBackground: true,
@@ -36,7 +36,7 @@ describe("resolveBackgroundMode", () => {
   });
 
   describe("a default request", () => {
-    it("defers to the agent config when it declares a mode", () => {
+    it("defers to the definition when it declares a mode", () => {
       const request: BackgroundRequest = {
         kind: "default",
         isBackground: true,
@@ -46,7 +46,7 @@ describe("resolveBackgroundMode", () => {
       );
     });
 
-    it("defers to an agent config declaring background too", () => {
+    it("defers to a definition declaring background too", () => {
       const request: BackgroundRequest = {
         kind: "default",
         isBackground: false,
@@ -56,7 +56,7 @@ describe("resolveBackgroundMode", () => {
       );
     });
 
-    it("falls back to its own value when the agent config is silent", () => {
+    it("falls back to its own value when the definition is silent", () => {
       const request: BackgroundRequest = {
         kind: "default",
         isBackground: true,
@@ -64,7 +64,7 @@ describe("resolveBackgroundMode", () => {
       expect(resolveBackgroundMode({}, request)).toBe(true);
     });
 
-    it("falls back to its own foreground value when the agent config is silent", () => {
+    it("falls back to its own foreground value when the definition is silent", () => {
       const request: BackgroundRequest = {
         kind: "default",
         isBackground: false,

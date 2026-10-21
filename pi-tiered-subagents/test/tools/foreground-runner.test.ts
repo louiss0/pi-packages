@@ -297,21 +297,20 @@ describe("runForeground", () => {
     expect(textOf(result)).toContain("runner crashed");
   });
 
-  it("includes fallback note when fellBack is true", async () => {
+  it("includes the spawn's notes when there are any", async () => {
     const { manager } = createToolDeps();
     const result = await runForeground(
       manager,
       makeParams({
         config: createResolvedSpawnConfig({
-          rawType: "unknown-type",
-          fellBack: true,
+          notes: ["Note: max_turns 1 is below the minimum."],
           description: "fg task",
         }),
       }),
       undefined,
       undefined,
     );
-    expect(textOf(result)).toContain('Unknown agent type "unknown-type"');
+    expect(textOf(result)).toContain("below the minimum");
   });
 
   it("calls onUpdate with streaming details while running", async () => {
@@ -518,9 +517,9 @@ describe("runForeground", () => {
       expect(onUpdate).toHaveBeenNthCalledWith(1, {
         content: [{ type: "text", text: "0 tool uses..." }],
         details: {
-          displayName: "Agent",
+          displayName: "Worker",
           description: "fg task",
-          subagentType: "general-purpose",
+          subagentType: "worker",
           toolUses: 0,
           tokens: "",
           durationMs: 0,
@@ -547,9 +546,9 @@ describe("runForeground", () => {
       expect(onUpdate).toHaveBeenLastCalledWith({
         content: [{ type: "text", text: "4 tool uses..." }],
         details: {
-          displayName: "Agent",
+          displayName: "Worker",
           description: "fg task",
-          subagentType: "general-purpose",
+          subagentType: "worker",
           toolUses: 4,
           tokens: "1.5k token",
           durationMs: 80,
@@ -640,8 +639,7 @@ describe("runForeground", () => {
         manager,
         makeParams({
           config: createResolvedSpawnConfig({
-            rawType: "unknown-type",
-            fellBack: true,
+            notes: ["Note: max_turns 1 is below the minimum."],
             description: "fg task",
           }),
         }),
@@ -649,11 +647,9 @@ describe("runForeground", () => {
         undefined,
       );
       const text = textOf(result);
-      expect(
-        text.startsWith(
-          'Note: Unknown agent type "unknown-type" — using general-purpose.',
-        ),
-      ).toBe(true);
+      expect(text.startsWith("Note: max_turns 1 is below the minimum.")).toBe(
+        true,
+      );
       expect(text.indexOf("Agent ID: agent-1")).toBeGreaterThan(0);
     });
   });

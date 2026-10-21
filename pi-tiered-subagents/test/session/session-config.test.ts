@@ -1,31 +1,41 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinition } from "#src/agents/definition";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type {
   AssemblerContext,
   AssemblerIO,
 } from "#src/session/session-config";
-import type { AgentConfig } from "#src/types";
 import { makeModel } from "#test/helpers/make-model";
 
-const mockResolveAgentConfig = vi.fn(
-  (): AgentConfig => ({
-    name: "Explore",
-    description: "Fast codebase exploration agent",
-    toolNames: ["read"],
-    systemPrompt: "You are Explore.",
-    promptMode: "replace",
+const mockSelect = vi.fn(
+  (_id: string): { ok: true; definition: AgentDefinition } => ({
+    ok: true,
+    definition: {
+      id: "explore",
+      displayName: "Explore",
+      description: "Fast codebase exploration agent",
+      instructions: "You are Explore.",
+      tools: { kind: "explicit", names: ["read"] },
+      inheritContext: false,
+      runInBackground: true,
+      enabled: true,
+      origin: "shipped",
+    },
   }),
 );
-const mockGetToolNamesForType = vi.fn((): string[] => ["read"]);
+const mockFind = vi.fn((_id: string): AgentDefinition | undefined =>
+  mockSelect("").ok ? mockSelect("").definition : undefined,
+);
 const mockBuildAgentPrompt: Mock<AssemblerIO["buildAgentPrompt"]> = vi.fn(
   () => "assembled system prompt",
 );
 
 /** Mock registry injected into assembleSessionConfig instead of module-level free functions. */
-const mockAgentLookup: AgentConfigLookup = {
-  resolveAgentConfig: mockResolveAgentConfig,
-  getToolNamesForType: mockGetToolNamesForType,
+const mockAgentLookup: AgentDefinitionLookup = {
+  select: mockSelect,
+  find: mockFind,
+  list: vi.fn(() => []),
 };
 
 import { assembleSessionConfig } from "#src/session/session-config";
@@ -42,6 +52,7 @@ const ctx: AssemblerContext = {
   cwd: "/tmp",
   parentSystemPrompt: "parent prompt",
   modelRegistry: mockRegistry,
+  activeToolNames: ["read", "bash"],
 };
 
 const mockLoadProjectContext: Mock<AssemblerIO["loadProjectContext"]> = vi.fn(
@@ -55,19 +66,26 @@ const mockIO = {
 };
 
 /** The Explore agent config used across the model/thinking resolution tests. */
-function exploreConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
+function exploreConfig(
+  overrides: Partial<AgentDefinition> = {},
+): AgentDefinition {
   return {
-    name: "Explore",
+    id: "explore",
+    displayName: "Explore",
     description: "test",
-    systemPrompt: "prompt",
-    promptMode: "replace",
+    instructions: "prompt",
+    tools: { kind: "explicit", names: ["read"] },
+    inheritContext: false,
+    runInBackground: true,
+    enabled: true,
+    origin: "shipped",
     ...overrides,
   };
 }
 
 beforeEach(() => {
-  mockResolveAgentConfig.mockClear();
-  mockGetToolNamesForType.mockClear();
+  mockSelect.mockClear();
+  mockFind.mockClear();
   mockBuildAgentPrompt.mockClear();
   mockLoadProjectContext.mockClear();
   mockRegistry.find.mockReset();
@@ -150,7 +168,7 @@ describe("assembleSessionConfig — default agent shape", () => {
     );
 
     expect(mockBuildAgentPrompt).toHaveBeenCalledWith(
-      mockResolveAgentConfig(),
+      { name: "explore", instructions: "You are Explore." },
       "/worktree",
       mockEnv,
       {
@@ -183,9 +201,10 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-opus-4",
     });
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "anthropic/claude-haiku-4" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "anthropic/claude-haiku-4" }),
+    });
 
     const result = assembleSessionConfig(
       "Explore",
@@ -207,9 +226,10 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-opus-4",
     });
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "anthropic/claude-opus-4" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "anthropic/claude-opus-4" }),
+    });
     mockRegistry.find.mockReturnValueOnce(resolvedModel);
     mockRegistry.getAvailable.mockReturnValueOnce([
       makeModel({ provider: "anthropic", id: "claude-opus-4" }),
@@ -236,9 +256,10 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-haiku-4",
     });
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "anthropic/unknown-model" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "anthropic/unknown-model" }),
+    });
     mockRegistry.find.mockReturnValueOnce(undefined);
     mockRegistry.getAvailable.mockReturnValueOnce([]);
 
@@ -263,9 +284,10 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-opus-4",
     });
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "anthropic/claude-opus-4" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "anthropic/claude-opus-4" }),
+    });
     // Model exists in registry but NOT in available set
     mockRegistry.find.mockReturnValueOnce(foundModel);
     mockRegistry.getAvailable.mockReturnValueOnce([]);
@@ -287,9 +309,10 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-haiku-4",
     });
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "claude-opus-4" }),
-    ); // no provider/ prefix
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "claude-opus-4" }),
+    }); // no provider/ prefix
 
     const result = assembleSessionConfig(
       "Explore",
@@ -324,13 +347,15 @@ describe("assembleSessionConfig — model resolution", () => {
 
 describe("assembleSessionConfig — unknown type fallback", () => {
   it("passes resolved config directly to buildAgentPrompt", () => {
-    // resolveAgentConfig handles the fallback internally —
-    // session-config just forwards whatever it returns
-    mockResolveAgentConfig.mockReturnValueOnce({
-      name: "general-purpose",
-      description: "General-purpose",
-      systemPrompt: "",
-      promptMode: "append" as const,
+    // The registry answers with a definition; the assembler forwards whatever
+    // it selects.
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({
+        id: "general-purpose",
+        description: "General-purpose",
+        instructions: "",
+      }),
     });
 
     mockBuildAgentPrompt.mockImplementationOnce(
@@ -365,9 +390,10 @@ describe("assembleSessionConfig — thinking level", () => {
   });
 
   it("options.thinkingLevel wins over agentConfig.thinking", () => {
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ thinking: "low" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ thinking: "low" }),
+    });
 
     const result = assembleSessionConfig(
       "Explore",
@@ -382,9 +408,10 @@ describe("assembleSessionConfig — thinking level", () => {
   });
 
   it("agentConfig.thinking is used when no option is provided", () => {
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ thinking: "medium" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ thinking: "medium" }),
+    });
 
     const result = assembleSessionConfig(
       "Explore",
@@ -437,9 +464,10 @@ describe("assembleSessionConfig — prompt inheritance", () => {
     const bridgeModel = makeModel({ provider: "claude-bridge", id: "opus" });
     mockRegistry.find.mockReturnValueOnce(bridgeModel);
     mockRegistry.getAvailable.mockReturnValueOnce([bridgeModel]);
-    mockResolveAgentConfig.mockReturnValueOnce(
-      exploreConfig({ model: "claude-bridge/opus" }),
-    );
+    mockSelect.mockReturnValueOnce({
+      ok: true,
+      definition: exploreConfig({ model: "claude-bridge/opus" }),
+    });
 
     assembleSessionConfig(
       "Explore",
