@@ -7,6 +7,7 @@
 
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
+import type { ResolvedInvocation } from "#src/agents/invocation";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { GLYPHS } from "#src/ui/glyphs";
 
@@ -158,12 +159,10 @@ export function getDisplayName(
 }
 
 /** The settings a launch resolved, as the tags name them. */
-export interface InvocationTags {
-  readonly thinking?: string;
-  readonly maxTurns?: number;
-  readonly inheritContext?: boolean;
-  readonly runInBackground?: boolean;
-}
+export type InvocationTags = Pick<
+  ResolvedInvocation,
+  "thinking" | "maxTurns" | "inheritContext" | "runInBackground"
+>;
 
 /** Mode label is not included — callers add it where they want it. */
 export function buildInvocationTags(invocation: InvocationTags | undefined): {

@@ -289,13 +289,13 @@ ${guidelines}
         model: Type.Optional(
           Type.String({
             description:
-              'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent type\'s default. An agent that locks this field keeps its own model and says so in the result.',
+              'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent definition\'s own model, or the one this call inherits.',
           }),
         ),
         thinking: Type.Optional(
           Type.String({
             description:
-              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent's default unless the agent locks this field.",
+              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level.",
           }),
         ),
         max_turns: Type.Optional(

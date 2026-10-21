@@ -15,12 +15,20 @@ definitions for subagent runtimes; it does not execute those agents.
 
 ### Subagent execution — `pi-tiered-subagents`
 
+Read the [Subagent execution glossary](pi-tiered-subagents/GLOSSARY.md)
+for the package's own vocabulary: agent definition, definition file,
+identifier, layer, tool selection, shipped specialist, and parent snapshot.
+
 Consult the inherited
 [decision records](pi-tiered-subagents/docs/decisions/)
-when changing source-derived behaviour.
+when changing source-derived behaviour, and this package's own
+[decision records](pi-tiered-subagents/docs/adr/) for the decisions this
+derivative made.
 
 The [specification](pi-tiered-subagents/docs/SPEC.md) records agreed
-requirements, not a glossary or evidence of completed implementation.
+requirements, not a glossary or evidence of completed implementation;
+[the status report](pi-tiered-subagents/docs/status.md) records what is
+implemented.
 
 ## Extending the map
 

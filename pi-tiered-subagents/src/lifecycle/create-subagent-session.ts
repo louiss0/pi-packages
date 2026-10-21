@@ -20,6 +20,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
+import { SUBAGENT_TOOL_NAMES } from "#src/agents/definition";
 import { debugNote } from "#src/debug";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
@@ -59,11 +60,7 @@ import type {
  * child extension registering a tool of its own. Filtering the active set once
  * after `bindExtensions` would be undone by that rebuild (#725).
  */
-const EXCLUDED_TOOL_NAMES = [
-  "subagent",
-  "get_subagent_result",
-  "steer_subagent",
-];
+const EXCLUDED_TOOL_NAMES = [...SUBAGENT_TOOL_NAMES];
 
 // ── IO boundary ───────────────────────────────────────────────────────────────
 

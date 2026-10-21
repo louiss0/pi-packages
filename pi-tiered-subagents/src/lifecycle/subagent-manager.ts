@@ -195,6 +195,14 @@ export interface SubagentManagerOptions {
   observer?: SubagentManagerObserver;
   /** Agent registry, consulted to canonicalize a spawn's type and resolve its config. */
   registry: SpawnTypeResolver;
+  /**
+   * Re-reads the agent definitions before a spawn resolves.
+   *
+   * The definition files live on disk and the project's trust is a session
+   * fact, so the registry is refreshed at the choke point every front door
+   * shares rather than once at load.
+   */
+  reloadDefinitions?: () => void;
 }
 
 export interface AgentSpawnConfig {
@@ -238,6 +246,7 @@ export class SubagentManager {
   private getRunConfig?: () => RunConfig;
   private getRetentionPolicy?: () => RetentionPolicy;
   private readonly registry: SpawnTypeResolver;
+  private readonly reloadDefinitions: (() => void) | undefined;
   private _workspaceProvider?: WorkspaceProvider;
 
   /** The registered workspace provider, or undefined when none is registered. */
@@ -253,6 +262,7 @@ export class SubagentManager {
     this.getRunConfig = options.getRunConfig;
     this.getRetentionPolicy = options.getRetentionPolicy;
     this.registry = options.registry;
+    this.reloadDefinitions = options.reloadDefinitions;
     // Periodically release the heavy session of terminal agents past their
     // retention window. The lightweight record (with its result) is kept for the
     // session lifetime, so get_subagent_result never misses in-session.
@@ -379,6 +389,9 @@ export class SubagentManager {
     type: string,
     background: BackgroundRequest,
   ): ResolvedSpawn {
+    // Refresh first: a definition file added since the last spawn, and the
+    // project's trust, are both facts that arrive after the extension loads.
+    this.reloadDefinitions?.();
     const selection = this.registry.select(type);
     if (!selection.ok) {
       throw new Error(selection.error);

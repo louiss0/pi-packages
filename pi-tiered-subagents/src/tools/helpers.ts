@@ -1,4 +1,5 @@
 import type { AgentDefinitionLookup } from "#src/agents/registry";
+import { isShippedSpecialist } from "#src/agents/shipped";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { getLifetimeTotal, type LifetimeUsage } from "#src/lifecycle/usage";
 import {
@@ -83,11 +84,11 @@ export function buildTypeListText(
     .list()
     .filter((definition) => definition.enabled);
 
-  const shipped = definitions.filter(
-    (definition) => definition.origin === "shipped",
+  const shipped = definitions.filter((definition) =>
+    isShippedSpecialist(definition.id),
   );
   const custom = definitions.filter(
-    (definition) => definition.origin !== "shipped",
+    (definition) => !isShippedSpecialist(definition.id),
   );
 
   const describe = (definition: (typeof definitions)[number]) => {
@@ -117,7 +118,7 @@ export function buildAgentGuidelines(registry: TypeListRegistry): string[] {
   return registry
     .list()
     .filter(
-      (definition) => definition.enabled && definition.origin === "shipped",
+      (definition) => definition.enabled && isShippedSpecialist(definition.id),
     )
     .map(
       (definition) => `- Use ${definition.id} for: ${definition.description}`,

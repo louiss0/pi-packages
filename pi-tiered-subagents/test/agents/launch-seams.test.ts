@@ -8,11 +8,17 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { resolveChildToolNames } from "#src/agents/definition";
+import {
+  type AgentDefinition,
+  defaultDefinition,
+  resolveChildToolNames,
+} from "#src/agents/definition";
 import { AgentRegistry } from "#src/agents/registry";
+import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { assembleSessionConfig } from "#src/session/session-config";
 import type { AssemblerIO } from "#src/session/session-config";
 import { AgentTool } from "#src/tools/agent-tool";
+import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
@@ -183,5 +189,79 @@ describe("the shipped specialists", () => {
     for (const id of ["explore", "reviewer", "researcher", "worker"]) {
       expect(deps.registry.find(id)?.inheritContext).toBe(false);
     }
+  });
+});
+
+describe("the service door", () => {
+  /** The adapter's collaborators, with a registry the adapter can read. */
+  function makeAdapter(definition?: AgentDefinition) {
+    const manager = {
+      spawn: vi.fn().mockReturnValue("agent-1"),
+      getRecord: vi.fn(),
+      listAgents: vi.fn(() => []),
+      abort: vi.fn(),
+      waitForAll: vi.fn(),
+      hasRunning: vi.fn(() => false),
+      registerWorkspaceProvider: vi.fn(),
+      resume: vi.fn(),
+    };
+    const runtime = {
+      currentCtx: {} as never,
+      buildSnapshot: vi.fn((inheritContext: boolean) => ({
+        ...STUB_SNAPSHOT,
+        parentContext: inheritContext ? "parent conversation" : undefined,
+      })),
+      getSessionInfo: vi.fn(() => ({
+        parentSessionFile: "/sessions/parent.jsonl",
+        parentSessionId: "session-1",
+      })),
+    };
+    const adapter = new SubagentsServiceAdapter(
+      manager,
+      () => "no such model",
+      runtime,
+      () => definition,
+    );
+    return { adapter, manager, runtime };
+  }
+
+  it("starts a debug spawn from the parent's conversation", () => {
+    const { adapter, runtime } = makeAdapter({
+      ...defaultDefinition("debug", "shipped"),
+      inheritContext: true,
+    });
+    adapter.spawn("debug", "diagnose it");
+    expect(runtime.buildSnapshot).toHaveBeenCalledWith(true);
+  });
+
+  it("lets the caller ask for a fresh conversation instead", () => {
+    const { adapter, runtime } = makeAdapter({
+      ...defaultDefinition("debug", "shipped"),
+      inheritContext: true,
+    });
+    adapter.spawn("debug", "diagnose it", { inheritContext: false });
+    expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
+  });
+
+  it("starts a specialist with a fresh conversation", () => {
+    const { adapter, runtime } = makeAdapter({
+      ...defaultDefinition("worker", "shipped"),
+      inheritContext: false,
+    });
+    adapter.spawn("worker", "do it");
+    expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("a specialist refined by a file", () => {
+  it("stays a specialist in the tool's list and its guidelines", () => {
+    const registry = registryWith("explore", { description: "Local explorer" });
+    const list = buildTypeListText(registry, "/home/.pi");
+    expect(list).toContain("Specialists:");
+    expect(list).toContain("- explore: Local explorer");
+    expect(list).not.toContain("Custom agents:");
+    expect(buildAgentGuidelines(registry)).toContain(
+      "- Use explore for: Local explorer",
+    );
   });
 });

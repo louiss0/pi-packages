@@ -62,11 +62,19 @@ body is either inherited (empty) or replaced (non-empty).
 | Omission inherits, explicit replaces, null clears, empty stays empty | 29–32 | Done. |
 | The body is the standing instructions | 33–34 | Done. |
 | Unknown and disabled agents are rejected, never redirected | 36 | Done at both doors. |
+| A duplicate identifier is reported to the operator | 27 | Done. The parent is told once per problem, with the two files it has to choose between. |
 | Tool inheritance from the parent's active tools | 38–43 | Done. The parent's active tools are captured with the request, so a queued child runs with the selection the request was made under. |
-| Fresh conversation except for `debug` | 44 | Done. |
-| Parent-only orchestration instructions excluded from children | 47 | Done by upstream's inherited-identity cut, which the single prompt shape keeps. |
+| Fresh conversation except for `debug` | 44 | Done, at both doors: the service door honours the definition's preference when the caller names none. |
+| Parent-only orchestration instructions excluded from children | 47 | Partly. The parent's session-resolved layers — its tool surface, its rules, its skills catalogue, its cwd footer — are cut from the child's inherited identity, so the child inherits neither the parent's tool list nor its per-session guidance. What the child still inherits is the harness's base identity and the operator's own words; the latter is story 45's requirement, not an orchestration leak. Narrowing the cut further is outstanding. |
 | Request-time capture of the parent's tools | 48 | Done. |
 | Background by default, foreground on request | 49 | Done. |
+
+### Inherited, and covered by the suite
+
+| Area | Stories | Where it is pinned |
+| --- | --- | --- |
+| User and project standing instructions kept apart from the conversation | 45 | `test/session/prompts.test.ts` — the child's own project context, and the parent's block cut when the child works elsewhere. |
+| Tool guidance derived from the child's own tools | 46 | Pi renders each session's guidance from that session's tools, and the child's tool list is the definition's; `test/agents/child-tools.test.ts` pins the tools a real child session holds. |
 
 ### Deliberate departures from upstream's shape
 
@@ -156,18 +164,19 @@ specification has not settled; it is not a defect in the inherited runtime.
 
 ## Outstanding work (owed to SPEC.md)
 
-Nothing in this table is implemented yet. Each item names the user stories it
-covers.
+Nothing in this table is implemented yet — the table lists what the
+specification still asks for and this package has not yet delivered. Each item
+names the user stories it covers.
 
 | Area | Stories | Notes |
 | --- | --- | --- |
-| Layered agent definitions, `inherit` tool selection, unknown/disabled rejection | 25–42, 45–47 | Done — see the agent-definition domain above. |
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | New domain; the removed `src/tier/**` experiment is not a starting point. |
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Upstream validates the level at the door and otherwise inherits the parent's. |
 | Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
-| Shared configuration resolver for both launch doors | 80–82 | The two doors still resolve separately, though both now answer through the same registry. |
+| One configuration resolver for both launch doors | 80–82 | Both doors now answer through the same registry and the same precedence, but the resolution itself is still two code paths: the tool door resolves a request, the service door resolves a spawn. |
 | Resolved model/thinking facts in the launch and result presentation | 74 | Not surfaced yet. |
+| A narrower cut of the inherited identity | 47 | The child's inherited identity still carries the harness's base preamble. Narrowing it is outstanding. |
 | A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 
 ## The Pi 1.3.0 upgrade, verified across the workspace

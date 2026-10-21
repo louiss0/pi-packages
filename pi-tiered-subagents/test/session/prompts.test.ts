@@ -77,7 +77,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("You review a scoped change");
   });
 
-  it("general-purpose uses the parent's identity as its base", () => {
+  it("adopts the parent's identity as its base", () => {
     const config: PromptConfig = { name: "worker", instructions: "" };
     const parentPrompt = "You are a parent coding agent with full powers.";
     const prompt = buildAgentPrompt(config, "/workspace", env, {
@@ -99,7 +99,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).not.toContain("READ-ONLY");
   });
 
-  it("append mode with parent prompt includes parent + custom instructions", () => {
+  it("includes the parent prompt and the standing instructions", () => {
     const config: PromptConfig = {
       name: "appender",
       instructions: "Extra custom instructions here.",
@@ -117,7 +117,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("Extra custom instructions here.");
   });
 
-  it("append mode without parent prompt falls back to generic base", () => {
+  it("falls back to the generic base without a parent prompt", () => {
     const config: PromptConfig = {
       name: "appender",
       instructions: "Extra custom instructions here.",
@@ -128,7 +128,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("Extra custom instructions here.");
   });
 
-  it("append mode with empty systemPrompt is a pure parent clone", () => {
+  it("is a pure parent clone when the definition has no instructions", () => {
     const config: PromptConfig = {
       name: "clone",
       instructions: "",
@@ -144,7 +144,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).not.toContain("<agent_instructions>");
   });
 
-  it("replace mode includes config systemPrompt last and removes the thin standalone header", () => {
+  it("puts the standing instructions last and drops the thin standalone header", () => {
     const config: PromptConfig = {
       name: "custom",
       instructions: "You are a specialized agent.",
@@ -156,7 +156,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).not.toContain("You are a pi coding agent sub-agent");
   });
 
-  it("replace mode includes parent prompt as base (no bridge/wrapper)", () => {
+  it("includes the parent prompt as the base", () => {
     const config: PromptConfig = {
       name: "standalone",
       instructions: "You are a standalone agent.",
@@ -174,7 +174,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("<agent_instructions>");
   });
 
-  it("replace mode falls back to genericBase when no parent supplied", () => {
+  it("falls back to the generic base when no parent is supplied", () => {
     const config: PromptConfig = {
       name: "standalone",
       instructions: "Custom standalone instructions.",
@@ -186,7 +186,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("Custom standalone instructions.");
   });
 
-  it("replace mode orders: identity → active_agent → env → config.systemPrompt", () => {
+  it("orders: identity → active_agent → env → instructions", () => {
     const config: PromptConfig = {
       name: "ordered",
       instructions: "Final custom instructions.",
@@ -209,7 +209,7 @@ describe("buildAgentPrompt", () => {
   // without `edit` was still told to use it. Pi's own tools contribute the
   // equivalent `promptGuidelines`, rendered per session for the tools the
   // child actually has.
-  it("append mode contributes no tool reminders of its own", () => {
+  it("contributes no tool reminders of its own", () => {
     const config = getDefaultConfig("general-purpose");
     const prompt = buildAgentPrompt(config, "/workspace", env, {
       systemPrompt: "Parent prompt.",
@@ -220,7 +220,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).not.toContain("Use the grep tool instead of");
   });
 
-  it("append mode without parent prompt falls back to the generic base", () => {
+  it("falls back to the generic base", () => {
     const config: PromptConfig = {
       name: "no-parent",
       instructions: "Extra stuff.",
@@ -236,7 +236,7 @@ describe("buildAgentPrompt", () => {
   // extensions (e.g. @gotgenes/pi-permission-system) can resolve per-agent
   // policy by parsing the child's system prompt.
   describe("active_agent tag injection", () => {
-    it("includes <active_agent name=...> tag in replace mode after identity prefix", () => {
+    it("includes the <active_agent name=...> tag after the identity prefix", () => {
       const config: PromptConfig = {
         name: "Explore",
         instructions: "You are an explorer.",
@@ -253,7 +253,7 @@ describe("buildAgentPrompt", () => {
       expect(idxTag).toBeGreaterThan(idxIdentity);
     });
 
-    it("includes <active_agent name=...> tag in append mode after the identity", () => {
+    it("places the <active_agent name=...> tag after the identity", () => {
       const config: PromptConfig = {
         name: "general-purpose",
         instructions: "",
@@ -279,7 +279,7 @@ describe("buildAgentPrompt", () => {
       expect(prompt).toContain('<active_agent name="my-custom-agent"/>');
     });
 
-    it("active_agent tag appears before envBlock in both modes", () => {
+    it("places the active_agent tag before the env block", () => {
       const replaceConfig: PromptConfig = {
         name: "agent-a",
         instructions: "Replace agent.",
@@ -397,7 +397,7 @@ describe("buildAgentPrompt", () => {
     }
 
     describe("skills-catalogue anchor", () => {
-      it("cuts the inherited catalogue in append mode", () => {
+      it("cuts the inherited catalogue", () => {
         const prompt = buildAgentPrompt(appendConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({
             skills: [skill("colgrep")],
@@ -409,7 +409,7 @@ describe("buildAgentPrompt", () => {
         expect(prompt).not.toContain("<available_skills>");
       });
 
-      it("cuts the inherited catalogue in replace mode", () => {
+      it("cuts the inherited catalogue for a child with instructions", () => {
         const prompt = buildAgentPrompt(replaceConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({
             skills: [skill("colgrep")],
@@ -551,7 +551,7 @@ describe("buildAgentPrompt", () => {
     });
 
     describe("cwd-footer anchor", () => {
-      it("strips the inherited footer in append mode", () => {
+      it("strips the inherited footer", () => {
         const prompt = buildAgentPrompt(appendConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({ footerCwd: PARENT_CWD }),
           cwd: PARENT_CWD,
@@ -562,7 +562,7 @@ describe("buildAgentPrompt", () => {
         );
       });
 
-      it("strips the inherited footer in replace mode", () => {
+      it("strips the inherited footer for a child with instructions", () => {
         const prompt = buildAgentPrompt(replaceConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({ footerCwd: PARENT_CWD }),
           cwd: PARENT_CWD,
@@ -638,7 +638,7 @@ describe("buildAgentPrompt", () => {
         { path: `${PARENT_CWD}/AGENTS.md`, content: "Repo rules." },
       ];
 
-      it("cuts the inherited block for a relocated child in append mode", () => {
+      it("cuts the inherited block for a relocated child", () => {
         const prompt = buildAgentPrompt(appendConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({
             contextFiles: PARENT_CONTEXT,
@@ -652,7 +652,7 @@ describe("buildAgentPrompt", () => {
         expect(prompt).not.toContain(`path="${PARENT_CWD}/AGENTS.md"`);
       });
 
-      it("cuts the inherited block for a relocated child in replace mode", () => {
+      it("cuts the inherited block for a relocated child with instructions", () => {
         const prompt = buildAgentPrompt(replaceConfig(), "/workspace", env, {
           systemPrompt: parentPrompt({
             contextFiles: PARENT_CONTEXT,
@@ -1283,84 +1283,82 @@ describe("buildAgentPrompt", () => {
       };
     }
 
-    for (const promptMode of ["append", "replace"] as const) {
-      describe(`${promptMode} mode`, () => {
-        it("opens with the parent's portable identity", () => {
-          const prompt = buildAgentPrompt(agentConfig(), "/workspace", env, {
-            systemPrompt: PI_BASE,
-            cwd: PARENT_CWD,
-            strategy: "portable",
-            portablePrompt: PORTABLE,
-          });
-          expect(prompt.startsWith(PORTABLE)).toBe(true);
+    describe("a portable child", () => {
+      it("opens with the parent's portable identity", () => {
+        const prompt = buildAgentPrompt(agentConfig(), "/workspace", env, {
+          systemPrompt: PI_BASE,
+          cwd: PARENT_CWD,
+          strategy: "portable",
+          portablePrompt: PORTABLE,
         });
-
-        it("carries none of Pi's base preamble", () => {
-          const prompt = buildAgentPrompt(agentConfig(), "/workspace", env, {
-            systemPrompt: PI_BASE,
-            cwd: PARENT_CWD,
-            strategy: "portable",
-            portablePrompt: PORTABLE,
-          });
-          expect(prompt).not.toContain(
-            "operating inside pi, a coding agent harness",
-          );
-          expect(prompt).not.toContain(
-            "custom providers (docs/custom-provider.md)",
-          );
-          expect(prompt).not.toContain("pi packages (docs/packages.md)");
-        });
-
-        it("resolves project context against the child's own directory", () => {
-          const prompt = buildAgentPrompt(
-            agentConfig(),
-            "/workspace",
-            env,
-            {
-              systemPrompt: PI_BASE,
-              cwd: PARENT_CWD,
-              strategy: "portable",
-              portablePrompt: PORTABLE,
-            },
-            (cwd) =>
-              renderProjectContext([
-                { path: `${cwd}/AGENTS.md`, content: "Worktree rules." },
-              ]),
-          );
-
-          expect(prompt).toContain(
-            '<project_instructions path="/workspace/AGENTS.md">',
-          );
-          expect(prompt.indexOf(PORTABLE)).toBeLessThan(
-            prompt.indexOf("<project_context>"),
-          );
-        });
-
-        it("resolves it even when the child shares the parent's directory", () => {
-          // Unlike a full identity, a portable one carries no project context
-          // to inherit, so the child supplies its own wherever it runs.
-          const prompt = buildAgentPrompt(
-            agentConfig(),
-            PARENT_CWD,
-            env,
-            {
-              systemPrompt: PI_BASE,
-              cwd: PARENT_CWD,
-              strategy: "portable",
-              portablePrompt: PORTABLE,
-            },
-            (cwd) =>
-              renderProjectContext([
-                { path: `${cwd}/AGENTS.md`, content: "Repo rules." },
-              ]),
-          );
-
-          expect(prompt).toContain(
-            `<project_instructions path="${PARENT_CWD}/AGENTS.md">`,
-          );
-        });
+        expect(prompt.startsWith(PORTABLE)).toBe(true);
       });
-    }
+
+      it("carries none of Pi's base preamble", () => {
+        const prompt = buildAgentPrompt(agentConfig(), "/workspace", env, {
+          systemPrompt: PI_BASE,
+          cwd: PARENT_CWD,
+          strategy: "portable",
+          portablePrompt: PORTABLE,
+        });
+        expect(prompt).not.toContain(
+          "operating inside pi, a coding agent harness",
+        );
+        expect(prompt).not.toContain(
+          "custom providers (docs/custom-provider.md)",
+        );
+        expect(prompt).not.toContain("pi packages (docs/packages.md)");
+      });
+
+      it("resolves project context against the child's own directory", () => {
+        const prompt = buildAgentPrompt(
+          agentConfig(),
+          "/workspace",
+          env,
+          {
+            systemPrompt: PI_BASE,
+            cwd: PARENT_CWD,
+            strategy: "portable",
+            portablePrompt: PORTABLE,
+          },
+          (cwd) =>
+            renderProjectContext([
+              { path: `${cwd}/AGENTS.md`, content: "Worktree rules." },
+            ]),
+        );
+
+        expect(prompt).toContain(
+          '<project_instructions path="/workspace/AGENTS.md">',
+        );
+        expect(prompt.indexOf(PORTABLE)).toBeLessThan(
+          prompt.indexOf("<project_context>"),
+        );
+      });
+
+      it("resolves it even when the child shares the parent's directory", () => {
+        // Unlike a full identity, a portable one carries no project context
+        // to inherit, so the child supplies its own wherever it runs.
+        const prompt = buildAgentPrompt(
+          agentConfig(),
+          PARENT_CWD,
+          env,
+          {
+            systemPrompt: PI_BASE,
+            cwd: PARENT_CWD,
+            strategy: "portable",
+            portablePrompt: PORTABLE,
+          },
+          (cwd) =>
+            renderProjectContext([
+              { path: `${cwd}/AGENTS.md`, content: "Repo rules." },
+            ]),
+        );
+
+        expect(prompt).toContain(
+          `<project_instructions path="${PARENT_CWD}/AGENTS.md">`,
+        );
+      });
+    });
 
     describe("fail-safe when the capture is unusable", () => {
       /**

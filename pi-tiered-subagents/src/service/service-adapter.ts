@@ -6,6 +6,7 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
+import type { AgentDefinition } from "#src/agents/definition";
 import {
   parseThinkingLevel,
   thinkingLevelError,
@@ -68,6 +69,16 @@ export class SubagentsServiceAdapter implements SubagentsService {
       registry: ModelRegistry,
     ) => Model<any> | string,
     private readonly runtime: ServiceRuntimeLike,
+    /**
+     * The definition of the agent a spawn names, when one exists.
+     *
+     * The service door honours the same defaults the tool door does: a
+     * definition that starts from the parent's conversation gets it unless the
+     * caller says otherwise.
+     */
+    private readonly resolveDefinition?: (
+      type: string,
+    ) => AgentDefinition | undefined,
   ) {}
 
   spawn(type: string, prompt: string, options?: SpawnOptions): string {
@@ -80,9 +91,14 @@ export class SubagentsServiceAdapter implements SubagentsService {
     const model = this.resolveModelOption(options?.model);
     const description = options?.description ?? prompt.slice(0, 80);
 
-    const snapshot = this.runtime.buildSnapshot(
-      options?.inheritContext ?? false,
-    );
+    // The definition's own preference fills a request that names none, so a
+    // programmatic `debug` spawn starts from the parent's conversation the way
+    // a tool-door spawn does.
+    const definition = this.resolveDefinition?.(type);
+    const inheritContext =
+      options?.inheritContext ?? definition?.inheritContext ?? false;
+
+    const snapshot = this.runtime.buildSnapshot(inheritContext);
     const { parentSessionFile, parentSessionId } =
       this.runtime.getSessionInfo();
     return this.manager.spawn(snapshot, type, prompt, {
@@ -93,7 +109,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
       parentSession: { parentSessionFile, parentSessionId },
       maxTurns: options?.maxTurns,
       thinkingLevel: this.resolveThinkingLevel(options?.thinkingLevel),
-      inheritContext: options?.inheritContext,
+      inheritContext,
       bypassQueue: options?.bypassQueue,
       // A caller that names `foreground` has committed; one that omits it has
       // not, so the agent's own frontmatter decides and background is the

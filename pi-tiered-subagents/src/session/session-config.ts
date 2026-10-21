@@ -16,7 +16,7 @@ import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
 import type { ModelRegistry } from "#src/session/model-resolver";
 import type { ProjectContextLoader } from "#src/session/project-context";
-import type { InheritedPrompt } from "#src/session/prompts";
+import type { AgentPromptConfig, InheritedPrompt } from "#src/session/prompts";
 import type {
   PromptInheritance,
   SubagentType,
@@ -35,7 +35,7 @@ import type {
  */
 export interface AssemblerIO {
   buildAgentPrompt: (
-    config: { name: string; instructions: string },
+    config: AgentPromptConfig,
     cwd: string,
     env: EnvInfo,
     inherited?: InheritedPrompt,

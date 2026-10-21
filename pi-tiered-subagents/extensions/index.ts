@@ -25,6 +25,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { loadDefinitionScopes } from "#src/agents/loader";
 import { AgentRegistry } from "#src/agents/registry";
+import { DefinitionErrorReporter } from "#src/agents/report";
 import {
   InterruptHandler,
   SessionLifecycleHandler,
@@ -102,6 +103,26 @@ export default function (pi: ExtensionAPI) {
       projectTrusted: runtime.currentCtx?.isProjectTrusted() ?? false,
     }),
   );
+
+  /**
+   * Re-reads the definition files and tells the parent about a problem the
+   * operator has to fix.
+   *
+   * A duplicate identifier is reported once per problem, not once per spawn:
+   * the operator can delete one of the two files, and the report goes away
+   * with it.
+   */
+  const definitionErrors = new DefinitionErrorReporter((message) => {
+    pi.sendMessage({
+      customType: "subagent-definitions",
+      content: message,
+      display: true,
+    });
+  });
+  const refreshDefinitions = (): void => {
+    registry.reload();
+    definitionErrors.reportNew(registry.errors());
+  };
 
   // ---- Notification system ----
   // Owns completion nudges and live-activity cleanup. The widget detects finished
@@ -236,11 +257,17 @@ export default function (pi: ExtensionAPI) {
     getRunConfig: () => settings,
     getRetentionPolicy: () => settings,
     registry,
+    reloadDefinitions: refreshDefinitions,
   });
 
   // Typed service published via Symbol.for() for cross-extension access.
   // Consumers: const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
-  const service = new SubagentsServiceAdapter(manager, resolveModel, runtime);
+  const service = new SubagentsServiceAdapter(
+    manager,
+    resolveModel,
+    runtime,
+    (type) => registry.find(type),
+  );
   publishSubagentsService(service);
 
   const lifecycle = new SessionLifecycleHandler(
@@ -260,9 +287,12 @@ export default function (pi: ExtensionAPI) {
   // registrations rather than sharing a lambda with an unrelated concern.
   const widgetEvents = new WidgetEventsHandler(widget);
 
-  pi.on("session_start", (event, ctx) =>
-    lifecycle.handleSessionStart(event, ctx),
-  );
+  pi.on("session_start", (event, ctx) => {
+    // The project's trust is a session fact, so the project's definition files
+    // become readable only now.
+    refreshDefinitions();
+    return lifecycle.handleSessionStart(event, ctx);
+  });
   pi.on("session_start", (event, ctx) =>
     widgetEvents.handleSessionStart(event, ctx),
   );

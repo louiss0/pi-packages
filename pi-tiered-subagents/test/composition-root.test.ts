@@ -527,6 +527,44 @@ describe("composition root: prompt-inheritance wiring", () => {
   });
 });
 
+describe("composition root: agent definitions", () => {
+  // Two files that differ only in case are one file on a case-insensitive
+  // filesystem, so the duplicate cannot be staged there.
+  it.skipIf(process.platform === "win32")(
+    "tells the parent about a definition file it cannot use",
+    async () => {
+      // The operator has to delete one of the two files, and the parent is the
+      // one who can say so.
+      const dir = mkdtempSync(join(tmpdir(), "pi-tiered-defs-"));
+      mkdirSync(join(dir, "agents"), { recursive: true });
+      writeFileSync(
+        join(dir, "agents", "reviewer.md"),
+        "---\ndescription: One\n---\n",
+      );
+      writeFileSync(
+        join(dir, "agents", "Reviewer.md"),
+        "---\ndescription: Two\n---\n",
+      );
+      vi.stubEnv("PI_CODING_AGENT_DIR", dir);
+
+      const { pi, fire } = makePi();
+      subagentsExtension(pi);
+      await fire(
+        "session_start",
+        {},
+        makeSessionStartCtx(makeParentRegistry().registry, makeRecordingUI()),
+      );
+
+      const sent = vi.mocked(pi.sendMessage).mock.calls;
+      expect(
+        sent.some(([message]: [{ content: string }]) =>
+          message.content.includes("normalize to the identifier"),
+        ),
+      ).toBe(true);
+    },
+  );
+});
+
 describe("composition root: parent tool list", () => {
   it("reads the parent's registered tools when a child asks, not when the extension loads", async () => {
     vi.mocked(createSubagentSession).mockClear();

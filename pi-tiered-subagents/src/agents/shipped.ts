@@ -118,3 +118,17 @@ export const SHIPPED_DEFINITIONS: readonly AgentDefinition[] = [
     origin: "shipped",
   },
 ];
+
+/**
+ * The identifiers the package ships.
+ *
+ * A definition file may refine a shipped specialist; the specialist is still a
+ * specialist, so the tool's list and its guidelines keep saying so.
+ */
+export const SHIPPED_SPECIALIST_IDS: readonly string[] =
+  SHIPPED_DEFINITIONS.map((definition) => definition.id);
+
+/** Whether an identifier names one of the shipped specialists. */
+export function isShippedSpecialist(id: string): boolean {
+  return SHIPPED_SPECIALIST_IDS.includes(id);
+}
