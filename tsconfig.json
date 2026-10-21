@@ -20,6 +20,9 @@
     },
     {
       "path": "./pi-session-manager"
+    },
+    {
+      "path": "./pi-tiered-subagents"
     }
   ]
 }
