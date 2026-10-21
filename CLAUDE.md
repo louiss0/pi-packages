@@ -21,3 +21,21 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+## Agent skills
+
+### Issue tracker
+
+Track issues and specs in GitHub Issues for `louiss0/pi-packages`.
+Before tracker operations, read `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five canonical triage states.
+Before triage, read `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use multi-context domain documentation organized by workspace package.
+Before domain exploration, read `docs/agents/domain.md` and
+`GLOSSARY-MAP.md`.
