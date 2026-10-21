@@ -4,7 +4,7 @@
 
 import type { Model } from "@earendil-works/pi-ai";
 import { buildParentContext } from "#src/session/context";
-import type { ModelRegistry } from "#src/session/model-resolver";
+import type { ModelRegistry } from "#src/models/registry";
 import type { SessionContext } from "#src/types";
 
 /**

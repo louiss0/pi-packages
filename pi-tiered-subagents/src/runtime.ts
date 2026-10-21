@@ -11,6 +11,7 @@ import {
   type ParentPromptOptions,
   type ParentSnapshot,
 } from "#src/lifecycle/parent-snapshot";
+import { routingContext, type RoutingLadders } from "#src/models/router";
 import type { ModelInfo } from "#src/tools/spawn-config";
 import type { SessionContext } from "#src/types";
 
@@ -46,13 +47,22 @@ export class SubagentRuntime {
   private listActiveTools: () => string[];
 
   /**
+   * The routing ladders the automatic model selection walks.
+   */
+  private readonly ladders: RoutingLadders;
+
+  /**
    * Prompt options Pi assembled for the parent's latest turn, captured from
    * `before_agent_start`. Undefined until the parent has run one.
    */
   private lastPromptOptions: ParentPromptOptions | undefined = undefined;
 
-  constructor(listActiveTools: () => string[] = () => []) {
+  constructor(
+    listActiveTools: () => string[] = () => [],
+    ladders: RoutingLadders = { profiles: new Map(), strategies: new Map() },
+  ) {
     this.listActiveTools = listActiveTools;
+    this.ladders = ladders;
   }
 
   // ── Session-context methods ──────────────────────────────────────────────
@@ -93,9 +103,16 @@ export class SubagentRuntime {
 
   /** Extract model info from the current session context. */
   getModelInfo(): ModelInfo {
+    const registry = this.currentCtx?.modelRegistry;
     return {
       parentModel: this.currentCtx?.model,
-      modelRegistry: this.currentCtx?.modelRegistry,
+      modelRegistry: registry,
+      // The models the session can run are a session fact, so the routing
+      // context is built here, per request.
+      routing: routingContext(
+        this.ladders,
+        registry?.getAvailable?.() ?? registry?.getAll() ?? [],
+      ),
     };
   }
 
@@ -115,6 +132,7 @@ export class SubagentRuntime {
  */
 export function createSubagentRuntime(
   listActiveTools: () => string[] = () => [],
+  ladders: RoutingLadders = { profiles: new Map(), strategies: new Map() },
 ): SubagentRuntime {
-  return new SubagentRuntime(listActiveTools);
+  return new SubagentRuntime(listActiveTools, ladders);
 }

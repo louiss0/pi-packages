@@ -57,6 +57,31 @@ One of the five roles the package ships: `explore`, `worker`, `reviewer`,
 `debug`, `researcher`. A definition file may refine a specialist; it stays a
 specialist.
 
+## Family
+
+A model series the package can read: `gpt`, `claude`, `gemini`, `kimi`,
+`minimax`, `qwen`, `deepseek`, `mimo`. A family has a **naming structure**
+(how its ids are written) and, usually, a **ladder** (the profile data).
+
+## Tier
+
+One rung of a family's ladder: a version's line of models, such as GPT's
+`sol` or Claude's `haiku`. A tier has concrete model ids, most preferred
+first. The version's default model — the one whose id names no tier — is the
+tier with the empty name.
+
+## Profile
+
+The data that describes a family's ladder: its versions, each version's tiers,
+the concrete ids of each tier, and the rungs a tier may cross to. A profile is
+read, never executed: it holds no matcher, no pattern and no parser.
+
+## Ladder
+
+A family's versions and tiers in capability order, with the cross-version
+links. The router walks down it: the tiers below the parent's, then the
+approved links.
+
 ## Parent snapshot
 
 The parent's state captured when a request is made: the model, the model

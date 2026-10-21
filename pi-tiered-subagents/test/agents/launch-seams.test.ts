@@ -218,8 +218,8 @@ describe("the service door", () => {
     };
     const adapter = new SubagentsServiceAdapter(
       manager,
-      () => "no such model",
       runtime,
+      { profiles: new Map(), strategies: new Map() },
       () => definition,
     );
     return { adapter, manager, runtime };

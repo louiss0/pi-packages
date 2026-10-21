@@ -4,11 +4,11 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,150-test characterization suite against Pi 1.3.0.
+> typechecks, and passes a 2,182-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
-> selection, and the rejection of unknown agents are **done**. Family-aware model
-> routing, reasoning defaults, capability-based scheduling, and the shared
-> settings backend are **not implemented yet**. See
+> selection, the rejection of unknown agents, and the family-aware model
+> selection are **done**. Reasoning defaults, capability-based scheduling, and
+> the shared settings backend are **not implemented yet**. See
 > [docs/status.md](docs/status.md) for the verified state and what is still owed.
 
 ## Install
@@ -64,6 +64,49 @@ v25.0.1, which is itself a friendly fork of
 | --- | --- |
 | `/subagents:settings` | Concurrency, turn limits, retention, interrupt policy |
 | `/subagents:sessions` | Browse a subagent's transcript (read-only) |
+
+## Models
+
+A model is named exactly, as `provider/modelId`:
+
+```json
+{ "model": "anthropic/claude-sonnet-5" }
+```
+
+A name that the session cannot run fails the launch; it never falls back to
+another model.
+
+A child that names no model runs **one tier down its parent's**, in that
+family's ladder — the tier below the parent's in the parent's own version, and
+then the versions the profile approves crossing into. The launch note says
+which model was chosen and why.
+
+The ladders are data. An operator can replace a family whole in the runtime's
+settings file, under `familyProfiles`:
+
+```json
+{
+  "familyProfiles": {
+    "gpt": {
+      "versions": [
+        {
+          "version": "6.1",
+          "tiers": [
+            {
+              "tier": "sol",
+              "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
+              "fallbacks": [{ "version": "6", "tier": "luna" }]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+Only data is read: a value the schema does not name is ignored, never
+evaluated. A family this package cannot read the names of is refused.
 
 ## Agent definitions
 

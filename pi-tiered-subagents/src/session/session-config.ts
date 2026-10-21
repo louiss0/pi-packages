@@ -14,7 +14,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
-import type { ModelRegistry } from "#src/session/model-resolver";
+import type { ModelRegistry } from "#src/models/registry";
 import type { ProjectContextLoader } from "#src/session/project-context";
 import type { AgentPromptConfig, InheritedPrompt } from "#src/session/prompts";
 import type {
@@ -53,9 +53,8 @@ export interface AssemblerIO {
  * Narrow context the assembler reads from the parent session.
  * Tests construct plain objects satisfying this interface — no SDK mocking needed.
  *
- * The assembler never inspects model internals, only passes them through;
- * `resolveDefaultModel` reads `provider`/`id` from `getAvailable()` for the
- * availability check.
+ * The assembler never inspects model internals, only passes them through; the
+ * model was already resolved by the door.
  */
 export interface AssemblerContext {
   /** Parent working directory (overridable via options.cwd). */
@@ -123,38 +122,6 @@ export interface SessionConfig {
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-/**
- * Resolve the default model from the agent config's model string.
- *
- * Priority: parentModel is the fallback; if `configModel` is a "provider/modelId"
- * string that resolves against the registry AND is in the available set, return
- * that model instead.
- */
-function resolveDefaultModel(
-  parentModel: Model<any> | undefined,
-  registry: AssemblerContext["modelRegistry"],
-  configModel?: string,
-): Model<any> | undefined {
-  if (configModel) {
-    const slashIdx = configModel.indexOf("/");
-    if (slashIdx !== -1) {
-      const provider = configModel.slice(0, slashIdx);
-      const modelId = configModel.slice(slashIdx + 1);
-
-      const available = registry.getAvailable?.();
-      const availableKeys = available
-        ? new Set(available.map((m) => `${m.provider}/${m.id}`))
-        : undefined;
-      const isAvailable = (p: string, id: string) =>
-        !availableKeys || availableKeys.has(`${p}/${id}`);
-
-      const found = registry.find(provider, modelId);
-      if (found && isAvailable(provider, modelId)) return found;
-    }
-  }
-  return parentModel;
-}
-
 // ── Public function ──────────────────────────────────────────────────────────
 
 /**
@@ -198,9 +165,10 @@ export function assembleSessionConfig(
   // Resolved before the prompt because the child's provider is what selects a
   // prompt-inheritance strategy; the two computations are otherwise
   // independent, so the order is free.
-  const model =
-    options.model ??
-    resolveDefaultModel(ctx.parentModel, ctx.modelRegistry, definition.model);
+  // The model was already resolved by the door: the request's own choice, the
+  // definition's, or the automatic step down the parent's ladder. The assembler
+  // only passes it through, so the two doors cannot resolve differently.
+  const model = options.model ?? ctx.parentModel;
 
   // Build system prompt from the resolved definition. The strategy is keyed
   // on the child's own provider, so a per-spawn model override moves the child

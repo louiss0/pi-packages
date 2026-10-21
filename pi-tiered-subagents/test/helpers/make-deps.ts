@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
+import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
@@ -53,6 +54,11 @@ export function createToolDeps(
         find: () => undefined,
         getAll: () => [],
         getAvailable: () => [],
+      },
+      routing: {
+        available: [],
+        profiles: new Map(),
+        strategies: strategiesByFamily(SHIPPED_STRATEGIES),
       },
     })),
     getSessionInfo: vi.fn(() => ({

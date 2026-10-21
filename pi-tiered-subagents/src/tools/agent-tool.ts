@@ -289,7 +289,7 @@ ${guidelines}
         model: Type.Optional(
           Type.String({
             description:
-              'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent definition\'s own model, or the one this call inherits.',
+              'Optional model override, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5"). Omit to use the agent definition\'s own model, or the one this call inherits.',
           }),
         ),
         thinking: Type.Optional(

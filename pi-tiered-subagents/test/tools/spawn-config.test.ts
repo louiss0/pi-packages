@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
+import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { makeModel } from "#test/helpers/make-model";
 
@@ -31,6 +32,11 @@ function makeModelInfo(
       find: () => undefined,
       getAll: () => [],
       getAvailable: () => [],
+    },
+    routing: {
+      available: [],
+      profiles: new Map(),
+      strategies: strategiesByFamily(SHIPPED_STRATEGIES),
     },
     ...overrides,
   };

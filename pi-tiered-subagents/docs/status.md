@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 90 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 94 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2150 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2182 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -68,6 +68,69 @@ body is either inherited (empty) or replaced (non-empty).
 | Parent-only orchestration instructions excluded from children | 47 | Partly. The parent's session-resolved layers — its tool surface, its rules, its skills catalogue, its cwd footer — are cut from the child's inherited identity, so the child inherits neither the parent's tool list nor its per-session guidance. What the child still inherits is the harness's base identity and the operator's own words; the latter is story 45's requirement, not an orchestration leak. Narrowing the cut further is outstanding. |
 | Request-time capture of the parent's tools | 48 | Done. |
 | Background by default, foreground on request | 49 | Done. |
+
+## The model selection
+
+`src/models/` decides which model a child runs on.
+
+| Module | What it owns |
+| --- | --- |
+| `src/models/identity.ts` | Naming a model exactly: `provider/modelId`, resolved or failed. |
+| `src/models/strategy.ts` | How one family's ids are read: the version and the tier. |
+| `src/models/profile.ts` | What a profile says, and how a malformed one is refused. |
+| `src/models/profiles.ts` | The ladders this package ships. |
+| `src/models/router.ts` | The walk: one tier down, then the approved cross-version links. |
+| `src/models/selection.ts` | The precedence: the request, then the definition, then the routing. |
+| `src/models/user-profiles.ts` | The operator's profiles, read from the settings layers. |
+
+The shipped ladders are written against the model catalogue the installed SDK
+ships — a representative registry, not a promise of vendor availability. A tier
+the session cannot run is skipped, and the walk continues.
+
+An operator replaces a family whole, in the same settings file the rest of the
+runtime uses:
+
+```json
+{
+  "familyProfiles": {
+    "gpt": {
+      "versions": [
+        {
+          "version": "6.1",
+          "tiers": [
+            {
+              "tier": "sol",
+              "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
+              "fallbacks": [{ "version": "6", "tier": "luna" }]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+Only data is read: a value the schema does not name is ignored, never
+evaluated. A family with no naming structure is refused — the eight shipped
+strategies are the structures this package can read.
+
+### What the model selection does now
+
+| Area | Stories | State |
+| --- | --- | --- |
+| A tool-call model wins over an agent-file model | 55 | Done. |
+| An agent-file model wins over the automatic routing | 56 | Done. |
+| Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
+| An explicit choice works without a known family | 59 | Done. |
+| Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover the eight agreed families. |
+| Cross-version links are declared, never inferred | 62 | Done. A link names the version and the tier it may cross to. |
+| The walk steps down, past a tier the session cannot run | 63 | Done. |
+| Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
+| An unplaceable family is an error | 66 | Done. |
+| A family with nothing to offer keeps the parent's model | 67 | Done. |
+| The choice is reported | 74 (model half) | Done. The launch note says which model was chosen and why. |
+| The reasoning level is chosen after the model | 68–73 | Outstanding — see the table below. |
 
 ### Inherited, and covered by the suite
 
@@ -122,8 +185,8 @@ The recovered suite pins the behaviour this derivative must preserve:
    (glob/pattern ladder matching with a price-ranked fallback). It did not
    compile, and its design is superseded by the specification, which replaces
    price ranking and user-supplied matchers with family strategies over
-   declared profile data. The runtime is therefore back to upstream's model
-   resolution until the specified design is implemented. See
+   declared profile data. The specified design now exists in `src/models/`.
+   See
    [adr/0002](adr/0002-do-not-carry-the-tier-experiment-into-the-import.md).
 3. **Platform-portable path expectations.** Two upstream tests asserted
    POSIX-only path strings; they now build expectations with `node:path`, so
@@ -138,6 +201,12 @@ The recovered suite pins the behaviour this derivative must preserve:
    See [adr/0004](adr/0004-ship-five-specialists.md),
    [adr/0005](adr/0005-one-definition-shape.md), and
    [adr/0006](adr/0006-background-by-default.md).
+7. **A model is named exactly, and the fuzzy resolver is gone.** Upstream
+   resolved a model name by scoring every model in the registry, so a typo
+   could run a different model than the one asked for. A model is now named
+   `provider/modelId` and resolved exactly or the launch fails, and a child
+   that names no model runs one tier down its parent's ladder. See
+   [adr/0007](adr/0007-the-childs-model-is-one-tier-down.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -170,8 +239,8 @@ names the user stories it covers.
 
 | Area | Stories | Notes |
 | --- | --- | --- |
-| Family profiles, automatic routing, exact explicit model selection | 55–67 | New domain; the removed `src/tier/**` experiment is not a starting point. |
-| Reasoning defaults, clamping, not-applicable reporting | 68–74 | Upstream validates the level at the door and otherwise inherits the parent's. |
+| Family profiles, automatic routing, exact explicit model selection | 55–67 | Done — see the model selection above. |
+| Reasoning defaults, clamping, not-applicable reporting | 68–74 | The model is chosen first; the reasoning level that follows is still upstream's: the door validates the caller's level and the child otherwise inherits the parent's. |
 | Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
 | One configuration resolver for both launch doors | 80–82 | Both doors now answer through the same registry and the same precedence, but the resolution itself is still two code paths: the tool door resolves a request, the service door resolves a spawn. |

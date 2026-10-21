@@ -221,34 +221,43 @@ describe("assembleSessionConfig — model resolution", () => {
     expect(result.model).toBe(explicitModel);
   });
 
-  it("config model string resolves via registry when available", () => {
+  it("uses the model the door resolved", () => {
+    // The model is resolved by the door — the request's own choice, the
+    // definition's, or the automatic step down the ladder — and the assembler
+    // only passes it through, so the two doors cannot resolve differently.
     const resolvedModel = makeModel({
       provider: "anthropic",
       id: "claude-opus-4",
     });
-    mockSelect.mockReturnValueOnce({
-      ok: true,
-      definition: exploreConfig({ model: "anthropic/claude-opus-4" }),
-    });
-    mockRegistry.find.mockReturnValueOnce(resolvedModel);
-    mockRegistry.getAvailable.mockReturnValueOnce([
-      makeModel({ provider: "anthropic", id: "claude-opus-4" }),
-    ]);
 
     const result = assembleSessionConfig(
       "Explore",
       ctx,
+      { model: resolvedModel },
+      mockEnv,
+      mockAgentLookup,
+      mockIO,
+    );
+
+    expect(result.model).toBe(resolvedModel);
+  });
+
+  it("falls back to the parent's model when the door resolved none", () => {
+    const parentModel = makeModel({
+      provider: "anthropic",
+      id: "claude-haiku-4",
+    });
+
+    const result = assembleSessionConfig(
+      "Explore",
+      { ...ctx, parentModel },
       {},
       mockEnv,
       mockAgentLookup,
       mockIO,
     );
 
-    expect(mockRegistry.find).toHaveBeenCalledWith(
-      "anthropic",
-      "claude-opus-4",
-    );
-    expect(result.model).toBe(resolvedModel);
+    expect(result.model).toBe(parentModel);
   });
 
   it("falls back to parentModel when config model string is not in registry", () => {
@@ -260,8 +269,6 @@ describe("assembleSessionConfig — model resolution", () => {
       ok: true,
       definition: exploreConfig({ model: "anthropic/unknown-model" }),
     });
-    mockRegistry.find.mockReturnValueOnce(undefined);
-    mockRegistry.getAvailable.mockReturnValueOnce([]);
 
     const result = assembleSessionConfig(
       "Explore",
@@ -458,12 +465,10 @@ describe("assembleSessionConfig — prompt inheritance", () => {
     expect(resolvePromptInheritance).toHaveBeenCalledWith("claude-bridge");
   });
 
-  it("asks about the provider named by the agent's own model string", () => {
-    // The third resolution path: no per-spawn override, and the agent file
-    // names a model whose provider differs from the parent's.
+  it("asks about the provider named by the model's own string", () => {
+    // The door resolved a model whose provider differs from the parent's, and
+    // the prompt strategy is keyed on the child's own provider.
     const bridgeModel = makeModel({ provider: "claude-bridge", id: "opus" });
-    mockRegistry.find.mockReturnValueOnce(bridgeModel);
-    mockRegistry.getAvailable.mockReturnValueOnce([bridgeModel]);
     mockSelect.mockReturnValueOnce({
       ok: true,
       definition: exploreConfig({ model: "claude-bridge/opus" }),
@@ -476,7 +481,7 @@ describe("assembleSessionConfig — prompt inheritance", () => {
         parentModel: makeModel({ provider: "anthropic", id: "sonnet" }),
         resolvePromptInheritance,
       },
-      {},
+      { model: bridgeModel },
       mockEnv,
       mockAgentLookup,
       mockIO,

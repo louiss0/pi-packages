@@ -15,6 +15,11 @@ describe("createResolvedSpawnConfig", () => {
         prompt: "do the task",
         description: "task",
         model: undefined,
+        modelSelection: {
+          model: undefined,
+          source: "inherited",
+          reason: "the parent has no model to step down from",
+        },
         effectiveMaxTurns: undefined,
         thinking: undefined,
         inheritContext: false,

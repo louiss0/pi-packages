@@ -53,7 +53,11 @@ import {
 } from "#src/service/service";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { detectEnv } from "#src/session/env";
-import { resolveModel } from "#src/session/model-resolver";
+import type { FamilyProfile } from "#src/models/profile";
+import { SHIPPED_PROFILES } from "#src/models/profiles";
+import type { RoutingLadders } from "#src/models/router";
+import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
+import { loadUserProfiles, mergeProfiles } from "#src/models/user-profiles";
 import { createExcludedPackagesStorage } from "#src/session/package-exclusions";
 import { createProjectContextLoader } from "#src/session/project-context";
 import { buildAgentPrompt } from "#src/session/prompts";
@@ -87,10 +91,61 @@ export default function (pi: ExtensionAPI) {
     createWorkspaceNoticeRenderer(),
   );
 
+  // ---- Family profiles and the routing they drive ----
+  /**
+   * Tells the parent about a problem the operator has to fix: a profile that
+   * cannot be read, or a definition file that cannot be used.
+   *
+   * A problem is reported once, not once per spawn: the operator can fix it,
+   * and the report goes away with it.
+   */
+  const definitionErrors = new DefinitionErrorReporter((message) => {
+    pi.sendMessage({
+      customType: "subagent-definitions",
+      content: message,
+      display: true,
+    });
+  });
+
+  // The shipped ladders, refined by the operator's profiles: the global layer
+  // replaces a family whole, and the project layer replaces a family whole
+  // when the project is trusted.
+  const strategies = strategiesByFamily(SHIPPED_STRATEGIES);
+  const profiles = new Map(
+    (SHIPPED_PROFILES as FamilyProfile[]).map((profile) => [
+      profile.family,
+      profile,
+    ]),
+  );
+  /** The routing ladders the model selection walks. */
+  const ladders: RoutingLadders = { profiles, strategies };
+
   // ---- Runtime: all mutable extension state in one place ----
   // The active tools are read from Pi at request time, so a definition that
   // inherits its tools follows the parent's current selection.
-  const runtime = createSubagentRuntime(() => pi.getActiveTools());
+  const runtime = createSubagentRuntime(() => pi.getActiveTools(), ladders);
+
+  const refreshProfiles = (): void => {
+    const { global, project, problems } = loadUserProfiles({
+      globalDir: getAgentDir(),
+      cwd: process.cwd(),
+      projectTrusted: runtime.currentCtx?.isProjectTrusted() ?? false,
+    });
+    const merged = mergeProfiles(
+      SHIPPED_PROFILES as FamilyProfile[],
+      global,
+      project,
+      strategies,
+    );
+    profiles.clear();
+    for (const [family, profile] of merged.profiles) {
+      profiles.set(family, profile);
+    }
+    for (const problem of [...problems, ...merged.problems]) {
+      definitionErrors.reportNew([problem]);
+    }
+  };
+  refreshProfiles();
 
   // ---- Agent definitions ----
   // Shipped specialists, then the operator's global files, then the project's
@@ -112,13 +167,6 @@ export default function (pi: ExtensionAPI) {
    * the operator can delete one of the two files, and the report goes away
    * with it.
    */
-  const definitionErrors = new DefinitionErrorReporter((message) => {
-    pi.sendMessage({
-      customType: "subagent-definitions",
-      content: message,
-      display: true,
-    });
-  });
   const refreshDefinitions = (): void => {
     registry.reload();
     definitionErrors.reportNew(registry.errors());
@@ -264,8 +312,8 @@ export default function (pi: ExtensionAPI) {
   // Consumers: const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
   const service = new SubagentsServiceAdapter(
     manager,
-    resolveModel,
     runtime,
+    ladders,
     (type) => registry.find(type),
   );
   publishSubagentsService(service);

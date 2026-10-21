@@ -8,7 +8,7 @@ import type {
   SessionContext as SdkSessionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
-import type { ModelRegistry } from "#src/session/model-resolver";
+import type { ModelRegistry } from "#src/models/registry";
 
 export type { SteerOutcome } from "#src/lifecycle/subagent";
 export { Subagent } from "#src/lifecycle/subagent";

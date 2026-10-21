@@ -5,7 +5,6 @@
  * (stripping non-serializable fields), and session gating.
  */
 
-import type { Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition } from "#src/agents/definition";
 import {
   parseThinkingLevel,
@@ -18,6 +17,8 @@ import type {
   ResumeOutcome,
 } from "#src/lifecycle/subagent-manager";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
+import { routingContext, type RoutingLadders } from "#src/models/router";
+import { selectModel } from "#src/models/selection";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -25,7 +26,6 @@ import type {
   SubagentRecord,
   SubagentsService,
 } from "#src/service/service";
-import type { ModelRegistry } from "#src/session/model-resolver";
 import type { SessionContext, Subagent, ThinkingLevel } from "#src/types";
 
 /** Narrow interface for the SubagentManager — avoids coupling to the concrete class. */
@@ -64,17 +64,18 @@ export interface ServiceRuntimeLike {
 export class SubagentsServiceAdapter implements SubagentsService {
   constructor(
     private readonly manager: SubagentManagerLike,
-    private readonly resolveModel: (
-      input: string,
-      registry: ModelRegistry,
-    ) => Model<any> | string,
     private readonly runtime: ServiceRuntimeLike,
+    /**
+     * The routing ladders, for the automatic model selection.
+     */
+    private readonly ladders: RoutingLadders,
     /**
      * The definition of the agent a spawn names, when one exists.
      *
      * The service door honours the same defaults the tool door does: a
      * definition that starts from the parent's conversation gets it unless the
-     * caller says otherwise.
+     * caller says otherwise, and a definition that names a model wins over
+     * the automatic routing.
      */
     private readonly resolveDefinition?: (
       type: string,
@@ -88,7 +89,6 @@ export class SubagentsServiceAdapter implements SubagentsService {
       );
     }
 
-    const model = this.resolveModelOption(options?.model);
     const description = options?.description ?? prompt.slice(0, 80);
 
     // The definition's own preference fills a request that names none, so a
@@ -97,6 +97,27 @@ export class SubagentsServiceAdapter implements SubagentsService {
     const definition = this.resolveDefinition?.(type);
     const inheritContext =
       options?.inheritContext ?? definition?.inheritContext ?? false;
+
+    // The model: the caller's own choice, then the definition's, then the
+    // automatic step down the parent's family ladder.
+    const registry = this.runtime.currentCtx.modelRegistry;
+    const selection = selectModel(
+      {
+        requestedModel: options?.model,
+        definitionModel:
+          options?.model === undefined ? definition?.model : undefined,
+        parentModel: this.runtime.currentCtx.model,
+      },
+      registry,
+      routingContext(
+        this.ladders,
+        registry?.getAvailable?.() ?? registry?.getAll() ?? [],
+      ),
+    );
+    if (!selection.ok) {
+      throw new Error(selection.error);
+    }
+    const model = selection.selection.model;
 
     const snapshot = this.runtime.buildSnapshot(inheritContext);
     const { parentSessionFile, parentSessionId } =
@@ -189,24 +210,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
     if (level === undefined) throw new Error(thinkingLevelError(input));
     return level;
   }
-
-  /** Resolve an optional model-string override against the current session's registry. */
-  private resolveModelOption(
-    modelInput: string | undefined,
-  ): Model<any> | undefined {
-    if (!modelInput) return undefined;
-    const registry = this.runtime.currentCtx?.modelRegistry;
-    if (!registry) {
-      throw new Error("No model registry available.");
-    }
-    const resolved = this.resolveModel(modelInput, registry);
-    if (typeof resolved === "string") {
-      throw new Error(resolved);
-    }
-    return resolved;
-  }
 }
-
 /**
  * Convert an internal Subagent to a serializable SubagentRecord.
  *

@@ -15,12 +15,17 @@ import {
   thinkingLevelError,
 } from "#src/config/thinking-level";
 import {
+  type ModelSelection,
+  type ModelSelectionResult,
+  selectModel,
+} from "#src/models/selection";
+import type { ModelRegistry } from "#src/models/registry";
+import type { RoutingContext } from "#src/models/router";
+import {
   isBelowMinimumTurns,
   MIN_MAX_TURNS,
   normalizeMaxTurns,
 } from "#src/lifecycle/turn-limits";
-import type { ModelRegistry } from "#src/session/model-resolver";
-import { resolveInvocationModel } from "#src/session/model-resolver";
 import type { SubagentType, ThinkingLevel } from "#src/types";
 import {
   type AgentDetails,
@@ -32,6 +37,8 @@ import {
 export interface ModelInfo {
   parentModel: Model<any> | undefined;
   modelRegistry: ModelRegistry | undefined;
+  /** The profiles and strategies the automatic routing uses. */
+  routing: RoutingContext;
 }
 
 /** Identity: who is being spawned. */
@@ -48,6 +55,8 @@ export interface SpawnExecution {
   prompt: string;
   description: string;
   model: Model<any> | undefined;
+  /** How the model was chosen, and why. */
+  modelSelection: ModelSelection;
   effectiveMaxTurns: number | undefined;
   thinking: ThinkingLevel | undefined;
   inheritContext: boolean;
@@ -118,15 +127,23 @@ export function resolveSpawnConfig(
     runInBackground: params.run_in_background as boolean | undefined,
   });
 
-  // Resolve model
-  const resolution = resolveInvocationModel(
-    modelInfo.parentModel,
-    resolvedConfig.model,
-    resolvedConfig.modelFromParams,
+  // Resolve the model: the request's own choice, then the definition's, then
+  // the automatic step down the parent's family ladder.
+  const modelChoice: ModelSelectionResult = selectModel(
+    {
+      requestedModel: resolvedConfig.modelFromParams
+        ? resolvedConfig.model
+        : undefined,
+      definitionModel: resolvedConfig.modelFromParams
+        ? undefined
+        : resolvedConfig.model,
+      parentModel: modelInfo.parentModel,
+    },
     modelInfo.modelRegistry,
+    modelInfo.routing,
   );
-  if (resolution.error) return { error: resolution.error };
-  const model = resolution.model;
+  if (!modelChoice.ok) return { error: modelChoice.error };
+  const model = modelChoice.selection.model;
 
   const thinking = resolvedConfig.thinking;
   const inheritContext = resolvedConfig.inheritContext;
@@ -156,11 +173,15 @@ export function resolveSpawnConfig(
 
   return {
     identity: { subagentType, rawType, displayName, definition },
-    notes: [...buildMinimumTurnsNote(resolvedConfig.maxTurns)],
+    notes: [
+      ...buildMinimumTurnsNote(resolvedConfig.maxTurns),
+      ...buildModelNote(modelChoice.selection),
+    ],
     execution: {
       prompt: params.prompt as string,
       description: params.description as string,
       model,
+      modelSelection: modelChoice.selection,
       effectiveMaxTurns,
       thinking,
       inheritContext,
@@ -168,6 +189,17 @@ export function resolveSpawnConfig(
     },
     presentation: { agentTags, detailBase },
   };
+}
+
+/**
+ * Advise that the model was chosen automatically, and say which.
+ *
+ * The caller did not name a model, so it cannot know which one the child will
+ * run on; the launch note is where it finds out.
+ */
+function buildModelNote(selection: ModelSelection): string[] {
+  if (selection.source !== "routed") return [];
+  return [`Note: the model was chosen automatically — ${selection.reason}.`];
 }
 
 /**

@@ -36,7 +36,7 @@ import {
 import { builtinExtensionsFor } from "#src/session/builtin-extensions";
 import type { EnvInfo } from "#src/session/env";
 import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
-import type { ModelRegistry } from "#src/session/model-resolver";
+import type { ModelRegistry } from "#src/models/registry";
 import {
   NotifyParentTool,
   type UpdateAnnouncer,
