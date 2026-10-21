@@ -7,8 +7,10 @@ notice is preserved in [`../LICENSE.upstream`](../LICENSE.upstream).
 
 They are **characterization** tests: they pin the inherited runtime's behaviour
 so the specified changes can be made against a known baseline. Where the
-approved specification changes behaviour, the change gets a new test rather
-than an edit here — see [`../docs/status.md`](../docs/status.md).
+approved specification changes behaviour, the change is developed against the
+baseline: a specified change may revise a baseline assertion (the unknown-type
+fallback the specification forbids is one), and a new behaviour gets a new
+test. See [`../docs/status.md`](../docs/status.md).
 
 ## Layout
 

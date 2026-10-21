@@ -157,7 +157,7 @@
       price-based routing fallback.</p>
       <p>Sections 4–7 record superseded experiments, not installation instructions or a verified
       implementation delta. The experimental <code>src/tier/**</code> patch they describe was
-      removed from the tree: it never compiled, and its design is superseded by the
+      not carried into the import: it never compiled, and its design is superseded by the
       specification. The verified state is recorded in <a href="status.md">status.md</a>;
       consult <a href="SPEC.md">SPEC.md</a> for current requirements and
       <a href="../README.md">the documentation index</a> for provenance.</p>
@@ -165,8 +165,8 @@
     <div class="chips">
       <span class="chip"><b>MIT</b> · Chris Lasher</span>
       <span class="chip">fork of <b>@tintinweb/pi-subagents</b></span>
-      <span class="chip"><b>73</b> TS files · <b>11.2k</b> lines</span>
-      <span class="chip">tests: <b>105</b> files · <b>2181</b> passing</span>
+      <span class="chip"><b>73</b> TS files · <b>13.7k</b> lines</span>
+      <span class="chip">tests: <b>88</b> files + <b>17</b> helpers · <b>2181</b> passing</span>
       <span class="chip">pi <b>1.3.0</b></span>
     </div>
   </div>
@@ -870,7 +870,7 @@ You are reviewing a single file…</code></pre>
     <text class="t-good" x="560" y="500" text-anchor="middle">added</text>
   </svg>
   </div>
-  <figcaption>Historical proposed change sites, not a verified implementation delta. The approved specification supersedes this plan, and the experimental patch it describes was removed from the tree.</figcaption>
+  <figcaption>Historical proposed change sites, not a verified implementation delta. The approved specification supersedes this plan, and the experimental patch it describes was not carried into the import.</figcaption>
 </figure>
 
 <p class="sub">
@@ -878,23 +878,24 @@ You are reviewing a single file…</code></pre>
   contains today. The experimental <code>src/tier/**</code> patch never compiled, and
   its design — glob ladders with a price-ranked fallback — is superseded by the
   specification, which replaces price ranking and user-supplied matchers with family
-  strategies over declared profile data. It has therefore been removed; the runtime
-  is back to upstream's model resolution until the specified design is implemented.
+  strategies over declared profile data. It was therefore not carried into the import;
+  the runtime is back to upstream's model resolution until the specified design is
+  implemented. See <a href="adr/0002-do-not-carry-the-tier-experiment-into-the-import.md">ADR 0002</a>.
 </p>
 
 <table>
   <thead><tr><th>File</th><th>Status</th><th>What changed</th></tr></thead>
   <tbody>
-    <tr><td><code>src/tier/model-id.ts</code></td><td><span class="tag new">removed</span></td><td>Identity rules: what makes two ids the same model. Strips <code>:batch</code> and <code>-pro</code>, compiles glob patterns, derives a model's family.</td></tr>
-    <tr><td><code>src/tier/tier-map.ts</code></td><td><span class="tag new">removed</span></td><td>The vocabulary: a ladder of rungs per family, plus the shipped OpenAI ladder and a sanitizer for hand-edited settings.</td></tr>
-    <tr><td><code>src/tier/tier-policy.ts</code></td><td><span class="tag new">removed</span></td><td>The rule: find the parent's rung, take the one below, fall back to the price ranking, and explain the decision either way.</td></tr>
-    <tr><td><code>src/tier/tier-settings.ts</code></td><td><span class="tag new">removed</span></td><td>Reads <code>tiered-subagents.json</code> from both layers and hands the policy its inputs.</td></tr>
-    <tr><td><code>src/session/model-resolver.ts</code></td><td><span class="tag ours">reverted</span></td><td>The resolution result said <i>where</i> the model came from — only the tier policy needed that.</td></tr>
-    <tr><td><code>src/tools/spawn-config.ts</code></td><td><span class="tag ours">reverted</span></td><td>Applied the policy to an inherited model and added a note naming both models.</td></tr>
-    <tr><td><code>src/session/session-config.ts</code></td><td><span class="tag ours">reverted</span></td><td>The same, for the service door that has no tool parameters.</td></tr>
-    <tr><td><code>src/lifecycle/create-subagent-session.ts</code></td><td><span class="tag ours">reverted</span></td><td>Carried the policy into the assembler.</td></tr>
-    <tr><td><code>src/tools/agent-tool.ts</code></td><td><span class="tag ours">reverted</span></td><td>Read the policy off the settings object it already receives.</td></tr>
-    <tr><td><code>extensions/index.ts</code></td><td><span class="tag ours">reverted</span></td><td>Built and loaded the <code>TierSettingsManager</code> at the composition root.</td></tr>
+    <tr><td><code>src/tier/model-id.ts</code></td><td><span class="tag new">not imported</span></td><td>Identity rules: what makes two ids the same model. Strips <code>:batch</code> and <code>-pro</code>, compiles glob patterns, derives a model's family.</td></tr>
+    <tr><td><code>src/tier/tier-map.ts</code></td><td><span class="tag new">not imported</span></td><td>The vocabulary: a ladder of rungs per family, plus the shipped OpenAI ladder and a sanitizer for hand-edited settings.</td></tr>
+    <tr><td><code>src/tier/tier-policy.ts</code></td><td><span class="tag new">not imported</span></td><td>The rule: find the parent's rung, take the one below, fall back to the price ranking, and explain the decision either way.</td></tr>
+    <tr><td><code>src/tier/tier-settings.ts</code></td><td><span class="tag new">not imported</span></td><td>Reads <code>tiered-subagents.json</code> from both layers and hands the policy its inputs.</td></tr>
+    <tr><td><code>src/session/model-resolver.ts</code></td><td><span class="tag ours">upstream</span></td><td>The resolution result said <i>where</i> the model came from — only the tier policy needed that.</td></tr>
+    <tr><td><code>src/tools/spawn-config.ts</code></td><td><span class="tag ours">upstream</span></td><td>Applied the policy to an inherited model and added a note naming both models.</td></tr>
+    <tr><td><code>src/session/session-config.ts</code></td><td><span class="tag ours">upstream</span></td><td>The same, for the service door that has no tool parameters.</td></tr>
+    <tr><td><code>src/lifecycle/create-subagent-session.ts</code></td><td><span class="tag ours">upstream</span></td><td>Carried the policy into the assembler.</td></tr>
+    <tr><td><code>src/tools/agent-tool.ts</code></td><td><span class="tag ours">upstream</span></td><td>Read the policy off the settings object it already receives.</td></tr>
+    <tr><td><code>extensions/index.ts</code></td><td><span class="tag ours">upstream</span></td><td>Built and loaded the <code>TierSettingsManager</code> at the composition root.</td></tr>
   </tbody>
 </table>
 

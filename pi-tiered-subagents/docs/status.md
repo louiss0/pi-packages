@@ -12,15 +12,26 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | --- | --- |
 | Source material | [`@gotgenes/pi-subagents`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 (MIT, © Chris Lasher), itself a friendly fork of [`@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents) |
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
-| Runtime code | `src/` — 73 files, ~11.2k lines |
+| Runtime code | `src/` — 73 files, 13.7k lines |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 105 files, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 88 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
 | Test suite | `pnpm nx run pi-tiered-subagents:test` — 2181 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
 characterized by upstream's own suite.
+
+## The inherited runtime, explained
+
+[how-it-works.html](how-it-works.html) is the guided tour of the inherited
+implementation: what a child session is, how the spawn doors resolve a
+request, how the lifecycle, observation, and UI domains fit together, and the
+upstream decisions that constrain where the specified work may live. The
+architecture record it draws on is upstream's
+[architecture.md](architecture/architecture.md) and
+[decision records](decisions/), kept as provenance rather than as decisions
+adopted for this derivative.
 
 ## Inherited behaviour, now characterized
 
@@ -50,14 +61,16 @@ The recovered suite pins the behaviour this derivative must preserve:
    (`Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`), not the
    upstream one, so the two runtimes cannot overwrite each other's service
    when both are loaded in one session. Pinned by
-   `test/service/service.test.ts`.
-2. **The experimental tier-routing patch was removed.** The tree carried an
-   unfinished `src/tier/**` experiment (glob/pattern ladder matching with a
-   price-ranked fallback). It did not compile, and its design is superseded by
-   the specification, which replaces price ranking and user-supplied matchers
-   with family strategies over declared profile data. The runtime is therefore
-   back to upstream's model resolution until the specified design is
-   implemented.
+   `test/service/service.test.ts`. See
+   [adr/0001](adr/0001-publish-the-service-under-our-own-identity.md).
+2. **The experimental tier-routing patch was not carried into the import.**
+   The scaffold's working tree carried an unfinished `src/tier/**` experiment
+   (glob/pattern ladder matching with a price-ranked fallback). It did not
+   compile, and its design is superseded by the specification, which replaces
+   price ranking and user-supplied matchers with family strategies over
+   declared profile data. The runtime is therefore back to upstream's model
+   resolution until the specified design is implemented. See
+   [adr/0002](adr/0002-do-not-carry-the-tier-experiment-into-the-import.md).
 3. **Platform-portable path expectations.** Two upstream tests asserted
    POSIX-only path strings; they now build expectations with `node:path`, so
    the suite passes on Windows as well as Linux. The runtime behaviour is
@@ -65,6 +78,8 @@ The recovered suite pins the behaviour this derivative must preserve:
 4. **Keybinding expectations follow Pi's current defaults.** The transcript
    pane's footer hints and paging tests now read the bound key from Pi's
    keybinding manager rather than hard-coding Pi 1.0.0's defaults.
+5. **The inherited lint rules are scoped to this package.** See
+   [adr/0003](adr/0003-scope-the-inherited-lint-rules-to-this-package.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -76,12 +91,23 @@ The recovered suite pins the behaviour this derivative must preserve:
   footer hints no longer fit in an 80-column terminal, and the pane drops them
   there. Pinned by `test/ui/session-navigator.test.ts`.
 
-No other behaviour difference was observed: the remaining 2172 upstream tests
-pass unchanged against Pi 1.3.0.
+Of upstream's 2179 tests, 2172 pass unchanged; the other seven needed the
+three adaptations above.
+
+### Known consequence of the drift
+
+The transcript pane's footer carries the scroll position and the key hints on
+one line. Pi 1.3.0's longer default key names (`Ctrl+Home`/`Ctrl+End` rather
+than `Home`/`End`) push the hints past the width of an 80-column terminal, so
+the pane drops them there and keeps only the position. The pane follows the
+operator's bindings, so an operator who rebinds the keys gets a footer that
+fits. Making the hints survive 80 columns is a **presentation** decision the
+specification has not settled; it is not a defect in the inherited runtime.
 
 ## Outstanding work (owed to SPEC.md)
 
-Nothing below is implemented yet. Each item names the user stories it covers.
+Nothing in this table is implemented yet. Each item names the user stories it
+covers.
 
 | Area | Stories | Notes |
 | --- | --- | --- |
@@ -90,10 +116,10 @@ Nothing below is implemented yet. Each item names the user stories it covers.
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | New domain; the removed `src/tier/**` experiment is not a starting point. |
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Upstream validates the level at the door and otherwise inherits the parent's. |
 | Request-time snapshots, capability-based workspace scheduling | 48, 52–54 | Upstream captures a parent snapshot but schedules on a single concurrency limiter. |
-| Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`). |
+| Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
 | Shared configuration resolver for both launch doors | 80–82 | The two doors still resolve separately. |
 | Resolved model/thinking facts in the launch and result presentation | 74 | Not surfaced yet. |
-| Workspace and sibling-package verification for the Pi 1.3.0 upgrade | 83 | Done: the whole workspace typechecks, lints, and tests clean on 1.3.0 (see below). |
+| A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 
 ## The Pi 1.3.0 upgrade, verified across the workspace
 
@@ -116,6 +142,7 @@ eight projects.
 - [SPEC.md](SPEC.md) is the authoritative requirement set.
 - [how-it-works.html](how-it-works.html) explains the inherited runtime and
   marks the historical routing proposal as superseded.
+- [adr/](adr/) records the decisions adopted for this derivative.
 - [architecture/](architecture/) and [decisions/](decisions/) are upstream
   snapshots, kept for provenance. They record upstream's decisions, not this
   derivative's.

@@ -13,7 +13,7 @@ scoped specialists, layered agent definitions, and inspectable model selection.
 ## Install
 
 ```bash
-pi package add @code-fixer-23/pi-tiered-subagents
+pi install npm:@code-fixer-23/pi-tiered-subagents
 ```
 
 The package is a **replacement runtime**, not a second orchestrator: enabling it
@@ -45,11 +45,14 @@ v25.0.1, which is itself a friendly fork of
   The service is published on `globalThis` under this package's own symbol key,
   `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`.
 
-- **Layered settings** — the shared loader is exported for other packages:
+- **Layered settings** — the inherited loader is exported for other packages:
 
   ```ts
   import { loadLayeredSettings } from "@code-fixer-23/pi-tiered-subagents/settings";
   ```
+
+  The specified settings backend (`@juanibiapina/pi-extension-settings`)
+  replaces it; see [docs/status.md](docs/status.md).
 
 - **A live widget** and a `/subagents:sessions` transcript viewer, mounted on Pi's
   own components.
@@ -87,10 +90,11 @@ claim checks you did not run.
 ## Development
 
 ```bash
+pnpm nx run pi-tiered-subagents:build       # type declarations
 pnpm nx run pi-tiered-subagents:typecheck
 pnpm nx run pi-tiered-subagents:test
-pnpm nx run pi-tiered-subagents:check      # formatting
-pnpm nx run pi-tiered-subagents:metadata   # package metadata
+pnpm nx run pi-tiered-subagents:check        # formatting
+pnpm nx run pi-tiered-subagents:metadata     # package metadata
 ```
 
 ## Documentation
@@ -98,6 +102,7 @@ pnpm nx run pi-tiered-subagents:metadata   # package metadata
 - [Approved specification](docs/SPEC.md), also published as
   [GitHub issue #8](https://github.com/louiss0/pi-packages/issues/8).
 - [Runtime status](docs/status.md) — what is inherited, what changed, what is owed.
+- [Decision records](docs/adr/) — the decisions adopted for this derivative.
 - [Illustrated source guide](docs/how-it-works.html) — open it in a browser.
 - [Architecture](docs/architecture/architecture.md) and
   [decision records](docs/decisions/) — upstream snapshots, kept for provenance.
