@@ -18,7 +18,7 @@ import {
   type SessionEntry,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import {
   isRunningStatus,
   type SubagentStatus,
@@ -32,7 +32,6 @@ import type {
 import {
   formatDuration,
   getDisplayName,
-  getPromptModeLabel,
   type ModelIdentity,
 } from "#src/ui/display";
 
@@ -87,8 +86,6 @@ export type NavigationEntry =
 /** Who produced a transcript, for the pane's header. Fixed for the life of the entry. */
 export interface EntryHeading {
   readonly name: string;
-  /** `twin` for an append-mode agent; undefined otherwise. */
-  readonly modeLabel: string | undefined;
   readonly description: string;
 }
 
@@ -147,7 +144,7 @@ export interface TranscriptSource {
  */
 export function listNavigableAgents(
   agents: readonly NavigableSubagent[],
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   persisted: readonly PersistedRunSummary[],
 ): NavigationEntry[] {
   const live: NavigationEntry[] = [];
@@ -240,18 +237,17 @@ export function liveSource(record: NavigableSubagent): TranscriptSource {
 
 function buildHeading(
   fields: Pick<LabelFields, "type" | "description">,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
 ): EntryHeading {
   return {
     name: getDisplayName(fields.type, registry),
-    modeLabel: getPromptModeLabel(fields.type, registry),
     description: fields.description,
   };
 }
 
 function buildLabel(
   fields: LabelFields,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   released = false,
 ): string {
   const name = getDisplayName(fields.type, registry);

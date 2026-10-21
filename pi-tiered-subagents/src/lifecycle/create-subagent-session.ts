@@ -19,7 +19,7 @@ import {
   type SettingsManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { debugNote } from "#src/debug";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
@@ -169,7 +169,7 @@ export type SubagentSessionIO = EnvironmentIO & SessionFactoryIO;
 export interface SubagentSessionDeps {
   io: SubagentSessionIO;
   exec: ShellExec;
-  registry: AgentConfigLookup;
+  registry: AgentDefinitionLookup;
   /** Publishes the child-execution lifecycle so consumers can observe it. */
   lifecycle: ChildLifecyclePublisher;
   /**
@@ -255,6 +255,7 @@ export async function createSubagentSession(
       parentPortablePrompt: snapshot.portablePrompt,
       parentModel: snapshot.model,
       modelRegistry: snapshot.modelRegistry,
+      activeToolNames: snapshot.activeToolNames,
       resolvePromptInheritance: deps.resolvePromptInheritance,
     },
     {

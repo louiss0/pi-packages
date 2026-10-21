@@ -43,7 +43,7 @@ import {
   type TuiMouseEventResult,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import {
   readPersistedRuns,
   type SessionEntryLike,
@@ -132,7 +132,7 @@ export interface ViewerMountOptions {
 export interface SessionNavigatorParams {
   ui: SessionNavigatorUI;
   agents: readonly NavigableSubagent[];
-  registry: AgentConfigLookup;
+  registry: AgentDefinitionLookup;
   /** Working directory for tool-call rendering (relative path display). */
   cwd: string;
   /** Reads a persisted session file for the file-snapshot source. */
@@ -409,9 +409,8 @@ export class TranscriptPane implements Component {
     thinkingLevel: string | undefined,
   ): string[] {
     const th = this.theme;
-    const { name, modeLabel, description } = this.heading;
-    const identity =
-      th.bold(name) + (modeLabel ? ` ${th.fg("muted", `(${modeLabel})`)}` : "");
+    const { name, description } = this.heading;
+    const identity = th.bold(name);
     const runtime = describeRuntime(model, thinkingLevel);
     const runtimeTag = runtime ? th.fg("muted", ` · ${runtime}`) : "";
     return [

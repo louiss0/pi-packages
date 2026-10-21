@@ -37,10 +37,23 @@ export class SubagentRuntime {
   currentCtx: SessionContext | undefined = undefined;
 
   /**
+   * The names of the tools the parent session has active.
+   *
+   * Read from Pi's extension API when the request is made, so a definition
+   * that inherits its tools takes the parent's current selection rather than
+   * a configured list.
+   */
+  private listActiveTools: () => string[];
+
+  /**
    * Prompt options Pi assembled for the parent's latest turn, captured from
    * `before_agent_start`. Undefined until the parent has run one.
    */
   private lastPromptOptions: ParentPromptOptions | undefined = undefined;
+
+  constructor(listActiveTools: () => string[] = () => []) {
+    this.listActiveTools = listActiveTools;
+  }
 
   // ── Session-context methods ──────────────────────────────────────────────
 
@@ -74,6 +87,7 @@ export class SubagentRuntime {
       this.currentCtx!,
       inheritContext,
       this.lastPromptOptions,
+      this.listActiveTools(),
     );
   }
 
@@ -99,6 +113,8 @@ export class SubagentRuntime {
  *
  * Call once at extension startup; pass the result to factories and handlers.
  */
-export function createSubagentRuntime(): SubagentRuntime {
-  return new SubagentRuntime();
+export function createSubagentRuntime(
+  listActiveTools: () => string[] = () => [],
+): SubagentRuntime {
+  return new SubagentRuntime(listActiveTools);
 }

@@ -7,11 +7,9 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import type { AgentTypeRegistry } from "#src/config/agent-types";
-import {
-  type LockableField,
-  resolveAgentInvocationConfig,
-} from "#src/config/invocation-config";
+import type { AgentDefinition } from "#src/agents/definition";
+import { resolveInvocation } from "#src/agents/invocation";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import {
   parseThinkingLevel,
   thinkingLevelError,
@@ -23,12 +21,10 @@ import {
 } from "#src/lifecycle/turn-limits";
 import type { ModelRegistry } from "#src/session/model-resolver";
 import { resolveInvocationModel } from "#src/session/model-resolver";
-import type { AgentInvocation, SubagentType, ThinkingLevel } from "#src/types";
+import type { SubagentType, ThinkingLevel } from "#src/types";
 import {
   type AgentDetails,
   buildInvocationTags,
-  getDisplayName,
-  getPromptModeLabel,
   modelLabel,
 } from "#src/ui/display";
 
@@ -42,8 +38,9 @@ export interface ModelInfo {
 export interface SpawnIdentity {
   subagentType: string;
   rawType: SubagentType;
-  fellBack: boolean;
   displayName: string;
+  /** The definition the request resolved to. */
+  definition: AgentDefinition;
 }
 
 /** Execution: how the agent will run. */
@@ -55,7 +52,6 @@ export interface SpawnExecution {
   thinking: ThinkingLevel | undefined;
   inheritContext: boolean;
   runInBackground: boolean;
-  agentInvocation: AgentInvocation;
 }
 
 /** Presentation: display/UI values derived from identity and execution. */
@@ -89,7 +85,7 @@ export interface SpawnConfigError {
  */
 export function resolveSpawnConfig(
   params: Record<string, unknown>,
-  registry: AgentTypeRegistry,
+  registry: AgentDefinitionLookup,
   modelInfo: ModelInfo,
   settings: { readonly defaultMaxTurns: number | undefined },
 ): ResolvedSpawnConfig | SpawnConfigError {
@@ -102,26 +98,30 @@ export function resolveSpawnConfig(
   }
 
   const rawType = params.subagent_type as SubagentType;
-  const resolved = registry.resolveType(rawType);
 
-  // A disabled type is rejected by SubagentManager.resolveSpawn, the choke point
-  // every front door shares.
-  const subagentType = resolved ?? "general-purpose";
-  const fellBack = resolved === undefined;
+  // An unknown or disabled agent is an error, never another agent: the caller
+  // asked for something specific, and running a different role would answer a
+  // question nobody asked.
+  const selection = registry.select(rawType);
+  if (!selection.ok) return { error: selection.error };
+  const definition = selection.definition;
+  const subagentType = definition.id;
 
-  const displayName = getDisplayName(subagentType, registry);
+  const displayName = definition.displayName;
 
-  // Merge agent config defaults with tool-call params
-  const customConfig = registry.resolveAgentConfig(subagentType);
-  const resolvedConfig = resolveAgentInvocationConfig(customConfig, {
-    ...params,
+  // Merge the definition's defaults with the tool-call params.
+  const resolvedConfig = resolveInvocation(definition, {
+    model: params.model as string | undefined,
     thinking: thinkingFromParams,
+    maxTurns: params.max_turns as number | undefined,
+    inheritContext: params.inherit_context as boolean | undefined,
+    runInBackground: params.run_in_background as boolean | undefined,
   });
 
   // Resolve model
   const resolution = resolveInvocationModel(
     modelInfo.parentModel,
-    resolvedConfig.modelInput,
+    resolvedConfig.model,
     resolvedConfig.modelFromParams,
     modelInfo.modelRegistry,
   );
@@ -138,16 +138,13 @@ export function resolveSpawnConfig(
     resolvedConfig.maxTurns ?? settings.defaultMaxTurns,
   );
 
-  const agentInvocation: AgentInvocation = {
+  const { tags: invocationTags } = buildInvocationTags({
     thinking,
-    maxTurns: normalizeMaxTurns(resolvedConfig.maxTurns),
+    maxTurns: resolvedConfig.maxTurns,
     inheritContext,
     runInBackground,
-  };
-
-  const modeLabel = getPromptModeLabel(subagentType, registry);
-  const { tags: invocationTags } = buildInvocationTags(agentInvocation);
-  const agentTags = modeLabel ? [modeLabel, ...invocationTags] : invocationTags;
+  });
+  const agentTags = invocationTags;
 
   const detailBase = {
     displayName,
@@ -158,12 +155,8 @@ export function resolveSpawnConfig(
   };
 
   return {
-    identity: { subagentType, rawType, fellBack, displayName },
-    notes: [
-      ...buildFallbackNote(rawType, fellBack),
-      ...buildLockNote(subagentType, resolvedConfig.discarded),
-      ...buildMinimumTurnsNote(resolvedConfig.maxTurns),
-    ],
+    identity: { subagentType, rawType, displayName, definition },
+    notes: [...buildMinimumTurnsNote(resolvedConfig.maxTurns)],
     execution: {
       prompt: params.prompt as string,
       description: params.description as string,
@@ -172,20 +165,9 @@ export function resolveSpawnConfig(
       thinking,
       inheritContext,
       runInBackground,
-      agentInvocation,
     },
     presentation: { agentTags, detailBase },
   };
-}
-
-/** Advise that the named type does not exist, so general-purpose ran instead. */
-export function buildFallbackNote(
-  rawType: SubagentType,
-  fellBack: boolean,
-): string[] {
-  return fellBack
-    ? [`Note: Unknown agent type "${rawType}" — using general-purpose.`]
-    : [];
 }
 
 /**
@@ -199,22 +181,4 @@ function buildMinimumTurnsNote(maxTurns: number | undefined): string[] {
   return [
     `Note: max_turns ${maxTurns} is below the minimum of ${MIN_MAX_TURNS} (one turn to work, one to answer), so the subagent runs with ${MIN_MAX_TURNS}.`,
   ];
-}
-
-/**
- * Advise that the agent's `locked:` frontmatter threw away parameters this call passed.
- *
- * The caller cannot see an agent file, so a silent discard reads as the tool ignoring
- * a parameter its own schema documents — which is the defect #829 reports.
- */
-function buildLockNote(
-  agentName: string,
-  discarded: readonly LockableField[],
-): string[] {
-  if (discarded.length === 0) return [];
-  const tail =
-    discarded.length === 1
-      ? `so the ${discarded[0]} parameter was ignored`
-      : "so those parameters were ignored";
-  return [`Note: agent "${agentName}" locks ${discarded.join(", ")}, ${tail}.`];
 }

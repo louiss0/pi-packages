@@ -7,7 +7,6 @@ import type {
   AgentSessionEvent,
   SessionContext as SdkSessionContext,
 } from "@earendil-works/pi-coding-agent";
-import type { LockDeclaration } from "#src/config/invocation-config";
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
 import type { ModelRegistry } from "#src/session/model-resolver";
 
@@ -51,53 +50,8 @@ export interface SubscribableSession {
   subscribe(fn: (event: AgentSessionEvent) => void): () => void;
 }
 
-/** Agent type: any string name (built-in defaults or user-defined). */
+/** Agent type: any string name (shipped specialists or user-defined). */
 export type SubagentType = string;
-
-/** UI display and agent listing — name, display name, description, prompt mode. */
-export interface AgentIdentity {
-  name: string;
-  displayName?: string;
-  description: string;
-  promptMode: "replace" | "append";
-}
-
-/** Prompt assembly — name, prompt mode, system prompt. */
-export interface AgentPromptConfig {
-  name: string;
-  promptMode: "replace" | "append";
-  systemPrompt: string;
-}
-
-/** Unified agent configuration — used for both default and user-defined agents. */
-export interface AgentConfig extends AgentIdentity, AgentPromptConfig {
-  /** The agent's tool allowlist. Entries name built-in or extension-registered tools; omitted means every built-in. */
-  toolNames?: string[];
-  model?: string;
-  thinking?: ThinkingLevel;
-  maxTurns?: number;
-  /** Default for spawn: fork parent conversation. undefined = caller decides. */
-  inheritContext?: boolean;
-  /** Default for spawn: run in background. undefined = caller decides. */
-  runInBackground?: boolean;
-  /** Fields a `subagent` tool caller may not override. Omitted — every field is overridable. */
-  locked?: LockDeclaration;
-  /** One-line usage guideline for the subagent tool's Guidelines: block. Omitted — no guideline line. */
-  toolGuideline?: string;
-  /** true = this is an embedded default agent (informational) */
-  isDefault?: boolean;
-  /** false = agent is hidden from the registry */
-  enabled?: boolean;
-  /** Where this agent was loaded from */
-  source?: "default" | "project" | "global";
-}
-
-export interface AgentInvocation {
-  thinking?: ThinkingLevel;
-  maxTurns?: number;
-  inheritContext?: boolean;
-  runInBackground?: boolean;
-}
 
 /**
  * Narrow shell-exec callback replacing `ExtensionAPI` in `detectEnv()`.
@@ -112,6 +66,13 @@ export interface SessionContext {
   readonly model: Model<any> | undefined;
   readonly modelRegistry: ModelRegistry;
   getSystemPrompt(): string;
+  /**
+   * Whether Pi has granted the project trust.
+   *
+   * A project the operator has not trusted contributes no agent definitions:
+   * opening a repository must not silently change what an agent may do.
+   */
+  isProjectTrusted(): boolean;
   readonly sessionManager: {
     getSessionFile(): string | undefined;
     getSessionId(): string;

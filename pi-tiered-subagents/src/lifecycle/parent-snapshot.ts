@@ -42,6 +42,14 @@ export interface ParentSnapshot {
   model: Model<any> | undefined;
   /** Model registry for resolving config.model strings and creating sessions. */
   modelRegistry: ModelRegistry;
+  /**
+   * The tools the parent session had active when the request was made.
+   *
+   * A definition that inherits its tools takes these, so a child that waits
+   * for a concurrency slot runs with the parent's selection as it was when
+   * the child was asked for — not as it is when the slot opens.
+   */
+  activeToolNames: readonly string[];
   /** Pre-built parent conversation text (when inheritContext was requested). */
   parentContext?: string;
   /**
@@ -65,6 +73,7 @@ export function buildParentSnapshot(
   ctx: SessionContext,
   inheritContext?: boolean,
   promptOptions?: ParentPromptOptions,
+  activeToolNames: readonly string[] = [],
 ): ParentSnapshot {
   const parentContext = inheritContext ? buildParentContext(ctx) : undefined;
   return {
@@ -72,6 +81,7 @@ export function buildParentSnapshot(
     systemPrompt: ctx.getSystemPrompt(),
     model: ctx.model,
     modelRegistry: ctx.modelRegistry,
+    activeToolNames: [...activeToolNames],
 
     parentContext: parentContext || undefined,
     portablePrompt: buildPortablePrompt(promptOptions),

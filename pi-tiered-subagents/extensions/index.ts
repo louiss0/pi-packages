@@ -23,8 +23,8 @@ import {
   SettingsManager as SdkSettingsManager,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { AgentTypeRegistry } from "#src/config/agent-types";
-import { loadCustomAgents } from "#src/config/custom-agents";
+import { loadDefinitionScopes } from "#src/agents/loader";
+import { AgentRegistry } from "#src/agents/registry";
 import {
   InterruptHandler,
   SessionLifecycleHandler,
@@ -86,10 +86,22 @@ export default function (pi: ExtensionAPI) {
     createWorkspaceNoticeRenderer(),
   );
 
-  const registry = new AgentTypeRegistry(() => loadCustomAgents(process.cwd()));
-
   // ---- Runtime: all mutable extension state in one place ----
-  const runtime = createSubagentRuntime();
+  // The active tools are read from Pi at request time, so a definition that
+  // inherits its tools follows the parent's current selection.
+  const runtime = createSubagentRuntime(() => pi.getActiveTools());
+
+  // ---- Agent definitions ----
+  // Shipped specialists, then the operator's global files, then the project's
+  // files — the last only when Pi has granted the project trust, so opening a
+  // repository cannot silently change what an agent may do.
+  const registry = new AgentRegistry(() =>
+    loadDefinitionScopes({
+      globalDir: getAgentDir(),
+      cwd: process.cwd(),
+      projectTrusted: runtime.currentCtx?.isProjectTrusted() ?? false,
+    }),
+  );
 
   // ---- Notification system ----
   // Owns completion nudges and live-activity cleanup. The widget detects finished

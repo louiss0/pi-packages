@@ -11,13 +11,13 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import { resolveChildToolNames } from "#src/agents/definition";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
 import type { ModelRegistry } from "#src/session/model-resolver";
 import type { ProjectContextLoader } from "#src/session/project-context";
 import type { InheritedPrompt } from "#src/session/prompts";
 import type {
-  AgentPromptConfig,
   PromptInheritance,
   SubagentType,
   ThinkingLevel,
@@ -35,7 +35,7 @@ import type {
  */
 export interface AssemblerIO {
   buildAgentPrompt: (
-    config: AgentPromptConfig,
+    config: { name: string; instructions: string },
     cwd: string,
     env: EnvInfo,
     inherited?: InheritedPrompt,
@@ -75,6 +75,14 @@ export interface AssemblerContext {
   parentModel?: Model<any>;
   /** Model registry for resolving config.model strings. */
   modelRegistry: ModelRegistry;
+  /**
+   * The parent's active tool names, captured when the request was made.
+   *
+   * A definition that inherits its tools takes these, so a child queued
+   * behind another one runs with the tools the parent had when it was asked
+   * for — not the ones it has now.
+   */
+  activeToolNames: readonly string[];
 }
 
 /**
@@ -168,14 +176,23 @@ export function assembleSessionConfig(
   ctx: AssemblerContext,
   options: AssemblerOptions,
   env: EnvInfo,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   io: AssemblerIO,
 ): SessionConfig {
-  const agentConfig = registry.resolveAgentConfig(type);
+  const selection = registry.select(type);
+  if (!selection.ok) {
+    // The spawn door selected the agent already; reaching here means the
+    // definition changed between the two, which is an error, not a fallback.
+    throw new Error(selection.error);
+  }
+  const definition = selection.definition;
 
   const effectiveCwd = options.cwd ?? ctx.cwd;
 
-  const toolNames = registry.getToolNamesForType(type);
+  const toolNames = resolveChildToolNames(
+    definition.tools,
+    ctx.activeToolNames,
+  );
 
   // Model resolution: explicit option > config model string > parent model.
   // Resolved before the prompt because the child's provider is what selects a
@@ -183,13 +200,13 @@ export function assembleSessionConfig(
   // independent, so the order is free.
   const model =
     options.model ??
-    resolveDefaultModel(ctx.parentModel, ctx.modelRegistry, agentConfig.model);
+    resolveDefaultModel(ctx.parentModel, ctx.modelRegistry, definition.model);
 
-  // Build system prompt from the resolved agent config. The strategy is keyed
+  // Build system prompt from the resolved definition. The strategy is keyed
   // on the child's own provider, so a per-spawn model override moves the child
   // between transports and takes the right strategy with it.
   const systemPrompt = io.buildAgentPrompt(
-    agentConfig,
+    { name: definition.id, instructions: definition.instructions },
     effectiveCwd,
     env,
     {
@@ -202,10 +219,10 @@ export function assembleSessionConfig(
   );
 
   // Thinking level: explicit option > agent config > undefined (inherit)
-  const thinkingLevel = options.thinkingLevel ?? agentConfig.thinking;
+  const thinkingLevel = options.thinkingLevel ?? definition.thinking;
 
   // Per-agent max turns (combined with per-call maxTurns and defaultMaxTurns by resolveTurnLimits)
-  const agentMaxTurns = agentConfig.maxTurns;
+  const agentMaxTurns = definition.maxTurns;
 
   return {
     effectiveCwd,

@@ -5,7 +5,7 @@ import type {
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { RunOutcome } from "#src/lifecycle/subagent-run";
 import {
   type GetResultDetails,
@@ -60,7 +60,7 @@ const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 export class GetResultTool {
   constructor(
     private readonly manager: GetResultToolManager,
-    private readonly registry: AgentConfigLookup,
+    private readonly registry: AgentDefinitionLookup,
   ) {}
 
   async execute(

@@ -1,4 +1,4 @@
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { getLifetimeTotal, type LifetimeUsage } from "#src/lifecycle/usage";
 import {
@@ -68,12 +68,8 @@ export function formatLifetimeTokens(o: {
 
 /**
  * Narrow registry interface needed by buildTypeListText.
- * Extends AgentConfigLookup with the two name-listing methods.
  */
-export interface TypeListRegistry extends AgentConfigLookup {
-  getDefaultAgentNames(): string[];
-  getUserAgentNames(): string[];
-}
+export type TypeListRegistry = AgentDefinitionLookup;
 
 /**
  * Build the full agent-type list text for the Agent tool description.
@@ -83,50 +79,50 @@ export function buildTypeListText(
   registry: TypeListRegistry,
   agentDir: string,
 ): string {
-  const defaultNames = registry
-    .getDefaultAgentNames()
-    .filter((name) => isEnabledAgent(registry, name));
-  const userNames = registry
-    .getUserAgentNames()
-    .filter((name) => isEnabledAgent(registry, name));
+  const definitions = registry
+    .list()
+    .filter((definition) => definition.enabled);
 
-  const defaultDescs = defaultNames.map((name) => {
-    const cfg = registry.resolveAgentConfig(name);
-    const modelSuffix = cfg.model
-      ? ` (${getModelLabelFromConfig(cfg.model)})`
+  const shipped = definitions.filter(
+    (definition) => definition.origin === "shipped",
+  );
+  const custom = definitions.filter(
+    (definition) => definition.origin !== "shipped",
+  );
+
+  const describe = (definition: (typeof definitions)[number]) => {
+    const modelSuffix = definition.model
+      ? ` (${getModelLabelFromConfig(definition.model)})`
       : "";
-    return `- ${name}: ${cfg.description}${modelSuffix}`;
-  });
-
-  const customDescs = userNames.map((name) => {
-    const cfg = registry.resolveAgentConfig(name);
-    return `- ${name}: ${cfg.description}`;
-  });
+    return `- ${definition.id}: ${definition.description}${modelSuffix}`;
+  };
 
   return [
-    ...(defaultDescs.length > 0 ? ["Default agents:", ...defaultDescs] : []),
-    ...(customDescs.length > 0 ? ["", "Custom agents:", ...customDescs] : []),
+    ...(shipped.length > 0 ? ["Specialists:", ...shipped.map(describe)] : []),
+    ...(custom.length > 0
+      ? ["", "Custom agents:", ...custom.map(describe)]
+      : []),
     "",
-    `Custom agents can be defined in .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) — they are picked up automatically. Project-level agents override global ones. Creating a .md file with the same name as a default agent overrides it.`,
+    `Custom agents can be defined in .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) — they are picked up automatically. Project-level agents override global ones. Creating a .md file with the same name as a specialist refines it, field by field.`,
   ].join("\n");
-}
-
-/** True when an agent config is present and not explicitly disabled. */
-function isEnabledAgent(registry: AgentConfigLookup, name: string): boolean {
-  return registry.resolveAgentConfig(name).enabled !== false;
 }
 
 /**
  * Collect the per-agent usage guidelines for the subagent tool's Guidelines: block.
- * Sourced from each enabled default agent's `toolGuideline`, in registry order,
- * so a disabled built-in drops its guideline automatically.
+ *
+ * Sourced from each enabled specialist's description, in registry order, so a
+ * disabled one drops its guideline automatically.
  */
 export function buildAgentGuidelines(registry: TypeListRegistry): string[] {
   return registry
-    .getDefaultAgentNames()
-    .filter((name) => isEnabledAgent(registry, name))
-    .map((name) => registry.resolveAgentConfig(name).toolGuideline)
-    .filter((line): line is string => line !== undefined);
+    .list()
+    .filter(
+      (definition) => definition.enabled && definition.origin === "shipped",
+    )
+    .map(
+      (definition) => `- Use ${definition.id} for: ${definition.description}`,
+    )
+    .filter((line) => line.length > 0);
 }
 
 /** Derive a short model label from a model string. */

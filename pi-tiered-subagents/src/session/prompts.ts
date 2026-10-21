@@ -4,7 +4,15 @@
 
 import type { EnvInfo } from "#src/session/env";
 import type { ProjectContextLoader } from "#src/session/project-context";
-import type { AgentPromptConfig, PromptInheritance } from "#src/types";
+import type { PromptInheritance } from "#src/types";
+
+/** The prompt configuration a child is built from. */
+export interface AgentPromptConfig {
+  /** The agent's identifier, as the `<active_agent>` tag names it. */
+  name: string;
+  /** The agent's standing instructions — the definition's body. */
+  instructions: string;
+}
 
 /** The parent session's contribution to a child prompt, plus the cwd that text claims. */
 export interface InheritedPrompt {
@@ -27,30 +35,25 @@ export interface InheritedPrompt {
 }
 
 /**
- * Build the system prompt for an agent from its config.
+ * Build the system prompt for an agent from its definition.
  *
- * Both modes place the shared/stable parent prompt (or `genericBase` when no
- * parent is available) first, so the inherited identity is a leading prefix the
+ * The prompt is the inherited identity first, so it forms a leading prefix the
  * child shares with its parent across all subagent invocations. What that is
  * worth is host-dependent — see ADR 0008.
  *
- * - "replace" mode: parent/genericBase + active_agent tag + env header +
- *   config.systemPrompt.  No `<agent_instructions>` wrapper — the custom
- *   prompt has full control and the final say.
- * - "append" mode: parent/genericBase + active_agent tag + env header +
- *   config.systemPrompt (wrapped in `<agent_instructions>` when non-empty).
- * - "append" with empty systemPrompt: pure parent clone.
+ * The agent's standing instructions follow, wrapped in `<agent_instructions>`
+ * when there are any. A definition has one prompt shape: there is no mode a
+ * definition can select, and no frontmatter property that selects one.
  *
- * The two modes now differ only in the `<agent_instructions>` wrapper. The
- * `<sub_agent_context>` bridge append mode used to carry was removed in #890:
- * its tool bullets duplicated the `promptGuidelines` Pi's own tools contribute
- * to every child's prompt, and it asserted them unconditionally — telling a
- * read-only child to use `edit` and `write` when it has neither.
+ * The `<sub_agent_context>` bridge upstream carried in append mode was removed
+ * in #890: its tool bullets duplicated the `promptGuidelines` Pi's own tools
+ * contribute to every child's prompt, and it asserted them unconditionally —
+ * telling a read-only child to use `edit` and `write` when it has neither.
  *
- * Both modes include an `<active_agent name="${config.name}"/>` tag so
+ * The prompt includes an `<active_agent name="${config.name}"/>` tag so
  * downstream extensions (e.g. `@gotgenes/pi-permission-system`) can resolve
  * per-agent policy inside the child session by parsing the system prompt.
- * The tag follows the cacheable parent prefix in both modes.
+ * The tag follows the cacheable parent prefix.
  *
  * Only the parent prompt's identity is inherited — see `inheritedIdentity`.
  *
@@ -70,25 +73,15 @@ export function buildAgentPrompt(
   const identity = inherited ? adoptedIdentity(inherited, cwd) : genericBase;
   const projectContext = ownProjectContext(inherited, cwd, loadProjectContext);
 
-  if (config.promptMode === "append") {
-    const customSection = config.systemPrompt.trim()
-      ? `\n\n<agent_instructions>\n${config.systemPrompt}\n</agent_instructions>`
-      : "";
+  const customSection = config.instructions.trim()
+    ? `\n\n<agent_instructions>\n${config.instructions}\n</agent_instructions>`
+    : "";
 
-    // Place the inherited identity first so it forms a shared leading prefix
-    // with the parent session, which prefix-reusing inference engines reuse
-    // instead of reprocessing. The <active_agent> tag and env block vary per
-    // call and are placed after that prefix.
-    return identity + projectContext + "\n\n" + header + customSection;
-  }
-
-  // "replace" mode — identity prefix first, then the active_agent tag, env
-  // block, and the config's full system prompt. Unlike append mode, no
-  // <agent_instructions> wrapper is injected — the custom prompt retains full
-  // control.
-  return (
-    identity + projectContext + "\n\n" + header + "\n\n" + config.systemPrompt
-  );
+  // Place the inherited identity first so it forms a shared leading prefix
+  // with the parent session, which prefix-reusing inference engines reuse
+  // instead of reprocessing. The <active_agent> tag and env block vary per
+  // call and are placed after that prefix.
+  return identity + projectContext + "\n\n" + header + customSection;
 }
 
 /**

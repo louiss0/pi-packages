@@ -12,7 +12,8 @@ import type { Model } from "@earendil-works/pi-ai";
 import {
   type BackgroundRequest,
   resolveBackgroundMode,
-} from "#src/config/invocation-config";
+} from "#src/agents/invocation";
+import type { AgentSelection } from "#src/agents/registry";
 import { debugLog } from "#src/debug";
 import type { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
@@ -30,7 +31,6 @@ import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 
 import type { RunConfig } from "#src/runtime";
 import type {
-  AgentConfig,
   CompactionInfo,
   ParentSessionInfo,
   SubagentType,
@@ -39,12 +39,17 @@ import type {
 
 /**
  * The agent-registry slice the manager needs to resolve a spawn. Deliberately
- * narrower than AgentConfigLookup, whose slice serves session assembly (ISP).
+ * narrower than the registry itself, whose slice also serves session assembly
+ * (ISP).
  */
 export interface SpawnTypeResolver {
-  resolveType(name: string): string | undefined;
-  isValidType(type: string): boolean;
-  resolveAgentConfig(type: string): AgentConfig;
+  /**
+   * The definition for an agent type, or the reason there is none.
+   *
+   * The manager is the choke point every front door shares, so an unknown or
+   * disabled agent is rejected here rather than answered with another role.
+   */
+  select(id: string): AgentSelection;
 }
 
 /**
@@ -374,15 +379,14 @@ export class SubagentManager {
     type: string,
     background: BackgroundRequest,
   ): ResolvedSpawn {
-    const canonical = this.registry.resolveType(type);
-    if (canonical !== undefined && !this.registry.isValidType(canonical)) {
-      throw new Error(`Agent type "${canonical}" is disabled`);
+    const selection = this.registry.select(type);
+    if (!selection.ok) {
+      throw new Error(selection.error);
     }
-    const resolvedType = canonical ?? "general-purpose";
-    const agentConfig = this.registry.resolveAgentConfig(resolvedType);
+    const definition = selection.definition;
     return {
-      type: resolvedType,
-      isBackground: resolveBackgroundMode(agentConfig, background),
+      type: definition.id,
+      isBackground: resolveBackgroundMode(definition, background),
     };
   }
 

@@ -6,9 +6,8 @@
  */
 
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
-import type { AgentInvocation, SubagentType } from "#src/types";
 import { GLYPHS } from "#src/ui/glyphs";
 
 // ---- Types ----
@@ -144,26 +143,30 @@ export function formatDuration(
 
 // ---- Display helpers ----
 
-/** Get display name for any agent type (built-in or custom). */
+/**
+ * The display name of an agent type.
+ *
+ * A type the registry does not know is named as it was asked for: the
+ * registry's own list is what a caller should have picked from.
+ */
 export function getDisplayName(
-  type: SubagentType,
-  registry: AgentConfigLookup,
+  type: string,
+  registry: AgentDefinitionLookup,
 ): string {
-  const config = registry.resolveAgentConfig(type);
-  return config.displayName ?? config.name;
+  const definition = registry.find(type);
+  return definition ? definition.displayName || definition.id : type;
 }
 
-/** Short label for prompt mode: "twin" for append, nothing for replace (the default). */
-export function getPromptModeLabel(
-  type: SubagentType,
-  registry: AgentConfigLookup,
-): string | undefined {
-  const config = registry.resolveAgentConfig(type);
-  return config.promptMode === "append" ? "twin" : undefined;
+/** The settings a launch resolved, as the tags name them. */
+export interface InvocationTags {
+  readonly thinking?: string;
+  readonly maxTurns?: number;
+  readonly inheritContext?: boolean;
+  readonly runInBackground?: boolean;
 }
 
 /** Mode label is not included — callers add it where they want it. */
-export function buildInvocationTags(invocation: AgentInvocation | undefined): {
+export function buildInvocationTags(invocation: InvocationTags | undefined): {
   tags: string[];
 } {
   const tags: string[] = [];

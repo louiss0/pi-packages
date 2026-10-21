@@ -6,7 +6,7 @@
  */
 
 import type { TuiMode } from "@earendil-works/pi-tui";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import type { AgentRegistry } from "#src/agents/registry";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type {
   SubagentManager,
@@ -128,7 +128,7 @@ export class AgentWidget implements SubagentManagerObserver {
 
   constructor(
     private manager: SubagentManager,
-    private registry: AgentTypeRegistry,
+    private registry: AgentRegistry,
   ) {}
 
   /** Set the UI context (captured at session_start). */

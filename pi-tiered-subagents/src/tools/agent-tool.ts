@@ -6,7 +6,7 @@ import type {
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { AgentTypeRegistry } from "#src/config/agent-types";
+import type { AgentRegistry } from "#src/agents/registry";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type {
   AgentSpawnConfig,
@@ -90,11 +90,11 @@ export class AgentTool {
     private readonly manager: AgentToolManager,
     private readonly runtime: AgentToolRuntime,
     private readonly settings: AgentToolSettings,
-    private readonly registry: AgentTypeRegistry,
+    private readonly registry: AgentRegistry,
     private readonly agentDir: string,
   ) {
     this.typeListText = buildTypeListText(registry, agentDir);
-    this.availableTypesText = registry.getAvailableTypes().join(", ");
+    this.availableTypesText = registry.enabledIds().join(", ");
     this.agentGuidelines = buildAgentGuidelines(registry);
   }
 
@@ -284,7 +284,7 @@ ${guidelines}
             "A short (3-5 word) description of the task (shown in UI).",
         }),
         subagent_type: Type.String({
-          description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) are also available.`,
+          description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) are also available. An unknown or disabled type is rejected, not replaced.`,
         }),
         model: Type.Optional(
           Type.String({

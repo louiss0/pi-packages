@@ -6,7 +6,7 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { AgentConfigLookup } from "#src/config/agent-types";
+import type { AgentDefinitionLookup } from "#src/agents/registry";
 import {
   isActiveStatus,
   type SubagentStatus,
@@ -25,7 +25,6 @@ import {
   formatSessionTokens,
   formatTurnBudget,
   getDisplayName,
-  getPromptModeLabel,
   type ModelIdentity,
   type Theme,
 } from "#src/ui/display";
@@ -61,11 +60,10 @@ export interface WidgetAgent {
 /** Render a single finished agent line (no tree connector prefix). */
 export function renderFinishedLine(
   agent: WidgetAgent,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   theme: Theme,
 ): string {
   const name = getDisplayName(agent.type, registry);
-  const modeLabel = getPromptModeLabel(agent.type, registry);
   const duration = formatMs(
     (agent.completedAt ?? Date.now()) - agent.startedAt,
   );
@@ -97,20 +95,17 @@ export function renderFinishedLine(
     parts.push(`${agent.toolUses} tool use${agent.toolUses === 1 ? "" : "s"}`);
   parts.push(duration);
 
-  const modeTag = modeLabel ? ` ${theme.fg("dim", `(${modeLabel})`)}` : "";
-  return `${icon} ${theme.fg("dim", name)}${modeTag}${modelTag(agent, theme)}  ${theme.fg("dim", agent.description)} ${theme.fg("dim", "·")} ${theme.fg("dim", parts.join(" · "))}${statusText}`;
+  return `${icon} ${theme.fg("dim", name)}${modelTag(agent, theme)}  ${theme.fg("dim", agent.description)} ${theme.fg("dim", "·")} ${theme.fg("dim", parts.join(" · "))}${statusText}`;
 }
 
 /** Render a single running agent as header + activity line pair (no tree connector prefix). */
 export function renderRunningLines(
   agent: WidgetAgent,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   spinnerFrame: number,
   theme: Theme,
 ): [header: string, activity: string] {
   const name = getDisplayName(agent.type, registry);
-  const modeLabel = getPromptModeLabel(agent.type, registry);
-  const modeTag = modeLabel ? ` ${theme.fg("dim", `(${modeLabel})`)}` : "";
   const elapsed = formatMs(Date.now() - agent.startedAt);
 
   const tokens = getLifetimeTotal(agent.lifetimeUsage);
@@ -135,7 +130,7 @@ export function renderRunningLines(
   const frame = SPINNER[spinnerFrame % SPINNER.length];
   const activityText = describeActivity(agent.activeTools, agent.responseText);
 
-  const header = `${theme.fg("accent", frame)} ${theme.bold(name)}${modeTag}${modelTag(agent, theme)}  ${theme.fg("muted", agent.description)} ${theme.fg("dim", "·")} ${theme.fg("dim", statsText)}`;
+  const header = `${theme.fg("accent", frame)} ${theme.bold(name)}${modelTag(agent, theme)}  ${theme.fg("muted", agent.description)} ${theme.fg("dim", "·")} ${theme.fg("dim", statsText)}`;
   const activityLine = theme.fg("dim", `  ${GLYPHS.subLine}  ${activityText}`);
 
   return [header, activityLine];
@@ -218,7 +213,7 @@ interface WidgetSections {
 /** Render each agent bucket into pre-formatted lines with ├─ tree connectors. */
 function buildSections(
   categories: AgentCategories,
-  registry: AgentConfigLookup,
+  registry: AgentDefinitionLookup,
   spinnerFrame: number,
   theme: Theme,
   truncate: (line: string) => string,
@@ -354,7 +349,7 @@ function assembleOverflow(
 /** Pure rendering of the widget body. Returns lines to display. */
 export function renderWidgetLines(params: {
   agents: readonly WidgetAgent[];
-  registry: AgentConfigLookup;
+  registry: AgentDefinitionLookup;
   spinnerFrame: number;
   terminalWidth: number;
   terminalHeight: number;
