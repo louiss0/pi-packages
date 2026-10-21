@@ -69,4 +69,28 @@ export default [
     ],
     rules: {},
   },
+  {
+    // pi-tiered-subagents carries a runtime recovered from an upstream project
+    // that deliberately relaxed these rules for its own tree: the Pi SDK types
+    // are `Model<any>`-shaped, its `Component` implementations have empty
+    // `invalidate()` bodies by contract, and its test doubles are empty on
+    // purpose. The rules come back as the specified work replaces the
+    // inherited code.
+    files: ['pi-tiered-subagents/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-function': [
+        'error',
+        { allow: ['arrowFunctions', 'functions', 'methods'] },
+      ],
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // A leading underscore marks a parameter the interface requires but the
+      // implementation does not use.
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      'no-control-regex': 'off',
+    },
+  },
 ];
