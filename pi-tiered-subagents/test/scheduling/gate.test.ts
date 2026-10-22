@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WorkspaceGate, workspaceGateFor } from "#src/scheduling/gate";
+import { WorkspaceGate, WorkspaceGateRegistry } from "#src/scheduling/gate";
 
 describe("the workspace's exclusive slot", () => {
   it("is free until a child takes it", () => {
@@ -57,7 +57,8 @@ describe("the workspace's exclusive slot", () => {
   });
 
   it("is one slot per workspace", () => {
-    expect(workspaceGateFor("/repo")).toBe(workspaceGateFor("/repo"));
-    expect(workspaceGateFor("/repo")).not.toBe(workspaceGateFor("/other"));
+    const registry = new WorkspaceGateRegistry();
+    expect(registry.gateFor("/repo")).toBe(registry.gateFor("/repo"));
+    expect(registry.gateFor("/repo")).not.toBe(registry.gateFor("/other"));
   });
 });

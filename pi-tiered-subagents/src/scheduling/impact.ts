@@ -19,17 +19,22 @@
 export type WorkspaceImpact = "read-only" | "file-changing";
 
 /**
+ * The local tools that only read.
+ *
+ * The read-only half of the vocabulary the shipped specialists use: they look
+ * at files without touching them.
+ */
+export const LOCAL_READER_TOOLS = ["read", "grep", "find", "ls"] as const;
+
+/**
  * The tools this package knows only read.
  *
- * The list is the read-only half of the vocabulary the shipped specialists
- * use: the local readers and the web search. Every other name — including
- * names this package has never seen — is treated as able to write.
+ * The local readers, and the web search a researcher may add. Every other
+ * name — including names this package has never seen — is treated as able to
+ * write.
  */
-const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
-  "read",
-  "grep",
-  "find",
-  "ls",
+const KNOWN_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  ...LOCAL_READER_TOOLS,
   "web_search",
   "web_fetch",
 ]);
@@ -44,7 +49,7 @@ export function classifyWorkspaceImpact(
   toolNames: readonly string[],
 ): WorkspaceImpact {
   for (const name of toolNames) {
-    if (!READ_ONLY_TOOLS.has(name)) return "file-changing";
+    if (!KNOWN_READ_ONLY_TOOLS.has(name)) return "file-changing";
   }
   return "read-only";
 }

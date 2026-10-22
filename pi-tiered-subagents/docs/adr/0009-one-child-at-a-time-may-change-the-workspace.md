@@ -23,7 +23,9 @@ Two questions had to be answered before the code could be written.
 whose definition was narrowed to reading changes nothing, and a reviewer
 handed a shell changes everything — so the classification follows the child's
 *effective* tools, the ones it will really have after its definition's
-override.
+override. The tools are resolved once, at the request, and the names travel
+with the child: the runtime and the child cannot disagree about what the
+child may do.
 
 **What about a tool the runtime has never heard of?** A tool name is data, so
 the runtime could ask the session what a tool does — but that is a promise
@@ -38,24 +40,30 @@ governs background runs, and a foreground run deliberately bypasses it: it
 blocks the parent anyway. The workspace slot is not the same kind of rule. A
 foreground child that may change files competes for the same files as a
 background one, so it waits for the slot too — but not for a limiter slot.
+And the slot is taken when the child is about to run, not when it is asked
+for: a child waiting for a concurrency slot is not running, so it holds no
+workspace slot and competes with nobody.
 
 ## Decision
 
 - **The classification follows the effective tools.** The child's tools are
-  resolved the same way the session will resolve them — the definition's
-  selection against the parent's active tools as they were when the request
-  was made — so the runtime and the child never disagree about what the child
-  can do.
-- **Only known readers are read-only.** `read`, `grep`, `find`, `ls`,
-  `web_search`, and `web_fetch` change nothing. Every other name, known or
+  resolved once, at the request — the definition's selection against the
+  parent's active tools as they were when the request was made — and the names
+  travel with the child, so the runtime and the child cannot disagree about
+  what the child may do. A definition edited while the child waited cannot
+  hand it a capability it was never cleared for.
+- **Only known readers are read-only.** The local readers (`read`, `grep`,
+  `find`, `ls`) and the web search change nothing. Every other name, known or
   not, may change files.
 - **One child at a time, per workspace.** The slot is held for the run, not
-  for the request: a child waiting for it is queued, and an aborted child
-  waiting for it never runs and never holds it.
-- **The slot is per workspace, not per parent.** Two parents working in the
-  same directory have children reaching for the same files, so they share one
-  slot. The gate hands the slot straight to the next waiter, so no moment
-  exists in which two children hold it.
+  for the request: a child waiting for a concurrency slot holds no workspace
+  slot, because it is not running. A child aborted while waiting never runs
+  and never holds it.
+- **The slot is per working directory, not per parent.** Two parents working
+  in the same directory have children reaching for the same files, so they
+  share one slot. The registry is handed to the managers the runtime creates —
+  it is a collaborator, not a hidden global — and it keeps one gate per
+  directory the runtime has used.
 - **A resume takes the same slot.** A resumed child reuses its session, and
   with it its tools, so the answer is the one its spawn gave.
 
@@ -69,5 +77,13 @@ background one, so it waits for the slot too — but not for a limiter slot.
 - The rule says nothing about the parent's own edits, another process in the
   same directory, or what a reader sees mid-write. It is a promise about this
   runtime's children only.
+- A child that works in a prepared directory of its own — a worktree from a
+  workspace provider — is classified by the tools it has, but shares the slot
+  of the directory the request was made in. The prepared directory is not
+  known when the request is made, so the promise is made about the directory
+  the parent was in.
 - An extension that ships a read-only tool under a name this package does not
   know takes the exclusive slot until the name is added to the known readers.
+- A child cannot delegate to a child of its own while it holds the slot: the
+  delegation tools are stripped from every child, so the situation cannot
+  arise today.

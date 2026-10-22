@@ -23,7 +23,7 @@ import type {
 } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationManager } from "#src/observation/notification";
-import { WorkspaceGate } from "#src/scheduling/gate";
+import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import type { RunConfig } from "#src/runtime";
 import { GetResultTool } from "#src/tools/get-result-tool";
 import type { AgentDefinition } from "#src/agents/definition";
@@ -123,7 +123,7 @@ function createManager(overrides?: {
     registry: overrides?.registry ?? defaultRegistry(),
     // A gate of its own, so one test's children never hold the slot another
     // test's children wait for.
-    workspaceGate: new WorkspaceGate(),
+    workspaceGates: new WorkspaceGateRegistry(),
   });
   return { manager: mgr, createSubagentSession, limiter };
 }

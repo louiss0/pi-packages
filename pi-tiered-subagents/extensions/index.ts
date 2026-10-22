@@ -52,6 +52,7 @@ import {
   unpublishSubagentsService,
 } from "#src/service/service";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
+import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import { detectEnv } from "#src/session/env";
 import type { FamilyProfile } from "#src/models/profile";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
@@ -298,12 +299,18 @@ export default function (pi: ExtensionAPI) {
   // It knows nothing about agents or the manager — dependency direction is strictly manager → limiter.
   const limiter = new ConcurrencyLimiter(() => settings.maxConcurrent);
 
+  // The workspace gates of this runtime: one per working directory, so the
+  // children of two parents in one directory share the slot that keeps two
+  // writers from reaching for the same files at once.
+  const workspaceGates = new WorkspaceGateRegistry();
+
   const manager = new SubagentManager({
     createSubagentSession: (params) =>
       createSubagentSession(params, subagentSessionDeps),
     baseCwd: process.cwd(),
     observer,
     limiter,
+    workspaceGates,
     getRunConfig: () => settings,
     getRetentionPolicy: () => settings,
     registry,

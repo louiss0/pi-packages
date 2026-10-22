@@ -30,7 +30,7 @@ import {
 import type { RunKind } from "#src/lifecycle/subagent-run";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
-import { WorkspaceGate, workspaceGateFor } from "#src/scheduling/gate";
+import { WorkspaceGate, WorkspaceGateRegistry } from "#src/scheduling/gate";
 import {
   classifyWorkspaceImpact,
   type WorkspaceImpact,
@@ -98,6 +98,23 @@ interface ResolvedSpawn {
   isBackground: boolean;
   /** The tools the child will get — the basis of its workspace impact. */
   tools: ToolSelection;
+}
+
+/**
+ * What a child may change, and where.
+ *
+ * The plan a child's admission follows: the slot it takes when it may change
+ * files, and the lever that ends its wait.
+ */
+interface WorkspacePlan {
+  /** The slot of the workspace the child works in. */
+  readonly gate: WorkspaceGate;
+  /** What the child's tools may change. */
+  readonly impact: WorkspaceImpact;
+  /** The child's id — the slot's holder while the child runs. */
+  readonly id: string;
+  /** The lever that cancels a wait for the slot. */
+  readonly signal: AbortSignal | undefined;
 }
 
 /**
@@ -213,12 +230,13 @@ export interface SubagentManagerOptions {
    */
   reloadDefinitions?: () => void;
   /**
-   * The exclusive slot a child that may change files holds.
+   * The gates of the workspaces this runtime's children work in.
    *
-   * Defaults to the gate for the manager's own working directory, so two
-   * parents working in the same directory share one slot.
+   * One registry for the whole runtime, so the children of two parents
+   * working in the same directory share one slot. A manager without one gets
+   * a registry of its own, which is enough for its own children.
    */
-  workspaceGate?: WorkspaceGate;
+  workspaceGates?: WorkspaceGateRegistry;
 }
 
 export interface AgentSpawnConfig {
@@ -269,14 +287,14 @@ export class SubagentManager {
    * One per workspace, not per manager: two parents in the same directory
    * have children reaching for the same files.
    */
-  private readonly workspaceGate: WorkspaceGate;
+  private readonly workspaceGates: WorkspaceGateRegistry;
   /**
-   * What each record may change, decided when it was spawned.
+   * What each record may change, and in which workspace.
    *
    * A resume reuses the child's session, so the tools it will use are the
    * ones it was spawned with — the answer is recorded once, at the spawn.
    */
-  private readonly workspaceImpacts = new Map<string, WorkspaceImpact>();
+  private readonly workspacePlans = new Map<string, WorkspacePlan>();
   private _workspaceProvider?: WorkspaceProvider;
 
   /** The registered workspace provider, or undefined when none is registered. */
@@ -293,8 +311,7 @@ export class SubagentManager {
     this.getRetentionPolicy = options.getRetentionPolicy;
     this.registry = options.registry;
     this.reloadDefinitions = options.reloadDefinitions;
-    this.workspaceGate =
-      options.workspaceGate ?? workspaceGateFor(options.baseCwd);
+    this.workspaceGates = options.workspaceGates ?? new WorkspaceGateRegistry();
     // Periodically release the heavy session of terminal agents past their
     // retention window. The lightweight record (with its result) is kept for the
     // session lifetime, so get_subagent_result never misses in-session.
@@ -445,13 +462,22 @@ export class SubagentManager {
   ): string {
     const { type, isBackground } = resolved;
     const id = randomUUID().slice(0, 17);
-    // What this child may change, decided from the tools it will really have.
-    // The parent's active tools are the ones captured when the request was
-    // made, so a child queued behind another one is classified as it was.
-    const impact = classifyWorkspaceImpact(
-      resolveChildToolNames(resolved.tools, snapshot.activeToolNames),
+    // The tools this child will have, resolved once, here: the definition's
+    // selection against the parent's active tools as they were when the
+    // request was made. The child is given exactly these names, so the
+    // runtime and the child can never disagree about what it may do — and a
+    // definition edited while the child waited cannot hand it a shell it was
+    // not cleared for.
+    const toolNames = resolveChildToolNames(
+      resolved.tools,
+      snapshot.activeToolNames,
     );
-    this.workspaceImpacts.set(id, impact);
+    const impact = classifyWorkspaceImpact(toolNames);
+    // The workspace the child works in: the parent's directory when the
+    // request was made. Two parents in one directory share one slot.
+    const gate = this.workspaceGates.gateFor(snapshot.cwd);
+    const plan: WorkspacePlan = { gate, impact, id, signal: options.signal };
+    this.workspacePlans.set(id, plan);
     const record = new Subagent({
       id,
       type,
@@ -470,6 +496,7 @@ export class SubagentManager {
         thinkingLevel: options.thinkingLevel,
         parentSession: options.parentSession,
         signal: options.signal,
+        toolNames,
       },
     });
     this.agents.set(id, record);
@@ -481,9 +508,11 @@ export class SubagentManager {
     if (isBackground && !options.bypassQueue) {
       // Schedule on the limiter — scheduleVia captures the limiter promise
       // eagerly, so a queued agent is awaitable from spawn; guardedRun guards
-      // against abort-while-queued when the slot frees.
+      // against abort-while-queued when the slot frees. The workspace slot is
+      // taken inside the scheduled task, so a child waiting for a concurrency
+      // slot holds no workspace slot.
       record.scheduleVia((thunk) =>
-        this.admit(id, impact, options.signal, this.admitBackground, thunk),
+        this.admitBackground(() => this.admit(plan, thunk)),
       );
       return id;
     }
@@ -491,9 +520,7 @@ export class SubagentManager {
     // A foreground child skips the concurrency queue, but not the workspace's
     // exclusive slot: two children that may change the same files must not
     // run at once, however they were launched.
-    record.scheduleVia((thunk) =>
-      this.admit(id, impact, options.signal, undefined, thunk),
-    );
+    record.scheduleVia((thunk) => this.admit(plan, thunk));
     return id;
   }
 
@@ -501,32 +528,38 @@ export class SubagentManager {
    * Admit a run: take the workspace's exclusive slot when the child may
    * change files, then run it.
    *
-   * The slot is taken before the run starts and given up when it ends, so two
-   * children that may write never overlap. A read-only child skips the slot
-   * entirely and runs with the others.
+   * The slot is held for the run and given up when it ends, so two children
+   * that may write never overlap. A read-only child skips the slot entirely
+   * and runs with the others.
    *
-   * A wait cancelled by the caller's signal ends the child's turn without
-   * taking the slot: the run still starts (and stops at once), so the record
-   * settles rather than waiting for a slot nobody will grant.
+   * A wait cancelled by the caller's signal gives the slot up without taking
+   * it. The run is still entered, but the signal has already fired: the run
+   * ends before it prepares a workspace or creates a session, so the child
+   * does nothing and the record settles.
    */
   private admit(
-    id: string,
-    impact: WorkspaceImpact,
-    signal: AbortSignal | undefined,
-    schedule: RunScheduler | undefined,
+    plan: WorkspacePlan,
     thunk: () => Promise<void>,
   ): Promise<void> {
-    const start = schedule ? () => schedule(thunk) : thunk;
-    if (impact === "read-only") return start();
+    if (plan.impact === "read-only") return thunk();
+    const { gate, id, signal } = plan;
     // A free slot is taken now, so the run starts in the same turn it always
     // did; only a child that has to wait starts later.
-    if (this.workspaceGate.tryAcquire(id)) {
-      return start().finally(() => this.workspaceGate.release(id));
+    if (gate.tryAcquire(id)) {
+      return this.runWithSlot(plan, thunk);
     }
-    return this.workspaceGate.acquire(id, signal).then((granted) => {
-      if (!granted) return start();
-      return start().finally(() => this.workspaceGate.release(id));
+    return gate.acquire(id, signal).then((granted) => {
+      if (!granted) return thunk();
+      return this.runWithSlot(plan, thunk);
     });
+  }
+
+  /** Run the child, giving the workspace slot up when the run ends. */
+  private runWithSlot(
+    plan: WorkspacePlan,
+    thunk: () => Promise<void>,
+  ): Promise<void> {
+    return thunk().finally(() => plan.gate.release(plan.id));
   }
 
   /**
@@ -575,8 +608,17 @@ export class SubagentManager {
     // missing session, which resumeRefusal has already refused as no-session.
     // A resumed child may change files just as its first run could, so it
     // takes the same exclusive slot. The impact was decided at the spawn:
-    // a resume reuses the session, and with it the child's tools.
-    const impact = this.workspaceImpacts.get(id) ?? "file-changing";
+    // a resume reuses the session, and with it the child's tools. A record
+    // with no plan is treated as a writer, which is the safe direction.
+    const plan = this.workspacePlans.get(id);
+    const gate = plan?.gate ?? this.workspaceGates.gateFor(this.baseCwd);
+    const impact = plan?.impact ?? "file-changing";
+    const resumePlan: WorkspacePlan = {
+      gate,
+      impact,
+      id,
+      signal: options.signal,
+    };
     const schedule = options.background ? this.admitBackground : undefined;
     void agent.resume(
       prompt,
@@ -585,7 +627,9 @@ export class SubagentManager {
         signal: options.signal,
         claimOutcome: options.claimOutcome,
       },
-      (thunk) => this.admit(id, impact, options.signal, schedule, thunk),
+      schedule
+        ? (thunk) => schedule(() => this.admit(resumePlan, thunk))
+        : (thunk) => this.admit(resumePlan, thunk),
     );
     return { kind: "started", record: agent };
   }
@@ -620,6 +664,9 @@ export class SubagentManager {
    */
   private removeRecord(id: string, record: Subagent): Promise<void> {
     this.agents.delete(id);
+    // The plan goes with the record: it described this child's workspace and
+    // its capabilities, and neither outlives the child.
+    this.workspacePlans.delete(id);
     return record.disposeSession();
   }
 

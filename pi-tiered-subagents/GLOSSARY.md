@@ -97,6 +97,25 @@ registry, the active tool names, the working directory, the prompt, and the
 conversation when the child is to inherit it. A queued child runs with the
 snapshot, not with the parent as it is when the child's slot opens.
 
+## Workspace impact
+
+What a child may change, decided from its **effective tools** — the ones it
+will really have, after its definition's override. A child is **read-only**
+when every tool it holds is known to only read, and **file-changing**
+otherwise: a shell, an editor, and any tool this package has never heard of
+all change files.
+
+## Exclusive slot
+
+The one-at-a-time rule for children that may change files, held per working
+directory: while one child that may write is running, another waits. The slot
+belongs to the directory, not to the parent, so two parents working in the
+same directory share it.
+
+This is not the **workspace** a workspace provider prepares for a child (the
+directory a child works in, when it is given one of its own): the slot is
+about the directory the request was made in.
+
 ## Related documents
 
 - [SPEC.md](docs/SPEC.md) — the approved requirements.

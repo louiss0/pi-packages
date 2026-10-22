@@ -207,6 +207,14 @@ export interface CreateSubagentSessionParams {
   notifyParent?: UpdateAnnouncer;
   /** The caller's turn-limit inputs, resolved with the agent's own limit into the session's. */
   turnLimits?: TurnLimitRequest;
+  /**
+   * The tools the child was given, resolved when the request was made.
+   *
+   * The door resolves the effective selection once, so the child runs with
+   * exactly the tools the runtime classified it by. Absent, the assembler
+   * resolves the definition's selection itself.
+   */
+  toolNames?: readonly string[];
 }
 
 /**
@@ -253,6 +261,7 @@ export async function createSubagentSession(
       parentModel: snapshot.model,
       modelRegistry: snapshot.modelRegistry,
       activeToolNames: snapshot.activeToolNames,
+      toolNames: params.toolNames,
       resolvePromptInheritance: deps.resolvePromptInheritance,
     },
     {

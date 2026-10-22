@@ -127,6 +127,14 @@ export interface SubagentExecution {
   thinkingLevel?: ThinkingLevel;
   parentSession?: ParentSessionInfo;
   signal?: AbortSignal;
+  /**
+   * The tools the child was given, resolved when the request was made.
+   *
+   * The manager resolves the effective selection once, so the child runs with
+   * exactly the tools the runtime classified it by. Absent, the session
+   * factory resolves the definition's selection itself.
+   */
+  toolNames?: readonly string[];
 }
 
 /**
@@ -527,6 +535,7 @@ export class Subagent {
           defaultMaxTurns: runConfig?.defaultMaxTurns,
           wrapUpTurns: runConfig?.wrapUpTurns,
         },
+        toolNames: this.execution.toolNames,
       });
     } catch (err) {
       // The factory disposed its own session on a post-creation failure.

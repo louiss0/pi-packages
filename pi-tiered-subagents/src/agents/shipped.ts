@@ -13,9 +13,10 @@
  */
 
 import type { AgentDefinition } from "#src/agents/definition";
+import { LOCAL_READER_TOOLS } from "#src/scheduling/impact";
 
 /** The tools a read-only investigator uses. */
-const READ_TOOLS = ["read", "grep", "find", "ls"] as const;
+const READ_TOOLS = LOCAL_READER_TOOLS;
 
 /** The tools a read-only reviewer uses — no directory listing needed. */
 const REVIEW_TOOLS = ["read", "grep", "find"] as const;

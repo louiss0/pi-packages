@@ -173,20 +173,28 @@ Recorded in [adr/](adr/):
 
 ## The workspace scheduling
 
-`src/scheduling/` decides when a child may run.
+`src/scheduling/` decides what a child may change; the manager admits the
+child according to that decision.
 
 | Rule | Stories | State |
 | --- | --- | --- |
-| One child at a time may change the workspace | 52 | Done. A child that may change files holds the workspace's exclusive slot for its run; children that only read run alongside it. The slot is per workspace, so two parents in one directory share it. |
-| The classification follows the tools, not the role | 53 | Done. The child's effective tools — the definition's selection against the parent's active tools as they were when the request was made — decide, so an override cannot slip past the rule. |
-| A shell and an unknown tool count as writers | 54 | Done. Only the tools this package knows to be read-only (`read`, `grep`, `find`, `ls`, `web_search`, `web_fetch`) are read-only; everything else takes the slot. |
+| One child at a time may change the workspace | 52 | Done. A child that may change files holds the workspace's exclusive slot for its run; children that only read run alongside it. The slot belongs to the working directory the request was made in, so two parents in one directory share it. |
+| The classification follows the tools, not the role | 53 | Done. The child's effective tools — the definition's selection against the parent's active tools as they were when the request was made — decide, so an override cannot slip past the rule. The names travel with the child, so the runtime and the child cannot disagree. |
+| A shell and an unknown tool count as writers | 54 | Done. Only the tools this package knows to be read-only (the local readers and the web search) are read-only; everything else takes the slot. |
 
 The rule is a scheduling promise between this runtime's children, not a
 sandbox: it does not coordinate the parent's own edits, another process in the
 same directory, or what a reader sees while a writer works. A foreground
 child waits for the slot too — it bypasses the concurrency limit, not the
-workspace — and a child aborted while waiting never runs and never holds the
-slot.
+workspace — and the slot is taken when the child is about to run, so a child
+waiting for a concurrency slot holds none. A child aborted while waiting
+never runs and never holds the slot, and a resume takes the same slot, because
+a resumed child reuses the tools it was spawned with.
+
+A child that works in a prepared directory of its own — a worktree from a
+workspace provider — is classified by the tools it has, but shares the slot of
+the directory the request was made in: the prepared directory is not known
+when the request is made.
 
 Recorded in [adr/0009](adr/0009-one-child-at-a-time-may-change-the-workspace.md).
 

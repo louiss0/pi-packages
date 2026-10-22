@@ -72,6 +72,9 @@ export class WorkspaceGate {
       this.holder = id;
       return Promise.resolve(true);
     }
+    // A signal that has already fired will never fire again, so the wait
+    // would never end: it ends now instead.
+    if (signal?.aborted) return Promise.resolve(false);
     return new Promise<boolean>((resolveWait) => {
       const waiter: Waiter = {
         id,
@@ -108,21 +111,36 @@ export class WorkspaceGate {
   }
 }
 
-/** The gates of the workspaces this process has children in. */
-const gates = new Map<string, WorkspaceGate>();
-
 /**
- * The gate for a workspace.
+ * The gates of the workspaces a process has children in.
  *
- * Keyed by the resolved directory, so two parents working in the same
- * directory share one slot: the children of both compete for the same files.
+ * One registry per runtime, handed to the managers it creates: the children
+ * of two parents working in the same directory share one slot, because they
+ * reach for the same files.
  */
-export function workspaceGateFor(cwd: string): WorkspaceGate {
-  const key = resolve(cwd);
-  let gate = gates.get(key);
-  if (!gate) {
-    gate = new WorkspaceGate();
-    gates.set(key, gate);
+export class WorkspaceGateRegistry {
+  private readonly gates = new Map<string, WorkspaceGate>();
+
+  /**
+   * The gate for a workspace.
+   *
+   * Keyed by the resolved directory, so two parents working in the same
+   * directory share one slot: the children of both compete for the same
+   * files.
+   *
+   * The registry keeps one entry per directory it has been asked about. An
+   * entry is never replaced — a gate that is handed out and given back stays
+   * the gate that directory uses — so the number of entries is the number of
+   * workspaces, which is small, and the promise holds for as long as the
+   * runtime runs.
+   */
+  gateFor(cwd: string): WorkspaceGate {
+    const key = resolve(cwd);
+    let gate = this.gates.get(key);
+    if (!gate) {
+      gate = new WorkspaceGate();
+      this.gates.set(key, gate);
+    }
+    return gate;
   }
-  return gate;
 }

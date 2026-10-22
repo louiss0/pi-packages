@@ -82,6 +82,16 @@ export interface AssemblerContext {
    * for — not the ones it has now.
    */
   activeToolNames: readonly string[];
+  /**
+   * The tools the child was given, resolved when the request was made.
+   *
+   * The door resolves the effective selection once — the definition's
+   * selection against the parent's captured tools — and passes the names
+   * here, so the child runs with exactly the tools the runtime classified
+   * it by. A definition edited while the child waited cannot hand it a
+   * capability it was never cleared for.
+   */
+  toolNames?: readonly string[];
 }
 
 /**
@@ -156,10 +166,13 @@ export function assembleSessionConfig(
 
   const effectiveCwd = options.cwd ?? ctx.cwd;
 
-  const toolNames = resolveChildToolNames(
-    definition.tools,
-    ctx.activeToolNames,
-  );
+  // The tools the child gets: the names the door resolved when the request
+  // was made, or — when the door resolved none — the definition's selection
+  // against the parent's captured tools.
+  const toolNames =
+    ctx.toolNames !== undefined
+      ? [...ctx.toolNames]
+      : resolveChildToolNames(definition.tools, ctx.activeToolNames);
 
   // Model resolution: explicit option > config model string > parent model.
   // Resolved before the prompt because the child's provider is what selects a
