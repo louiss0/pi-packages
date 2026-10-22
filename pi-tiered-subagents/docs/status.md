@@ -181,7 +181,7 @@ the package's own vocabulary.
 | --- | --- | --- |
 | The shared store holds the operational settings and the family profiles | 75 | Done. The settings live in the store's two files — the operator's and the project's — under this package's name. This package keeps no settings file of its own. |
 | A project overrides one family without discarding the others | 76 | Done. The two files are read on their own, and the profiles merge per family. |
-| A named profile is replaced as a whole | 77 | Done. A family in the project's scope replaces that family's profile entirely; nothing is merged into it. |
+| A named profile is replaced as a whole | 77 | Done. A family in the project's file replaces that family's profile entirely; nothing is merged into it. |
 | A profile is added with the shipped schema | 78 | Done. A profile is data: the same schema the shipped profiles use, validated by the model domain. |
 | Profiles are data, never code | 79 | Done. The schema names what a profile may contain; a value it does not name is ignored, never evaluated. |
 

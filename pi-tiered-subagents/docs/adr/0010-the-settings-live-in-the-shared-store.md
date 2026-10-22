@@ -20,8 +20,8 @@ an operator with several extensions has to look in several places.
 The specification names the shared store as the single backend. Before the
 code could be written, three things had to be answered.
 
-**What does the shared store hold?** Strings. One file per scope — the
-operator's `<agentDir>/settings-extensions.json` and the project's
+**What does the shared store hold?** Strings. One file for the operator —
+`<agentDir>/settings-extensions.json` — and one for the project —
 `<cwd>/.pi/settings-extensions.json` — keyed by extension name and then by
 setting id. Every value is text, so the settings that carry structure (the
 family profiles, the excluded packages, the prompt-inheritance map) are
@@ -38,7 +38,7 @@ operational settings then merge per setting, the project's over the
 operator's, and the family profiles merge per family, so a project replaces
 one family and leaves the operator's others alone.
 
-**What about the project's trust?** The project's scope is only read when Pi
+**What about the project's trust?** The project's file is only read when Pi
 has granted the project trust. The trust decision is a session fact, so the
 settings are read again when the session starts.
 
@@ -83,9 +83,9 @@ import was verified under Pi's loader before this decision was taken.
   `[]` clears what the operator declared, and the empty list stays empty.
 - The store owns its file's error handling: a malformed file is ignored
   quietly, where the inherited loader warned about it.
-- The store keeps what it was given and never removes a key, so a value that
-  is no longer written stays in the file. A setting that is cleared is
-  written as an empty value.
+- The store keeps what it was given and never removes a key, so a value the
+  package no longer writes stays in the file, and a value that is cleared is
+  written as an empty one.
 - The inherited generic loader (`loadLayeredSettings`) is still exported for
   other packages that read their own files; it is no longer this package's
   backend.
