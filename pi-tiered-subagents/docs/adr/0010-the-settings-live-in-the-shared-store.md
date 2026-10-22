@@ -30,8 +30,11 @@ serialized as JSON in one place, the adapter, and nowhere else.
 **How are the layers merged?** The store's own convenience reads the project
 and falls back to the operator's file, per setting. That is right for the
 operational settings and wrong for the family profiles: a project replaces one
-family and leaves the operator's others alone. So both scopes are read
-separately and the profiles are merged per family.
+family and leaves the operator's others alone. So the operator's file is read
+on its own, the project's file is read through the store's fallback, and the
+two are compared: the families the project declares are the ones that differ
+from the operator's. A project that declares a family exactly as the operator
+has it is read as declaring nothing — the same profile either way.
 
 **What about the project's trust?** The project's scope is only read when Pi
 has granted the project trust. The trust decision is a session fact, so the
@@ -44,14 +47,21 @@ extension has to be loaded first. The store's own file access does not depend
 on that: the settings are read and written either way, and only the menu that
 edits them is missing.
 
+The store's runtime entry point is its TypeScript source, not compiled
+JavaScript, so a consumer has to load it with a TypeScript-aware loader.
+Pi's own loader is one, and the package's tests run under another: the
+import was verified under Pi's loader before this decision was taken.
+
 ## Decision
 
 - **The shared store is the only backend.** The settings module reads and
   writes through a small adapter over the store; it keeps no path of its own.
 - **The adapter is the only place that serializes.** Everything above it
   speaks in the package's own vocabulary.
-- **The scopes are read separately.** The operational settings merge per
-  setting; the family profiles merge per family.
+- **The operator's file is read on its own.** The store's project scope falls
+  back to it, so the two reads are compared when the project's own layer
+  matters. The family profiles merge per family; the operational settings
+  merge per setting, the store's own layering.
 - **A save writes the project's own layer.** The operator's families are not
   copied into the project's file, where they would outlive a later change to
   the operator's own settings.

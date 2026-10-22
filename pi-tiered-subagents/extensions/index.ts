@@ -82,7 +82,6 @@ import { SessionNavigatorHandler } from "#src/ui/session-navigator";
 import { SubagentsSettingsHandler } from "#src/ui/subagents-settings";
 
 export default function (pi: ExtensionAPI) {
-  // ---- Register with the shared settings UI ----
   /**
    * Publishes this package's settings to the shared settings extension, so
    * they can be edited where the other extensions' settings are edited.

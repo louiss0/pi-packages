@@ -295,12 +295,20 @@ An agent that asked a question and has not been answered holds the safety cap ra
 
 Set `midRunUpdates` to `false` to withhold `notify_parent` from every agent, leaving them no way to tell you anything before they finish.
 `ask_parent` is unaffected: a blocked agent can still end its turn with a question.
-Two files, merged on load:
+Two scopes, merged on load:
 
-- **Global:** `~/.pi/agent/subagents.json` — your machine-wide defaults.
+- **Global:** `~/.pi/agent/settings-extensions.json` — your machine-wide defaults,
+  under this package's name (`pi-tiered-subagents`).
   Edit by hand; the `/subagents:settings` command never writes here.
-- **Project:** `<cwd>/.pi/subagents.json` — per-project overrides.
+- **Project:** `<cwd>/.pi/settings-extensions.json` — per-project overrides, under
+  the same name.
   Written by `/subagents:settings`.
+
+The files belong to `@juanibiapina/pi-extension-settings`, the store every
+extension can share: one file holds the settings of every extension that uses
+it. The values are text — a number is written as its text, and a value that
+carries structure (the family profiles, `excludedExtensionPackages`,
+`promptInheritance`) is JSON.
 
 **Precedence:** project overrides global on any field present in both.
 Missing fields fall back to the hardcoded defaults (max concurrency `4`, default max turns unlimited, wrap-up turns `2`, consumed-session retention `10` minutes, unconsumed-session retention `720` minutes, abort-all-on-interrupt `true`, mid-run updates `true`).
@@ -309,13 +317,15 @@ Missing fields fall back to the hardcoded defaults (max concurrency `4`, default
 
 ```bash
 mkdir -p ~/.pi/agent
-cat > ~/.pi/agent/subagents.json <<'EOF'
+cat > ~/.pi/agent/settings-extensions.json <<'EOF'
 {
-  "maxConcurrent": 16,
-  "wrapUpTurns": 3,
-  "unconsumedSessionRetentionMinutes": 1440,
-  "abortAllOnInterrupt": false,
-  "midRunUpdates": true
+  "pi-tiered-subagents": {
+    "maxConcurrent": "16",
+    "wrapUpTurns": "3",
+    "unconsumedSessionRetentionMinutes": "1440",
+    "abortAllOnInterrupt": "false",
+    "midRunUpdates": "true"
+  }
 }
 EOF
 ```
@@ -323,11 +333,14 @@ EOF
 Every project now starts with concurrency 16, a three-turn wrap-up warning, and ESC left to the parent, without ever touching the command.
 Individual projects can still override via `/subagents:settings`.
 
+The same values are editable in the shared `/extension-settings` menu, when
+that extension is installed and loaded before this one.
+
 `wrapUpTurns` is how many turns an agent has left when it is warned about its budget; see [Turn Budget](../README.md#turn-budget).
-It replaced `graceTurns`, which allowed extra turns past `max_turns`: a file that still sets `graceTurns` logs a `[pi-subagents] graceTurns was removed…` warning and the key is ignored, so replace it with `wrapUpTurns`.
+It replaced `graceTurns`, which allowed extra turns past `max_turns`: a setting that still sets `graceTurns` logs a `[pi-subagents] graceTurns was removed…` warning and the value is ignored, so replace it with `wrapUpTurns`.
 A `defaultMaxTurns` of `1` runs with `2`, the minimum, and logs a warning.
 
-**Failure behavior:** missing file is silent; malformed JSON logs a `[pi-subagents] Ignoring malformed settings at …` warning to stderr; invalid/out-of-range field values are dropped per-field; write failures downgrade the `/subagents:settings` toast to a warning with `(session only; failed to persist)`.
+**Failure behavior:** a missing file is silent; a malformed file is ignored by the store, quietly; invalid/out-of-range field values are dropped per-field; write failures downgrade the `/subagents:settings` toast to a warning with `(session only; failed to persist)`.
 
 ### Excluding package extensions from children
 
@@ -353,7 +366,7 @@ What this does and does not do:
 - Excluding a package keeps the **tools** that extension registers out of child sessions too: its factory never runs there, so an agent that names one of those tools in [`tools`](#tool-selection) gets nothing.
   If you need the tools but want the extension's resources released when the child is disposed, exclusion is the wrong lever — see [Child session lifecycle](../README.md#child-session-lifecycle).
 
-This key is hand-edited in the global or project `subagents.json`; `/subagents:settings` does not expose it, but it is preserved when you change other settings there.
+This key is hand-edited in the global or project `settings-extensions.json`; `/subagents:settings` does not expose it, but it is preserved when you change other settings there.
 An absent or empty list reproduces the default behavior, in which children inherit every parent extension.
 
 The same is true of [`promptInheritance`](#portable-inheritance-opt-in): hand-edited only, preserved across other settings changes, and absent means every child inherits the full parent identity.

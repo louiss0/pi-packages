@@ -6,10 +6,25 @@
 
 import { isBelowMinimumTurns, MIN_MAX_TURNS } from "#src/lifecycle/turn-limits";
 import {
+  BOOLEAN_SETTING_IDS,
+  DEFAULT_ABORT_ALL_ON_INTERRUPT,
+  DEFAULT_CONSUMED_RETENTION_MINUTES,
+  DEFAULT_MAX_CONCURRENT,
+  DEFAULT_MID_RUN_UPDATES,
+  DEFAULT_UNCONSUMED_RETENTION_MINUTES,
+  DEFAULT_WRAP_UP_TURNS,
+  JSON_SETTING_IDS,
+  NUMBER_SETTING_IDS,
+  readBoolean,
+  readJson,
+  readNumber,
   readSetting,
+  RETIRED_SETTING_ID,
   type SharedScope,
   type SharedScopes,
-  writeSetting,
+  writeBoolean,
+  writeJson,
+  writeNumber,
 } from "#src/shared-settings";
 import type { PromptInheritance } from "#src/types";
 export interface SubagentsSettings {
@@ -96,13 +111,6 @@ export interface SettingsSnapshot {
 
 /** Emit callback — a subset of `pi.events.emit` to keep helpers testable. */
 export type SettingsEmit = (event: string, payload: unknown) => void;
-
-const DEFAULT_MAX_CONCURRENT = 4;
-const DEFAULT_WRAP_UP_TURNS = 2;
-const DEFAULT_CONSUMED_RETENTION_MINUTES = 10;
-const DEFAULT_UNCONSUMED_RETENTION_MINUTES = 720;
-const DEFAULT_ABORT_ALL_ON_INTERRUPT = true;
-const DEFAULT_MID_RUN_UPDATES = true;
 
 /**
  * Owns all three in-memory settings values and their load/save/persist cycle.
@@ -534,75 +542,28 @@ function sanitizePromptInheritance(
   return Object.keys(rules).length > 0 ? rules : undefined;
 }
 
-/**
- * The setting ids this package keeps in the shared store.
- *
- * Every value in the store is a string, so the ids name the settings and the
- * values are the operator's own text.
- */
-const NUMBER_SETTINGS = [
-  "maxConcurrent",
-  "defaultMaxTurns",
-  "wrapUpTurns",
-  "consumedSessionRetentionMinutes",
-  "unconsumedSessionRetentionMinutes",
-] as const;
-
-const BOOLEAN_SETTINGS = ["abortAllOnInterrupt", "midRunUpdates"] as const;
-
-/** The settings that carry structure, and are therefore stored as JSON text. */
-const JSON_SETTINGS = [
-  "excludedExtensionPackages",
-  "promptInheritance",
-  "familyProfiles",
-] as const;
-
 /** Read one scope of the shared store as the settings it holds. */
 function readScope(
   scope: SharedScope,
   scopes: SharedScopes,
 ): SubagentsSettings {
   const raw: Record<string, unknown> = {};
-  for (const id of NUMBER_SETTINGS) {
-    const text = readSetting(id, scope, scopes);
-    if (text === undefined) continue;
-    const value = Number(text);
-    if (Number.isFinite(value)) raw[id] = value;
+  for (const id of NUMBER_SETTING_IDS) {
+    const value = readNumber(id, scope, scopes);
+    if (value !== undefined) raw[id] = value;
   }
-  for (const id of BOOLEAN_SETTINGS) {
-    const text = readSetting(id, scope, scopes);
-    if (text === undefined) continue;
-    if (text === "true") raw[id] = true;
-    else if (text === "false") raw[id] = false;
+  for (const id of BOOLEAN_SETTING_IDS) {
+    const value = readBoolean(id, scope, scopes);
+    if (value !== undefined) raw[id] = value;
   }
-  for (const id of JSON_SETTINGS) {
-    const text = readSetting(id, scope, scopes);
-    if (text === undefined) continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(text);
-    } catch {
-      // A value that is not JSON is not a value this package understands:
-      // it is dropped, like any other malformed setting.
-      continue;
-    }
-    // An empty list or an empty object says what an absent setting says, so
-    // it is dropped rather than carried as an empty value.
-    if (Array.isArray(value) && value.length === 0) continue;
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      Object.keys(value).length === 0
-    ) {
-      continue;
-    }
-    raw[id] = value;
+  for (const id of JSON_SETTING_IDS) {
+    const value = readJson(id, scope, scopes);
+    if (value !== undefined) raw[id] = value;
   }
   // A setting this version no longer reads is still worth naming: the
   // operator is told what to use instead.
-  if (readSetting("graceTurns", scope, scopes) !== undefined) {
-    raw.graceTurns = true;
+  if (readSetting(RETIRED_SETTING_ID, scope, scopes) !== undefined) {
+    raw[RETIRED_SETTING_ID] = true;
   }
   return sanitize(raw);
 }
@@ -624,6 +585,44 @@ function mergeScopes(
         }
       : {}),
   };
+}
+
+/**
+ * The profiles the project's own file declares.
+ *
+ * The shared store reads the project's file and falls back to the operator's
+ * file, so a read of the project's scope answers with the operator's
+ * profiles when the project declares none. The two are therefore compared:
+ * the project's own profiles are the ones that differ from the operator's.
+ *
+ * A project that declares a family exactly as the operator has it is read as
+ * declaring nothing — the two are the same profile, so the outcome is the
+ * same either way.
+ */
+function projectOwnProfiles(
+  global: SubagentsSettings,
+  project: SubagentsSettings,
+): Record<string, unknown> | undefined {
+  const operator = global.familyProfiles;
+  const declared = project.familyProfiles;
+  if (!declared) return undefined;
+  if (operator && sameProfiles(operator, declared)) return undefined;
+  return { ...declared };
+}
+
+/** Whether two sets of profiles hold the same families with the same data. */
+function sameProfiles(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+): boolean {
+  return JSON.stringify(sorted(left)) === JSON.stringify(sorted(right));
+}
+
+/** The profiles with their families in a fixed order, so two can be compared. */
+function sorted(profiles: Record<string, unknown>): unknown {
+  return Object.keys(profiles)
+    .sort()
+    .map((family) => [family, profiles[family]]);
 }
 
 /**
@@ -669,7 +668,7 @@ export function loadSettingsLayers(
   const project = trusted ? readScope("local", scopes) : {};
   return {
     settings: mergeScopes(global, project),
-    projectFamilyProfiles: project.familyProfiles,
+    projectFamilyProfiles: projectOwnProfiles(global, project),
   };
 }
 
@@ -684,39 +683,31 @@ export function saveSettings(
   s: SubagentsSettings,
   cwd: string = process.cwd(),
 ): boolean {
+  // Only the project's file is written, so the operator's directory is never
+  // reached: the store looks at it only for the global scope.
   const scopes: SharedScopes = { agentDir: "", cwd };
   try {
-    for (const id of NUMBER_SETTINGS) {
+    for (const id of NUMBER_SETTING_IDS) {
       const value = s[id];
       if (value === undefined) continue;
-      writeSetting(id, String(value), "local", scopes);
+      writeNumber(id, value, "local", scopes);
     }
-    for (const id of BOOLEAN_SETTINGS) {
+    for (const id of BOOLEAN_SETTING_IDS) {
       const value = s[id];
       if (value === undefined) continue;
-      writeSetting(id, value ? "true" : "false", "local", scopes);
+      writeBoolean(id, value, "local", scopes);
     }
     // A setting that is no longer set is written as an empty value rather
     // than left behind: the store keeps what it was given, so a cleared
     // setting would otherwise survive the next load.
-    writeSetting(
+    writeJson(
       "excludedExtensionPackages",
-      JSON.stringify(s.excludedExtensionPackages ?? []),
+      s.excludedExtensionPackages ?? [],
       "local",
       scopes,
     );
-    writeSetting(
-      "promptInheritance",
-      JSON.stringify(s.promptInheritance ?? {}),
-      "local",
-      scopes,
-    );
-    writeSetting(
-      "familyProfiles",
-      JSON.stringify(s.familyProfiles ?? {}),
-      "local",
-      scopes,
-    );
+    writeJson("promptInheritance", s.promptInheritance ?? {}, "local", scopes);
+    writeJson("familyProfiles", s.familyProfiles ?? {}, "local", scopes);
     return true;
   } catch {
     return false;

@@ -4,7 +4,7 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,246-test characterization suite against Pi 1.3.0.
+> typechecks, and passes a 2,248-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
 > the reasoning level that follows it, the capability-based workspace
@@ -51,7 +51,7 @@ v25.0.1, which is itself a friendly fork of
   The service is published on `globalThis` under this package's own symbol key,
   `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`.
 
-- **Layered settings** — the settings live in the shared store
+- **Shared settings** — the settings live in the shared store
   (`@juanibiapina/pi-extension-settings`), in the operator's file and the
   project's file, so one place holds the settings of every extension that
   uses it. The inherited generic loader is still exported for other packages:

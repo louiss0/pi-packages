@@ -8,7 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadSettings, saveSettings } from "#src/settings";
+import { loadSettings, saveSettings, SettingsManager } from "#src/settings";
 import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
 import { toSharedStore } from "#test/helpers/tmp-settings-dirs";
 
@@ -128,5 +128,53 @@ describe("the family profiles in the settings", () => {
     expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
       JSON.stringify({ gpt: GPT_PROFILE }),
     );
+  });
+
+  it("does not copy the operator's families into the project's file", () => {
+    // The project declares no families of its own: a save must leave the
+    // operator's families where they are, or the project would shadow every
+    // later change to them.
+    writeFileSync(
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
+    );
+
+    const manager = new SettingsManager({
+      emit: () => {},
+      cwd,
+      agentDir,
+    });
+    expect(manager.load(true).familyProfiles).toEqual({
+      claude: CLAUDE_PROFILE,
+    });
+    manager.saveAndNotify("Max concurrency set to 4");
+
+    const written = JSON.parse(
+      readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
+    );
+    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual("{}");
+  });
+
+  it("keeps the operator's families when the project declares one of its own", () => {
+    writeFileSync(
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({
+          familyProfiles: { claude: CLAUDE_PROFILE, gpt: GPT_PROFILE },
+        }),
+      ),
+    );
+    writeFileSync(
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
+    );
+
+    const loaded = loadSettings(agentDir, cwd, { projectTrusted: true });
+    expect(Object.keys(loaded.familyProfiles ?? {}).sort()).toEqual([
+      "claude",
+      "gpt",
+    ]);
   });
 });

@@ -27,7 +27,8 @@ import {
  * Tests for persistent settings. Uses two tmp directories:
  * - `globalDir`: passed directly as agentDir. Simulates `~/.pi/agent/` — the global scope.
  * - `projectDir`: passed explicitly as cwd to load/save.
- *   Simulates the user's project root. Settings live at `<projectDir>/.pi/subagents.json`.
+ *   Simulates the user's project root. The settings live in the shared
+ *   store's project file, at `<projectDir>/.pi/settings-extensions.json`.
  */
 describe("settings persistence", () => {
   let dirs: SettingsDirs;
@@ -95,7 +96,13 @@ describe("settings persistence", () => {
       wrapUpTurns: 3,
     };
     saveSettings(settings, projectDir);
-    expect(loadSettings(globalDir, projectDir)).toEqual(settings);
+    // The empty values are written explicitly, so the store holds them and
+    // the load reports them.
+    expect(loadSettings(globalDir, projectDir)).toEqual({
+      ...settings,
+      excludedExtensionPackages: [],
+      familyProfiles: {},
+    });
   });
 
   it("saveSettings writes only to the project file; global is untouched", () => {
@@ -125,7 +132,9 @@ describe("settings persistence", () => {
 
   it("round-trips defaultMaxTurns: 0 (unlimited marker)", () => {
     saveSettings({ defaultMaxTurns: 0 }, projectDir);
-    expect(loadSettings(globalDir, projectDir)).toEqual({ defaultMaxTurns: 0 });
+    expect(loadSettings(globalDir, projectDir)).toMatchObject({
+      defaultMaxTurns: 0,
+    });
   });
 
   it("ignores unknown extra fields on load (forward-compat)", () => {
@@ -332,9 +341,11 @@ describe("settings persistence", () => {
         expect(loadSettings(globalDir, projectDir)).toEqual({});
       });
 
-      it("drops an empty array — it says what an absent list says", () => {
+      it("keeps an empty array as an empty array", () => {
         writeProject({ excludedExtensionPackages: [] });
-        expect(loadSettings(globalDir, projectDir)).toEqual({});
+        expect(loadSettings(globalDir, projectDir)).toEqual({
+          excludedExtensionPackages: [],
+        });
       });
     });
 

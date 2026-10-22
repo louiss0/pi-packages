@@ -697,11 +697,12 @@ every token appears somewhere       →  20   ← acceptance threshold</code></p
 
 <div class="grid g2">
   <div class="card">
-    <span class="path">upstream · src/settings.ts</span>
-    <h3>subagents.json</h3>
+    <span class="path">this fork · src/shared-settings.ts</span>
+    <h3>the shared settings store</h3>
     <p>Concurrency, turn limits, retention windows, interrupt policy, mid-run updates, excluded packages, and
-    per-provider prompt inheritance. Global at <code>~/.pi/agent/subagents.json</code>, project at
-    <code>&lt;cwd&gt;/.pi/subagents.json</code>, merged shallow — the project layer wins.</p>
+    per-provider prompt inheritance live in <code>@juanibiapina/pi-extension-settings</code> — the store every
+    extension can share. Global at <code>~/.pi/agent/settings-extensions.json</code>, project at
+    <code>&lt;cwd&gt;/.pi/settings-extensions.json</code>, merged shallow — the project layer wins.</p>
   </div>
   <div class="card ours">
     <span class="path">this fork · src/tier/tier-settings.ts</span>

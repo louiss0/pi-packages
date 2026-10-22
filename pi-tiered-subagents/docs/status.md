@@ -187,9 +187,17 @@ the package's own vocabulary.
 
 The store holds strings, so the adapter is the one place that serializes: the
 family profiles, the excluded packages, and the prompt-inheritance map are
-JSON in a single setting. The project's scope is read only when Pi has
-granted the project trust, and a save writes the project's own layer — the
-operator's families are not copied into the project's file.
+JSON in a single setting. The operational settings merge per setting — the
+store's own layering, project over operator — and the family profiles merge
+per family, so a project replaces one family and leaves the operator's others
+alone. Because the store's project scope falls back to the operator's file,
+the two reads are compared to tell what the project declared for itself. A
+save writes the project's own layer, so the operator's families are not copied
+into the project's file.
+
+The project's scope is read only when Pi has granted the project trust, and a
+save writes the project's own layer — the operator's families are not copied
+into the project's file.
 
 The store is also an extension, offering a `/extension-settings` menu. This
 package publishes its settings to that menu when it loads; the shared
