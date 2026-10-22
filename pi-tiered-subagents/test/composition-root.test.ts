@@ -73,6 +73,7 @@ import {
   createSubagentSessionStub,
   toSubagentSession,
 } from "./helpers/mock-session";
+import { toSharedStore } from "./helpers/tmp-settings-dirs";
 
 function makePi() {
   const tools = new Map<string, any>();
@@ -480,8 +481,12 @@ describe("composition root: prompt-inheritance wiring", () => {
       projectDir = mkdtempSync(join(tmpdir(), "pi-root-inherit-"));
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ promptInheritance: { "claude-bridge": "portable" } }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(
+          toSharedStore({
+            promptInheritance: { "claude-bridge": "portable" },
+          }),
+        ),
       );
       // The root reads settings from process.cwd(), so point it at the fixture.
       vi.spyOn(process, "cwd").mockReturnValue(projectDir);

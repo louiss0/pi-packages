@@ -1,14 +1,16 @@
 // Persistence for pi-subagents operational settings.
-// - Global:  ~/.pi/agent/subagents.json (agentDir injected at construction) — manual defaults, never written here
-// - Project: <cwd>/.pi/subagents.json — written by /agents → Settings; overrides global on load
+//
+// The settings live in the shared store (`@juanibiapina/pi-extension-settings`),
+// in two scopes: the operator's global file and the project's local file. The
+// project layer is only read when Pi has granted the project trust.
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import {
-  type LayeredSettingsSource,
-  loadLayeredSettings,
-} from "#src/layered-settings";
 import { isBelowMinimumTurns, MIN_MAX_TURNS } from "#src/lifecycle/turn-limits";
+import {
+  readSetting,
+  type SharedScope,
+  type SharedScopes,
+  writeSetting,
+} from "#src/shared-settings";
 import type { PromptInheritance } from "#src/types";
 export interface SubagentsSettings {
   maxConcurrent?: number;
@@ -119,6 +121,15 @@ export class SettingsManager {
   private _excludedExtensionPackages: string[] = [];
   private _promptInheritance: Record<string, PromptInheritance> = {};
   private _familyProfiles: Record<string, unknown> | undefined = undefined;
+  /**
+   * The profiles the project's own scope declares.
+   *
+   * A save writes these back, not the merged set: the operator's families
+   * belong to the operator's scope, and copying them into the project's file
+   * would make them outlive a later change to the operator's settings.
+   */
+  private _projectFamilyProfiles: Record<string, unknown> | undefined =
+    undefined;
 
   private readonly emit: SettingsEmit;
   private readonly cwd: string;
@@ -226,12 +237,13 @@ export class SettingsManager {
    * session starts.
    */
   load(projectTrusted = true): SubagentsSettings {
-    const { legacyGraceTurns, ...settings } = loadSettings(
+    const { settings, projectFamilyProfiles } = loadSettingsLayers(
       this.agentDir,
       this.cwd,
       { projectTrusted },
     );
-    warnAboutRetiredSettings(settings, legacyGraceTurns === true);
+    const { legacyGraceTurns, ...loaded } = settings;
+    warnAboutRetiredSettings(loaded, legacyGraceTurns === true);
     if (typeof settings.maxConcurrent === "number")
       this.maxConcurrent = settings.maxConcurrent;
     if (typeof settings.defaultMaxTurns === "number")
@@ -256,8 +268,11 @@ export class SettingsManager {
     this._familyProfiles = settings.familyProfiles
       ? { ...settings.familyProfiles }
       : undefined;
-    this.emit("subagents:settings_loaded", { settings });
-    return settings;
+    this._projectFamilyProfiles = projectFamilyProfiles
+      ? { ...projectFamilyProfiles }
+      : undefined;
+    this.emit("subagents:settings_loaded", { settings: loaded });
+    return loaded;
   }
 
   /**
@@ -290,8 +305,8 @@ export class SettingsManager {
     if (Object.keys(this._promptInheritance).length > 0) {
       snapshot.promptInheritance = { ...this._promptInheritance };
     }
-    if (this._familyProfiles) {
-      snapshot.familyProfiles = { ...this._familyProfiles };
+    if (this._projectFamilyProfiles) {
+      snapshot.familyProfiles = { ...this._projectFamilyProfiles };
     }
     return snapshot;
   }
@@ -519,17 +534,105 @@ function sanitizePromptInheritance(
   return Object.keys(rules).length > 0 ? rules : undefined;
 }
 
-function projectPath(cwd: string): string {
-  return join(cwd, ".pi", "subagents.json");
+/**
+ * The setting ids this package keeps in the shared store.
+ *
+ * Every value in the store is a string, so the ids name the settings and the
+ * values are the operator's own text.
+ */
+const NUMBER_SETTINGS = [
+  "maxConcurrent",
+  "defaultMaxTurns",
+  "wrapUpTurns",
+  "consumedSessionRetentionMinutes",
+  "unconsumedSessionRetentionMinutes",
+] as const;
+
+const BOOLEAN_SETTINGS = ["abortAllOnInterrupt", "midRunUpdates"] as const;
+
+/** The settings that carry structure, and are therefore stored as JSON text. */
+const JSON_SETTINGS = [
+  "excludedExtensionPackages",
+  "promptInheritance",
+  "familyProfiles",
+] as const;
+
+/** Read one scope of the shared store as the settings it holds. */
+function readScope(
+  scope: SharedScope,
+  scopes: SharedScopes,
+): SubagentsSettings {
+  const raw: Record<string, unknown> = {};
+  for (const id of NUMBER_SETTINGS) {
+    const text = readSetting(id, scope, scopes);
+    if (text === undefined) continue;
+    const value = Number(text);
+    if (Number.isFinite(value)) raw[id] = value;
+  }
+  for (const id of BOOLEAN_SETTINGS) {
+    const text = readSetting(id, scope, scopes);
+    if (text === undefined) continue;
+    if (text === "true") raw[id] = true;
+    else if (text === "false") raw[id] = false;
+  }
+  for (const id of JSON_SETTINGS) {
+    const text = readSetting(id, scope, scopes);
+    if (text === undefined) continue;
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      // A value that is not JSON is not a value this package understands:
+      // it is dropped, like any other malformed setting.
+      continue;
+    }
+    // An empty list or an empty object says what an absent setting says, so
+    // it is dropped rather than carried as an empty value.
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0
+    ) {
+      continue;
+    }
+    raw[id] = value;
+  }
+  // A setting this version no longer reads is still worth naming: the
+  // operator is told what to use instead.
+  if (readSetting("graceTurns", scope, scopes) !== undefined) {
+    raw.graceTurns = true;
+  }
+  return sanitize(raw);
+}
+
+/** Merge the two scopes: the project's values win, the operator's fill the rest. */
+function mergeScopes(
+  global: SubagentsSettings,
+  project: SubagentsSettings,
+): SubagentsSettings {
+  return {
+    ...global,
+    ...project,
+    ...(global.familyProfiles || project.familyProfiles
+      ? {
+          familyProfiles: {
+            ...global.familyProfiles,
+            ...project.familyProfiles,
+          },
+        }
+      : {}),
+  };
 }
 
 /**
- * Load merged settings: global provides defaults, project overrides.
+ * Load the settings: the operator's global scope, then the project's.
  *
- * The project layer is only read when the project is trusted: a repository the
- * operator has not trusted cannot change how the extension behaves.
+ * The project scope is only read when the project is trusted: a repository
+ * the operator has not trusted cannot change how the extension behaves.
  *
- * The family profiles merge per family rather than per file, so a project
+ * The family profiles merge per family rather than per scope, so a project
  * refines one family without erasing the operator's others.
  */
 export function loadSettings(
@@ -537,41 +640,83 @@ export function loadSettings(
   cwd: string,
   options: { projectTrusted?: boolean } = {},
 ): SubagentsSettings {
-  return loadLayeredSettings({
-    agentDir,
-    cwd,
-    filename: "subagents.json",
-    sanitize,
-    warnLabel: "pi-subagents",
-    projectTrusted: options.projectTrusted,
-    merge: (global, project) => ({
-      ...global,
-      ...project,
-      ...(global.familyProfiles || project.familyProfiles
-        ? {
-            familyProfiles: {
-              ...global.familyProfiles,
-              ...project.familyProfiles,
-            },
-          }
-        : {}),
-    }),
-  } satisfies LayeredSettingsSource<SubagentsSettings>);
+  return loadSettingsLayers(agentDir, cwd, options).settings;
+}
+
+/** What one load found: the merged settings, and the project's own profiles. */
+export interface LoadedSettings {
+  /** The merged settings: the project's values over the operator's. */
+  readonly settings: SubagentsSettings;
+  /**
+   * The family profiles the project's scope declares.
+   *
+   * These are the profiles a save writes back: the merged set would carry
+   * the operator's families into the project's file, where they would
+   * outlive a later change to the operator's own settings.
+   */
+  readonly projectFamilyProfiles?: Record<string, unknown>;
+}
+
+/** Read both scopes once, and report what each of them held. */
+export function loadSettingsLayers(
+  agentDir: string,
+  cwd: string,
+  options: { projectTrusted?: boolean } = {},
+): LoadedSettings {
+  const scopes: SharedScopes = { agentDir, cwd };
+  const global = readScope("global", scopes);
+  const trusted = options.projectTrusted !== false;
+  const project = trusted ? readScope("local", scopes) : {};
+  return {
+    settings: mergeScopes(global, project),
+    projectFamilyProfiles: project.familyProfiles,
+  };
 }
 
 /**
- * Write project-local settings. Global is never touched from code.
- * Returns `true` on success, `false` if the write (or mkdir) failed so the
- * caller can surface a warning — persistence isn't fatal but isn't silent.
+ * Write the project's settings. The operator's global scope is never touched
+ * from code.
+ *
+ * Returns `true` on success, `false` if the write failed so the caller can
+ * surface a warning — persistence isn't fatal but isn't silent.
  */
 export function saveSettings(
   s: SubagentsSettings,
   cwd: string = process.cwd(),
 ): boolean {
-  const path = projectPath(cwd);
+  const scopes: SharedScopes = { agentDir: "", cwd };
   try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(s, null, 2), "utf-8");
+    for (const id of NUMBER_SETTINGS) {
+      const value = s[id];
+      if (value === undefined) continue;
+      writeSetting(id, String(value), "local", scopes);
+    }
+    for (const id of BOOLEAN_SETTINGS) {
+      const value = s[id];
+      if (value === undefined) continue;
+      writeSetting(id, value ? "true" : "false", "local", scopes);
+    }
+    // A setting that is no longer set is written as an empty value rather
+    // than left behind: the store keeps what it was given, so a cleared
+    // setting would otherwise survive the next load.
+    writeSetting(
+      "excludedExtensionPackages",
+      JSON.stringify(s.excludedExtensionPackages ?? []),
+      "local",
+      scopes,
+    );
+    writeSetting(
+      "promptInheritance",
+      JSON.stringify(s.promptInheritance ?? {}),
+      "local",
+      scopes,
+    );
+    writeSetting(
+      "familyProfiles",
+      JSON.stringify(s.familyProfiles ?? {}),
+      "local",
+      scopes,
+    );
     return true;
   } catch {
     return false;

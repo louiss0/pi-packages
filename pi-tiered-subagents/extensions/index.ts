@@ -53,6 +53,10 @@ import {
 } from "#src/service/service";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { WorkspaceGateRegistry } from "#src/scheduling/gate";
+import {
+  SETTINGS_EXTENSION_NAME,
+  SHARED_SETTING_DEFINITIONS,
+} from "#src/shared-settings";
 import { detectEnv } from "#src/session/env";
 import type { FamilyProfile } from "#src/models/profile";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
@@ -78,6 +82,20 @@ import { SessionNavigatorHandler } from "#src/ui/session-navigator";
 import { SubagentsSettingsHandler } from "#src/ui/subagents-settings";
 
 export default function (pi: ExtensionAPI) {
+  // ---- Register with the shared settings UI ----
+  /**
+   * Publishes this package's settings to the shared settings extension, so
+   * they can be edited where the other extensions' settings are edited.
+   *
+   * The shared extension has to be loaded first: it keeps the registry this
+   * event fills. Without it the settings are still read and written — only
+   * the menu that edits them is missing.
+   */
+  pi.events.emit("pi-extension-settings:register", {
+    name: SETTINGS_EXTENSION_NAME,
+    settings: [...SHARED_SETTING_DEFINITIONS],
+  });
+
   // ---- Register custom notification renderer ----
   pi.registerMessageRenderer<NotificationDetails>(
     "subagent-notification",

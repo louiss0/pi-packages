@@ -171,6 +171,36 @@ Recorded in [adr/](adr/):
 - [0006](adr/0006-background-by-default.md) — the background is the default
   for both doors.
 
+## The shared settings backend
+
+`src/shared-settings.ts` is the only place this package talks to
+`@juanibiapina/pi-extension-settings`; the settings module above it speaks in
+the package's own vocabulary.
+
+| Rule | Stories | State |
+| --- | --- | --- |
+| The shared store holds the operational settings and the family profiles | 75 | Done. The settings live in the store's two files — the operator's and the project's — under this package's name. This package keeps no settings file of its own. |
+| A project overrides one family without discarding the others | 76 | Done. The scopes are read separately and the profiles merge per family. |
+| A named profile is replaced as a whole | 77 | Done. A family in the project's scope replaces that family's profile entirely; nothing is merged into it. |
+| A profile is added with the shipped schema | 78 | Done. A profile is data: the same schema the shipped profiles use, validated by the model domain. |
+| Profiles are data, never code | 79 | Done. The schema names what a profile may contain; a value it does not name is ignored, never evaluated. |
+
+The store holds strings, so the adapter is the one place that serializes: the
+family profiles, the excluded packages, and the prompt-inheritance map are
+JSON in a single setting. The project's scope is read only when Pi has
+granted the project trust, and a save writes the project's own layer — the
+operator's families are not copied into the project's file.
+
+The store is also an extension, offering a `/extension-settings` menu. This
+package publishes its settings to that menu when it loads; the shared
+extension has to be loaded first for the menu to know them. Without it the
+settings are still read and written — only the menu is missing.
+
+The settings *moved*: `subagents.json` is no longer read. A hand-edited file
+stays where it is; nothing is migrated automatically.
+
+Recorded in [adr/0010](adr/0010-the-settings-live-in-the-shared-store.md).
+
 ## The workspace scheduling
 
 `src/scheduling/` decides what a child may change; the manager admits the
@@ -296,7 +326,7 @@ names the user stories it covers.
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | Done — see the model selection above. |
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Done — see the reasoning selection above. |
 | Capability-based workspace scheduling | 52–54 | Done — see the workspace scheduling above. |
-| Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
+| Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | Done — see the shared settings backend above. The inherited generic loader (`loadLayeredSettings`) is still exported for other packages, but it is no longer this package's backend. |
 | One configuration resolver for both launch doors | 80–82 | The model and the reasoning level are resolved by one resolver (`src/models/launch.ts`), so the two doors cannot drift apart on them. The rest of a launch — the definition, the tools, the context — is still resolved by each door. |
 | The routing reason in the service door's record | 74 | The record carries the model and the level; the *reason* is in the tool door's launch note only. |
 | A narrower cut of the inherited identity | 47 | The child's inherited identity still carries the harness's base preamble. Narrowing it is outstanding. |

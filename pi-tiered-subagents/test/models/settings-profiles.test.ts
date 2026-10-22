@@ -9,8 +9,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadSettings, saveSettings } from "#src/settings";
+import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
+import { toSharedStore } from "#test/helpers/tmp-settings-dirs";
 
-/** A profile as the settings file holds it. */
+/** A profile as the settings store holds it. */
 const GPT_PROFILE = {
   versions: [
     {
@@ -58,12 +60,14 @@ describe("the family profiles in the settings", () => {
 
   it("reads the global and the project layers", () => {
     writeFileSync(
-      join(agentDir, "subagents.json"),
-      JSON.stringify({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
     );
     writeFileSync(
-      join(cwd, ".pi", "subagents.json"),
-      JSON.stringify({ familyProfiles: { gpt: GPT_PROFILE } }),
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
     const settings = loadSettings(agentDir, cwd, { projectTrusted: true });
@@ -75,12 +79,14 @@ describe("the family profiles in the settings", () => {
 
   it("merges the layers per family, so a project refines one family only", () => {
     writeFileSync(
-      join(agentDir, "subagents.json"),
-      JSON.stringify({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
     );
     writeFileSync(
-      join(cwd, ".pi", "subagents.json"),
-      JSON.stringify({ familyProfiles: { gpt: GPT_PROFILE } }),
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
     const settings = loadSettings(agentDir, cwd, { projectTrusted: true });
@@ -91,12 +97,14 @@ describe("the family profiles in the settings", () => {
 
   it("does not read the project layer when the project is not trusted", () => {
     writeFileSync(
-      join(agentDir, "subagents.json"),
-      JSON.stringify({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
     );
     writeFileSync(
-      join(cwd, ".pi", "subagents.json"),
-      JSON.stringify({ familyProfiles: { gpt: GPT_PROFILE } }),
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
     const settings = loadSettings(agentDir, cwd, { projectTrusted: false });
@@ -104,19 +112,21 @@ describe("the family profiles in the settings", () => {
   });
 
   it("survives a settings save", () => {
-    // The settings file is the one place the profiles live, so saving the
+    // The settings store is the one place the profiles live, so saving the
     // settings must not erase them.
     writeFileSync(
-      join(cwd, ".pi", "subagents.json"),
-      JSON.stringify({ familyProfiles: { gpt: GPT_PROFILE } }),
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
     const loaded = loadSettings(agentDir, cwd, { projectTrusted: true });
     expect(saveSettings(loaded, cwd)).toBe(true);
 
     const written = JSON.parse(
-      readFileSync(join(cwd, ".pi", "subagents.json"), "utf-8"),
+      readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
     );
-    expect(written.familyProfiles.gpt).toEqual(GPT_PROFILE);
+    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
+      JSON.stringify({ gpt: GPT_PROFILE }),
+    );
   });
 });

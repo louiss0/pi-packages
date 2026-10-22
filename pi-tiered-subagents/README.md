@@ -7,10 +7,10 @@ scoped specialists, layered agent definitions, and inspectable model selection.
 > typechecks, and passes a 2,246-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
-> the reasoning level that follows it, and the capability-based workspace
-> scheduling are **done**. The shared settings backend is **not implemented
-> yet**. See [docs/status.md](docs/status.md) for the verified state and what is
-> still owed.
+> the reasoning level that follows it, the capability-based workspace
+> scheduling, and the shared settings backend are **done**. The narrowed
+> inherited identity is **not implemented yet**. See [docs/status.md](docs/status.md)
+> for the verified state and what is still owed.
 
 ## Install
 
@@ -51,14 +51,17 @@ v25.0.1, which is itself a friendly fork of
   The service is published on `globalThis` under this package's own symbol key,
   `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`.
 
-- **Layered settings** — the inherited loader is exported for other packages:
+- **Layered settings** — the settings live in the shared store
+  (`@juanibiapina/pi-extension-settings`), in the operator's file and the
+  project's file, so one place holds the settings of every extension that
+  uses it. The inherited generic loader is still exported for other packages:
 
   ```ts
   import { loadLayeredSettings } from "@code-fixer-23/pi-tiered-subagents/settings";
   ```
 
-  The specified settings backend (`@juanibiapina/pi-extension-settings`)
-  replaces it; see [docs/status.md](docs/status.md).
+  It is no longer this package's own backend; see
+  [docs/status.md](docs/status.md).
 
 - **A live widget** and a `/subagents:sessions` transcript viewer, mounted on Pi's
   own components.

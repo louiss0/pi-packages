@@ -15,10 +15,12 @@ import {
   SettingsManager,
   saveSettings,
 } from "#src/settings";
+import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
 import { captureWarn } from "#test/helpers/capture-warn";
 import {
-  createSettingsDirs,
+  createSharedSettingsDirs,
   type SettingsDirs,
+  toSharedStore,
 } from "#test/helpers/tmp-settings-dirs";
 
 /**
@@ -37,7 +39,7 @@ describe("settings persistence", () => {
   let writeProject: (obj: unknown) => void;
 
   beforeEach(() => {
-    dirs = createSettingsDirs("subagents.json");
+    dirs = createSharedSettingsDirs();
     ({
       globalDir,
       projectDir,
@@ -101,13 +103,18 @@ describe("settings persistence", () => {
     saveSettings({ maxConcurrent: 2 }, projectDir);
 
     // Project file contains the new value
-    expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual({
-      maxConcurrent: 2,
-    });
+    expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual(
+      toSharedStore({
+        maxConcurrent: 2,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+        familyProfiles: {},
+      }),
+    );
     // Global file unchanged
-    expect(JSON.parse(readFileSync(globalFile(), "utf-8"))).toEqual({
-      maxConcurrent: 16,
-    });
+    expect(JSON.parse(readFileSync(globalFile(), "utf-8"))).toEqual(
+      toSharedStore({ maxConcurrent: 16 }),
+    );
   });
 
   it("saveSettings creates <cwd>/.pi/ when missing", () => {
@@ -278,13 +285,13 @@ describe("settings persistence", () => {
       });
     });
 
-    it("drops a non-boolean midRunUpdates", () => {
-      writeProject({ midRunUpdates: "false", wrapUpTurns: 5 });
+    it("drops a midRunUpdates that is neither true nor false", () => {
+      writeProject({ midRunUpdates: "yes", wrapUpTurns: 5 });
       expect(loadSettings(globalDir, projectDir)).toEqual({ wrapUpTurns: 5 });
     });
 
-    it("drops a non-boolean abortAllOnInterrupt", () => {
-      writeProject({ abortAllOnInterrupt: "false", wrapUpTurns: 5 });
+    it("drops an abortAllOnInterrupt that is neither true nor false", () => {
+      writeProject({ abortAllOnInterrupt: "yes", wrapUpTurns: 5 });
       expect(loadSettings(globalDir, projectDir)).toEqual({ wrapUpTurns: 5 });
       writeProject({ abortAllOnInterrupt: 0 });
       expect(loadSettings(globalDir, projectDir)).toEqual({});
@@ -325,11 +332,9 @@ describe("settings persistence", () => {
         expect(loadSettings(globalDir, projectDir)).toEqual({});
       });
 
-      it("keeps an empty array as an empty array", () => {
+      it("drops an empty array — it says what an absent list says", () => {
         writeProject({ excludedExtensionPackages: [] });
-        expect(loadSettings(globalDir, projectDir)).toEqual({
-          excludedExtensionPackages: [],
-        });
+        expect(loadSettings(globalDir, projectDir)).toEqual({});
       });
     });
 
@@ -371,9 +376,14 @@ describe("settings persistence", () => {
   describe("save result + corrupt-file warning", () => {
     it("saveSettings returns true on success", () => {
       expect(saveSettings({ maxConcurrent: 2 }, projectDir)).toBe(true);
-      expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual({
-        maxConcurrent: 2,
-      });
+      expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual(
+        toSharedStore({
+          maxConcurrent: 2,
+          excludedExtensionPackages: [],
+          promptInheritance: {},
+          familyProfiles: {},
+        }),
+      );
     });
 
     it("saveSettings returns false when the target dir cannot be created", () => {
@@ -391,14 +401,12 @@ describe("settings persistence", () => {
       }
     });
 
-    it("warns to console.warn when an existing file is malformed", () => {
+    it("ignores a malformed file", () => {
+      // The shared store owns the file and answers with nothing when it
+      // cannot read it; this package never sees a malformed value.
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(projectFile(), "not valid json {{{");
-      const warnings = captureWarn(() => {
-        expect(loadSettings(globalDir, projectDir)).toEqual({});
-      });
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatch(/Ignoring malformed settings/);
+      expect(loadSettings(globalDir, projectDir)).toEqual({});
     });
 
     it("does NOT warn when a file is simply missing", () => {
@@ -516,8 +524,8 @@ describe("SettingsManager", () => {
     /** A manager loaded from a project file declaring the given rules. */
     function managerWith(rules: Record<string, string>): SettingsManager {
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ promptInheritance: rules }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ promptInheritance: rules })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -555,8 +563,8 @@ describe("SettingsManager", () => {
     it("clears rules that a later load no longer declares", () => {
       const sm = managerWith({ "claude-bridge": "portable" });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ wrapUpTurns: 7 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
       );
       sm.load();
       expect(sm.promptInheritanceFor("claude-bridge")).toBe("full");
@@ -722,8 +730,8 @@ describe("SettingsManager", () => {
     it("applies merged settings from disk to in-memory values", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ wrapUpTurns: 7, maxConcurrent: 8 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ wrapUpTurns: 7, maxConcurrent: 8 })),
       );
       const emit = vi.fn();
       const sm = new SettingsManager({
@@ -740,8 +748,8 @@ describe("SettingsManager", () => {
     it("applies defaultMaxTurns from disk (0 → unlimited)", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ defaultMaxTurns: 0 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ defaultMaxTurns: 0 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -755,8 +763,8 @@ describe("SettingsManager", () => {
     it("applies defaultMaxTurns: 50 from disk", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ defaultMaxTurns: 50 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ defaultMaxTurns: 50 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -770,11 +778,13 @@ describe("SettingsManager", () => {
     it("applies retention windows from disk", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({
-          consumedSessionRetentionMinutes: 20,
-          unconsumedSessionRetentionMinutes: 60,
-        }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(
+          toSharedStore({
+            consumedSessionRetentionMinutes: 20,
+            unconsumedSessionRetentionMinutes: 60,
+          }),
+        ),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -789,8 +799,8 @@ describe("SettingsManager", () => {
     it("applies abortAllOnInterrupt: false from disk", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ abortAllOnInterrupt: false }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ abortAllOnInterrupt: false })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -804,8 +814,8 @@ describe("SettingsManager", () => {
     it("leaves abortAllOnInterrupt at its default when the file omits it", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ wrapUpTurns: 7 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -819,8 +829,8 @@ describe("SettingsManager", () => {
     it("warns that graceTurns was removed, and neither applies, emits, nor persists it", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ graceTurns: 5, maxConcurrent: 6 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ graceTurns: 5, maxConcurrent: 6 })),
       );
       const emit = vi.fn();
       const sm = new SettingsManager({
@@ -844,8 +854,8 @@ describe("SettingsManager", () => {
     it("warns about a defaultMaxTurns below the minimum and runs with 2", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ defaultMaxTurns: 1 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ defaultMaxTurns: 1 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -862,8 +872,8 @@ describe("SettingsManager", () => {
     it("does not warn for settings within range", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ defaultMaxTurns: 2, wrapUpTurns: 3 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ defaultMaxTurns: 2, wrapUpTurns: 3 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -876,8 +886,8 @@ describe("SettingsManager", () => {
     it("emits subagents:settings_loaded with merged settings", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ wrapUpTurns: 7 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
       );
       const emit = vi.fn();
       const sm = new SettingsManager({
@@ -895,8 +905,8 @@ describe("SettingsManager", () => {
     it("returns the loaded settings object", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
-        join(projectDir, ".pi", "subagents.json"),
-        JSON.stringify({ maxConcurrent: 6 }),
+        join(projectDir, ".pi", "settings-extensions.json"),
+        JSON.stringify(toSharedStore({ maxConcurrent: 6 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -922,12 +932,14 @@ describe("SettingsManager", () => {
 
     it("loads excluded extension package sources, and clears them when removed", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      const settingsPath = join(projectDir, ".pi", "subagents.json");
+      const settingsPath = join(projectDir, ".pi", "settings-extensions.json");
       writeFileSync(
         settingsPath,
-        JSON.stringify({
-          excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
-        }),
+        JSON.stringify(
+          toSharedStore({
+            excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
+          }),
+        ),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -939,7 +951,7 @@ describe("SettingsManager", () => {
         "npm:@cortexkit/pi-magic-context",
       ]);
 
-      writeFileSync(settingsPath, JSON.stringify({}));
+      writeFileSync(settingsPath, JSON.stringify(toSharedStore({})));
       sm.load();
       expect(sm.excludedExtensionPackages).toEqual([]);
     });
@@ -1088,12 +1100,14 @@ describe("SettingsManager", () => {
       // saveSettings rewrites the whole project file, so a key missing from
       // snapshot() is destroyed the next time any setting changes.
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      const settingsPath = join(projectDir, ".pi", "subagents.json");
+      const settingsPath = join(projectDir, ".pi", "settings-extensions.json");
       writeFileSync(
         settingsPath,
-        JSON.stringify({
-          excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
-        }),
+        JSON.stringify(
+          toSharedStore({
+            excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
+          }),
+        ),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -1105,16 +1119,20 @@ describe("SettingsManager", () => {
       sm.applyWrapUpTurns(7);
 
       const written = JSON.parse(readFileSync(settingsPath, "utf-8"));
-      expect(written).toEqual({
-        maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 7,
-        consumedSessionRetentionMinutes: 10,
-        unconsumedSessionRetentionMinutes: 720,
-        abortAllOnInterrupt: true,
-        midRunUpdates: true,
-        excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
-      });
+      expect(written).toEqual(
+        toSharedStore({
+          maxConcurrent: 4,
+          defaultMaxTurns: 0,
+          wrapUpTurns: 7,
+          consumedSessionRetentionMinutes: 10,
+          unconsumedSessionRetentionMinutes: 720,
+          abortAllOnInterrupt: true,
+          midRunUpdates: true,
+          excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
+          promptInheritance: {},
+          familyProfiles: {},
+        }),
+      );
     });
 
     it("preserves hand-edited promptInheritance rules across an unrelated edit", () => {
@@ -1122,10 +1140,12 @@ describe("SettingsManager", () => {
       // /subagents:settings affordance, so a snapshot that omitted it would
       // destroy a hand-edited value on the next unrelated setting change.
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      const settingsPath = join(projectDir, ".pi", "subagents.json");
+      const settingsPath = join(projectDir, ".pi", "settings-extensions.json");
       writeFileSync(
         settingsPath,
-        JSON.stringify({ promptInheritance: { "claude-bridge": "portable" } }),
+        JSON.stringify(
+          toSharedStore({ promptInheritance: { "claude-bridge": "portable" } }),
+        ),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -1137,16 +1157,20 @@ describe("SettingsManager", () => {
       sm.applyWrapUpTurns(7);
 
       const written = JSON.parse(readFileSync(settingsPath, "utf-8"));
-      expect(written).toEqual({
-        maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 7,
-        consumedSessionRetentionMinutes: 10,
-        unconsumedSessionRetentionMinutes: 720,
-        abortAllOnInterrupt: true,
-        midRunUpdates: true,
-        promptInheritance: { "claude-bridge": "portable" },
-      });
+      expect(written).toEqual(
+        toSharedStore({
+          maxConcurrent: 4,
+          defaultMaxTurns: 0,
+          wrapUpTurns: 7,
+          consumedSessionRetentionMinutes: 10,
+          unconsumedSessionRetentionMinutes: 720,
+          abortAllOnInterrupt: true,
+          midRunUpdates: true,
+          promptInheritance: { "claude-bridge": "portable" },
+          excludedExtensionPackages: [],
+          familyProfiles: {},
+        }),
+      );
     });
 
     it("persists snapshot to disk and returns info toast on success", () => {
@@ -1163,17 +1187,25 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written).toEqual({
-        maxConcurrent: 5,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
-        consumedSessionRetentionMinutes: 10,
-        unconsumedSessionRetentionMinutes: 720,
-        abortAllOnInterrupt: true,
-        midRunUpdates: true,
-      });
+      expect(written).toEqual(
+        toSharedStore({
+          maxConcurrent: 5,
+          defaultMaxTurns: 0,
+          wrapUpTurns: 2,
+          consumedSessionRetentionMinutes: 10,
+          unconsumedSessionRetentionMinutes: 720,
+          abortAllOnInterrupt: true,
+          midRunUpdates: true,
+          excludedExtensionPackages: [],
+          promptInheritance: {},
+          familyProfiles: {},
+        }),
+      );
     });
 
     it("emits subagents:settings_changed with persisted:true on success", () => {
@@ -1274,9 +1306,12 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written.maxConcurrent).toBe(8);
+      expect(written[SETTINGS_EXTENSION_NAME].maxConcurrent).toBe("8");
     });
 
     it("normalizes 0 to 1 and reports the post-normalization value in the toast", () => {
@@ -1374,9 +1409,14 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written.consumedSessionRetentionMinutes).toBe(30);
+      expect(
+        written[SETTINGS_EXTENSION_NAME].consumedSessionRetentionMinutes,
+      ).toBe("30");
     });
 
     it("normalizes 0 to 1 for the consumed window and reports it", () => {
@@ -1403,9 +1443,14 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written.unconsumedSessionRetentionMinutes).toBe(1440);
+      expect(
+        written[SETTINGS_EXTENSION_NAME].unconsumedSessionRetentionMinutes,
+      ).toBe("1440");
     });
 
     it("does not call onMaxConcurrentChanged", () => {
@@ -1504,9 +1549,12 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written.midRunUpdates).toBe(false);
+      expect(written[SETTINGS_EXTENSION_NAME].midRunUpdates).toBe("false");
     });
 
     it("flips the channel back on", () => {
@@ -1559,9 +1607,14 @@ describe("SettingsManager", () => {
         level: "info",
       });
       const written = JSON.parse(
-        readFileSync(join(projectDir, ".pi", "subagents.json"), "utf-8"),
+        readFileSync(
+          join(projectDir, ".pi", "settings-extensions.json"),
+          "utf-8",
+        ),
       );
-      expect(written.abortAllOnInterrupt).toBe(false);
+      expect(written[SETTINGS_EXTENSION_NAME].abortAllOnInterrupt).toBe(
+        "false",
+      );
     });
 
     it("flips the policy back on", () => {
