@@ -1,8 +1,9 @@
 // Persistence for pi-subagents operational settings.
 //
 // The settings live in the shared store (`@juanibiapina/pi-extension-settings`),
-// in two scopes: the operator's global file and the project's local file. The
-// project layer is only read when Pi has granted the project trust.
+// in two files: the operator's global file and the project's local file. The
+// project's file is only read when Pi has granted the project trust, and only
+// the project's file is ever written.
 
 import { isBelowMinimumTurns, MIN_MAX_TURNS } from "#src/lifecycle/turn-limits";
 import {
@@ -72,7 +73,8 @@ export interface SubagentsSettings {
    */
   promptInheritance?: Record<string, PromptInheritance>;
   /**
-   * The operator's family profiles, keyed by family.
+   * The family profiles in force, keyed by family: the operator's, with the
+   * project's replacing one family whole.
    *
    * The values are data the model domain reads and validates; this module only
    * carries them, so that saving the settings does not erase them.
@@ -81,9 +83,14 @@ export interface SubagentsSettings {
 }
 
 /**
- * The persisted form of the in-memory settings values.
- * `saveSettings` rewrites the whole project file from this shape, so every key
- * that must survive a `/subagents:settings` edit has to appear here.
+ * The values a save writes into the project's file.
+ *
+ * The settings the operator edits are the effective ones, so the project's
+ * file says what the operator last chose. The three data settings are the
+ * project's own values, and are present only when the project's file
+ * declares them: the key has no `/subagents:settings` affordance, so a
+ * hand-edited value must round-trip, and the operator's own value must not
+ * be copied into the project's file.
  */
 export interface SettingsSnapshot {
   maxConcurrent: number;
@@ -94,17 +101,17 @@ export interface SettingsSnapshot {
   abortAllOnInterrupt: boolean;
   midRunUpdates: boolean;
   /**
-   * Present only when non-empty, so files that never set it gain no noise.
-   * It must round-trip: the key has no `/subagents:settings` affordance, so a
-   * hand-edited value would otherwise be erased by any unrelated setting change.
+   * The packages the project's file excludes, when it declares them. It must
+   * round-trip: a hand-edited value would otherwise be erased by any
+   * unrelated setting change.
    */
   excludedExtensionPackages?: string[];
-  /** Present only when non-empty, and round-tripped for the same reason. */
+  /** The project's own inheritance rules, round-tripped for the same reason. */
   promptInheritance?: Record<string, PromptInheritance>;
   /**
-   * The operator's family profiles, round-tripped for the same reason: the
-   * settings file is the one place they live, so a `/subagents:settings` edit
-   * must not erase them.
+   * The family profiles the project's file declares, round-tripped for the
+   * same reason: the settings file is the one place they live, so a
+   * `/subagents:settings` edit must not erase them.
    */
   familyProfiles?: Record<string, unknown>;
 }
@@ -130,14 +137,13 @@ export class SettingsManager {
   private _promptInheritance: Record<string, PromptInheritance> = {};
   private _familyProfiles: Record<string, unknown> | undefined = undefined;
   /**
-   * The profiles the project's own scope declares.
+   * The values the project's own file declares.
    *
-   * A save writes these back, not the merged set: the operator's families
-   * belong to the operator's scope, and copying them into the project's file
-   * would make them outlive a later change to the operator's settings.
+   * A save writes these back, not the merged set: the operator's data
+   * belongs to the operator's file, and copying it into the project's file
+   * would make it outlive a later change to the operator's own settings.
    */
-  private _projectFamilyProfiles: Record<string, unknown> | undefined =
-    undefined;
+  private _projectSettings: SubagentsSettings = {};
 
   private readonly emit: SettingsEmit;
   private readonly cwd: string;
@@ -245,7 +251,7 @@ export class SettingsManager {
    * session starts.
    */
   load(projectTrusted = true): SubagentsSettings {
-    const { settings, projectFamilyProfiles } = loadSettingsLayers(
+    const { settings, projectSettings } = loadSettingsLayers(
       this.agentDir,
       this.cwd,
       { projectTrusted },
@@ -276,9 +282,7 @@ export class SettingsManager {
     this._familyProfiles = settings.familyProfiles
       ? { ...settings.familyProfiles }
       : undefined;
-    this._projectFamilyProfiles = projectFamilyProfiles
-      ? { ...projectFamilyProfiles }
-      : undefined;
+    this._projectSettings = { ...projectSettings };
     this.emit("subagents:settings_loaded", { settings: loaded });
     return loaded;
   }
@@ -293,7 +297,13 @@ export class SettingsManager {
   }
 
   /**
-   * Snapshot current in-memory values for persistence.
+   * Snapshot the values a save writes into the project's file.
+   *
+   * The settings the operator edits are the effective ones, so the project's
+   * file says what the operator last chose. The data the operator hand-edits
+   * is the project's own, so the operator's data is never copied into the
+   * project's file.
+   *
    * `defaultMaxTurns` uses 0 as the on-disk marker for unlimited (undefined).
    */
   snapshot(): SettingsSnapshot {
@@ -307,14 +317,18 @@ export class SettingsManager {
       abortAllOnInterrupt: this._abortAllOnInterrupt,
       midRunUpdates: this._midRunUpdates,
     };
-    if (this._excludedExtensionPackages.length > 0) {
-      snapshot.excludedExtensionPackages = [...this._excludedExtensionPackages];
+    if (this._projectSettings.excludedExtensionPackages !== undefined) {
+      snapshot.excludedExtensionPackages = [
+        ...this._projectSettings.excludedExtensionPackages,
+      ];
     }
-    if (Object.keys(this._promptInheritance).length > 0) {
-      snapshot.promptInheritance = { ...this._promptInheritance };
+    if (this._projectSettings.promptInheritance !== undefined) {
+      snapshot.promptInheritance = {
+        ...this._projectSettings.promptInheritance,
+      };
     }
-    if (this._projectFamilyProfiles) {
-      snapshot.familyProfiles = { ...this._projectFamilyProfiles };
+    if (this._projectSettings.familyProfiles !== undefined) {
+      snapshot.familyProfiles = { ...this._projectSettings.familyProfiles };
     }
     return snapshot;
   }
@@ -588,44 +602,6 @@ function mergeScopes(
 }
 
 /**
- * The profiles the project's own file declares.
- *
- * The shared store reads the project's file and falls back to the operator's
- * file, so a read of the project's scope answers with the operator's
- * profiles when the project declares none. The two are therefore compared:
- * the project's own profiles are the ones that differ from the operator's.
- *
- * A project that declares a family exactly as the operator has it is read as
- * declaring nothing — the two are the same profile, so the outcome is the
- * same either way.
- */
-function projectOwnProfiles(
-  global: SubagentsSettings,
-  project: SubagentsSettings,
-): Record<string, unknown> | undefined {
-  const operator = global.familyProfiles;
-  const declared = project.familyProfiles;
-  if (!declared) return undefined;
-  if (operator && sameProfiles(operator, declared)) return undefined;
-  return { ...declared };
-}
-
-/** Whether two sets of profiles hold the same families with the same data. */
-function sameProfiles(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-): boolean {
-  return JSON.stringify(sorted(left)) === JSON.stringify(sorted(right));
-}
-
-/** The profiles with their families in a fixed order, so two can be compared. */
-function sorted(profiles: Record<string, unknown>): unknown {
-  return Object.keys(profiles)
-    .sort()
-    .map((family) => [family, profiles[family]]);
-}
-
-/**
  * Load the settings: the operator's global scope, then the project's.
  *
  * The project scope is only read when the project is trusted: a repository
@@ -642,18 +618,18 @@ export function loadSettings(
   return loadSettingsLayers(agentDir, cwd, options).settings;
 }
 
-/** What one load found: the merged settings, and the project's own profiles. */
+/** What one load found: the merged settings, and the project's own layer. */
 export interface LoadedSettings {
   /** The merged settings: the project's values over the operator's. */
   readonly settings: SubagentsSettings;
   /**
-   * The family profiles the project's scope declares.
+   * The values the project's own file declares.
    *
-   * These are the profiles a save writes back: the merged set would carry
-   * the operator's families into the project's file, where they would
-   * outlive a later change to the operator's own settings.
+   * These are the values a save writes back: the merged set would carry the
+   * operator's data into the project's file, where it would outlive a later
+   * change to the operator's own settings.
    */
-  readonly projectFamilyProfiles?: Record<string, unknown>;
+  readonly projectSettings: SubagentsSettings;
 }
 
 /** Read both scopes once, and report what each of them held. */
@@ -665,16 +641,22 @@ export function loadSettingsLayers(
   const scopes: SharedScopes = { agentDir, cwd };
   const global = readScope("global", scopes);
   const trusted = options.projectTrusted !== false;
-  const project = trusted ? readScope("local", scopes) : {};
+  const project = trusted ? readScope("project", scopes) : {};
   return {
     settings: mergeScopes(global, project),
-    projectFamilyProfiles: projectOwnProfiles(global, project),
+    projectSettings: project,
   };
 }
 
 /**
- * Write the project's settings. The operator's global scope is never touched
- * from code.
+ * Write the project's layer of the settings. The operator's global file is
+ * never touched from code.
+ *
+ * The values written are the project's own: the settings the operator edits
+ * through `/subagents:settings`, and the data the operator hand-edits in the
+ * project's file. A value the project's file does not declare is not written
+ * at all, so the operator's own data is never copied into the project's file
+ * — where it would outlive a later change to the operator's settings.
  *
  * Returns `true` on success, `false` if the write failed so the caller can
  * surface a warning — persistence isn't fatal but isn't silent.
@@ -683,31 +665,26 @@ export function saveSettings(
   s: SubagentsSettings,
   cwd: string = process.cwd(),
 ): boolean {
-  // Only the project's file is written, so the operator's directory is never
-  // reached: the store looks at it only for the global scope.
-  const scopes: SharedScopes = { agentDir: "", cwd };
   try {
     for (const id of NUMBER_SETTING_IDS) {
       const value = s[id];
       if (value === undefined) continue;
-      writeNumber(id, value, "local", scopes);
+      writeNumber(id, value, cwd);
     }
     for (const id of BOOLEAN_SETTING_IDS) {
       const value = s[id];
       if (value === undefined) continue;
-      writeBoolean(id, value, "local", scopes);
+      writeBoolean(id, value, cwd);
     }
-    // A setting that is no longer set is written as an empty value rather
-    // than left behind: the store keeps what it was given, so a cleared
-    // setting would otherwise survive the next load.
-    writeJson(
-      "excludedExtensionPackages",
-      s.excludedExtensionPackages ?? [],
-      "local",
-      scopes,
-    );
-    writeJson("promptInheritance", s.promptInheritance ?? {}, "local", scopes);
-    writeJson("familyProfiles", s.familyProfiles ?? {}, "local", scopes);
+    // The data settings are written only when the project's file declares
+    // them: the store keeps what it was given, so a setting that is written
+    // as an empty value clears the operator's, and a setting that is not
+    // written leaves the operator's own value in force.
+    for (const id of JSON_SETTING_IDS) {
+      const value = s[id];
+      if (value === undefined) continue;
+      writeJson(id, value, cwd);
+    }
     return true;
   } catch {
     return false;

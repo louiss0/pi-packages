@@ -1,14 +1,19 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
+import {
+  encodeBoolean,
+  encodeJson,
+  encodeNumber,
+  SETTINGS_EXTENSION_NAME,
+} from "#src/shared-settings";
 
 /**
  * The shared store's shape for a settings object.
  *
  * The store holds strings, keyed by the extension's name and then by the
- * setting: `{ "<extension>": { "<setting>": "<text>" } }`. A number and a
- * boolean are written as their text; a list or an object is written as JSON.
+ * setting: `{ "<extension>": { "<setting>": "<text>" } }`. The text is the
+ * one the adapter writes, so a fixture and the package agree on it.
  */
 export function toSharedStore(
   settings: Record<string, unknown>,
@@ -17,9 +22,9 @@ export function toSharedStore(
   for (const [id, value] of Object.entries(settings)) {
     if (value === undefined) continue;
     if (typeof value === "string") values[id] = value;
-    else if (typeof value === "number" || typeof value === "boolean")
-      values[id] = String(value);
-    else values[id] = JSON.stringify(value);
+    else if (typeof value === "number") values[id] = encodeNumber(value);
+    else if (typeof value === "boolean") values[id] = encodeBoolean(value);
+    else values[id] = encodeJson(value);
   }
   return { [SETTINGS_EXTENSION_NAME]: values };
 }

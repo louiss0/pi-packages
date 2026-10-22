@@ -28,13 +28,15 @@ family profiles, the excluded packages, the prompt-inheritance map) are
 serialized as JSON in one place, the adapter, and nowhere else.
 
 **How are the layers merged?** The store's own convenience reads the project
-and falls back to the operator's file, per setting. That is right for the
-operational settings and wrong for the family profiles: a project replaces one
-family and leaves the operator's others alone. So the operator's file is read
-on its own, the project's file is read through the store's fallback, and the
-two are compared: the families the project declares are the ones that differ
-from the operator's. A project that declares a family exactly as the operator
-has it is read as declaring nothing — the same profile either way.
+and falls back to the operator's file, per setting. That answers "what is in
+force", but not "what did the project declare for itself" — the answer to the
+second question has to be the project's own file, read on its own. So the
+adapter reads each file separately: the operator's file through the store's
+global scope, the project's file through the store's project scope with the
+operator's directory pointed away, so the fallback finds nothing. The
+operational settings then merge per setting, the project's over the
+operator's, and the family profiles merge per family, so a project replaces
+one family and leaves the operator's others alone.
 
 **What about the project's trust?** The project's scope is only read when Pi
 has granted the project trust. The trust decision is a session fact, so the
@@ -58,13 +60,15 @@ import was verified under Pi's loader before this decision was taken.
   writes through a small adapter over the store; it keeps no path of its own.
 - **The adapter is the only place that serializes.** Everything above it
   speaks in the package's own vocabulary.
-- **The operator's file is read on its own.** The store's project scope falls
-  back to it, so the two reads are compared when the project's own layer
-  matters. The family profiles merge per family; the operational settings
-  merge per setting, the store's own layering.
-- **A save writes the project's own layer.** The operator's families are not
-  copied into the project's file, where they would outlive a later change to
-  the operator's own settings.
+- **Each file is read on its own.** The store's project scope falls back to
+  the operator's file, so the adapter reads the project's file without that
+  fallback. The operational settings merge per setting; the family profiles
+  merge per family.
+- **A save writes the project's own layer.** The operator's data — the
+  families, the excluded packages, the inheritance rules — is not copied into
+  the project's file, where it would outlive a later change to the operator's
+  own settings. A value the project's file does not declare is not written at
+  all, so the operator's value stays in force.
 - **The settings are published to the shared menu.** The definitions name the
   values a menu can offer; the family profiles are data, not a menu entry.
 
@@ -75,10 +79,13 @@ import was verified under Pi's loader before this decision was taken.
   automatically — a hand-edited file stays where it is.
 - A value that is not text is not a value: the store holds strings, so a
   number is read as its text and a malformed value is dropped.
-- An empty list and an empty object say what an absent setting says, so they
-  are dropped rather than carried.
+- An empty list is a value, not the absence of one: a project that writes
+  `[]` clears what the operator declared, and the empty list stays empty.
 - The store owns its file's error handling: a malformed file is ignored
   quietly, where the inherited loader warned about it.
+- The store keeps what it was given and never removes a key, so a value that
+  is no longer written stays in the file. A setting that is cleared is
+  written as an empty value.
 - The inherited generic loader (`loadLayeredSettings`) is still exported for
   other packages that read their own files; it is no longer this package's
   backend.

@@ -3,7 +3,7 @@
  * extensions.
  *
  * `@juanibiapina/pi-extension-settings` keeps one file of string-valued
- * settings, in two scopes: the operator's global file
+ * settings, in two files: the operator's global file
  * (`<agentDir>/settings-extensions.json`) and the project's local file
  * (`<cwd>/.pi/settings-extensions.json`). This package keeps its settings
  * there rather than in a file of its own, so one place holds the settings of
@@ -14,16 +14,23 @@
  * packages, the prompt-inheritance map — are JSON here, and nothing above
  * this module knows that.
  *
- * The two scopes are not read separately by the store: its *local* scope
- * reads the project's file and falls back to the operator's file, per
- * setting. The caller therefore compares the two reads when it needs to know
- * what the project declared for itself.
+ * **The two files are read on their own.** The store's *local* scope reads
+ * the project's file and falls back to the operator's file, per setting, so
+ * it cannot answer "what did the project declare for itself?". The project's
+ * read therefore points the operator's directory at a path that holds no
+ * store file, and the read stops at the project's file.
+ *
+ * **Only the project's file is written.** The operator's file is the
+ * operator's own; nothing in this package changes it.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   getSetting,
   setSetting,
   type SettingDefinition,
+  type SettingStorageOptions,
 } from "@juanibiapina/pi-extension-settings";
 
 /**
@@ -38,18 +45,58 @@ export const SETTINGS_EXTENSION_NAME = "pi-tiered-subagents";
 export interface SharedScopes {
   /** The operator's global directory — Pi's agent directory. */
   readonly agentDir: string;
-  /** The project directory — the local scope. */
+  /** The project directory — the project's file. */
   readonly cwd: string;
 }
 
 /**
- * Which file of the shared store a setting lives in.
+ * Which file of the shared store a setting is read from.
  *
- * `global` is the operator's file alone. `local` is the project's file with
- * the operator's file as its fallback — the store's own layering, per
- * setting.
+ * `global` is the operator's file alone. `project` is the project's file
+ * alone: the store's own project scope would fall back to the operator's
+ * file, and a reader has to be able to tell the two files apart.
  */
-export type SharedScope = "global" | "local";
+export type SharedScope = "global" | "project";
+
+/**
+ * A directory that holds no shared-store file.
+ *
+ * The store's project scope reads the project's file and falls back to the
+ * operator's file, per setting. That fallback hides whether the project
+ * declared a setting for itself, so the project's read points the operator's
+ * directory here instead: a path that holds no store file, so the fallback
+ * finds nothing and the read stops at the project's file.
+ *
+ * The path is under the temporary directory, so a project cannot put a file
+ * there, and this package never creates it.
+ */
+const NO_OPERATOR_FILE = join(
+  tmpdir(),
+  "pi-tiered-subagents-no-operator-file",
+);
+
+/**
+ * The store's own options for one of this package's scopes.
+ *
+ * The store's `global` scope is the operator's file alone. Its `local` scope
+ * is the project's file with the operator's file as its fallback, so the
+ * operator's directory is pointed at a path that holds no store file: the
+ * read then stops at the project's file, and the two scopes answer
+ * separately.
+ */
+function storeOptions(
+  scope: SharedScope,
+  scopes: SharedScopes,
+): SettingStorageOptions {
+  if (scope === "global") {
+    return { scope: "global", agentDir: scopes.agentDir };
+  }
+  return {
+    scope: "local",
+    cwd: scopes.cwd,
+    agentDir: NO_OPERATOR_FILE,
+  };
+}
 
 /** The settings that hold a number. */
 export const NUMBER_SETTING_IDS = [
@@ -97,36 +144,30 @@ export function readSetting(
   scopes: SharedScopes,
 ): string | undefined {
   try {
-    return getSetting(SETTINGS_EXTENSION_NAME, id, undefined, {
-      scope,
-      cwd: scopes.cwd,
-      agentDir: scopes.agentDir,
-    });
+    return getSetting(
+      SETTINGS_EXTENSION_NAME,
+      id,
+      undefined,
+      storeOptions(scope, scopes),
+    );
   } catch {
-    // The store reads the file it owns; a file whose root is not an object
-    // makes it fail. A setting that cannot be read is a setting that is not
-    // set — the same answer a missing file gives.
+    // The store reads the file it owns; a file it cannot read — one the
+    // process has no permission for — makes it fail. A setting that cannot
+    // be read is a setting that is not set — the same answer a missing file
+    // gives.
     return undefined;
   }
 }
 
 /**
- * Write one setting into one scope.
+ * Write one setting into the project's file.
  *
  * The store rewrites the file it owns, keeping the settings of the other
- * extensions and the other settings of this one.
+ * extensions and the other settings of this one. The operator's file is
+ * never written: the operator's settings are the operator's own.
  */
-export function writeSetting(
-  id: string,
-  value: string,
-  scope: SharedScope,
-  scopes: SharedScopes,
-): void {
-  setSetting(SETTINGS_EXTENSION_NAME, id, value, {
-    scope,
-    cwd: scopes.cwd,
-    agentDir: scopes.agentDir,
-  });
+export function writeSetting(id: string, value: string, cwd: string): void {
+  setSetting(SETTINGS_EXTENSION_NAME, id, value, { scope: "local", cwd });
 }
 
 /** Read a number. A value that is not a number is no value. */
@@ -168,34 +209,34 @@ export function readJson(
   }
 }
 
+/** The text the store holds a number as. */
+export function encodeNumber(value: number): string {
+  return String(value);
+}
+
+/** The text the store holds a yes-or-no answer as. */
+export function encodeBoolean(value: boolean): string {
+  return value ? "true" : "false";
+}
+
+/** The text the store holds a value that carries structure as. */
+export function encodeJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
 /** Write a number as its text. */
-export function writeNumber(
-  id: string,
-  value: number,
-  scope: SharedScope,
-  scopes: SharedScopes,
-): void {
-  writeSetting(id, String(value), scope, scopes);
+export function writeNumber(id: string, value: number, cwd: string): void {
+  writeSetting(id, encodeNumber(value), cwd);
 }
 
 /** Write a yes-or-no answer as its text. */
-export function writeBoolean(
-  id: string,
-  value: boolean,
-  scope: SharedScope,
-  scopes: SharedScopes,
-): void {
-  writeSetting(id, value ? "true" : "false", scope, scopes);
+export function writeBoolean(id: string, value: boolean, cwd: string): void {
+  writeSetting(id, encodeBoolean(value), cwd);
 }
 
 /** Write a value that carries structure as JSON text. */
-export function writeJson(
-  id: string,
-  value: unknown,
-  scope: SharedScope,
-  scopes: SharedScopes,
-): void {
-  writeSetting(id, JSON.stringify(value), scope, scopes);
+export function writeJson(id: string, value: unknown, cwd: string): void {
+  writeSetting(id, encodeJson(value), cwd);
 }
 
 /**

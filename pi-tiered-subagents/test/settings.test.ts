@@ -96,13 +96,9 @@ describe("settings persistence", () => {
       wrapUpTurns: 3,
     };
     saveSettings(settings, projectDir);
-    // The empty values are written explicitly, so the store holds them and
-    // the load reports them.
-    expect(loadSettings(globalDir, projectDir)).toEqual({
-      ...settings,
-      excludedExtensionPackages: [],
-      familyProfiles: {},
-    });
+    // Only the values that were saved are written, so the load reports them
+    // and nothing else.
+    expect(loadSettings(globalDir, projectDir)).toEqual({ ...settings });
   });
 
   it("saveSettings writes only to the project file; global is untouched", () => {
@@ -111,12 +107,7 @@ describe("settings persistence", () => {
 
     // Project file contains the new value
     expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual(
-      toSharedStore({
-        maxConcurrent: 2,
-        excludedExtensionPackages: [],
-        promptInheritance: {},
-        familyProfiles: {},
-      }),
+      toSharedStore({ maxConcurrent: 2 }),
     );
     // Global file unchanged
     expect(JSON.parse(readFileSync(globalFile(), "utf-8"))).toEqual(
@@ -388,12 +379,7 @@ describe("settings persistence", () => {
     it("saveSettings returns true on success", () => {
       expect(saveSettings({ maxConcurrent: 2 }, projectDir)).toBe(true);
       expect(JSON.parse(readFileSync(projectFile(), "utf-8"))).toEqual(
-        toSharedStore({
-          maxConcurrent: 2,
-          excludedExtensionPackages: [],
-          promptInheritance: {},
-          familyProfiles: {},
-        }),
+        toSharedStore({ maxConcurrent: 2 }),
       );
     });
 
@@ -441,6 +427,91 @@ describe("settings persistence", () => {
         message: "Max concurrency set to 7 (session only; failed to persist)",
         level: "warning",
       });
+    });
+  });
+
+  describe("the project's own layer", () => {
+    /** The manager the project's layer is read and written through. */
+    function manager(): SettingsManager {
+      return new SettingsManager({
+        emit: vi.fn(),
+        cwd: projectDir,
+        agentDir: globalDir,
+      });
+    }
+
+    it("does not copy the operator's data into the project's file", () => {
+      // The project declares nothing of its own, so the operator's data is
+      // in force — but it stays in the operator's file, where a later change
+      // to it still reaches the project.
+      writeGlobal({
+        excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
+        promptInheritance: { "claude-bridge": "portable" },
+      });
+
+      const sm = manager();
+      sm.load();
+      expect(sm.excludedExtensionPackages).toEqual([
+        "npm:@cortexkit/pi-magic-context",
+      ]);
+      expect(sm.promptInheritanceFor("claude-bridge")).toBe("portable");
+      sm.applyWrapUpTurns(7);
+
+      const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
+      expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
+        undefined,
+      );
+      expect(written[SETTINGS_EXTENSION_NAME].promptInheritance).toBe(
+        undefined,
+      );
+    });
+
+    it("keeps the project's own data across an unrelated edit", () => {
+      writeProject({
+        excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
+      });
+
+      const sm = manager();
+      sm.load();
+      sm.applyWrapUpTurns(7);
+
+      const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
+      expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
+        JSON.stringify(["npm:@cortexkit/pi-magic-context"]),
+      );
+    });
+
+    it("lets the project clear what the operator declared", () => {
+      // An empty list is a value, not the absence of one: the project says
+      // "no packages are excluded here", and the operator's list does not
+      // come back.
+      writeGlobal({ excludedExtensionPackages: ["npm:@cortexkit/pi-magic"] });
+      writeProject({ excludedExtensionPackages: [] });
+
+      const sm = manager();
+      sm.load();
+      expect(sm.excludedExtensionPackages).toEqual([]);
+      sm.applyWrapUpTurns(7);
+
+      const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
+      expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
+        "[]",
+      );
+    });
+
+    it("leaves the project's data alone when the project is not trusted", () => {
+      // The project's file is not read, so nothing in it is known: a save
+      // must leave it as it is.
+      writeProject({ promptInheritance: { "claude-bridge": "portable" } });
+
+      const sm = manager();
+      sm.load(false);
+      sm.applyWrapUpTurns(7);
+
+      const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
+      expect(written[SETTINGS_EXTENSION_NAME].promptInheritance).toBe(
+        JSON.stringify({ "claude-bridge": "portable" }),
+      );
     });
   });
 });
@@ -1140,8 +1211,6 @@ describe("SettingsManager", () => {
           abortAllOnInterrupt: true,
           midRunUpdates: true,
           excludedExtensionPackages: ["npm:@cortexkit/pi-magic-context"],
-          promptInheritance: {},
-          familyProfiles: {},
         }),
       );
     });
@@ -1178,8 +1247,6 @@ describe("SettingsManager", () => {
           abortAllOnInterrupt: true,
           midRunUpdates: true,
           promptInheritance: { "claude-bridge": "portable" },
-          excludedExtensionPackages: [],
-          familyProfiles: {},
         }),
       );
     });
@@ -1212,9 +1279,6 @@ describe("SettingsManager", () => {
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: true,
           midRunUpdates: true,
-          excludedExtensionPackages: [],
-          promptInheritance: {},
-          familyProfiles: {},
         }),
       );
     });

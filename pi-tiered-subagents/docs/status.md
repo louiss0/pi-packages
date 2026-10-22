@@ -16,7 +16,7 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2248 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2254 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -180,24 +180,25 @@ the package's own vocabulary.
 | Rule | Stories | State |
 | --- | --- | --- |
 | The shared store holds the operational settings and the family profiles | 75 | Done. The settings live in the store's two files — the operator's and the project's — under this package's name. This package keeps no settings file of its own. |
-| A project overrides one family without discarding the others | 76 | Done. The scopes are read separately and the profiles merge per family. |
+| A project overrides one family without discarding the others | 76 | Done. The two files are read on their own, and the profiles merge per family. |
 | A named profile is replaced as a whole | 77 | Done. A family in the project's scope replaces that family's profile entirely; nothing is merged into it. |
 | A profile is added with the shipped schema | 78 | Done. A profile is data: the same schema the shipped profiles use, validated by the model domain. |
 | Profiles are data, never code | 79 | Done. The schema names what a profile may contain; a value it does not name is ignored, never evaluated. |
 
 The store holds strings, so the adapter is the one place that serializes: the
 family profiles, the excluded packages, and the prompt-inheritance map are
-JSON in a single setting. The operational settings merge per setting — the
-store's own layering, project over operator — and the family profiles merge
-per family, so a project replaces one family and leaves the operator's others
-alone. Because the store's project scope falls back to the operator's file,
-the two reads are compared to tell what the project declared for itself. A
-save writes the project's own layer, so the operator's families are not copied
-into the project's file.
+JSON in a single setting. The store's own project scope falls back to the
+operator's file, so the adapter reads each file on its own: the operational
+settings merge per setting, the project's over the operator's, and the family
+profiles merge per family, so a project replaces one family and leaves the
+operator's others alone.
 
-The project's scope is read only when Pi has granted the project trust, and a
-save writes the project's own layer — the operator's families are not copied
-into the project's file.
+A save writes the project's own layer. The operator's data — the families, the
+excluded packages, the inheritance rules — stays in the operator's file, where
+a later change to it still reaches the project; a value the project's file
+does not declare is not written at all, so the operator's value stays in
+force. The project's file is only read when Pi has granted the project trust,
+and an unread project's file is left alone rather than written empty.
 
 The store is also an extension, offering a `/extension-settings` menu. This
 package publishes its settings to that menu when it loads; the shared

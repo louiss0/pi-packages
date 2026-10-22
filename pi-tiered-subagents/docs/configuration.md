@@ -312,6 +312,8 @@ carries structure (the family profiles, `excludedExtensionPackages`,
 
 **Precedence:** project overrides global on any field present in both.
 Missing fields fall back to the hardcoded defaults (max concurrency `4`, default max turns unlimited, wrap-up turns `2`, consumed-session retention `10` minutes, unconsumed-session retention `720` minutes, abort-all-on-interrupt `true`, mid-run updates `true`).
+The project's file is read only when Pi has granted the project trust, so an untrusted repository cannot change how the extension behaves.
+`/subagents:settings` writes the project's file only, and it writes the values you chose there: what the operator's file holds for the hand-edited keys stays in the operator's file, so a later change to it still reaches the project.
 
 **Example — global defaults for a beefy machine:**
 
@@ -367,7 +369,7 @@ What this does and does not do:
   If you need the tools but want the extension's resources released when the child is disposed, exclusion is the wrong lever — see [Child session lifecycle](../README.md#child-session-lifecycle).
 
 This key is hand-edited in the global or project `settings-extensions.json`; `/subagents:settings` does not expose it, but it is preserved when you change other settings there.
-An absent or empty list reproduces the default behavior, in which children inherit every parent extension.
+An absent list means the operator's list is in force; an empty list in the project's file clears what the operator declared, and stays empty.
 
 The same is true of [`promptInheritance`](#portable-inheritance-opt-in): hand-edited only, preserved across other settings changes, and absent means every child inherits the full parent identity.
 

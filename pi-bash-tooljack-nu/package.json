@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@code-fixer-23/pi-form-components": "workspace:*",
-    "@juanibiapina/pi-extension-settings": "^0.9.1",
+    "@juanibiapina/pi-extension-settings": "catalog:",
     "valibot": "catalog:"
   },
   "peerDependencies": {

@@ -8,7 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadSettings, saveSettings, SettingsManager } from "#src/settings";
+import { loadSettings, SettingsManager } from "#src/settings";
 import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
 import { toSharedStore } from "#test/helpers/tmp-settings-dirs";
 
@@ -119,8 +119,11 @@ describe("the family profiles in the settings", () => {
       JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
-    const loaded = loadSettings(agentDir, cwd, { projectTrusted: true });
-    expect(saveSettings(loaded, cwd)).toBe(true);
+    const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
+    manager.load(true);
+    expect(manager.saveAndNotify("Max concurrency set to 4").level).toBe(
+      "info",
+    );
 
     const written = JSON.parse(
       readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
@@ -154,7 +157,57 @@ describe("the family profiles in the settings", () => {
     const written = JSON.parse(
       readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
     );
-    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual("{}");
+    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toBeUndefined();
+  });
+
+  it("keeps a project declaration that is the same as the operator's", () => {
+    // The project's own file declares the family, so the project means it —
+    // even when the operator declares the very same profile. A save must not
+    // drop it: the project would then follow every later change of the
+    // operator's.
+    writeFileSync(
+      join(agentDir, "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
+    );
+    writeFileSync(
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(
+        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
+      ),
+    );
+
+    const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
+    manager.load(true);
+    manager.saveAndNotify("Max concurrency set to 4");
+
+    const written = JSON.parse(
+      readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
+    );
+    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
+      JSON.stringify({ claude: CLAUDE_PROFILE }),
+    );
+  });
+
+  it("does not erase a project's families when the project is not trusted", () => {
+    // The project's file is not read, so nothing in it is known: a save must
+    // leave it alone rather than write an empty value over it.
+    writeFileSync(
+      join(cwd, ".pi", "settings-extensions.json"),
+      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
+    );
+
+    const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
+    manager.load(false);
+    manager.saveAndNotify("Max concurrency set to 4");
+
+    const written = JSON.parse(
+      readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
+    );
+    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
+      JSON.stringify({ gpt: GPT_PROFILE }),
+    );
   });
 
   it("keeps the operator's families when the project declares one of its own", () => {
