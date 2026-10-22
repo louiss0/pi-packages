@@ -8,7 +8,8 @@ date: 2026-05-29
 ## Status
 
 Accepted.
-Introduces the repository's first build step, scoped to type declarations only.
+Superseded by the source-only settlement: the source-ship model keeps the public surface served from TypeScript source with no build step at all, and the bundled `.d.ts` was set aside in favour of letting Pi compile the TypeScript.
+The build step it introduced was removed from the repository.
 
 ## Context
 

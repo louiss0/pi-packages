@@ -3,8 +3,9 @@
 A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-coding-agent):
 scoped specialists, layered agent definitions, and inspectable model selection.
 
-> **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,256-test characterization suite against Pi 1.3.0.
+> **Status: inherited runtime, specified work pending.** The package now typechecks,
+> and passes a 2,256-test characterization suite against Pi 1.3.0. It is loaded
+> from TypeScript source, with no build step, so Pi compiles the extension itself.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
 > the reasoning level that follows it, the capability-based workspace
@@ -167,7 +168,6 @@ model or thinking choice, and `tools: []` means no tools at all.
 ## Development
 
 ```bash
-pnpm nx run pi-tiered-subagents:build       # type declarations
 pnpm nx run pi-tiered-subagents:typecheck
 pnpm nx run pi-tiered-subagents:test
 pnpm nx run pi-tiered-subagents:check        # formatting
