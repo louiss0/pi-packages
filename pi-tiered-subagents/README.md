@@ -4,7 +4,7 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,254-test characterization suite against Pi 1.3.0.
+> typechecks, and passes a 2,256-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
 > the reasoning level that follows it, the capability-based workspace

@@ -16,7 +16,7 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2254 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,256 tests, all passing (one skipped) |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -65,7 +65,7 @@ body is either inherited (empty) or replaced (non-empty).
 | A duplicate identifier is reported to the operator | 27 | Done. The parent is told once per problem, with the two files it has to choose between. |
 | Tool inheritance from the parent's active tools | 38–43 | Done. The parent's active tools are captured with the request, so a queued child runs with the selection the request was made under. |
 | Fresh conversation except for `debug` | 44 | Done, at both doors: the service door honours the definition's preference when the caller names none. |
-| Parent-only orchestration instructions excluded from children | 47 | Partly. The parent's session-resolved layers — its tool surface, its rules, its skills catalogue, its cwd footer — are cut from the child's inherited identity, so the child inherits neither the parent's tool list nor its per-session guidance. What the child still inherits is the harness's base identity and the operator's own words; the latter is story 45's requirement, not an orchestration leak. Narrowing the cut further is outstanding. |
+| Parent-only orchestration instructions excluded from children | 47 | Done. The parent's session-resolved layers — its tool surface, its rules, its skills catalogue, its cwd footer — and the harness's own base identity and documentation pointer are cut from the child's inherited identity, so the child inherits neither the parent's tools, per-session guidance, nor the harness's role. The operator's and the project's own words stay, and the package's own base stands in the gap; the parent's orchestration instructions therefore never reach a child through the adopted identity. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md) and [adr/0005](../decisions/0005-subagent-record-admission-policy.md). |
 | Request-time capture of the parent's tools | 48 | Done. |
 | Background by default, foreground on request | 49 | Done. |
 
@@ -246,7 +246,7 @@ The recovered suite pins the behaviour this derivative must preserve:
 | Agent registry, defaults, custom agent files | `test/config/agent-types.test.ts`, `test/config/custom-agents.test.ts` |
 | Invocation merge, field locks, background mode | `test/config/invocation-config.test.ts`, `test/config/background-mode.test.ts` |
 | Thinking-level validation at the door | `test/config/thinking-level.test.ts` |
-| Model resolution and spawn configuration | `test/session/model-resolver.test.ts`, `test/tools/spawn-config.test.ts` |
+| Model resolution and spawn configuration | `test/models/selection.test.ts`, `test/models/router.test.ts`, `test/agents/launch-seams.test.ts`, `test/tools/spawn-config.test.ts` |
 | Spawn doors (tool and service), background/foreground | `test/tools/agent-tool.test.ts`, `test/service/service-adapter.test.ts`, `test/tools/background-spawner.test.ts`, `test/tools/foreground-runner.test.ts` |
 | Lifecycle: sessions, runs, state, budgets, resume | `test/lifecycle/*` |
 | Concurrency admission | `test/lifecycle/concurrency-limiter.test.ts` |
