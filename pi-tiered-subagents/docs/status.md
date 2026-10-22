@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 96 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2214 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2248 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
