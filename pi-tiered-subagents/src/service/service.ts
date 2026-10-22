@@ -13,6 +13,8 @@ import type { ResumeRefusal, SubagentStatus } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
+import type { ModelSelection } from "#src/models/selection";
+import type { ThinkingDecision } from "#src/thinking/resolve";
 import type {
   Workspace,
   WorkspaceDisposeOutcome,
@@ -87,6 +89,19 @@ export interface SubagentRecord {
    */
   model?: { readonly provider: string; readonly id: string };
   thinking?: { readonly level?: string };
+  /**
+   * How the model was chosen, and why: the source the launch resolved from and
+   * the sentence saying why. Absent until a launch resolved a model.
+   */
+  modelSelection?: Pick<ModelSelection, "source" | "reason">;
+  /**
+   * The reasoning decision behind the level the child ran at: whether it applied,
+   * where it came from, whether it was clamped, and why.
+   */
+  thinkingDecision?: Pick<
+    ThinkingDecision,
+    "applicable" | "source" | "clamped" | "reason"
+  >;
   /**
    * Why `resume()` would refuse this agent at snapshot time; absent when it
    * would start a run. `still-running` clears when the run settles,

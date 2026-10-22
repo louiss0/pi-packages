@@ -201,6 +201,36 @@ describe("toSubagentRecord", () => {
     expect(agent.turnBudget?.used).toBe(3);
   });
 
+  it("carries the resolved model decision and the reasoning decision", () => {
+    const agent = createTestSubagent({
+      execution: {
+        ...makeStubExecution(),
+        modelSelection: {
+          source: "routed",
+          reason: "the child's family routed it down a tier",
+        },
+        thinkingDecision: {
+          applicable: true,
+          source: "automatic",
+          clamped: false,
+          reason: "the default reasoning level for the model is low",
+        },
+      },
+    });
+
+    const result = toSubagentRecord(agent);
+    expect(result.modelSelection).toEqual({
+      source: "routed",
+      reason: "the child's family routed it down a tier",
+    });
+    expect(result.thinkingDecision).toEqual({
+      applicable: true,
+      source: "automatic",
+      clamped: false,
+      reason: "the default reasoning level for the model is low",
+    });
+  });
+
   it("omits optional fields when undefined on the source", () => {
     const minimal = createTestSubagent({
       id: "min-1",
@@ -507,6 +537,28 @@ describe("SubagentsServiceAdapter — spawn", () => {
       expect.objectContaining({
         model: resolvedModel,
         maxTurns: 5,
+      }),
+    );
+  });
+
+  it("hands the resolved decision onto the spawn", () => {
+    const mgr = createManagerStub();
+    const svc = new SubagentsServiceAdapter(mgr, makeRuntimeStub(), LADDERS);
+    svc.spawn("Explore", "task", {
+      thinkingLevel: "low",
+      inheritContext: false,
+      maxTurns: 4,
+      foreground: true,
+    });
+
+    expect(mgr.spawn).toHaveBeenCalledWith(
+      expect.anything(), // snapshot
+      "Explore",
+      "task",
+      expect.objectContaining({
+        modelSelection: expect.objectContaining({ source: "inherited" }),
+        thinkingDecision: expect.objectContaining({ source: "request" }),
+        maxTurns: 4,
       }),
     );
   });

@@ -15,6 +15,8 @@ import {
 } from "#src/agents/invocation";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { ToolSelection } from "#src/agents/definition";
+import type { ModelSelection } from "#src/models/selection";
+import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { AgentSelection } from "#src/agents/registry";
 import { debugLog } from "#src/debug";
 import type { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
@@ -245,6 +247,19 @@ export interface AgentSpawnConfig {
   maxTurns?: number;
   inheritContext?: boolean;
   thinkingLevel?: ThinkingLevel;
+  /**
+   * How the resolved model was chosen, and why — the decision behind a launch,
+   * carried so a spawned record can answer why it runs on the model it does.
+   */
+  modelSelection?: Pick<ModelSelection, "source" | "reason">;
+  /**
+   * The reasoning decision behind the level the child runs at: whether it
+   * applied, where it came from, whether it was clamped, and why.
+   */
+  thinkingDecision?: Pick<
+    ThinkingDecision,
+    "applicable" | "source" | "clamped" | "reason"
+  >;
   /**
    * Whether this door has committed to a background mode or is offering a
    * default the agent's frontmatter may override. Required so a new front door
@@ -494,6 +509,8 @@ export class SubagentManager {
         model: options.model,
         maxTurns: options.maxTurns,
         thinkingLevel: options.thinkingLevel,
+        modelSelection: options.modelSelection,
+        thinkingDecision: options.thinkingDecision,
         parentSession: options.parentSession,
         signal: options.signal,
         toolNames,

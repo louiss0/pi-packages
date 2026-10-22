@@ -63,6 +63,8 @@ export async function runForeground(
       {
         description: execution.description,
         model: execution.model,
+        modelSelection: execution.modelSelection,
+        thinkingDecision: execution.thinkingDecision,
         maxTurns: execution.effectiveMaxTurns,
         inheritContext: execution.inheritContext,
         thinkingLevel: execution.thinking,

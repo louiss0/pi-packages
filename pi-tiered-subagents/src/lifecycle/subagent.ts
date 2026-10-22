@@ -35,6 +35,8 @@ import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
+import type { ModelSelection } from "#src/models/selection";
+import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { RunConfig } from "#src/runtime";
 import type {
   CompactionInfo,
@@ -125,6 +127,18 @@ export interface SubagentExecution {
   model?: Model<any>;
   maxTurns?: number;
   thinkingLevel?: ThinkingLevel;
+  /**
+   * How the resolved model was chosen, and why — the decision behind a launch.
+   */
+  modelSelection?: Pick<ModelSelection, "source" | "reason">;
+  /**
+   * The reasoning decision behind the level the child runs at: whether it
+   * applied, where it came from, whether it was clamped, and why.
+   */
+  thinkingDecision?: Pick<
+    ThinkingDecision,
+    "applicable" | "source" | "clamped" | "reason"
+  >;
   parentSession?: ParentSessionInfo;
   signal?: AbortSignal;
   /**
@@ -353,6 +367,16 @@ export class Subagent {
       this._releasedThinkingLevel ??
       this.execution.thinkingLevel
     );
+  }
+
+  /** How the resolved model was chosen, and why, for the launch this run was born from. */
+  get modelSelection(): Pick<ModelSelection, "source" | "reason"> | undefined {
+    return this.execution.modelSelection;
+  }
+
+  /** The reasoning decision behind the level the child runs at, for this launch. */
+  get thinkingDecision(): ThinkingDecision | undefined {
+    return this.execution.thinkingDecision;
   }
 
   /** The tool call ID that spawned this background agent, if any. */

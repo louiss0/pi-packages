@@ -345,7 +345,7 @@ delivered. Each item names the user stories it covers.
 | Capability-based workspace scheduling | 52–54 | Done — see the workspace scheduling above. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | Done — see the shared settings backend above. The inherited generic loader (`loadLayeredSettings`) is still exported for other packages, but it is no longer this package's backend. |
 | One configuration resolver for both launch doors | 80–82 | Done — the whole launch, the definition merge through the model and reasoning level, is resolved by one resolver (`src/agents/resolver.ts`), so the two doors cannot drift apart on a launch. The rest of a launch — the tool selection and the context assembly that follows a resolved launch — is still per door. |
-| The routing reason in the service door's record | 74 | The record carries the model and the level; the *reason* is in the tool door's launch note only. |
+| The routing reason in the service door's record | 74 | Done — the record now carries the resolved model decision (source and reason) and the reasoning decision (applicability, source, clamping, and reason), for spawns from either door. |
 | A narrower cut of the inherited identity | 47 | Done. Pi's base identity, its tool surface, and its documentation pointer are not inherited; the operator's own prompt is, and the package's own base stands in the gap. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md). |
 | A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 

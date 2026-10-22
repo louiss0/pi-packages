@@ -129,6 +129,8 @@ export class SubagentsServiceAdapter implements SubagentsService {
     return this.manager.spawn(snapshot, type, prompt, {
       description: execution.description,
       model: execution.model,
+      modelSelection: execution.modelSelection,
+      thinkingDecision: execution.thinkingDecision,
       maxTurns: execution.effectiveMaxTurns,
       inheritContext: execution.inheritContext,
       thinkingLevel: execution.thinking,
@@ -259,6 +261,24 @@ export function toSubagentRecord(record: Subagent): SubagentRecord {
   }
   if (record.thinkingLevel) {
     out.thinking = { level: record.thinkingLevel };
+  }
+
+  // The launch's decision facts travel with the record: the model was chosen
+  // from somewhere, and why, plus the reasoning decision behind the level.
+  // Both are absent until a launch resolved a model.
+  if (record.modelSelection) {
+    out.modelSelection = {
+      source: record.modelSelection.source,
+      reason: record.modelSelection.reason,
+    };
+  }
+  if (record.thinkingDecision) {
+    out.thinkingDecision = {
+      applicable: record.thinkingDecision.applicable,
+      source: record.thinkingDecision.source,
+      clamped: record.thinkingDecision.clamped,
+      reason: record.thinkingDecision.reason,
+    };
   }
 
   return out;

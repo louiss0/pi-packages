@@ -62,6 +62,8 @@ export function spawnBackground(
         parentSession: params.parentSession,
         description: execution.description,
         model: execution.model,
+        modelSelection: execution.modelSelection,
+        thinkingDecision: execution.thinkingDecision,
         maxTurns: execution.effectiveMaxTurns,
         inheritContext: execution.inheritContext,
         thinkingLevel: execution.thinking,
