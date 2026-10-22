@@ -4,12 +4,13 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,214-test characterization suite against Pi 1.3.0.
+> typechecks, and passes a 2,222-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
-> and the reasoning level that follows it are **done**. Capability-based
-> scheduling and the shared settings backend are **not implemented yet**. See
-> [docs/status.md](docs/status.md) for the verified state and what is still owed.
+> the reasoning level that follows it, and the capability-based workspace
+> scheduling are **done**. The shared settings backend is **not implemented
+> yet**. See [docs/status.md](docs/status.md) for the verified state and what is
+> still owed.
 
 ## Install
 
@@ -29,6 +30,10 @@ v25.0.1, which is itself a friendly fork of
 
 - **Spawning** — a `subagent` tool that starts a child agent in the background by
   default, with an explicit foreground mode.
+- **Workspace scheduling** — one child at a time may change the files in a
+  workspace. The rule follows the child's effective tools, not its role: a
+  child that only reads runs alongside the one that writes, and a shell or an
+  unknown tool counts as a writer.
 - **Result retrieval** — `get_subagent_result` polls or awaits a child's status
   and result.
 - **Steering** — `steer_subagent` sends a message to a running child.

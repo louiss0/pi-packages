@@ -23,6 +23,7 @@ import type {
 } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationManager } from "#src/observation/notification";
+import { WorkspaceGate } from "#src/scheduling/gate";
 import type { RunConfig } from "#src/runtime";
 import { GetResultTool } from "#src/tools/get-result-tool";
 import type { AgentDefinition } from "#src/agents/definition";
@@ -120,6 +121,9 @@ function createManager(overrides?: {
     getRunConfig: overrides?.getRunConfig,
     getRetentionPolicy: overrides?.getRetentionPolicy,
     registry: overrides?.registry ?? defaultRegistry(),
+    // A gate of its own, so one test's children never hold the slot another
+    // test's children wait for.
+    workspaceGate: new WorkspaceGate(),
   });
   return { manager: mgr, createSubagentSession, limiter };
 }
@@ -749,6 +753,12 @@ describe("SubagentManager", () => {
           createSubagentSession: factory,
           getMaxConcurrent: () => 1,
           observer,
+          // Read-only children, so these tests exercise the concurrency limit
+          // alone: a child that may change files also waits for the
+          // workspace's exclusive slot, which is a rule of its own.
+          registry: registryWith("worker", {
+            tools: { kind: "explicit", names: ["read", "grep", "find", "ls"] },
+          }),
         }));
         const x = spawnBg(manager, "x");
         await manager.getRecord(x)!.promise;

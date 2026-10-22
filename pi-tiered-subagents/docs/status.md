@@ -171,6 +171,25 @@ Recorded in [adr/](adr/):
 - [0006](adr/0006-background-by-default.md) — the background is the default
   for both doors.
 
+## The workspace scheduling
+
+`src/scheduling/` decides when a child may run.
+
+| Rule | Stories | State |
+| --- | --- | --- |
+| One child at a time may change the workspace | 52 | Done. A child that may change files holds the workspace's exclusive slot for its run; children that only read run alongside it. The slot is per workspace, so two parents in one directory share it. |
+| The classification follows the tools, not the role | 53 | Done. The child's effective tools — the definition's selection against the parent's active tools as they were when the request was made — decide, so an override cannot slip past the rule. |
+| A shell and an unknown tool count as writers | 54 | Done. Only the tools this package knows to be read-only (`read`, `grep`, `find`, `ls`, `web_search`, `web_fetch`) are read-only; everything else takes the slot. |
+
+The rule is a scheduling promise between this runtime's children, not a
+sandbox: it does not coordinate the parent's own edits, another process in the
+same directory, or what a reader sees while a writer works. A foreground
+child waits for the slot too — it bypasses the concurrency limit, not the
+workspace — and a child aborted while waiting never runs and never holds the
+slot.
+
+Recorded in [adr/0009](adr/0009-one-child-at-a-time-may-change-the-workspace.md).
+
 ## Inherited behaviour, now characterized
 
 The recovered suite pins the behaviour this derivative must preserve:
@@ -268,7 +287,7 @@ names the user stories it covers.
 | --- | --- | --- |
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | Done — see the model selection above. |
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Done — see the reasoning selection above. |
-| Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
+| Capability-based workspace scheduling | 52–54 | Done — see the workspace scheduling above. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
 | One configuration resolver for both launch doors | 80–82 | The model and the reasoning level are resolved by one resolver (`src/models/launch.ts`), so the two doors cannot drift apart on them. The rest of a launch — the definition, the tools, the context — is still resolved by each door. |
 | The routing reason in the service door's record | 74 | The record carries the model and the level; the *reason* is in the tool door's launch note only. |
