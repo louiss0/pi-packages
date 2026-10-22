@@ -54,6 +54,13 @@ export interface SubagentsSettings {
    * between transports (ADR 0009).
    */
   promptInheritance?: Record<string, PromptInheritance>;
+  /**
+   * The operator's family profiles, keyed by family.
+   *
+   * The values are data the model domain reads and validates; this module only
+   * carries them, so that saving the settings does not erase them.
+   */
+  familyProfiles?: Record<string, unknown>;
 }
 
 /**
@@ -77,6 +84,12 @@ export interface SettingsSnapshot {
   excludedExtensionPackages?: string[];
   /** Present only when non-empty, and round-tripped for the same reason. */
   promptInheritance?: Record<string, PromptInheritance>;
+  /**
+   * The operator's family profiles, round-tripped for the same reason: the
+   * settings file is the one place they live, so a `/subagents:settings` edit
+   * must not erase them.
+   */
+  familyProfiles?: Record<string, unknown>;
 }
 
 /** Emit callback — a subset of `pi.events.emit` to keep helpers testable. */
@@ -105,6 +118,7 @@ export class SettingsManager {
   private _midRunUpdates: boolean = DEFAULT_MID_RUN_UPDATES;
   private _excludedExtensionPackages: string[] = [];
   private _promptInheritance: Record<string, PromptInheritance> = {};
+  private _familyProfiles: Record<string, unknown> | undefined = undefined;
 
   private readonly emit: SettingsEmit;
   private readonly cwd: string;
@@ -206,11 +220,16 @@ export class SettingsManager {
    * Load merged settings (global + project), apply to in-memory values,
    * and emit the `subagents:settings_loaded` lifecycle event.
    * Returns the raw loaded settings object.
+   *
+   * The project layer is only read when the project is trusted. The trust
+   * decision is a session fact, so the settings are loaded again when the
+   * session starts.
    */
-  load(): SubagentsSettings {
+  load(projectTrusted = true): SubagentsSettings {
     const { legacyGraceTurns, ...settings } = loadSettings(
       this.agentDir,
       this.cwd,
+      { projectTrusted },
     );
     warnAboutRetiredSettings(settings, legacyGraceTurns === true);
     if (typeof settings.maxConcurrent === "number")
@@ -234,8 +253,20 @@ export class SettingsManager {
       ...(settings.excludedExtensionPackages ?? []),
     ];
     this._promptInheritance = { ...settings.promptInheritance };
+    this._familyProfiles = settings.familyProfiles
+      ? { ...settings.familyProfiles }
+      : undefined;
     this.emit("subagents:settings_loaded", { settings });
     return settings;
+  }
+
+  /**
+   * The operator's family profiles, as they were loaded.
+   *
+   * The model domain reads and validates them; this module only carries them.
+   */
+  get familyProfiles(): Record<string, unknown> | undefined {
+    return this._familyProfiles;
   }
 
   /**
@@ -258,6 +289,9 @@ export class SettingsManager {
     }
     if (Object.keys(this._promptInheritance).length > 0) {
       snapshot.promptInheritance = { ...this._promptInheritance };
+    }
+    if (this._familyProfiles) {
+      snapshot.familyProfiles = { ...this._familyProfiles };
     }
     return snapshot;
   }
@@ -455,6 +489,12 @@ function sanitize(raw: unknown): SubagentsSettings {
   if (promptInheritance) {
     out.promptInheritance = promptInheritance;
   }
+  // The family profiles are data the model domain reads, not settings this
+  // module interprets. They are kept as they were written, so that saving the
+  // settings does not erase them.
+  if (r.familyProfiles && typeof r.familyProfiles === "object") {
+    out.familyProfiles = r.familyProfiles as Record<string, unknown>;
+  }
   return out;
 }
 
@@ -483,14 +523,39 @@ function projectPath(cwd: string): string {
   return join(cwd, ".pi", "subagents.json");
 }
 
-/** Load merged settings: global provides defaults, project overrides. */
-export function loadSettings(agentDir: string, cwd: string): SubagentsSettings {
+/**
+ * Load merged settings: global provides defaults, project overrides.
+ *
+ * The project layer is only read when the project is trusted: a repository the
+ * operator has not trusted cannot change how the extension behaves.
+ *
+ * The family profiles merge per family rather than per file, so a project
+ * refines one family without erasing the operator's others.
+ */
+export function loadSettings(
+  agentDir: string,
+  cwd: string,
+  options: { projectTrusted?: boolean } = {},
+): SubagentsSettings {
   return loadLayeredSettings({
     agentDir,
     cwd,
     filename: "subagents.json",
     sanitize,
     warnLabel: "pi-subagents",
+    projectTrusted: options.projectTrusted,
+    merge: (global, project) => ({
+      ...global,
+      ...project,
+      ...(global.familyProfiles || project.familyProfiles
+        ? {
+            familyProfiles: {
+              ...global.familyProfiles,
+              ...project.familyProfiles,
+            },
+          }
+        : {}),
+    }),
   } satisfies LayeredSettingsSource<SubagentsSettings>);
 }
 

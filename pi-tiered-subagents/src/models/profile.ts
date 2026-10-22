@@ -14,9 +14,9 @@
  */
 
 import {
-  candidateJoins,
   type FamilyStrategy,
   matchesTier,
+  tierNameList,
 } from "#src/models/strategy";
 
 /** A concrete model: the provider that serves it and its id there. */
@@ -206,6 +206,6 @@ export function validateProfile(
 
 /** The tier names a model's id carries, for a problem message. */
 function describeCandidates(candidates: readonly string[]): string {
-  const joins = candidateJoins(candidates).filter((join) => join !== "");
-  return joins.length > 0 ? joins.join(", ") : "no tier";
+  const names = tierNameList(candidates);
+  return names.length > 0 ? names.join(", ") : "no tier";
 }

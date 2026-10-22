@@ -82,6 +82,16 @@ describe("resolveThinking — an explicit level", () => {
     expect(decision.level).not.toBe("off");
   });
 
+  it("refuses an explicit off on a model that reasons", () => {
+    const decision = resolveThinking({
+      requested: "off",
+      model: makeReasoningModel(),
+    });
+    expect(decision.clamped).toBe(true);
+    expect(decision.level).not.toBe("off");
+    expect(decision.reason).toContain("does extended reasoning");
+  });
+
   it("keeps the request's level when there is no model to check it against", () => {
     const decision = resolveThinking({ requested: "medium" });
     expect(decision.level).toBe("medium");

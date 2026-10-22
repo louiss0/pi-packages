@@ -115,6 +115,12 @@ Only data is read: a value the schema does not name is ignored, never
 evaluated. A family with no naming structure is refused — the eight shipped
 strategies are the structures this package can read.
 
+The profiles live in the runtime's settings file, which the settings module
+owns: it merges the global and project layers per family, reads the project
+layer only when the project is trusted, and round-trips the profiles so a
+`/subagents:settings` edit does not erase them. The model domain reads the
+data and validates it; it never touches a file of its own.
+
 ### What the model selection does now
 
 | Area | Stories | State |
@@ -145,6 +151,7 @@ is known.
 | A model that does not reason is still usable | 72 | Done. |
 | The level is discarded for a model that does not reason | 73 | Done. The launch reports *not applicable* rather than a level that was never applied. |
 | The choice is reported | 74 (thinking half) | Done. A clamp and a not-applicable level both appear in the launch note. |
+| An explicit "off" is refused on a model that reasons | 71 | Done. The lowest level the model supports takes its place, and the launch says so. |
 
 ### Inherited, and covered by the suite
 
@@ -263,8 +270,8 @@ names the user stories it covers.
 | Reasoning defaults, clamping, not-applicable reporting | 68–74 | Done — see the reasoning selection above. |
 | Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
-| One configuration resolver for both launch doors | 80–82 | Both doors now answer through the same registry and the same precedence, but the resolution itself is still two code paths: the tool door resolves a request, the service door resolves a spawn. |
-| Resolved model/thinking facts in the launch and result presentation | 74 | Not surfaced yet. |
+| One configuration resolver for both launch doors | 80–82 | The model and the reasoning level are resolved by one resolver (`src/models/launch.ts`), so the two doors cannot drift apart on them. The rest of a launch — the definition, the tools, the context — is still resolved by each door. |
+| The routing reason in the service door's record | 74 | The record carries the model and the level; the *reason* is in the tool door's launch note only. |
 | A narrower cut of the inherited identity | 47 | The child's inherited identity still carries the harness's base preamble. Narrowing it is outstanding. |
 | A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 

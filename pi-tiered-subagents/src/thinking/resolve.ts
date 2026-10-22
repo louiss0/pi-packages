@@ -28,18 +28,13 @@ import {
   getSupportedThinkingLevels,
   type Model,
 } from "@earendil-works/pi-ai";
-import type { SubagentThinkingLevel } from "#src/config/thinking-level";
+import {
+  THINKING_LEVELS,
+  type SubagentThinkingLevel,
+} from "#src/config/thinking-level";
 
 /** The levels, in ascending order of effort. */
-const EFFORT: readonly SubagentThinkingLevel[] = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-];
+const EFFORT: readonly SubagentThinkingLevel[] = THINKING_LEVELS;
 
 /** Where the level came from. */
 export type ThinkingSource =
@@ -177,6 +172,23 @@ function explicit(
   supported: readonly SubagentThinkingLevel[],
   model: Model<any>,
 ): ThinkingDecision {
+  // A model that reasons does not reason less because the caller asked it to:
+  // an explicit "off" is refused on such a model, and the lowest level it does
+  // support takes its place. A model that does not reason never reaches here —
+  // the level does not apply to it at all.
+  if (requested === "off") {
+    const lowest = supported.find((level) => level !== "off");
+    if (lowest) {
+      return {
+        level: lowest,
+        applicable: true,
+        source,
+        clamped: true,
+        reason: `${model.provider}/${model.id} does extended reasoning, so "off" was not applied; the lowest level it supports is ${lowest}`,
+      };
+    }
+  }
+
   if (supported.includes(requested)) {
     return {
       level: requested,

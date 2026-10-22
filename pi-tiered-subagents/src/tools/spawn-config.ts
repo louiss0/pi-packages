@@ -14,14 +14,11 @@ import {
   parseThinkingLevel,
   thinkingLevelError,
 } from "#src/config/thinking-level";
-import {
-  type ModelSelection,
-  type ModelSelectionResult,
-  selectModel,
-} from "#src/models/selection";
+import { type ModelSelection } from "#src/models/selection";
+import { resolveLaunchModel } from "#src/models/launch";
 import type { ModelRegistry } from "#src/models/registry";
-import type { RoutingContext } from "#src/models/router";
-import { type ThinkingDecision, resolveThinking } from "#src/thinking/resolve";
+import type { RoutingLadders } from "#src/models/router";
+import { type ThinkingDecision } from "#src/thinking/resolve";
 import {
   isBelowMinimumTurns,
   MIN_MAX_TURNS,
@@ -38,8 +35,8 @@ import {
 export interface ModelInfo {
   parentModel: Model<any> | undefined;
   modelRegistry: ModelRegistry | undefined;
-  /** The profiles and strategies the automatic routing uses. */
-  routing: RoutingContext;
+  /** The routing ladders the automatic model selection walks. */
+  ladders: RoutingLadders;
   /** The effort the parent was running at, when the parent has one. */
   parentThinkingLevel?: ThinkingLevel;
 }
@@ -132,9 +129,10 @@ export function resolveSpawnConfig(
     runInBackground: params.run_in_background as boolean | undefined,
   });
 
-  // Resolve the model: the request's own choice, then the definition's, then
-  // the automatic step down the parent's family ladder.
-  const modelChoice: ModelSelectionResult = selectModel(
+  // Resolve the model and the reasoning level, through the resolver both doors
+  // use: the request's own choice, then the definition's, then the automatic
+  // step down the parent's ladder.
+  const launch = resolveLaunchModel(
     {
       requestedModel: resolvedConfig.modelFromParams
         ? resolvedConfig.model
@@ -142,25 +140,18 @@ export function resolveSpawnConfig(
       definitionModel: resolvedConfig.modelFromParams
         ? undefined
         : resolvedConfig.model,
-      parentModel: modelInfo.parentModel,
+      requestedThinking: thinkingFromParams,
+      definitionThinking: resolvedConfig.thinking,
     },
-    modelInfo.modelRegistry,
-    modelInfo.routing,
+    {
+      registry: modelInfo.modelRegistry,
+      ladders: modelInfo.ladders,
+      parentModel: modelInfo.parentModel,
+      parentThinkingLevel: modelInfo.parentThinkingLevel,
+    },
   );
-  if (!modelChoice.ok) return { error: modelChoice.error };
-  const model = modelChoice.selection.model;
-
-  // The reasoning level follows the model: what a model can do is a property of
-  // the model, so the level is resolved once the model is known.
-  const thinkingDecision = resolveThinking({
-    requested: thinkingFromParams,
-    defined: resolvedConfig.thinking,
-    model,
-    parentLevel: modelInfo.parentThinkingLevel,
-    // The parent's model was kept when nothing below it was available.
-    parentModelKept: modelChoice.selection.source === "inherited",
-  });
-  const thinking = thinkingDecision.level;
+  if (!launch.ok) return { error: launch.error };
+  const { model, modelSelection, thinking, thinkingDecision } = launch.resolved;
   const inheritContext = resolvedConfig.inheritContext;
   const runInBackground = resolvedConfig.runInBackground;
 
@@ -190,14 +181,14 @@ export function resolveSpawnConfig(
     identity: { subagentType, rawType, displayName, definition },
     notes: [
       ...buildMinimumTurnsNote(resolvedConfig.maxTurns),
-      ...buildModelNote(modelChoice.selection),
+      ...buildModelNote(modelSelection),
       ...buildThinkingNote(thinkingDecision),
     ],
     execution: {
       prompt: params.prompt as string,
       description: params.description as string,
       model,
-      modelSelection: modelChoice.selection,
+      modelSelection,
       thinkingDecision,
       effectiveMaxTurns,
       thinking,
@@ -223,14 +214,16 @@ function buildThinkingNote(decision: ThinkingDecision): string[] {
 }
 
 /**
- * Advise that the model was chosen automatically, and say which.
+ * Advise which model the child will run on, and say why.
  *
- * The caller did not name a model, so it cannot know which one the child will
- * run on; the launch note is where it finds out.
+ * The caller did not name a model, so it cannot know which one the child
+ * runs on; the launch note is where it finds out.
  */
 function buildModelNote(selection: ModelSelection): string[] {
-  if (selection.source !== "routed") return [];
-  return [`Note: the model was chosen automatically — ${selection.reason}.`];
+  if (selection.source === "request") return [];
+  const model = selection.model;
+  const named = model ? `${model.provider}/${model.id}` : "the parent's model";
+  return [`Note: the child runs on ${named} — ${selection.reason}.`];
 }
 
 /**

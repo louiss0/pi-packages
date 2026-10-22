@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Model } from "@earendil-works/pi-ai";
 import { parseModelIdentity, resolveExactModel } from "#src/models/identity";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
+import { makeModel } from "#test/helpers/make-model";
 import type { FamilyProfile } from "#src/models/profile";
 import type { ModelRegistry } from "#src/models/registry";
 import { type RoutingContext, routingContext } from "#src/models/router";
@@ -85,6 +86,19 @@ describe("resolveExactModel", () => {
       "openai/claude-sonnet-5-5",
       registry([SONNET]),
     );
+    expect(typeof resolved === "string").toBe(true);
+  });
+
+  it("does not resolve a model the session cannot run", () => {
+    const registry = {
+      // The session knows the model, but cannot run it.
+      find: () => makeModel({ id: "claude-sonnet-5-5", provider: "anthropic" }),
+      getAll: () => [
+        makeModel({ id: "claude-sonnet-5-5", provider: "anthropic" }),
+      ],
+      getAvailable: () => [],
+    };
+    const resolved = resolveExactModel("anthropic/claude-sonnet-5-5", registry);
     expect(typeof resolved === "string").toBe(true);
   });
 

@@ -67,6 +67,22 @@ export interface LayeredSettingsSource<T> {
    * e.g. `"pi-subagents"` → `"[pi-subagents] Ignoring malformed settings at …"`.
    */
   warnLabel: string;
+  /**
+   * Whether the project layer may be read at all.
+   *
+   * A project the operator has not trusted contributes nothing: its settings
+   * are not read, so opening a repository cannot change how the extension
+   * behaves. Defaults to reading it, for callers that have no trust decision.
+   */
+  projectTrusted?: boolean;
+  /**
+   * Merge the two layers, when the shallow spread is not enough.
+   *
+   * A key whose value is an object of named entries — the family profiles, say
+   * — is merged per entry rather than replaced whole, so a project refines one
+   * family without erasing the operator's others.
+   */
+  merge?: (global: Partial<T>, project: Partial<T>) => Partial<T>;
 }
 
 /**
@@ -75,7 +91,9 @@ export interface LayeredSettingsSource<T> {
  * - A missing file is silent — returns `{}` for that layer.
  * - A file that exists but cannot be parsed warns to stderr and returns `{}` for
  *   that layer, so startup proceeds normally.
- * - The two layers are merged with a shallow spread; project keys win.
+ * - The two layers are merged with a shallow spread; project keys win, unless
+ *   the source names a `merge` of its own.
+ * - A project layer that is not trusted is not read at all.
  *
  * Throws nothing. All error conditions produce a warning and fall back to `{}`.
  *
@@ -86,8 +104,13 @@ export function loadLayeredSettings<T>(
 ): Partial<T> {
   const { agentDir, cwd, filename, sanitize, warnLabel } = source;
   const global = readLayer(join(agentDir, filename), sanitize, warnLabel);
-  const project = readLayer(join(cwd, ".pi", filename), sanitize, warnLabel);
-  return { ...global, ...project };
+  const project =
+    source.projectTrusted === false
+      ? {}
+      : readLayer(join(cwd, ".pi", filename), sanitize, warnLabel);
+  return source.merge
+    ? source.merge(global, project)
+    : { ...global, ...project };
 }
 
 // ── Private helpers ──────────────────────────────────────────────────────────

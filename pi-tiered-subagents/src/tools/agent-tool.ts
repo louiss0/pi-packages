@@ -255,7 +255,7 @@ export class AgentTool {
       "- Use run_in_background for work you don't need immediately. You will be notified when it completes.",
       "- Use resume with an agent ID to continue a previous agent's work, or to answer an agent that ended its turn with a question.",
       "- Use steer_subagent to send mid-run messages to a running background agent.",
-      '- Use model to specify a different model (as "provider/modelId", or fuzzy e.g. "haiku", "sonnet").',
+      '- Use model to specify a different model, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5").',
       "- Use thinking to control extended thinking level.",
       "- Use inherit_context if the agent needs the parent conversation history.",
     ].join("\n");

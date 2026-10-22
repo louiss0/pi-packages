@@ -33,8 +33,7 @@ function makeModelInfo(
       getAll: () => [],
       getAvailable: () => [],
     },
-    routing: {
-      available: [],
+    ladders: {
       profiles: new Map(),
       strategies: strategiesByFamily(SHIPPED_STRATEGIES),
     },

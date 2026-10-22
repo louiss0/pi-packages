@@ -106,6 +106,16 @@ export function matchesTier(
 }
 
 /**
+ * The tier names a model's id carries, longest first.
+ *
+ * A tier name may be one segment ("sol") or several joined ("flash-lite"),
+ * and a model may qualify a tier further ("code-highspeed").
+ */
+export function tierNameList(candidates: readonly string[]): string[] {
+  return candidateJoins(candidates).filter((join) => join !== "");
+}
+
+/**
  * The most specific tier a model's candidates name.
  *
  * `["flash", "lite"]` is the "flash-lite" tier rather than the "flash" one, so

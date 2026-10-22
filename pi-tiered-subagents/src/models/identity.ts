@@ -65,12 +65,10 @@ export function resolveExactModel(
   );
   if (found) return found;
 
-  const registryModel = registry.find(identity.provider, identity.id);
-  if (registryModel) return registryModel;
-
   return (
     `Model not found: "${input}".\n\n` +
-    "Name the model exactly, as provider/modelId.\n\n" +
+    "Name the model exactly, as provider/modelId. A model the session cannot " +
+    "run is not a model it can be given.\n\n" +
     "Available models:\n" +
     (available
       .map((model) => `  ${model.provider}/${model.id}`)

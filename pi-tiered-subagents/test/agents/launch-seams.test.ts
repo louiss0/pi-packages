@@ -14,11 +14,14 @@ import {
   resolveChildToolNames,
 } from "#src/agents/definition";
 import { AgentRegistry } from "#src/agents/registry";
+import { resolveLaunchModel } from "#src/models/launch";
+import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { assembleSessionConfig } from "#src/session/session-config";
 import type { AssemblerIO } from "#src/session/session-config";
 import { AgentTool } from "#src/tools/agent-tool";
 import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
+import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
@@ -250,6 +253,45 @@ describe("the service door", () => {
     });
     adapter.spawn("worker", "do it");
     expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("both doors resolve alike", () => {
+  it("gives the tool door and the service door the same model and level", () => {
+    // The two doors ask the same question in different words; one resolver
+    // answers it, so they cannot drift apart.
+    const registry = {
+      find: () => undefined,
+      getAll: () => [],
+      getAvailable: () => [],
+    };
+    const ladders = {
+      profiles: new Map(),
+      strategies: strategiesByFamily(SHIPPED_STRATEGIES),
+    };
+
+    const tool = resolveSpawnConfig(
+      { prompt: "do it", description: "d", subagent_type: "worker" },
+      registryWith("worker", { thinking: "low" }),
+      {
+        parentModel: undefined,
+        modelRegistry: registry,
+        ladders,
+      },
+      { defaultMaxTurns: undefined },
+    );
+    if ("error" in tool) throw new Error(tool.error);
+
+    const service = resolveLaunchModel(
+      { definitionThinking: "low" },
+      { registry, ladders },
+    );
+    if (!service.ok) throw new Error(service.error);
+
+    expect(tool.execution.thinking).toBe(service.resolved.thinking);
+    expect(tool.execution.modelSelection.source).toBe(
+      service.resolved.modelSelection.source,
+    );
   });
 });
 

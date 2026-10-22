@@ -11,7 +11,7 @@ import {
   type ParentPromptOptions,
   type ParentSnapshot,
 } from "#src/lifecycle/parent-snapshot";
-import { routingContext, type RoutingLadders } from "#src/models/router";
+import type { RoutingLadders } from "#src/models/router";
 import type { ModelInfo } from "#src/tools/spawn-config";
 import type { SessionContext } from "#src/types";
 
@@ -111,12 +111,8 @@ export class SubagentRuntime {
       // because a child that keeps the parent's model must not work harder
       // than the parent did.
       parentThinkingLevel: this.currentCtx?.thinkingLevel,
-      // The models the session can run are a session fact, so the routing
-      // context is built here, per request.
-      routing: routingContext(
-        this.ladders,
-        registry?.getAvailable?.() ?? registry?.getAll() ?? [],
-      ),
+      // The routing ladders the model selection walks.
+      ladders: this.ladders,
     };
   }
 

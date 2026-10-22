@@ -80,6 +80,14 @@ export interface SubagentRecord {
   /** Path to the agent's session JSONL, once the session exists. */
   outputFile?: string;
   /**
+   * The model the child ran on, and the reasoning level it ran at.
+   *
+   * The facts a consumer needs to know what it actually got: the model the
+   * launch resolved, and the level it resolved with it.
+   */
+  model?: { readonly provider: string; readonly id: string };
+  thinking?: { readonly level?: string };
+  /**
    * Why `resume()` would refuse this agent at snapshot time; absent when it
    * would start a run. `still-running` clears when the run settles,
    * `resume-queued` (a resume waiting for a concurrency slot) clears when that

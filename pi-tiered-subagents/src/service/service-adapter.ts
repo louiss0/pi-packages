@@ -17,9 +17,8 @@ import type {
   ResumeOutcome,
 } from "#src/lifecycle/subagent-manager";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
-import { routingContext, type RoutingLadders } from "#src/models/router";
-import { selectModel } from "#src/models/selection";
-import { resolveThinking } from "#src/thinking/resolve";
+import type { RoutingLadders } from "#src/models/router";
+import { resolveLaunchModel } from "#src/models/launch";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -102,32 +101,25 @@ export class SubagentsServiceAdapter implements SubagentsService {
     // The model: the caller's own choice, then the definition's, then the
     // automatic step down the parent's family ladder.
     const registry = this.runtime.currentCtx.modelRegistry;
-    const selection = selectModel(
+    const launch = resolveLaunchModel(
       {
         requestedModel: options?.model,
         definitionModel:
           options?.model === undefined ? definition?.model : undefined,
-        parentModel: this.runtime.currentCtx.model,
+        requestedThinking: this.resolveThinkingLevel(options?.thinkingLevel),
+        definitionThinking: definition?.thinking,
       },
-      registry,
-      routingContext(
-        this.ladders,
-        registry?.getAvailable?.() ?? registry?.getAll() ?? [],
-      ),
+      {
+        registry,
+        ladders: this.ladders,
+        parentModel: this.runtime.currentCtx.model,
+        parentThinkingLevel: this.runtime.currentCtx.thinkingLevel,
+      },
     );
-    if (!selection.ok) {
-      throw new Error(selection.error);
+    if (!launch.ok) {
+      throw new Error(launch.error);
     }
-    const model = selection.selection.model;
-
-    // The reasoning level follows the model, the way it does at the tool door.
-    const thinking = resolveThinking({
-      requested: this.resolveThinkingLevel(options?.thinkingLevel),
-      defined: definition?.thinking,
-      model,
-      parentLevel: this.runtime.currentCtx.thinkingLevel,
-      parentModelKept: selection.selection.source === "inherited",
-    });
+    const { model, thinking } = launch.resolved;
 
     const snapshot = this.runtime.buildSnapshot(inheritContext);
     const { parentSessionFile, parentSessionId } =
@@ -139,7 +131,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
       // Subagent.toolCallId reporting undefined there is the truth.
       parentSession: { parentSessionFile, parentSessionId },
       maxTurns: options?.maxTurns,
-      thinkingLevel: thinking.level,
+      thinkingLevel: thinking,
       inheritContext,
       bypassQueue: options?.bypassQueue,
       // A caller that names `foreground` has committed; one that omits it has
@@ -257,6 +249,15 @@ export function toSubagentRecord(record: Subagent): SubagentRecord {
   if (record.outputFile !== undefined) out.outputFile = record.outputFile;
   if (record.resumeRefusal !== undefined)
     out.resumeRefusal = record.resumeRefusal;
+
+  // The model the child ran on, and the reasoning level it ran at: the facts a
+  // consumer needs to know what it actually got.
+  if (record.model) {
+    out.model = { provider: record.model.provider, id: record.model.id };
+  }
+  if (record.thinkingLevel) {
+    out.thinking = { level: record.thinkingLevel };
+  }
 
   return out;
 }
