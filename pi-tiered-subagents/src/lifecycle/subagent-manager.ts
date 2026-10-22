@@ -226,9 +226,8 @@ export interface SubagentManagerOptions {
   /**
    * Re-reads the agent definitions before a spawn resolves.
    *
-   * The definition files live on disk and the project's trust is a session
-   * fact, so the registry is refreshed at the choke point every front door
-   * shares rather than once at load.
+   * The definition files live on disk, so the registry is refreshed at the
+   * choke point every front door shares rather than once at load.
    */
   reloadDefinitions?: () => void;
   /**
@@ -453,8 +452,8 @@ export class SubagentManager {
     type: string,
     background: BackgroundRequest,
   ): ResolvedSpawn {
-    // Refresh first: a definition file added since the last spawn, and the
-    // project's trust, are both facts that arrive after the extension loads.
+    // Refresh first: a definition file added since the last spawn is a fact
+    // that arrives after the extension loads.
     this.reloadDefinitions?.();
     const selection = this.registry.select(type);
     if (!selection.ok) {

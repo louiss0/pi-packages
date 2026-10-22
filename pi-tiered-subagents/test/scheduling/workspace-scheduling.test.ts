@@ -34,6 +34,7 @@ function registryWithTools(tools: Record<string, string[]>): AgentRegistry {
       })),
       errors: [],
     },
+    project: { definitions: [], errors: [] },
   }));
 }
 

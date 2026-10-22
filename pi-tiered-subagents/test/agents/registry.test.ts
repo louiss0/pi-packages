@@ -37,12 +37,11 @@ describe("AgentRegistry", () => {
     rmSync(tree.cwd, { recursive: true, force: true });
   });
 
-  const registry = (projectTrusted = true) =>
+  const registry = () =>
     new AgentRegistry(() =>
       loadDefinitionScopes({
         globalDir: tree.globalDir,
         cwd: tree.cwd,
-        projectTrusted,
       }),
     );
 
@@ -120,16 +119,11 @@ describe("AgentRegistry", () => {
     expect(found?.origin).toBe("project");
   });
 
-  it("ignores project definitions when the project is not trusted", () => {
-    tree.writeProject("reviewer.md", "---\ndescription: Project\n---\n");
-    const found = registry(false).find("reviewer");
-    expect(found?.description).not.toBe("Project");
-    expect(found?.origin).toBe("shipped");
-  });
-
-  it("ignores a project definition that introduces a new agent when untrusted", () => {
+  it("adds a definition the project introduces", () => {
     tree.writeProject("sneaky.md", "---\ndescription: Sneaky\n---\n");
-    expect(registry(false).find("sneaky")).toBeUndefined();
+    const found = registry().find("sneaky");
+    expect(found?.description).toBe("Sneaky");
+    expect(found?.origin).toBe("project");
   });
 
   it("clears a shipped model when a file writes null", () => {
@@ -180,6 +174,7 @@ describe("AgentRegistry", () => {
           'Two agent definitions normalize to the identifier "reviewer": a/reviewer.md and a/Reviewer.md. Rename one of them; neither is used.',
         ],
       },
+      project: { definitions: [], errors: [] },
     }));
     expect(reg.errors()).toHaveLength(1);
     expect(reg.errors()[0]).toContain('normalize to the identifier "reviewer"');

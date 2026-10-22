@@ -499,13 +499,13 @@ describe("settings persistence", () => {
       );
     });
 
-    it("leaves the project's data alone when the project is not trusted", () => {
-      // The project's file is not read, so nothing in it is known: a save
-      // must leave it as it is.
+    it("keeps project-declared data the settings UI does not own", () => {
+      // The project's hand-edited data is the project's own: a save of an
+      // unrelated setting must leave it exactly as it was.
       writeProject({ promptInheritance: { "claude-bridge": "portable" } });
 
       const sm = manager();
-      sm.load(false);
+      sm.load();
       sm.applyWrapUpTurns(7);
 
       const written = JSON.parse(readFileSync(projectFile(), "utf-8"));

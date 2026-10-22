@@ -19,6 +19,7 @@ function stubTheme(): Theme {
 
 const testRegistry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 function makeAgent(overrides: Partial<WidgetAgent> = {}): WidgetAgent {

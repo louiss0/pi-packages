@@ -13,6 +13,7 @@ import { makeNavigable } from "#test/helpers/make-navigable";
 
 const registry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 describe("listNavigableAgents", () => {

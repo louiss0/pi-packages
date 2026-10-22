@@ -35,6 +35,7 @@ function registryWith(
       definitions: [{ id, patch, path: `${id}.md` }],
       errors: [],
     },
+    project: { definitions: [], errors: [] },
   }));
 }
 

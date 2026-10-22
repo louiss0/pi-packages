@@ -25,6 +25,10 @@
  * Two files in one scope that normalize to the same identifier are a
  * duplicate, and a duplicate is reported rather than resolved by filesystem
  * order — the operator has to delete one of them.
+ *
+ * Both scopes are read unconditionally. Whether a project's files may be used
+ * is Pi's decision, made for its own resources; this package adds no second
+ * trust gate of its own (ARCHITECTURE-SPEC story 36).
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -69,17 +73,12 @@ export interface LoadedScope {
   readonly errors: readonly string[];
 }
 
-/** The two file scopes a registry merges. */
+/** The two file scopes a registry merges. Both are always read. */
 export interface LoadedScopes {
   /** The operator's global definitions. */
   readonly global: LoadedScope;
-  /**
-   * The project's definitions.
-   *
-   * Absent when the project is not trusted: its files are never read, so
-   * opening a repository cannot change what an agent may do.
-   */
-  readonly project?: LoadedScope;
+  /** The project's definitions. */
+  readonly project: LoadedScope;
 }
 
 /** Where the two file scopes are read from. */
@@ -88,21 +87,14 @@ export interface DefinitionSources {
   readonly globalDir: string;
   /** The project root; the project definitions live in `<cwd>/.pi/agents`. */
   readonly cwd: string;
-  /** Whether Pi has granted the project trust. */
-  readonly projectTrusted: boolean;
 }
 
-/**
- * Read both file scopes.
- *
- * The project scope is read only when the project is trusted.
- */
+/** Read both file scopes. */
 export function loadDefinitionScopes(sources: DefinitionSources): LoadedScopes {
-  const global = loadDefinitionScope(join(sources.globalDir, "agents"));
-  const project = sources.projectTrusted
-    ? loadDefinitionScope(join(sources.cwd, ".pi", "agents"))
-    : undefined;
-  return { global, project };
+  return {
+    global: loadDefinitionScope(join(sources.globalDir, "agents")),
+    project: loadDefinitionScope(join(sources.cwd, ".pi", "agents")),
+  };
 }
 
 /**

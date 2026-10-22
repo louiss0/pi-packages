@@ -176,8 +176,12 @@ pnpm nx run pi-tiered-subagents:metadata     # package metadata
 
 ## Documentation
 
-- [Approved specification](docs/SPEC.md), also published as
+- [Original product specification](docs/SPEC.md), also published as
   [GitHub issue #8](https://github.com/louiss0/pi-packages/issues/8).
+- [Approved architecture and modernization specification](docs/ARCHITECTURE-SPEC.md),
+  published as [GitHub issue #9](https://github.com/louiss0/pi-packages/issues/9),
+  with detailed TypeScript/API diagrams and requirements. Implementation is pending;
+  this follow-up supersedes conflicting portions of the original specification.
 - [Runtime status](docs/status.md) — what is inherited, what changed, what is owed.
 - [Decision records](docs/adr/) — the decisions adopted for this derivative.
 - [Illustrated source guide](docs/how-it-works.html) — open it in a browser.

@@ -29,6 +29,7 @@ import { fakeSource, mockTui } from "#test/helpers/transcript-fixtures";
 
 const registry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 // Pi's per-entry components read the global interactive theme; Pi initializes it

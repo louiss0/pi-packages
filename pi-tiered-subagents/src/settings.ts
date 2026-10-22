@@ -1,9 +1,8 @@
 // Persistence for pi-subagents operational settings.
 //
 // The settings live in the shared store (`@juanibiapina/pi-extension-settings`),
-// in two files: the operator's global file and the project's local file. The
-// project's file is only read when Pi has granted the project trust, and only
-// the project's file is ever written.
+// in two files: the operator's global file and the project's local file. Both
+// are read on their own; only the project's file is ever written.
 
 import { isBelowMinimumTurns, MIN_MAX_TURNS } from "#src/lifecycle/turn-limits";
 import {
@@ -246,15 +245,14 @@ export class SettingsManager {
    * and emit the `subagents:settings_loaded` lifecycle event.
    * Returns the raw loaded settings object.
    *
-   * The project layer is only read when the project is trusted. The trust
-   * decision is a session fact, so the settings are loaded again when the
-   * session starts.
+   * Both layers are read here, while the extension runs. Whether a project's
+   * files may be used is Pi's decision about its own resources; this package
+   * adds no second trust gate (ARCHITECTURE-SPEC story 36).
    */
-  load(projectTrusted = true): SubagentsSettings {
+  load(): SubagentsSettings {
     const { settings, projectSettings } = loadSettingsLayers(
       this.agentDir,
       this.cwd,
-      { projectTrusted },
     );
     const { legacyGraceTurns, ...loaded } = settings;
     warnAboutRetiredSettings(loaded, legacyGraceTurns === true);
@@ -604,18 +602,11 @@ function mergeScopes(
 /**
  * Load the settings: the operator's global scope, then the project's.
  *
- * The project scope is only read when the project is trusted: a repository
- * the operator has not trusted cannot change how the extension behaves.
- *
  * The family profiles merge per family rather than per scope, so a project
  * refines one family without erasing the operator's others.
  */
-export function loadSettings(
-  agentDir: string,
-  cwd: string,
-  options: { projectTrusted?: boolean } = {},
-): SubagentsSettings {
-  return loadSettingsLayers(agentDir, cwd, options).settings;
+export function loadSettings(agentDir: string, cwd: string): SubagentsSettings {
+  return loadSettingsLayers(agentDir, cwd).settings;
 }
 
 /** What one load found: the merged settings, and the project's own layer. */
@@ -636,12 +627,10 @@ export interface LoadedSettings {
 export function loadSettingsLayers(
   agentDir: string,
   cwd: string,
-  options: { projectTrusted?: boolean } = {},
 ): LoadedSettings {
   const scopes: SharedScopes = { agentDir, cwd };
   const global = readScope("global", scopes);
-  const trusted = options.projectTrusted !== false;
-  const project = trusted ? readScope("project", scopes) : {};
+  const project = readScope("project", scopes);
   return {
     settings: mergeScopes(global, project),
     projectSettings: project,

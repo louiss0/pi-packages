@@ -28,7 +28,6 @@ function makeSessionCtx(overrides?: Partial<SessionContext>): SessionContext {
     model: undefined,
     modelRegistry: { find: () => undefined, getAll: () => [] },
     getSystemPrompt: () => "test prompt",
-    isProjectTrusted: () => true,
     sessionManager: {
       getSessionFile: () => "/sessions/test.jsonl",
       getSessionId: () => "test-session-id",

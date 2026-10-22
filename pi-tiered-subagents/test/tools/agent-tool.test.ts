@@ -634,6 +634,7 @@ describe("AgentTool — resume path", () => {
             ],
             errors: [],
           },
+          project: { definitions: [], errors: [] },
         })),
       });
 

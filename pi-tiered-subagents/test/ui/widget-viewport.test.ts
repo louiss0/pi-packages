@@ -82,7 +82,10 @@ function animateUnderRealRenderer(opts: {
   const manager = { listAgents: () => records } as unknown as SubagentManager;
   const widget = new AgentWidget(
     manager,
-    new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
+    new AgentRegistry(() => ({
+      global: { definitions: [], errors: [] },
+      project: { definitions: [], errors: [] },
+    })),
   );
 
   const tui = new TuiMainScreen(
@@ -205,7 +208,10 @@ describe("AgentWidget cadence under Pi's real renderers", () => {
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
+      new AgentRegistry(() => ({
+        global: { definitions: [], errors: [] },
+        project: { definitions: [], errors: [] },
+      })),
     );
     const theme = {
       fg: (_: string, text: string) => text,

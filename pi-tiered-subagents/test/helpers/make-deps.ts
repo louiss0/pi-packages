@@ -16,6 +16,7 @@ import { STUB_SNAPSHOT } from "./stub-ctx";
 /** Minimal registry with the shipped specialists and no files. */
 const defaultRegistry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 /**
@@ -136,6 +137,7 @@ export function createToolDepsWithDisabledBuiltInAgents(
       })),
       errors: [],
     },
+    project: { definitions: [], errors: [] },
   }));
   return createToolDeps({ registry });
 }

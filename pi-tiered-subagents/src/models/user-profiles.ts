@@ -35,8 +35,8 @@ export interface LoadedProfiles {
  * Merge the shipped profiles with the operator's.
  *
  * The shipped profiles come first; the global layer replaces a family whole;
- * the project layer replaces a family whole, and only when the project is
- * trusted. A family the operator did not name keeps the shipped profile.
+ * the project layer replaces a family whole. A family the operator did not
+ * name keeps the shipped profile.
  */
 export function mergeProfiles(
   shipped: readonly FamilyProfile[],

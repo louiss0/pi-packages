@@ -270,7 +270,6 @@ function makeStubCtx(): SessionContext {
     model: undefined,
     modelRegistry: { find: () => undefined, getAll: () => [] },
     getSystemPrompt: () => "test prompt",
-    isProjectTrusted: () => true,
     sessionManager: {
       getSessionFile: () => undefined,
       getSessionId: () => "stub-session",

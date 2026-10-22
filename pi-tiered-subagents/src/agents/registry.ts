@@ -5,9 +5,11 @@
  *
  * 1. the shipped specialists,
  * 2. the operator's global files (`<agentDir>/agents/*.md`),
- * 3. the project's files (`<cwd>/.pi/agents/*.md`) — read only when Pi has
- *    granted the project trust, so opening a repository cannot silently
- *    change what an agent may do.
+ * 3. the project's files (`<cwd>/.pi/agents/*.md`).
+ *
+ * All three load while the extension runs. Whether a project's files may be
+ * used is Pi's decision about its own resources; this package adds no second
+ * trust gate (ARCHITECTURE-SPEC story 36).
  *
  * A later layer refines an earlier one field by field. A file that mentions
  * one setting does not restate the rest, so a small override never discards a
@@ -65,7 +67,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
   /** Re-read the file layers and rebuild the merged definitions. */
   reload(): void {
     const { global, project } = this.load();
-    this.loadErrors = [...global.errors, ...(project?.errors ?? [])];
+    this.loadErrors = [...global.errors, ...project.errors];
     this.definitions = buildDefinitions(global, project);
   }
 
@@ -137,7 +139,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
  */
 function buildDefinitions(
   global: LoadedScope,
-  project: LoadedScope | undefined,
+  project: LoadedScope,
 ): Map<string, AgentDefinition> {
   const definitions = new Map<string, AgentDefinition>();
 
@@ -146,7 +148,7 @@ function buildDefinitions(
   }
 
   applyScope(definitions, global, "global");
-  if (project) applyScope(definitions, project, "project");
+  applyScope(definitions, project, "project");
 
   return definitions;
 }

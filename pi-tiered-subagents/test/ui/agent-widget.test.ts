@@ -80,6 +80,7 @@ function makeWidget(
   } as unknown as SubagentManager;
   const registry = new AgentRegistry(() => ({
     global: { definitions: [], errors: [] },
+    project: { definitions: [], errors: [] },
   }));
   const widget = new AgentWidget(manager, registry);
   const setWidget = vi.fn<UICtx["setWidget"]>();
@@ -270,6 +271,7 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     } as unknown as SubagentManager;
     const registry = new AgentRegistry(() => ({
       global: { definitions: [], errors: [] },
+      project: { definitions: [], errors: [] },
     }));
     const widget = new AgentWidget(manager, registry);
 
@@ -310,7 +312,10 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
+      new AgentRegistry(() => ({
+        global: { definitions: [], errors: [] },
+        project: { definitions: [], errors: [] },
+      })),
     );
 
     let renderFn:
@@ -343,7 +348,10 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
+      new AgentRegistry(() => ({
+        global: { definitions: [], errors: [] },
+        project: { definitions: [], errors: [] },
+      })),
     );
 
     let renderFn:
@@ -543,6 +551,7 @@ describe("AgentWidget — background-only filtering", () => {
     const manager = { listAgents: () => records } as unknown as SubagentManager;
     const registry = new AgentRegistry(() => ({
       global: { definitions: [], errors: [] },
+      project: { definitions: [], errors: [] },
     }));
     const widget = new AgentWidget(manager, registry);
     const setWidgetCalls: unknown[] = [];
@@ -714,7 +723,10 @@ describe("AgentWidget — animation cadence", () => {
     const manager = { listAgents } as unknown as SubagentManager;
     const widget = new AgentWidget(
       manager,
-      new AgentRegistry(() => ({ global: { definitions: [], errors: [] } })),
+      new AgentRegistry(() => ({
+        global: { definitions: [], errors: [] },
+        project: { definitions: [], errors: [] },
+      })),
     );
     widget.setUICtx({
       setStatus: () => {},

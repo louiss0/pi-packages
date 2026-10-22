@@ -61,7 +61,10 @@ function defaultFactory(): SessionFactory {
 
 /** Registry with the shipped specialists only. */
 function defaultRegistry(): AgentRegistry {
-  return new AgentRegistry(() => ({ global: { definitions: [], errors: [] } }));
+  return new AgentRegistry(() => ({
+    global: { definitions: [], errors: [] },
+    project: { definitions: [], errors: [] },
+  }));
 }
 
 /** Registry with a single custom agent, keyed by its canonical identifier. */
@@ -80,6 +83,7 @@ function registryWith(
       ],
       errors: [],
     },
+    project: { definitions: [], errors: [] },
   }));
 }
 

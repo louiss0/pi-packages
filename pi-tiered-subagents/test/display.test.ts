@@ -11,6 +11,7 @@ import { makeModel } from "#test/helpers/make-model";
 
 const testRegistry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 describe("Theme", () => {
@@ -32,6 +33,7 @@ describe("getDisplayName", () => {
         ],
         errors: [],
       },
+      project: { definitions: [], errors: [] },
     }));
     expect(getDisplayName("my-agent", registry)).toBe("My Agent");
   });
@@ -44,6 +46,7 @@ describe("getDisplayName", () => {
         ],
         errors: [],
       },
+      project: { definitions: [], errors: [] },
     }));
     expect(getDisplayName("my-agent", registry)).toBe("my-agent");
   });

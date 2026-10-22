@@ -7,6 +7,7 @@ import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 /** The registry with the shipped specialists and no files. */
 const testRegistry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 /** A registry holding one definition file, for the cases that need one. */
@@ -19,6 +20,7 @@ function registryWith(
       definitions: [{ id, patch, path: `${id}.md` }],
       errors: [],
     },
+    project: { definitions: [], errors: [] },
   }));
 }
 

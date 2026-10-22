@@ -1,5 +1,7 @@
 # pi-tiered-subagents: family-aware delegation with overridable specialists
 
+> **Later approved architecture specification:** [ARCHITECTURE-SPEC.md](ARCHITECTURE-SPEC.md), published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), supersedes this document where it requires extension-owned trust gating, foreground concurrency exemptions, or inherited programmatic launch semantics. It also defines the agreed captured-launch, session-lifetime, UI-library, and targeted TypeScript/API modernization changes. Unchanged product requirements below remain applicable; the follow-up is a specification, not a claim of completed implementation.
+
 ## Problem Statement
 
 Users want to delegate work to specialists without manually choosing an appropriate child model for every task. Inheriting an expensive parent model for every child wastes resources, while hardcoded model pins ignore the user's current session and available model families. Model names, versions, capability tiers, and reasoning controls vary across providers and series; naive suffix parsing, fuzzy selection, or ranking by price cannot reliably express the intended relationships.

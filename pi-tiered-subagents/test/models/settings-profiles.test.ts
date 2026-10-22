@@ -70,7 +70,7 @@ describe("the family profiles in the settings", () => {
       JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
-    const settings = loadSettings(agentDir, cwd, { projectTrusted: true });
+    const settings = loadSettings(agentDir, cwd);
     expect(Object.keys(settings.familyProfiles ?? {}).sort()).toEqual([
       "claude",
       "gpt",
@@ -89,26 +89,10 @@ describe("the family profiles in the settings", () => {
       JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
-    const settings = loadSettings(agentDir, cwd, { projectTrusted: true });
+    const settings = loadSettings(agentDir, cwd);
     const profiles = settings.familyProfiles ?? {};
     expect(profiles.claude).toEqual(CLAUDE_PROFILE);
     expect(profiles.gpt).toEqual(GPT_PROFILE);
-  });
-
-  it("does not read the project layer when the project is not trusted", () => {
-    writeFileSync(
-      join(agentDir, "settings-extensions.json"),
-      JSON.stringify(
-        toSharedStore({ familyProfiles: { claude: CLAUDE_PROFILE } }),
-      ),
-    );
-    writeFileSync(
-      join(cwd, ".pi", "settings-extensions.json"),
-      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
-    );
-
-    const settings = loadSettings(agentDir, cwd, { projectTrusted: false });
-    expect(Object.keys(settings.familyProfiles ?? {})).toEqual(["claude"]);
   });
 
   it("survives a settings save", () => {
@@ -120,7 +104,7 @@ describe("the family profiles in the settings", () => {
     );
 
     const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
-    manager.load(true);
+    manager.load();
     expect(manager.saveAndNotify("Max concurrency set to 4").level).toBe(
       "info",
     );
@@ -149,7 +133,7 @@ describe("the family profiles in the settings", () => {
       cwd,
       agentDir,
     });
-    expect(manager.load(true).familyProfiles).toEqual({
+    expect(manager.load().familyProfiles).toEqual({
       claude: CLAUDE_PROFILE,
     });
     manager.saveAndNotify("Max concurrency set to 4");
@@ -179,7 +163,7 @@ describe("the family profiles in the settings", () => {
     );
 
     const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
-    manager.load(true);
+    manager.load();
     manager.saveAndNotify("Max concurrency set to 4");
 
     const written = JSON.parse(
@@ -187,26 +171,6 @@ describe("the family profiles in the settings", () => {
     );
     expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
       JSON.stringify({ claude: CLAUDE_PROFILE }),
-    );
-  });
-
-  it("does not erase a project's families when the project is not trusted", () => {
-    // The project's file is not read, so nothing in it is known: a save must
-    // leave it alone rather than write an empty value over it.
-    writeFileSync(
-      join(cwd, ".pi", "settings-extensions.json"),
-      JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
-    );
-
-    const manager = new SettingsManager({ emit: () => {}, cwd, agentDir });
-    manager.load(false);
-    manager.saveAndNotify("Max concurrency set to 4");
-
-    const written = JSON.parse(
-      readFileSync(join(cwd, ".pi", "settings-extensions.json"), "utf-8"),
-    );
-    expect(written[SETTINGS_EXTENSION_NAME].familyProfiles).toEqual(
-      JSON.stringify({ gpt: GPT_PROFILE }),
     );
   });
 
@@ -224,7 +188,7 @@ describe("the family profiles in the settings", () => {
       JSON.stringify(toSharedStore({ familyProfiles: { gpt: GPT_PROFILE } })),
     );
 
-    const loaded = loadSettings(agentDir, cwd, { projectTrusted: true });
+    const loaded = loadSettings(agentDir, cwd);
     expect(Object.keys(loaded.familyProfiles ?? {}).sort()).toEqual([
       "claude",
       "gpt",

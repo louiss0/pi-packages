@@ -145,8 +145,7 @@ export default function (pi: ExtensionAPI) {
 
   const refreshProfiles = (): void => {
     // The profiles live in the settings file, which the settings module owns:
-    // it has already merged the global and project layers per family, and it
-    // read the project layer only when the project was trusted.
+    // it merges the operator's and the project's layers per family.
     const { profiles: operator, problems } = parseUserProfiles(
       settings.familyProfiles,
     );
@@ -167,13 +166,13 @@ export default function (pi: ExtensionAPI) {
 
   // ---- Agent definitions ----
   // Shipped specialists, then the operator's global files, then the project's
-  // files — the last only when Pi has granted the project trust, so opening a
-  // repository cannot silently change what an agent may do.
+  // files. Both file layers load while the extension runs: whether a project's
+  // files may be used is Pi's decision about its own resources, and this
+  // extension adds no second gate of its own (ARCHITECTURE-SPEC story 36).
   const registry = new AgentRegistry(() =>
     loadDefinitionScopes({
       globalDir: getAgentDir(),
       cwd: process.cwd(),
-      projectTrusted: runtime.currentCtx?.isProjectTrusted() ?? false,
     }),
   );
 
@@ -213,9 +212,7 @@ export default function (pi: ExtensionAPI) {
     agentDir: getAgentDir(),
     onMaxConcurrentChanged: () => limiter.recheck(),
   });
-  // The project is not trusted until the session says so, so the project's
-  // settings layer is not read at load.
-  settings.load(false);
+  settings.load();
 
   // Observer: receives agent lifecycle notifications and dispatches events/notifications.
   const eventsObserver = new SubagentEventsObserver({
@@ -367,10 +364,9 @@ export default function (pi: ExtensionAPI) {
   const widgetEvents = new WidgetEventsHandler(widget);
 
   pi.on("session_start", (event, ctx) => {
-    // The project's trust is a session fact, so the project's settings and
-    // definition files become readable only now.
-    const trusted = ctx.isProjectTrusted?.() ?? false;
-    settings.load(trusted);
+    // The files behind the settings and the definitions can change while the
+    // extension is loaded, so both are re-read once the session exists.
+    settings.load();
     refreshProfiles();
     refreshDefinitions();
     return lifecycle.handleSessionStart(event, ctx);

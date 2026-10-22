@@ -73,13 +73,6 @@ export interface SessionContext {
    * parent did, so the reasoning fallback reads it.
    */
   readonly thinkingLevel?: ThinkingLevel;
-  /**
-   * Whether Pi has granted the project trust.
-   *
-   * A project the operator has not trusted contributes no agent definitions:
-   * opening a repository must not silently change what an agent may do.
-   */
-  isProjectTrusted(): boolean;
   readonly sessionManager: {
     getSessionFile(): string | undefined;
     getSessionId(): string;

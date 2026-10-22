@@ -29,6 +29,7 @@ import { turnLoopResult } from "#test/helpers/turn-loop-result";
 
 const testRegistry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
+  project: { definitions: [], errors: [] },
 }));
 
 /** A result body long enough to overflow the expanded cap, with a recognisable last line. */
