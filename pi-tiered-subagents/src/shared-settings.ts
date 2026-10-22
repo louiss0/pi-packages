@@ -70,10 +70,7 @@ export type SharedScope = "global" | "project";
  * The path is under the temporary directory, so a project cannot put a file
  * there, and this package never creates it.
  */
-const NO_OPERATOR_FILE = join(
-  tmpdir(),
-  "pi-tiered-subagents-no-operator-file",
-);
+const NO_OPERATOR_FILE = join(tmpdir(), "pi-tiered-subagents-no-operator-file");
 
 /**
  * The store's own options for one of this package's scopes.

@@ -6,6 +6,7 @@
  */
 
 import type { AgentDefinition } from "#src/agents/definition";
+import { defaultDefinition } from "#src/agents/definition";
 import {
   parseThinkingLevel,
   thinkingLevelError,
@@ -18,7 +19,7 @@ import type {
 } from "#src/lifecycle/subagent-manager";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import type { RoutingLadders } from "#src/models/router";
-import { resolveLaunchModel } from "#src/models/launch";
+import { resolveSpawn } from "#src/agents/resolver";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -80,6 +81,13 @@ export class SubagentsServiceAdapter implements SubagentsService {
     private readonly resolveDefinition?: (
       type: string,
     ) => AgentDefinition | undefined,
+    /**
+     * The operator's default turn ceiling, so the service door resolves launches
+     * exactly as the tool door does.
+     */
+    private readonly settings: {
+      readonly defaultMaxTurns: number | undefined;
+    } = { defaultMaxTurns: undefined },
   ) {}
 
   spawn(type: string, prompt: string, options?: SpawnOptions): string {
@@ -89,50 +97,44 @@ export class SubagentsServiceAdapter implements SubagentsService {
       );
     }
 
-    const description = options?.description ?? prompt.slice(0, 80);
-
-    // The definition's own preference fills a request that names none, so a
-    // programmatic `debug` spawn starts from the parent's conversation the way
-    // a tool-door spawn does.
-    const definition = this.resolveDefinition?.(type);
-    const inheritContext =
-      options?.inheritContext ?? definition?.inheritContext ?? false;
-
-    // The model: the caller's own choice, then the definition's, then the
-    // automatic step down the parent's family ladder.
-    const registry = this.runtime.currentCtx.modelRegistry;
-    const launch = resolveLaunchModel(
-      {
-        requestedModel: options?.model,
-        definitionModel:
-          options?.model === undefined ? definition?.model : undefined,
-        requestedThinking: this.resolveThinkingLevel(options?.thinkingLevel),
-        definitionThinking: definition?.thinking,
-      },
-      {
-        registry,
-        ladders: this.ladders,
+    // The one resolver answers both doors: the caller's own answers, then the
+    // definition's, then the automatic routing.
+    const resolution = resolveSpawn({
+      definition:
+        this.resolveDefinition?.(type) ?? defaultDefinition(type, "shipped"),
+      prompt,
+      description: options?.description,
+      requestedModel: options?.model,
+      requestedThinking: this.resolveThinkingLevel(options?.thinkingLevel),
+      requestedMaxTurns: options?.maxTurns,
+      inheritContext: options?.inheritContext,
+      runInBackground:
+        options?.foreground === undefined ? undefined : !options.foreground,
+      modelInfo: {
         parentModel: this.runtime.currentCtx.model,
+        modelRegistry: this.runtime.currentCtx.modelRegistry,
+        ladders: this.ladders,
         parentThinkingLevel: this.runtime.currentCtx.thinkingLevel,
       },
-    );
-    if (!launch.ok) {
-      throw new Error(launch.error);
+      settings: this.settings,
+    });
+    if ("error" in resolution) {
+      throw new Error(resolution.error);
     }
-    const { model, thinking } = launch.resolved;
+    const { execution } = resolution;
 
-    const snapshot = this.runtime.buildSnapshot(inheritContext);
+    const snapshot = this.runtime.buildSnapshot(execution.inheritContext);
     const { parentSessionFile, parentSessionId } =
       this.runtime.getSessionInfo();
     return this.manager.spawn(snapshot, type, prompt, {
-      description,
-      model,
+      description: execution.description,
+      model: execution.model,
+      maxTurns: execution.effectiveMaxTurns,
+      inheritContext: execution.inheritContext,
+      thinkingLevel: execution.thinking,
       // No toolCallId — an SDK spawn has no originating tool call, and
       // Subagent.toolCallId reporting undefined there is the truth.
       parentSession: { parentSessionFile, parentSessionId },
-      maxTurns: options?.maxTurns,
-      thinkingLevel: thinking,
-      inheritContext,
       bypassQueue: options?.bypassQueue,
       // A caller that names `foreground` has committed; one that omits it has
       // not, so the agent's own frontmatter decides and background is the

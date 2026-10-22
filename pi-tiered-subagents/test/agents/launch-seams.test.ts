@@ -14,7 +14,6 @@ import {
   resolveChildToolNames,
 } from "#src/agents/definition";
 import { AgentRegistry } from "#src/agents/registry";
-import { resolveLaunchModel } from "#src/models/launch";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { assembleSessionConfig } from "#src/session/session-config";
@@ -23,6 +22,7 @@ import { AgentTool } from "#src/tools/agent-tool";
 import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
+import { makeModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 /** A registry with one definition file, for the cases that need one. */
@@ -257,41 +257,102 @@ describe("the service door", () => {
 });
 
 describe("both doors resolve alike", () => {
-  it("gives the tool door and the service door the same model and level", () => {
+  it("gives the tool door and the service door the same resolution", () => {
     // The two doors ask the same question in different words; one resolver
     // answers it, so they cannot drift apart.
-    const registry = {
-      find: () => undefined,
-      getAll: () => [],
-      getAvailable: () => [],
-    };
     const ladders = {
       profiles: new Map(),
       strategies: strategiesByFamily(SHIPPED_STRATEGIES),
     };
+    const haiku = makeModel({
+      provider: "anthropic",
+      id: "claude-haiku-4-5",
+      name: "Claude Haiku 4.5",
+    });
 
     const tool = resolveSpawnConfig(
-      { prompt: "do it", description: "d", subagent_type: "worker" },
-      registryWith("worker", { thinking: "low" }),
+      {
+        prompt: "do it",
+        description: "d",
+        subagent_type: "worker",
+        thinking: "low",
+        model: "anthropic/claude-haiku-4-5",
+        inherit_context: false,
+        max_turns: 3,
+        run_in_background: false,
+      },
+      registryWith("worker", {}),
       {
         parentModel: undefined,
-        modelRegistry: registry,
+        modelRegistry: {
+          find: (provider: string, id: string) =>
+            provider === haiku.provider && id === haiku.id ? haiku : undefined,
+          getAll: () => [haiku],
+          getAvailable: () => [haiku],
+        },
         ladders,
       },
       { defaultMaxTurns: undefined },
     );
     if ("error" in tool) throw new Error(tool.error);
 
-    const service = resolveLaunchModel(
-      { definitionThinking: "low" },
-      { registry, ladders },
+    const manager = {
+      spawn: vi.fn().mockReturnValue("agent-1"),
+      getRecord: vi.fn(),
+      listAgents: vi.fn(() => []),
+      abort: vi.fn(),
+      waitForAll: vi.fn(),
+      hasRunning: vi.fn(() => false),
+      registerWorkspaceProvider: vi.fn(),
+      resume: vi.fn(),
+    };
+    const runtime = {
+      currentCtx: {
+        modelRegistry: {
+          find: (provider: string, id: string) =>
+            provider === haiku.provider && id === haiku.id ? haiku : undefined,
+          getAll: () => [haiku],
+          getAvailable: () => [haiku],
+        },
+      } as never,
+      buildSnapshot: vi.fn(() => STUB_SNAPSHOT),
+      getSessionInfo: vi.fn(() => ({
+        parentSessionFile: "/sessions/parent.jsonl",
+        parentSessionId: "session-1",
+      })),
+    };
+    const adapter = new SubagentsServiceAdapter(
+      manager,
+      runtime,
+      { profiles: new Map(), strategies: new Map() },
+      () => defaultDefinition("worker", "shipped"),
     );
-    if (!service.ok) throw new Error(service.error);
+    adapter.spawn("worker", "do it", {
+      description: "d",
+      model: "anthropic/claude-haiku-4-5",
+      thinkingLevel: "low",
+      inheritContext: false,
+      maxTurns: 3,
+      foreground: true,
+    });
 
-    expect(tool.execution.thinking).toBe(service.resolved.thinking);
-    expect(tool.execution.modelSelection.source).toBe(
-      service.resolved.modelSelection.source,
+    // The service door hands the shared resolution to the manager exactly as
+    // the tool door computed it, so the two cannot disagree about a launch.
+    expect(manager.spawn).toHaveBeenCalledWith(
+      expect.anything(),
+      "worker",
+      "do it",
+      expect.objectContaining({
+        description: "d",
+        model: tool.execution.model,
+        maxTurns: tool.execution.effectiveMaxTurns,
+        inheritContext: false,
+        thinkingLevel: tool.execution.thinking,
+        background: { kind: "explicit", isBackground: false },
+      }),
     );
+    expect(tool.execution.runInBackground).toBe(false);
+    expect(tool.execution.inheritContext).toBe(false);
   });
 });
 
