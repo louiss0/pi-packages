@@ -300,6 +300,13 @@ The recovered suite pins the behaviour this derivative must preserve:
    what the model supports decides, an unsupported request is clamped the way
    Pi clamps it, and a model that does not reason gets no level at all. See
    [adr/0008](adr/0008-the-reasoning-level-follows-the-model.md).
+9. **The harness's own text is not inherited.** A child used to adopt the
+   parent's identity byte for byte, and that identity began with Pi's base
+   claim — an assistant with a shell and an editor, helping a user. A child
+   is a specialist with its own tool list, so Pi's base identity, its tool
+   surface, and its documentation pointer now stay with the parent session,
+   and the operator's own prompt is what a child adopts. See
+   [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -326,9 +333,10 @@ specification has not settled; it is not a defect in the inherited runtime.
 
 ## Outstanding work (owed to SPEC.md)
 
-Nothing in this table is implemented yet — the table lists what the
-specification still asks for and this package has not yet delivered. Each item
-names the user stories it covers.
+This table lists what the specification asked for and where each item stands.
+The rows marked *Done* point at the section above that describes them; the
+rest is what the specification still asks for and this package has not yet
+delivered. Each item names the user stories it covers.
 
 | Area | Stories | Notes |
 | --- | --- | --- |
@@ -338,7 +346,7 @@ names the user stories it covers.
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | Done — see the shared settings backend above. The inherited generic loader (`loadLayeredSettings`) is still exported for other packages, but it is no longer this package's backend. |
 | One configuration resolver for both launch doors | 80–82 | The model and the reasoning level are resolved by one resolver (`src/models/launch.ts`), so the two doors cannot drift apart on them. The rest of a launch — the definition, the tools, the context — is still resolved by each door. |
 | The routing reason in the service door's record | 74 | The record carries the model and the level; the *reason* is in the tool door's launch note only. |
-| A narrower cut of the inherited identity | 47 | The child's inherited identity still carries the harness's base preamble. Narrowing it is outstanding. |
+| A narrower cut of the inherited identity | 47 | Done. Pi's base identity, its tool surface, and its documentation pointer are not inherited; the operator's own prompt is, and the package's own base stands in the gap. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md). |
 | A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
 
 ## The Pi 1.3.0 upgrade, verified across the workspace

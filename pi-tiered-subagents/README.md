@@ -8,9 +8,9 @@ scoped specialists, layered agent definitions, and inspectable model selection.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
 > the reasoning level that follows it, the capability-based workspace
-> scheduling, and the shared settings backend are **done**. The narrowed
-> inherited identity is **not implemented yet**. See [docs/status.md](docs/status.md)
-> for the verified state and what is still owed.
+> scheduling, the shared settings backend, and the narrowed inherited identity
+> are **done**. See [docs/status.md](docs/status.md) for the verified state and
+> what is still owed.
 
 ## Install
 

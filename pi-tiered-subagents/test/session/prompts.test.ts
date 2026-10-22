@@ -929,7 +929,12 @@ describe("buildAgentPrompt", () => {
         const DOCS =
           "Pi documentation (read only when the user asks about pi itself):";
 
-        it("drops the parent's <tools> and <rules>, keeping what follows byte for byte", () => {
+        it("drops the parent's preamble, tool surface, and documentation pointer", () => {
+          // Pi's own text describes the harness: the base identity it writes
+          // when no custom prompt is set, the tool surface it renders from
+          // the parent's session, and the pointer to its own documentation.
+          // A child is a specialist with its own tool list, so it inherits
+          // none of them — the package's own base stands in their place.
           const prompt = buildAgentPrompt(replaceConfig(), PARENT_CWD, env, {
             systemPrompt: sectionParentPrompt({
               tools: TOOLS,
@@ -941,41 +946,30 @@ describe("buildAgentPrompt", () => {
             cwd: PARENT_CWD,
           });
 
-          const expectedHead = `${IDENTITY}\n\n<docs>\n${DOCS}\n</docs>\n\n<active_agent`;
-          expect(prompt.slice(0, expectedHead.length)).toBe(expectedHead);
+          expect(prompt.startsWith(`${GENERIC_BASE}\n\n<active_agent`)).toBe(
+            true,
+          );
+          expect(prompt).not.toContain(IDENTITY);
+          expect(prompt).not.toContain(DOCS);
+          expect(prompt).not.toContain("<tools>");
+          expect(prompt).not.toContain("<rules>");
         });
 
-        it("matches the identity a parent without them produces", () => {
-          const layers = {
-            docs: DOCS,
-            contextFiles: PARENT_CONTEXT,
-            skills: [skill("colgrep")],
+        it("keeps the operator's own prompt when the parent runs one", () => {
+          // A parent running a custom prompt renders no tool surface, so
+          // there is nothing of Pi's to narrow — and the operator's words are
+          // the operator's.
+          const operator = "You are the release engineer for this repo.";
+          const prompt = buildAgentPrompt(replaceConfig(), PARENT_CWD, env, {
+            systemPrompt: sectionParentPrompt({
+              identity: operator,
+              skills: [skill("colgrep")],
+              cwd: PARENT_CWD,
+            }),
             cwd: PARENT_CWD,
-          };
-          const fromPiAuthored = buildAgentPrompt(
-            appendConfig(),
-            PARENT_CWD,
-            env,
-            {
-              systemPrompt: sectionParentPrompt({
-                ...layers,
-                tools: TOOLS,
-                rules: RULES,
-              }),
-              cwd: PARENT_CWD,
-            },
-          );
-          const fromRelocated = buildAgentPrompt(
-            appendConfig(),
-            PARENT_CWD,
-            env,
-            {
-              systemPrompt: sectionParentPrompt(layers),
-              cwd: PARENT_CWD,
-            },
-          );
+          });
 
-          expect(fromPiAuthored).toBe(fromRelocated);
+          expect(prompt.startsWith(`${operator}\n\n<active_agent`)).toBe(true);
         });
 
         it("drops them for a relocated child too", () => {
@@ -990,8 +984,11 @@ describe("buildAgentPrompt", () => {
             cwd: PARENT_CWD,
           });
 
-          const expectedHead = `${IDENTITY}\n\n<docs>\n${DOCS}\n</docs>\n\n<active_agent`;
-          expect(prompt.slice(0, expectedHead.length)).toBe(expectedHead);
+          expect(prompt.startsWith(`${GENERIC_BASE}\n\n<active_agent`)).toBe(
+            true,
+          );
+          expect(prompt).not.toContain(IDENTITY);
+          expect(prompt).not.toContain(DOCS);
         });
 
         it("keeps a quoted pair inside project context", () => {

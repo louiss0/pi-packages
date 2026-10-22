@@ -28,12 +28,18 @@ The layers after it are resolved against one session, so Pi and the child's own 
 
 | Layer                        | Where a child's copy comes from                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Pi preamble                  | inherited from the parent, byte for byte                                                                     |
+| Pi's base identity           | not inherited; it describes the harness, not the child. The package's own base stands in its place            |
+| `<docs>` pointer             | not inherited; it points at Pi's own documentation, in a session that is not about Pi                        |
+| Your own prompt              | inherited byte for byte — a custom prompt or an appended prompt is yours, and it stays                       |
 | `<project_context>`          | inherited byte for byte, unless the child runs in its own directory — then resolved from that directory      |
 | `<tools>` / `<rules>`        | never inherited; stated by the child's own `@gotgenes/pi-permission-system` when installed, otherwise absent |
 | Skills catalogue             | rebuilt by Pi for the child's own directory and tool set                                                     |
 | `Current working directory:` | rebuilt by Pi for the child's own directory                                                                  |
 | Extension-appended blocks    | rebuilt by the child's own extensions                                                                        |
+
+Pi's base identity is the sentence it writes when no custom prompt is set: "You are an expert coding assistant operating inside pi, a coding agent harness."
+It claims a shell and an editor and a role helping a user, and a read-only child has neither tool, so the claim is dropped rather than inherited.
+The same holds for the pointer to Pi's documentation, and for the tool surface below.
 
 This matters most for a child that runs somewhere other than the parent — one given an isolated workspace by a `WorkspaceProvider`.
 Its skills resolve from its own workspace, and its working-directory claim names that workspace.
@@ -45,6 +51,7 @@ If **none** of those carries one, the child receives no project instructions at 
 A `WorkspaceProvider` whose workspace is not a checkout — a bare sandbox directory — should place the instructions it wants its children to follow inside that workspace.
 
 Inheriting the identity rather than the whole prompt also gives the child a leading prefix it shares with the parent, which local inference engines reuse instead of reprocessing.
+That holds when the parent runs a custom prompt, because the child's copy of it is byte for byte; a parent running Pi's own prompt leaves the child its own base, so there is no shared prefix to reuse.
 How much that is worth depends on the host: a provider whose cache prefix covers the tool definitions ahead of the system prompt — Anthropic's does — reuses nothing for a child, because a child's tool set always differs from its parent's.
 
 Pi renders the `<tools>` and `<rules>` sections from one session's tool set, and writes neither for a child, so a child drops its parent's copies rather than presenting the parent's tools as its own.
@@ -57,9 +64,9 @@ The reasoning behind the boundary is recorded in [ADR 0006](decisions/0006-inher
 
 ### Portable inheritance (opt-in)
 
-The inherited identity includes Pi's own preamble.
+The inherited identity is your own text: your custom prompt, your appended prompt, and your project context.
 That is correct when the child talks to the same API as its parent, and wrong when the child's provider **re-homes** the prompt into another harness — `pi-claude-bridge`, for example, projects it onto Claude Code's preset as an append.
-There, Pi's preamble reaches an API that already has a base prompt of its own, and Anthropic's subscription gate scores the documentation-routing line inside it as a third-party app ([#883]).
+There, the text reaches an API that already has a base prompt of its own, and Anthropic's subscription gate scores a documentation-routing line as a third-party app ([#883]).
 
 Opt such a provider into `portable`, which replaces the inherited identity with the parent's operator-authored parts only:
 
@@ -71,8 +78,8 @@ Opt such a provider into `portable`, which replaces the inherited identity with 
 
 | Strategy         | The child's identity                                           | Shares a prefix with the parent |
 | ---------------- | -------------------------------------------------------------- | ------------------------------- |
-| `full` (default) | the parent's identity layers, byte for byte                    | yes                             |
-| `portable`       | the parent's custom prompt, append prompt, and project context | no                              |
+| `full` (default) | your own text, byte for byte                                  | yes, when you wrote a prompt    |
+| `portable`       | your custom prompt, append prompt, and project context         | no                              |
 
 The map keys on the **provider id of the child's resolved model**, so only children whose requests actually travel through that provider change strategy.
 That is also why the key is the provider rather than the agent: a `subagent` call may override an agent's model, which moves the child to a different transport, and the strategy follows it.
@@ -84,7 +91,7 @@ Project context files ride along, and must: the child's loader is built with con
 It is not enforced, because Pi exposes no way to identify such a provider — but pointing it at an ordinary provider is worse than leaving the default.
 `@gotgenes/pi-anthropic-auth`, for instance, finds Pi's role line in order to shape the OAuth system prompt; a portable child has no such line, so shaping returns it unchanged and the child never receives the neutral role prompt that shaping would have substituted.
 
-If the parent has no context files, custom prompt, or append prompt, a portable child falls back to a short generic base rather than to the full parent prompt — opting in never silently re-embeds the preamble it exists to avoid.
+If the parent has no context files, custom prompt, or append prompt, a portable child falls back to a short generic base rather than to the full parent prompt — opting in never silently re-embeds text it exists to avoid.
 
 The reasoning is recorded in [ADR 0009](decisions/0009-portable-inheritance-is-provider-scoped.md).
 

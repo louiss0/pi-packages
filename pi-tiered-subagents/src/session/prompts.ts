@@ -119,16 +119,21 @@ function ownProjectContext(
  * operator-authored parts instead, for a provider that re-homes the prompt into
  * a harness supplying its own base (ADR 0009).
  *
- * An absent or whitespace-only portable capture falls back to the generic base,
- * never to the full prompt: opting into portable must never silently re-embed
- * the harness base it exists to avoid.
+ * A parent whose identity is all harness text leaves the child nothing to
+ * adopt: the base identity Pi writes, its tool surface, and its documentation
+ * pointer are not inherited (ADR 0011), so the child's own base stands in
+ * their place. An absent or whitespace-only portable capture falls back to the
+ * same base, never to the full prompt: opting into portable must never
+ * silently re-embed the harness base it exists to avoid.
  */
 function adoptedIdentity(inherited: InheritedPrompt, cwd: string): string {
   if (inherited.strategy !== "portable") {
-    return inheritedIdentity(
-      inherited.systemPrompt,
-      inherited.cwd,
-      cwd !== inherited.cwd,
+    return (
+      inheritedIdentity(
+        inherited.systemPrompt,
+        inherited.cwd,
+        cwd !== inherited.cwd,
+      ) || genericBase
     );
   }
 
@@ -187,6 +192,12 @@ const RULES_SECTION_OPEN = "<rules>";
 /** Closing tag of that section. */
 const RULES_SECTION_CLOSE = "</rules>";
 
+/** Opening tag of the section Pi writes its own documentation pointer in. */
+const DOCS_SECTION_OPEN = "<docs>";
+
+/** Closing tag of that section. */
+const DOCS_SECTION_CLOSE = "</docs>";
+
 /**
  * Opening tags of the sections Pi ≥0.86 renders below `<rules>`, in its
  * order: `<docs>`, the `--append-system-prompt` addendum, project context,
@@ -194,6 +205,20 @@ const RULES_SECTION_CLOSE = "</rules>";
  */
 const SECTIONS_BELOW_RULES: ReadonlySet<string> = new Set([
   "<docs>",
+  "<addendum>",
+  "<project_context>",
+  "<skills>",
+  "<cwd>",
+]);
+
+/**
+ * Opening tags of the sections Pi renders below `<docs>`.
+ *
+ * The documentation pointer is the last of Pi's own sections above the
+ * per-session ones, so this is the bound that tells Pi's `<docs>` from a tag
+ * an operator quoted in an addendum or a context file.
+ */
+const SECTIONS_BELOW_DOCS: ReadonlySet<string> = new Set([
   "<addendum>",
   "<project_context>",
   "<skills>",
@@ -236,11 +261,13 @@ const PROJECT_CONTEXT_LEAD_IN = "Project-specific instructions and guidelines:";
  * precedes it is returned byte for byte, so it stays a shared prefix with the
  * parent's prompt for hosts that reuse one over the system text (#180, #400).
  *
- * One exception sits inside that region: from 0.86 Pi renders the session's
- * tool surface as `<tools>` and `<rules>` sections just below the preamble.
- * They are as session-resolved as the catalogue, so they are excised rather
- * than inherited (ADR 0011); the shared prefix then ends at the preamble for a
- * parent that renders them, and is unchanged for one that does not.
+ * What precedes it is narrowed too: from 0.86 Pi writes its own text there —
+ * the base identity above the tool surface, the `<tools>` and `<rules>`
+ * sections, and the documentation pointer. The tool surface is as
+ * session-resolved as the catalogue, and the other two describe the harness
+ * rather than the child, so none of them is inherited (ADR 0011). The shared
+ * prefix then holds the operator's own words, and a parent that runs Pi's own
+ * prompt leaves the child none.
  *
  * A prompt carrying neither layer is not one `buildSystemPrompt` assembled, and
  * is returned unchanged.
@@ -259,13 +286,69 @@ function inheritedIdentity(
   const tail = sessionResolvedTailStart(lines, parentCwd, cutProjectContext);
   if (tail.at === -1) return prompt;
   const head = lines.slice(0, tail.at);
-  const kept = tail.shape === "section" ? withoutToolSurface(head) : head;
+  const kept = tail.shape === "section" ? withoutHarnessSections(head) : head;
   return kept.join("\n").trimEnd();
 }
 
 /**
- * The head with Pi ≥0.86's `<tools>` and `<rules>` sections excised, or the
- * head unchanged when Pi wrote neither there.
+ * The head with the harness's own text removed: its base identity, its tool
+ * surface, and its documentation pointer.
+ *
+ * The base identity is what Pi writes when no custom prompt is set — "You are
+ * an expert coding assistant operating inside pi …" — and it describes the
+ * *harness's* role: an assistant helping a user, with a shell and an editor.
+ * A child is not that: it is a specialist with a named tool list, and a
+ * read-only one has no shell and no editor. Inheriting the claim tells it to
+ * do what it cannot do, and tells it to coordinate — the parent's role, not
+ * its own.
+ *
+ * The identity is located positionally, like every other anchor here: Pi
+ * writes the preamble alone, ahead of the `<tools>` section it renders next.
+ * A parent running a custom prompt renders no tool surface at all, so the
+ * cut finds no anchor and the operator's own words stand — they are the
+ * operator's, and the operator keeps them. A `<tools>` block the operator
+ * wrote, or one quoted in a context file, is not Pi's either: only the pair
+ * Pi renders together says so.
+ *
+ * The documentation pointer goes with it: it is Pi talking about itself.
+ *
+ * The legacy prompt shape (through 0.85) is not narrowed: its preamble has no
+ * marker to locate it by, and the shape is no longer rendered by the Pi this
+ * package supports.
+ */
+function withoutHarnessSections(head: readonly string[]): readonly string[] {
+  const surface = piToolSurface(head);
+  if (!surface) return head;
+  // Everything above the tool surface is Pi's own preamble: the identity it
+  // writes when no custom prompt is set.
+  const withoutPreamble = head.slice(surface.toolsAt);
+  const span = surface.spanEnd - surface.toolsAt;
+  return withoutDocs(withoutPreamble.slice(span));
+}
+
+/**
+ * The head with Pi's documentation pointer excised.
+ *
+ * The section names Pi's own documentation and when to read it — harness
+ * text, in a session that is not about Pi.
+ *
+ * Located positionally, like every other anchor here: Pi writes the section
+ * above the addendum, the project context, the catalogue, and the cwd. A
+ * `<docs>` tag quoted in one of those is the operator's text, and it stays.
+ */
+function withoutDocs(head: readonly string[]): readonly string[] {
+  const bound = head.findIndex((line) => SECTIONS_BELOW_DOCS.has(line));
+  const limit = bound === -1 ? head.length : bound;
+  const docsAt = head.indexOf(DOCS_SECTION_OPEN);
+  if (docsAt === -1 || docsAt >= limit) return head;
+  const closeAt = head.indexOf(DOCS_SECTION_CLOSE, docsAt);
+  if (closeAt === -1 || closeAt >= limit) return head;
+  const end = head[closeAt + 1] === "" ? closeAt + 2 : closeAt + 1;
+  return [...head.slice(0, docsAt), ...head.slice(end)];
+}
+
+/**
+ * Where Pi's own tool surface sits in the head, or null when it is not there.
  *
  * Both sections are rendered from the parent session's own tool set, and Pi
  * writes neither for a child, whose prompt is a `customPrompt` — so an
@@ -273,26 +356,28 @@ function inheritedIdentity(
  *
  * Located positionally, like every other anchor here: Pi writes the pair
  * adjacent, `<rules>` one blank line below `</tools>`, and above every later
- * section it renders. A pair quoted in an addendum or a context file sits below
- * that bound, and a lone `<tools>` block is not Pi's. The blank line below
- * `</rules>` goes with the pair, so the head reads exactly as Pi renders it
- * without them.
+ * section it renders. A lone `<tools>` block is the operator's own text, not
+ * Pi's, and a pair quoted in an addendum or a context file sits below that
+ * bound. The blank line below `</rules>` goes with the pair, so the head
+ * reads exactly as Pi renders it without them.
  */
-function withoutToolSurface(head: readonly string[]): readonly string[] {
+function piToolSurface(
+  head: readonly string[],
+): { readonly toolsAt: number; readonly spanEnd: number } | null {
   const bound = laterSectionStart(head);
   const toolsAt = head.indexOf(TOOLS_SECTION_OPEN);
-  if (toolsAt === -1 || toolsAt >= bound) return head;
+  if (toolsAt === -1 || toolsAt >= bound) return null;
   const toolsCloseAt = head.indexOf(TOOLS_SECTION_CLOSE, toolsAt);
-  if (toolsCloseAt === -1 || toolsCloseAt >= bound) return head;
+  if (toolsCloseAt === -1 || toolsCloseAt >= bound) return null;
   const rulesAt = toolsCloseAt + 2;
   if (head[toolsCloseAt + 1] !== "" || head[rulesAt] !== RULES_SECTION_OPEN) {
-    return head;
+    return null;
   }
   const rulesCloseAt = head.indexOf(RULES_SECTION_CLOSE, rulesAt);
-  if (rulesCloseAt === -1 || rulesCloseAt >= bound) return head;
+  if (rulesCloseAt === -1 || rulesCloseAt >= bound) return null;
   const spanEnd =
     head[rulesCloseAt + 1] === "" ? rulesCloseAt + 2 : rulesCloseAt + 1;
-  return [...head.slice(0, toolsAt), ...head.slice(spanEnd)];
+  return { toolsAt, spanEnd };
 }
 
 /**
