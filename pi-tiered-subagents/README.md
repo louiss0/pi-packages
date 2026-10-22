@@ -4,11 +4,11 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now builds,
-> typechecks, and passes a 2,182-test characterization suite against Pi 1.3.0.
+> typechecks, and passes a 2,214-test characterization suite against Pi 1.3.0.
 > The five scoped specialists, the layered agent definitions, the inherited tool
-> selection, the rejection of unknown agents, and the family-aware model
-> selection are **done**. Reasoning defaults, capability-based scheduling, and
-> the shared settings backend are **not implemented yet**. See
+> selection, the rejection of unknown agents, the family-aware model selection,
+> and the reasoning level that follows it are **done**. Capability-based
+> scheduling and the shared settings backend are **not implemented yet**. See
 > [docs/status.md](docs/status.md) for the verified state and what is still owed.
 
 ## Install
@@ -107,6 +107,23 @@ settings file, under `familyProfiles`:
 
 Only data is read: a value the schema does not name is ignored, never
 evaluated. A family this package cannot read the names of is refused.
+
+## Reasoning
+
+A child's reasoning level is chosen after its model, from what the model
+actually supports:
+
+- a level the request names, then the level the definition names, then the
+  default: **medium**, then **low**, then the lowest supported level above off;
+- a level the model does not support is clamped the way Pi clamps it — never
+  rejected, and never silently down to "off" on a model that reasons;
+- a model that does not reason is still usable: the level does not apply, and
+  the launch says so;
+- when the child keeps the parent's model, its effort never rises above the
+  effort the parent was running at.
+
+The launch note reports what was decided, so a caller that asked for one thing
+and got another can see it.
 
 ## Agent definitions
 

@@ -82,6 +82,14 @@ A family's versions and tiers in capability order, with the cross-version
 links. The router walks down it: the tiers below the parent's, then the
 approved links.
 
+## Reasoning level
+
+The effort a child reasons at. It is chosen after the model, from what the
+model supports: the request's level, then the definition's, then the default —
+**medium**, then **low**, then the lowest supported level above off. A level the
+model does not support is clamped; a model that does not reason has no level
+at all, which is *not applicable* rather than wrong.
+
 ## Parent snapshot
 
 The parent's state captured when a request is made: the model, the model

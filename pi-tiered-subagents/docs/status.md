@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 94 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 96 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2182 tests, all passing |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2214 tests, all passing |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -130,7 +130,21 @@ strategies are the structures this package can read.
 | An unplaceable family is an error | 66 | Done. |
 | A family with nothing to offer keeps the parent's model | 67 | Done. |
 | The choice is reported | 74 (model half) | Done. The launch note says which model was chosen and why. |
-| The reasoning level is chosen after the model | 68–73 | Outstanding — see the table below. |
+
+## The reasoning selection
+
+`src/thinking/resolve.ts` decides the level a child reasons at, once its model
+is known.
+
+| Rule | Stories | State |
+| --- | --- | --- |
+| Automatic defaults: medium, then low, then the lowest supported non-off | 68 | Done. The supported levels come from Pi's own report about the model, not from its name. |
+| The retained-parent fallback never raises the effort | 69 | Done. Medium or low are taken only when they are below the effort the parent was running at; otherwise a supported level below it; otherwise the parent's effort stands. |
+| The request's level wins over the definition's | 70 | Done. |
+| An unsupported level is clamped, never rejected | 71 | Done. The clamp is Pi's own, so the runtime cannot disagree with Pi about a level, and it never lands on "off" for a reasoning model. |
+| A model that does not reason is still usable | 72 | Done. |
+| The level is discarded for a model that does not reason | 73 | Done. The launch reports *not applicable* rather than a level that was never applied. |
+| The choice is reported | 74 (thinking half) | Done. A clamp and a not-applicable level both appear in the launch note. |
 
 ### Inherited, and covered by the suite
 
@@ -207,6 +221,12 @@ The recovered suite pins the behaviour this derivative must preserve:
    `provider/modelId` and resolved exactly or the launch fails, and a child
    that names no model runs one tier down its parent's ladder. See
    [adr/0007](adr/0007-the-childs-model-is-one-tier-down.md).
+8. **The reasoning level is chosen after the model, from what the model
+   supports.** Upstream took the caller's level or the parent's, and never
+   looked at the model. The level now follows the model: Pi's own report of
+   what the model supports decides, an unsupported request is clamped the way
+   Pi clamps it, and a model that does not reason gets no level at all. See
+   [adr/0008](adr/0008-the-reasoning-level-follows-the-model.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -240,7 +260,7 @@ names the user stories it covers.
 | Area | Stories | Notes |
 | --- | --- | --- |
 | Family profiles, automatic routing, exact explicit model selection | 55–67 | Done — see the model selection above. |
-| Reasoning defaults, clamping, not-applicable reporting | 68–74 | The model is chosen first; the reasoning level that follows is still upstream's: the door validates the caller's level and the child otherwise inherits the parent's. |
+| Reasoning defaults, clamping, not-applicable reporting | 68–74 | Done — see the reasoning selection above. |
 | Capability-based workspace scheduling | 52–54 | Upstream schedules on a single concurrency limiter, with no exclusive slot for file-changing children. |
 | Shared settings backend (`@juanibiapina/pi-extension-settings`) | 75–79 | The runtime still keeps upstream's own JSON settings loader (`src/settings.ts`, `src/layered-settings.ts`), and still exports that loader as `…/settings`. |
 | One configuration resolver for both launch doors | 80–82 | Both doors now answer through the same registry and the same precedence, but the resolution itself is still two code paths: the tool door resolves a request, the service door resolves a spawn. |
