@@ -347,7 +347,7 @@ delivered. Each item names the user stories it covers.
 | One configuration resolver for both launch doors | 80–82 | Done — the whole launch, the definition merge through the model and reasoning level, is resolved by one resolver (`src/agents/resolver.ts`), so the two doors cannot drift apart on a launch. The rest of a launch — the tool selection and the context assembly that follows a resolved launch — is still per door. |
 | The routing reason in the service door's record | 74 | Done — the record now carries the resolved model decision (source and reason) and the reasoning decision (applicability, source, clamping, and reason), for spawns from either door. |
 | A narrower cut of the inherited identity | 47 | Done. Pi's base identity, its tool surface, and its documentation pointer are not inherited; the operator's own prompt is, and the package's own base stands in the gap. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md). |
-| A bundled public `.d.ts` | — | The `build` target emits per-file declarations; bundling them (upstream's ADR 0003) is still to do, so another package cannot yet import this one by name. |
+| A bundled public `.d.ts` | — | Settled as *not adopted*: the source-ship model keeps the public surface served from TypeScript source (`exports["."].default` → `./src/service/service.ts`) with the `build` target emitting per-file declarations, and bundling was set aside in favour of letting Pi compile the TypeScript rather than adding a build step. Another package can import the surface by name once a consumer needs it. |
 
 ## The Pi 1.3.0 upgrade, verified across the workspace
 
