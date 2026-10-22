@@ -535,7 +535,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
       "check TODOs",
       expect.objectContaining({
         model: resolvedModel,
-        maxTurns: 5,
+        turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
       }),
     );
   });
@@ -557,7 +557,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
       expect.objectContaining({
         modelSelection: expect.objectContaining({ source: "inherited" }),
         thinkingDecision: expect.objectContaining({ source: "request" }),
-        maxTurns: 4,
+        turnPolicy: { kind: "limited", maxTurns: 4, wrapUpTurns: 2 },
       }),
     );
   });

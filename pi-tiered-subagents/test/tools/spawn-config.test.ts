@@ -3,6 +3,8 @@ import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /** The registry with the shipped specialists and no files. */
 const testRegistry = new AgentRegistry(() => ({
@@ -43,7 +45,10 @@ function makeModelInfo(
   };
 }
 
-const defaultSettings = { defaultMaxTurns: undefined as number | undefined };
+const defaultSettings = {
+  defaultMaxTurns: undefined as number | undefined,
+  wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+};
 
 /** The common parameters of a spawn request. */
 function params(overrides: Record<string, unknown> = {}) {
@@ -205,7 +210,7 @@ describe("resolveSpawnConfig — model label", () => {
   });
 });
 
-describe("resolveSpawnConfig — max turns normalization", () => {
+describe("resolveSpawnConfig — the turn policy", () => {
   it("normalizes max_turns from params", () => {
     const result = resolveSpawnConfig(
       params({ max_turns: 10 }),
@@ -214,7 +219,11 @@ describe("resolveSpawnConfig — max turns normalization", () => {
       defaultSettings,
     );
     if ("error" in result) return;
-    expect(result.execution.effectiveMaxTurns).toBe(10);
+    expect(result.execution.turnPolicy).toEqual({
+      kind: "limited",
+      maxTurns: 10,
+      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+    });
   });
 
   it("takes the definition's turn ceiling when the request names none", () => {
@@ -226,7 +235,7 @@ describe("resolveSpawnConfig — max turns normalization", () => {
       defaultSettings,
     );
     if ("error" in result) return;
-    expect(result.execution.effectiveMaxTurns).toBe(8);
+    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 8 });
   });
 
   it("lets the request win over the definition's turn ceiling", () => {
@@ -238,18 +247,19 @@ describe("resolveSpawnConfig — max turns normalization", () => {
       defaultSettings,
     );
     if ("error" in result) return;
-    expect(result.execution.effectiveMaxTurns).toBe(3);
+    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 3 });
   });
 
   it("uses settings defaultMaxTurns when no max_turns in params", () => {
     const result = resolveSpawnConfig(params(), testRegistry, makeModelInfo(), {
       defaultMaxTurns: 25,
+      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
     });
     if ("error" in result) return;
-    expect(result.execution.effectiveMaxTurns).toBe(25);
+    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 25 });
   });
 
-  it("returns undefined effectiveMaxTurns when neither params nor settings specify", () => {
+  it("resolves to unlimited when neither params nor settings specify", () => {
     const result = resolveSpawnConfig(
       params(),
       testRegistry,
@@ -257,7 +267,36 @@ describe("resolveSpawnConfig — max turns normalization", () => {
       defaultSettings,
     );
     if ("error" in result) return;
-    expect(result.execution.effectiveMaxTurns).toBeUndefined();
+    expect(result.execution.turnPolicy).toEqual({ kind: "unlimited" });
+  });
+
+  it("captures the wrap-up allowance with the ceiling", () => {
+    const result = resolveSpawnConfig(
+      params({ max_turns: 6 }),
+      testRegistry,
+      makeModelInfo(),
+      { defaultMaxTurns: undefined, wrapUpTurns: 4 },
+    );
+    if ("error" in result) return;
+    expect(result.execution.turnPolicy).toEqual({
+      kind: "limited",
+      maxTurns: 6,
+      wrapUpTurns: 4,
+    });
+  });
+
+  it("honours a deliberately unlimited request over the operator's default", () => {
+    const result = resolveSpawnConfig(
+      params({ max_turns: 0 }),
+      testRegistry,
+      makeModelInfo(),
+      {
+        defaultMaxTurns: 25,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      },
+    );
+    if ("error" in result) return;
+    expect(result.execution.turnPolicy).toEqual({ kind: "unlimited" });
   });
 
   it("advises when the ceiling was raised to the minimum", () => {
@@ -359,7 +398,7 @@ describe("resolveSpawnConfig — invocation fields", () => {
 describe("resolveSpawnConfig — detailBase and tags", () => {
   it("builds detailBase with description from params", () => {
     const result = resolveSpawnConfig(
-      params({ description: "my task" }),
+      params({ description: "my task", turnPolicy: UNLIMITED_TURNS }),
       testRegistry,
       makeModelInfo(),
       defaultSettings,

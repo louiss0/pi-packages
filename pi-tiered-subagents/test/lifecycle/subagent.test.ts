@@ -21,6 +21,7 @@ import type {
   WorkspaceProvider,
 } from "#src/lifecycle/workspace";
 import type { RunConfig } from "#src/runtime";
+import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type { CompactionInfo, SubagentType } from "#src/types";
 import { gatedScheduler } from "#test/helpers/gated-scheduler";
 import { makeModel } from "#test/helpers/make-model";
@@ -42,6 +43,7 @@ import {
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { createChildLifecycleMock } from "#test/helpers/subagent-session-io";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 const WARNED: TurnBudget = { maxTurns: 5, used: 3, phase: "warned" };
 const EXHAUSTED: TurnBudget = { maxTurns: 5, used: 5, phase: "exhausted" };
@@ -183,7 +185,7 @@ function createRunnableAgent(overrides?: {
   baseCwd?: string;
   workspaceProvider?: WorkspaceProvider;
   isBackground?: boolean;
-  maxTurns?: number;
+  turnPolicy?: TurnPolicy;
   status?: SubagentStatus;
 }) {
   const createSubagentSession =
@@ -201,7 +203,7 @@ function createRunnableAgent(overrides?: {
       snapshot: STUB_SNAPSHOT,
       prompt: "do something",
       getRunConfig: overrides?.getRunConfig,
-      maxTurns: overrides?.maxTurns,
+      turnPolicy: overrides?.turnPolicy ?? UNLIMITED_TURNS,
       parentSession: overrides?.parentSession,
       signal: overrides?.signal,
       baseCwd: overrides?.baseCwd ?? "/base",
@@ -1775,7 +1777,7 @@ describe("Subagent", () => {
             sessionId: "child-1",
             sessionDir: "/sessions",
             agentName: "Explore",
-            turnLimits: { wrapUpTurns: 2 },
+            turnPolicy: { kind: "unlimited" },
             parentContext: undefined,
             lifecycle: createChildLifecycleMock(),
           }),
@@ -2229,24 +2231,37 @@ describe("Subagent", () => {
       });
     });
 
-    describe("RunConfig threading", () => {
-      it("hands the session factory the spawn's maxTurns with the run config's defaultMaxTurns and wrapUpTurns", async () => {
+    describe("turn policy threading", () => {
+      it("hands the session factory the ceiling the door resolved, unchanged", async () => {
+        // The record carries a decision, not the inputs to one: a later
+        // default-budget change must not reach an accepted run.
         const { factory, params } = createFactory();
+        const policy: TurnPolicy = {
+          kind: "limited",
+          maxTurns: 6,
+          wrapUpTurns: 3,
+        };
         const agent = createRunnableAgent({
           createSubagentSession: factory,
-          maxTurns: 6,
+          turnPolicy: policy,
           getRunConfig: () => ({
             defaultMaxTurns: 10,
-            wrapUpTurns: 3,
+            wrapUpTurns: 9,
             midRunUpdates: true,
           }),
         });
         await agent.run();
-        expect(params().turnLimits).toStrictEqual({
-          maxTurns: 6,
-          defaultMaxTurns: 10,
-          wrapUpTurns: 3,
+        expect(params().turnPolicy).toStrictEqual(policy);
+      });
+
+      it("passes a deliberately unlimited policy through unchanged", async () => {
+        const { factory, params } = createFactory();
+        const agent = createRunnableAgent({
+          createSubagentSession: factory,
+          turnPolicy: { kind: "unlimited" },
         });
+        await agent.run();
+        expect(params().turnPolicy).toEqual({ kind: "unlimited" });
       });
     });
   });

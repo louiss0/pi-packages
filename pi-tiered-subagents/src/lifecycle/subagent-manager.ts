@@ -40,6 +40,7 @@ import {
 } from "#src/scheduling/impact";
 
 import type { RunConfig } from "#src/runtime";
+import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type {
   CompactionInfo,
   ParentSessionInfo,
@@ -244,7 +245,13 @@ export interface SubagentManagerOptions {
 export interface AgentSpawnConfig {
   description: string;
   model?: Model<any>;
-  maxTurns?: number;
+  /**
+   * The run's turn ceiling, resolved once by the door that prepared the launch.
+   *
+   * A closed decision, so the record enforces it rather than re-reading a
+   * default that may since have changed.
+   */
+  turnPolicy: TurnPolicy;
   inheritContext?: boolean;
   thinkingLevel?: ThinkingLevel;
   /**
@@ -503,7 +510,7 @@ export class SubagentManager {
         getRunConfig: this.getRunConfig,
         getWorkspaceProvider: () => this._workspaceProvider,
         model: options.model,
-        maxTurns: options.maxTurns,
+        turnPolicy: options.turnPolicy,
         thinkingLevel: options.thinkingLevel,
         modelSelection: options.modelSelection,
         thinkingDecision: options.thinkingDecision,

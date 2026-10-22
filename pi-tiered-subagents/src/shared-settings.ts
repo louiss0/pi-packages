@@ -32,6 +32,9 @@ import {
   type SettingDefinition,
   type SettingStorageOptions,
 } from "@juanibiapina/pi-extension-settings";
+// The wrap-up default is the turn policy's own: the resolver falls back to the
+// same number when no layer names one, so the menu advertises a single value.
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /**
  * The name this package's settings live under in the shared store.
@@ -122,7 +125,6 @@ export const RETIRED_SETTING_ID = "graceTurns";
 
 /** The defaults the shipped settings start from. */
 export const DEFAULT_MAX_CONCURRENT = 4;
-export const DEFAULT_WRAP_UP_TURNS = 2;
 export const DEFAULT_CONSUMED_RETENTION_MINUTES = 10;
 export const DEFAULT_UNCONSUMED_RETENTION_MINUTES = 720;
 export const DEFAULT_ABORT_ALL_ON_INTERRUPT = true;

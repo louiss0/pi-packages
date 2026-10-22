@@ -25,7 +25,8 @@ import { type ThinkingDecision } from "#src/thinking/resolve";
 import {
   isBelowMinimumTurns,
   MIN_MAX_TURNS,
-  normalizeMaxTurns,
+  resolveTurnPolicy,
+  type TurnPolicy,
 } from "#src/lifecycle/turn-limits";
 import type { SubagentType, ThinkingLevel } from "#src/types";
 import {
@@ -62,7 +63,14 @@ export interface SpawnExecution {
   modelSelection: ModelSelection;
   /** The reasoning level, and what was decided about it. */
   thinkingDecision: ThinkingDecision;
-  effectiveMaxTurns: number | undefined;
+  /**
+   * The run's turn ceiling, resolved once here.
+   *
+   * A closed decision with no unresolved fallback: the child session enforces
+   * this and never merges another default of its own, so a later change to the
+   * operator's default cannot alter accepted work.
+   */
+  turnPolicy: TurnPolicy;
   thinking: ThinkingLevel | undefined;
   inheritContext: boolean;
   runInBackground: boolean;
@@ -119,8 +127,19 @@ export interface SpawnRequest {
   readonly rawType?: SubagentType;
   /** The session facts the automatic routing reads. */
   readonly modelInfo: ModelInfo;
-  /** The operator's default turn ceiling, when there is one. */
-  readonly settings: { readonly defaultMaxTurns: number | undefined };
+  /**
+   * The operator's turn-budget defaults, captured with the launch.
+   *
+   * Read at preparation, so a queued child runs with the budget that was in
+   * force when the request was made.
+   */
+  readonly settings: TurnSettings;
+}
+
+/** The operator's turn-budget defaults the resolver reads. */
+export interface TurnSettings {
+  readonly defaultMaxTurns: number | undefined;
+  readonly wrapUpTurns: number;
 }
 
 /**
@@ -170,9 +189,14 @@ export function resolveSpawn(
 
   const modelName = modelLabel(model);
 
-  const effectiveMaxTurns = normalizeMaxTurns(
-    resolvedInvocation.maxTurns ?? request.settings.defaultMaxTurns,
-  );
+  // The turn ceiling, decided once: the request's, then the definition's, then
+  // the operator's default, captured here so a later default change reaches
+  // only the next launch.
+  const turnPolicy = resolveTurnPolicy({
+    resolvedMaxTurns: resolvedInvocation.maxTurns,
+    defaultMaxTurns: request.settings.defaultMaxTurns,
+    wrapUpTurns: request.settings.wrapUpTurns,
+  });
 
   const { tags: invocationTags } = buildInvocationTags({
     thinking,
@@ -204,7 +228,7 @@ export function resolveSpawn(
       model,
       modelSelection,
       thinkingDecision,
-      effectiveMaxTurns,
+      turnPolicy,
       thinking,
       inheritContext,
       runInBackground,

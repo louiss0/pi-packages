@@ -65,7 +65,7 @@ export async function runForeground(
         model: execution.model,
         modelSelection: execution.modelSelection,
         thinkingDecision: execution.thinkingDecision,
-        maxTurns: execution.effectiveMaxTurns,
+        turnPolicy: execution.turnPolicy,
         inheritContext: execution.inheritContext,
         thinkingLevel: execution.thinking,
         signal,

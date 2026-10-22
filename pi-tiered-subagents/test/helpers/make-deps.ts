@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
@@ -79,6 +80,7 @@ export function createToolDeps(
     runtime,
     settings: {
       defaultMaxTurns: undefined as number | undefined,
+      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
       maxConcurrent: 4,
     },
     registry: defaultRegistry,

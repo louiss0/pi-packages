@@ -4,7 +4,11 @@
 // in two files: the operator's global file and the project's local file. Both
 // are read on their own; only the project's file is ever written.
 
-import { isBelowMinimumTurns, MIN_MAX_TURNS } from "#src/lifecycle/turn-limits";
+import {
+  DEFAULT_WRAP_UP_TURNS,
+  isBelowMinimumTurns,
+  MIN_MAX_TURNS,
+} from "#src/lifecycle/turn-limits";
 import {
   BOOLEAN_SETTING_IDS,
   DEFAULT_ABORT_ALL_ON_INTERRUPT,
@@ -12,7 +16,6 @@ import {
   DEFAULT_MAX_CONCURRENT,
   DEFAULT_MID_RUN_UPDATES,
   DEFAULT_UNCONSUMED_RETENTION_MINUTES,
-  DEFAULT_WRAP_UP_TURNS,
   JSON_SETTING_IDS,
   NUMBER_SETTING_IDS,
   readBoolean,

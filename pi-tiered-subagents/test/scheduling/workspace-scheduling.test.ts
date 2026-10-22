@@ -19,6 +19,7 @@ import {
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /** The tools a specialist gets, as the shipped definitions give them. */
 const READ_ONLY = ["read", "grep", "find", "ls"];
@@ -92,6 +93,7 @@ function registryFor(): WorkspaceGateRegistry {
 function spawnBg(manager: SubagentManager, type: string, prompt: string) {
   return manager.spawn(WRITING_SNAPSHOT, type, prompt, {
     description: prompt,
+    turnPolicy: UNLIMITED_TURNS,
     background: { kind: "explicit", isBackground: true },
   });
 }
@@ -194,6 +196,7 @@ describe("children that may change files", () => {
     spawnBg(manager, "writer", "holder");
     const pending = manager.spawnAndWait(WRITING_SNAPSHOT, "writer", "now", {
       description: "foreground",
+      turnPolicy: UNLIMITED_TURNS,
     });
 
     await vi.waitFor(() => expect(started).toEqual(["holder"]));
@@ -226,6 +229,7 @@ describe("children that may change files", () => {
     // The second child waits for the slot; its parent's signal fires.
     const id2 = manager.spawn(WRITING_SNAPSHOT, "writer", "cancelled", {
       description: "cancelled",
+      turnPolicy: UNLIMITED_TURNS,
       background: { kind: "explicit", isBackground: true },
       signal: controller.signal,
     });
@@ -415,10 +419,12 @@ describe("children that may change files", () => {
 
     const id1 = first.spawn(snapshot, "writer", "one", {
       description: "one",
+      turnPolicy: UNLIMITED_TURNS,
       background: { kind: "explicit", isBackground: true },
     });
     const id2 = second.spawn(snapshot, "writer", "two", {
       description: "two",
+      turnPolicy: UNLIMITED_TURNS,
       background: { kind: "explicit", isBackground: true },
     });
 

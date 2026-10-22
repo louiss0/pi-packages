@@ -16,12 +16,13 @@ import type { ModelInfo } from "#src/tools/spawn-config";
 import type { SessionContext } from "#src/types";
 
 /**
- * Narrow config subset read by Agent when driving the turn loop (defaultMaxTurns, wrapUpTurns).
- * Kept separate so callers can satisfy it without depending on the full runtime.
+ * The settings a run reads live, rather than the ones it captured.
+ *
+ * Only an operational control belongs here: the turn ceiling and wrap-up
+ * allowance are resolved into a `TurnPolicy` when the launch is prepared, so a
+ * change to them reaches only the next launch.
  */
 export interface RunConfig {
-  readonly defaultMaxTurns: number | undefined;
-  readonly wrapUpTurns: number;
   /** Whether a background child gets the `notify_parent` channel. */
   readonly midRunUpdates: boolean;
 }

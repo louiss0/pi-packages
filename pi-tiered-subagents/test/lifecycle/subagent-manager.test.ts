@@ -44,6 +44,8 @@ import {
 } from "#test/helpers/mock-session";
 import { STUB_CTX, STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
+import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 
 /** Default max concurrent background agents (matches production default). */
 const DEFAULT_MAX_CONCURRENT = 4;
@@ -133,9 +135,15 @@ function createManager(overrides?: {
 }
 
 /** Spawn a background agent using STUB_SNAPSHOT. */
-function spawnBg(mgr: SubagentManager, prompt = "test", desc = prompt) {
+function spawnBg(
+  mgr: SubagentManager,
+  prompt = "test",
+  desc = prompt,
+  turnPolicy: TurnPolicy = UNLIMITED_TURNS,
+) {
   return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
+    turnPolicy,
     background: { kind: "explicit", isBackground: true },
   });
 }
@@ -144,6 +152,7 @@ function spawnBg(mgr: SubagentManager, prompt = "test", desc = prompt) {
 function spawnFg(mgr: SubagentManager, prompt = "test", desc = prompt) {
   return mgr.spawnAndWait(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
+    turnPolicy: UNLIMITED_TURNS,
   });
 }
 
@@ -156,6 +165,7 @@ function spawnBgWithToolCall(
 ) {
   return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
     description: desc,
+    turnPolicy: UNLIMITED_TURNS,
     background: { kind: "explicit", isBackground: true },
     parentSession: { toolCallId },
   });
@@ -228,6 +238,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "explore", "test", {
           description: "d",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
         });
 
@@ -240,6 +251,7 @@ describe("SubagentManager", () => {
         expect(() =>
           manager.spawn(STUB_SNAPSHOT, "no-such-agent", "test", {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
           }),
         ).toThrow('Unknown agent type "no-such-agent"');
@@ -253,6 +265,7 @@ describe("SubagentManager", () => {
         expect(() =>
           manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
           }),
         ).toThrow('Agent "planner" is disabled');
@@ -266,6 +279,7 @@ describe("SubagentManager", () => {
         expect(() =>
           manager.spawn(STUB_SNAPSHOT, "PLANNER", "test", {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
           }),
         ).toThrow('Agent "planner" is disabled');
@@ -279,6 +293,7 @@ describe("SubagentManager", () => {
         expect(() =>
           manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
           }),
         ).toThrow();
@@ -307,6 +322,7 @@ describe("SubagentManager", () => {
         }));
         return manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
           description: "d",
+          turnPolicy: UNLIMITED_TURNS,
           background,
         });
       }
@@ -358,6 +374,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
           description: "d",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "default", isBackground: false },
         });
 
@@ -381,7 +398,10 @@ describe("SubagentManager", () => {
           STUB_SNAPSHOT,
           "explore",
           "test",
-          { description: "d" },
+          {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+          },
         );
 
         expect(record.type).toBe("explore");
@@ -395,6 +415,7 @@ describe("SubagentManager", () => {
         await expect(
           manager.spawnAndWait(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
           }),
         ).rejects.toThrow('Agent "planner" is disabled');
       });
@@ -410,7 +431,10 @@ describe("SubagentManager", () => {
           STUB_SNAPSHOT,
           "Explore",
           "test",
-          { description: "d" },
+          {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+          },
         );
 
         expect(record.isBackground).toBe(false);
@@ -427,7 +451,10 @@ describe("SubagentManager", () => {
           STUB_SNAPSHOT,
           "Explore",
           "test",
-          { description: "d" },
+          {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+          },
         );
 
         // The caller holds the result promise, so the frontmatter must not route
@@ -450,6 +477,7 @@ describe("SubagentManager", () => {
           "test",
           {
             description: "d",
+            turnPolicy: UNLIMITED_TURNS,
             signal: controller.signal,
           },
         );
@@ -474,6 +502,7 @@ describe("SubagentManager", () => {
 
         const pending = manager.spawnAndWait(STUB_SNAPSHOT, "Explore", "test", {
           description: "d",
+          turnPolicy: UNLIMITED_TURNS,
         });
 
         expect(manager.listAgents()[0]?.claimed).toBe(true);
@@ -509,6 +538,7 @@ describe("SubagentManager", () => {
 
         const pending = manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "d",
+          turnPolicy: UNLIMITED_TURNS,
         });
 
         // Queued, not running: the await has no slot of its own.
@@ -964,6 +994,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test agent",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
         });
 
@@ -981,6 +1012,7 @@ describe("SubagentManager", () => {
 
         await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "foreground agent",
+          turnPolicy: UNLIMITED_TURNS,
         });
 
         expect(onCreated).not.toHaveBeenCalled();
@@ -1016,6 +1048,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "bg agent",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
         });
         await manager.getRecord(id)!.promise;
@@ -1041,6 +1074,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
           observer: {
             onSessionCreated: (agent) => {
@@ -1059,6 +1093,7 @@ describe("SubagentManager", () => {
 
         await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "fg",
+          turnPolicy: UNLIMITED_TURNS,
           observer: {
             onSessionCreated: (agent) => {
               received.agent = agent;
@@ -1093,6 +1128,7 @@ describe("SubagentManager", () => {
 
         const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "bg",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
         });
         const record = manager.getRecord(id)!;
@@ -1665,17 +1701,19 @@ describe("SubagentManager", () => {
       });
     });
 
-    describe("getRunConfig threads defaultMaxTurns and wrapUpTurns into the turn loop", () => {
+    describe("the turn policy the spawn carries", () => {
       let manager: SubagentManager;
 
       afterEach(async () => {
         await manager.dispose();
       });
 
-      it("passes defaultMaxTurns and wrapUpTurns from getRunConfig to the session's turn limits", async () => {
+      it("hands the session factory the ceiling the spawn resolved", async () => {
+        // The run config is an operational control, not a budget: whatever it
+        // says at run time, the record enforces the decision it was given.
         const getRunConfig = vi.fn(() => ({
-          defaultMaxTurns: 10,
-          wrapUpTurns: 3,
+          defaultMaxTurns: 20,
+          wrapUpTurns: 5,
           midRunUpdates: true,
         }));
         const { factory } = createSessionFactory();
@@ -1684,21 +1722,21 @@ describe("SubagentManager", () => {
           createSubagentSession: factory,
         }));
 
-        const id = spawnBg(manager);
+        const id = spawnBg(manager, "test", "test", {
+          kind: "limited",
+          maxTurns: 10,
+          wrapUpTurns: 3,
+        });
         await manager.getRecord(id)!.promise;
 
         expect(factory).toHaveBeenCalledWith(
           expect.objectContaining({
-            turnLimits: {
-              maxTurns: undefined,
-              defaultMaxTurns: 10,
-              wrapUpTurns: 3,
-            },
+            turnPolicy: { kind: "limited", maxTurns: 10, wrapUpTurns: 3 },
           }),
         );
       });
 
-      it("leaves defaultMaxTurns and wrapUpTurns unset when no getRunConfig is provided", async () => {
+      it("is unlimited when nothing resolved a ceiling", async () => {
         const { factory } = createSessionFactory();
         ({ manager } = createManager({ createSubagentSession: factory }));
 
@@ -1706,13 +1744,7 @@ describe("SubagentManager", () => {
         await manager.getRecord(id)!.promise;
 
         expect(factory).toHaveBeenCalledWith(
-          expect.objectContaining({
-            turnLimits: {
-              maxTurns: undefined,
-              defaultMaxTurns: undefined,
-              wrapUpTurns: undefined,
-            },
-          }),
+          expect.objectContaining({ turnPolicy: { kind: "unlimited" } }),
         );
       });
     });
@@ -1730,6 +1762,7 @@ describe("SubagentManager", () => {
 
         manager.spawn(STUB_SNAPSHOT, "worker", "test", {
           description: "test",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
           parentSession: {
             parentSessionFile: "/sessions/parent.jsonl",
@@ -1910,6 +1943,7 @@ describe("SubagentManager", () => {
 
       const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
         description: "held agent",
+        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
       });
       const record = manager.getRecord(id)!;

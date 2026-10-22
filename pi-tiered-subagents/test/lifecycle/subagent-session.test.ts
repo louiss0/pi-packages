@@ -1,15 +1,13 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
-import {
-  resolveTurnLimits,
-  type TurnLimitRequest,
-} from "#src/lifecycle/turn-limits";
+import { type TurnPolicy } from "#src/lifecycle/turn-limits";
 import {
   createChildLifecycleMock,
   createFactorySession,
 } from "#test/helpers/subagent-session-io";
 import { childCompletedEvent } from "#test/helpers/turn-loop-result";
+import { UNLIMITED_TURNS as UNLIMITED } from "#test/helpers/turn-policy";
 
 // ── Session mock factory ───────────────────────────────────────────────────────
 
@@ -183,7 +181,7 @@ function makeSubagentSession(
     sessionId: string;
     sessionDir: string;
     agentName: string;
-    turnLimits: TurnLimitRequest;
+    turnPolicy: TurnPolicy;
     parentContext: string | undefined;
     lifecycle: ReturnType<typeof createChildLifecycleMock>;
   }>,
@@ -197,7 +195,7 @@ function makeSubagentSession(
     sessionId: metaOverrides?.sessionId ?? "child-session-default",
     sessionDir: metaOverrides?.sessionDir ?? "/sessions/dir",
     agentName: metaOverrides?.agentName ?? "Explore",
-    turnLimits: resolveTurnLimits(metaOverrides?.turnLimits, undefined),
+    turnPolicy: metaOverrides?.turnPolicy ?? UNLIMITED,
     parentContext: metaOverrides?.parentContext,
     lifecycle,
   });
@@ -291,7 +289,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
       const { session } = createSession("done");
       programTurns(session, 5);
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 3, wrapUpTurns: 1 },
+        turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(session.abort).toHaveBeenCalledOnce();
@@ -306,7 +304,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
       const { session } = createSession("done");
       programTurns(session, [{}, {}, { stopReason: "stop", toolResults: 0 }]);
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 3, wrapUpTurns: 1 },
+        turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(session.abort).not.toHaveBeenCalled();
@@ -328,7 +326,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
         emitTurnStart(session);
       });
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 2, wrapUpTurns: 1 },
+        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 1 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(session.abort).toHaveBeenCalledOnce();
@@ -347,7 +345,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
         { stopReason: "stop", toolResults: 0 },
       ]);
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 5, wrapUpTurns: 1 },
+        turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 1 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(result.turnBudget).toEqual({
@@ -368,7 +366,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
         { stopReason: "stop", toolResults: 0 },
       ]);
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 5, wrapUpTurns: 2 },
+        turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(session.sendCustomMessage).toHaveBeenCalledOnce();
@@ -398,7 +396,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
         emitTurnEnd(session, { stopReason: "stop", toolResults: 0 });
       });
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 2, wrapUpTurns: 2 },
+        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 2 },
       });
       const result = await sub.runTurnLoop("go", {});
       expect(session.sendCustomMessage).toHaveBeenCalledWith(
@@ -420,7 +418,7 @@ describe("SubagentSession — runTurnLoop turn budget", () => {
       const { session } = createSession("done");
       programTurns(session, 2);
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 4, wrapUpTurns: 2 },
+        turnPolicy: { kind: "limited", maxTurns: 4, wrapUpTurns: 2 },
       });
       const reports: unknown[] = [];
       await sub.runTurnLoop("go", {
@@ -500,7 +498,7 @@ describe("SubagentSession — runTurnLoop lifecycle events", () => {
       sessionDir: "/d",
       agentName: "Explore",
       lifecycle,
-      turnLimits: { maxTurns: 5, wrapUpTurns: 2 },
+      turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
     });
     await sub.runTurnLoop("go", {});
     expect(lifecycle.completed).toHaveBeenCalledWith({
@@ -795,7 +793,7 @@ describe("SubagentSession — a later run's turn budget", () => {
     const { session } = createSession("done");
     programTurns(session, 5);
     const { sub } = makeSubagentSession(session, {
-      turnLimits: { maxTurns: 3, wrapUpTurns: 1 },
+      turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
     });
     const first = await sub.runTurnLoop("go", {});
     expect(first.turnBudget.phase).toBe("exhausted");
@@ -819,7 +817,7 @@ describe("SubagentSession — a later run's turn budget", () => {
     const { session } = createSession("done");
     programTurns(session, 1);
     const { sub } = makeSubagentSession(session, {
-      turnLimits: { maxTurns: 2, wrapUpTurns: 1 },
+      turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 1 },
     });
     await sub.runTurnLoop("go", {});
 
@@ -875,7 +873,7 @@ describe("SubagentSession — a turn loop whose signal already fired", () => {
     it("sends no budget warning when every turn is a wrap-up turn", async () => {
       const { session } = createSession("full answer");
       const { sub } = makeSubagentSession(session, {
-        turnLimits: { maxTurns: 2, wrapUpTurns: 2 },
+        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 2 },
       });
       await sub.runTurnLoop("go", { signal: firedSignal() });
       expect(session.sendCustomMessage).not.toHaveBeenCalled();

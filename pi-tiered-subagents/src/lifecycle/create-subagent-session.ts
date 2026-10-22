@@ -25,10 +25,7 @@ import { debugNote } from "#src/debug";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
-import {
-  resolveTurnLimits,
-  type TurnLimitRequest,
-} from "#src/lifecycle/turn-limits";
+import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import {
   AskParentTool,
   type QuestionRecorder,
@@ -205,8 +202,8 @@ export interface CreateSubagentSessionParams {
    * installs no update tool.
    */
   notifyParent?: UpdateAnnouncer;
-  /** The caller's turn-limit inputs, resolved with the agent's own limit into the session's. */
-  turnLimits?: TurnLimitRequest;
+  /** The run's turn ceiling, resolved once at the door. Enforced, not re-decided. */
+  turnPolicy: TurnPolicy;
   /**
    * The tools the child was given, resolved when the request was made.
    *
@@ -349,7 +346,7 @@ export async function createSubagentSession(
     sessionId,
     sessionDir,
     agentName: type,
-    turnLimits: resolveTurnLimits(params.turnLimits, cfg.agentMaxTurns),
+    turnPolicy: params.turnPolicy,
     parentContext: snapshot.parentContext,
     lifecycle: deps.lifecycle,
   });

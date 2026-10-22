@@ -64,7 +64,7 @@ export function spawnBackground(
         model: execution.model,
         modelSelection: execution.modelSelection,
         thinkingDecision: execution.thinkingDecision,
-        maxTurns: execution.effectiveMaxTurns,
+        turnPolicy: execution.turnPolicy,
         inheritContext: execution.inheritContext,
         thinkingLevel: execution.thinking,
         // resolveSpawnConfig already merged the agent's frontmatter and AgentTool

@@ -24,6 +24,7 @@ import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { makeModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /** A registry with one definition file, for the cases that need one. */
 function registryWith(
@@ -293,7 +294,7 @@ describe("both doors resolve alike", () => {
         },
         ladders,
       },
-      { defaultMaxTurns: undefined },
+      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     if ("error" in tool) throw new Error(tool.error);
 
@@ -346,7 +347,7 @@ describe("both doors resolve alike", () => {
       expect.objectContaining({
         description: "d",
         model: tool.execution.model,
-        maxTurns: tool.execution.effectiveMaxTurns,
+        turnPolicy: tool.execution.turnPolicy,
         inheritContext: false,
         thinkingLevel: tool.execution.thinking,
         background: { kind: "explicit", isBackground: false },

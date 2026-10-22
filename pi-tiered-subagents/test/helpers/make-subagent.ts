@@ -12,6 +12,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /**
  * A minimal, mandatory SubagentExecution for tests that build a passive record
@@ -28,6 +29,9 @@ export function makeStubExecution(
     snapshot: STUB_SNAPSHOT,
     prompt: "do something",
     baseCwd: "",
+    // Unlimited unless a fixture is about the budget: a ceiling nobody asked
+    // for would stop turns the test expects to happen.
+    turnPolicy: UNLIMITED_TURNS,
     ...overrides,
   };
 }

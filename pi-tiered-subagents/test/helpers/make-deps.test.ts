@@ -3,6 +3,8 @@ import type { BackgroundManagerDeps } from "#src/tools/background-spawner";
 import type { ForegroundManagerDeps } from "#src/tools/foreground-runner";
 import { createToolDeps } from "./make-deps";
 import { STUB_SNAPSHOT } from "./stub-ctx";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 describe("createToolDeps", () => {
   describe("manager defaults", () => {
@@ -11,6 +13,7 @@ describe("createToolDeps", () => {
       expect(
         manager.spawn(STUB_SNAPSHOT, "general-purpose", "prompt", {
           description: "test",
+          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
         }),
       ).toBe("agent-1");
@@ -22,7 +25,7 @@ describe("createToolDeps", () => {
         STUB_SNAPSHOT,
         "general-purpose",
         "prompt",
-        { description: "test" },
+        { description: "test", turnPolicy: UNLIMITED_TURNS },
       );
       expect(record.status).toBe("completed");
     });
@@ -73,6 +76,7 @@ describe("createToolDeps", () => {
       });
       deps.manager.spawn(STUB_SNAPSHOT, "t", "p", {
         description: "test",
+        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
       });
       expect(customSpawn).toHaveBeenCalledOnce();
@@ -80,7 +84,11 @@ describe("createToolDeps", () => {
 
     it("replaces settings when overridden", () => {
       const deps = createToolDeps({
-        settings: { defaultMaxTurns: 10, maxConcurrent: 2 },
+        settings: {
+          defaultMaxTurns: 10,
+          wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+          maxConcurrent: 2,
+        },
       });
       expect(deps.settings.defaultMaxTurns).toBe(10);
       expect(deps.settings.maxConcurrent).toBe(2);

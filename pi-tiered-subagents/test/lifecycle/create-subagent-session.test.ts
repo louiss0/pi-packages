@@ -4,6 +4,7 @@ import type {
   ResourceLoaderOptions,
 } from "#src/lifecycle/create-subagent-session";
 import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
+import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
 import { STUB_CTX, STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import {
@@ -55,7 +56,7 @@ describe("createSubagentSession — assembly", () => {
 
   it("returns a born-complete SubagentSession wrapping the created session", async () => {
     const sub = await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -63,12 +64,15 @@ describe("createSubagentSession — assembly", () => {
     expect(sub.session).toBe(session);
   });
 
-  it("holds the session to the agent's maxTurns over the run config's default", async () => {
+  it("enforces the ceiling the door resolved, without merging another default", async () => {
+    // The door already resolved request → definition → operator default. The
+    // session enforces that decision; a definition or setting that says
+    // something else must not re-decide the budget here.
     const sub = await createSubagentSession(
       {
         snapshot: STUB_SNAPSHOT,
         type: "Explore",
-        turnLimits: { defaultMaxTurns: 9, wrapUpTurns: 3 },
+        turnPolicy: { kind: "limited", maxTurns: 4, wrapUpTurns: 3 },
       },
       createSubagentSessionDeps({
         io,
@@ -80,15 +84,34 @@ describe("createSubagentSession — assembly", () => {
     const result = await sub.runTurnLoop("go", {});
 
     expect(result.turnBudget).toEqual({
-      maxTurns: 7,
+      maxTurns: 4,
       used: 0,
       phase: "within",
     });
   });
 
+  it("does not limit a run the door resolved as unlimited", async () => {
+    const sub = await createSubagentSession(
+      {
+        snapshot: STUB_SNAPSHOT,
+        type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
+      },
+      createSubagentSessionDeps({
+        io,
+        exec,
+        registry: createAgentLookup({ maxTurns: 7 }),
+      }),
+    );
+
+    const result = await sub.runTurnLoop("go", {});
+
+    expect(result.turnBudget).toEqual({ used: 0, phase: "within" });
+  });
+
   it("exposes the persisted session file as outputFile", async () => {
     const sub = await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -97,7 +120,7 @@ describe("createSubagentSession — assembly", () => {
 
   it("binds extensions before returning", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -107,7 +130,12 @@ describe("createSubagentSession — assembly", () => {
 
   it("passes the effective cwd and agentDir to the loader, settings, and session", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore", cwd: "/tmp/worktree" },
+      {
+        snapshot: STUB_SNAPSHOT,
+        type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
+        cwd: "/tmp/worktree",
+      },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -141,7 +169,7 @@ describe("createSubagentSession — assembly", () => {
     io.createLoaderSettingsManager.mockReturnValue(loaderSettings);
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -158,7 +186,7 @@ describe("createSubagentSession — assembly", () => {
 
   it("creates the session's settings manager exactly once and reuses it", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -168,7 +196,7 @@ describe("createSubagentSession — assembly", () => {
 
   it("suppresses AGENTS.md/CLAUDE.md/APPEND_SYSTEM.md for subagents", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
@@ -186,6 +214,7 @@ describe("createSubagentSession — assembly", () => {
     await createSubagentSession(
       {
         snapshot: STUB_SNAPSHOT,
+        turnPolicy: UNLIMITED_TURNS,
         type: "Explore",
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
@@ -214,7 +243,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
 
   it("emits spawning before session-created", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -231,7 +260,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
 
   it("emits session-created before bindExtensions()", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -248,7 +277,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
 
   it("emits bound after bindExtensions()", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -267,6 +296,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
     await createSubagentSession(
       {
         snapshot: STUB_SNAPSHOT,
+        turnPolicy: UNLIMITED_TURNS,
         type: "Explore",
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
@@ -293,6 +323,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
     await createSubagentSession(
       {
         snapshot: STUB_SNAPSHOT,
+        turnPolicy: UNLIMITED_TURNS,
         type: "Explore",
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
@@ -315,7 +346,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
 
   it("does not emit completed or disposed during creation", async () => {
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -341,7 +372,11 @@ describe("createSubagentSession — dispose on creation failure", () => {
 
     await expect(
       createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore" },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+        },
         createSubagentSessionDeps({
           io,
           exec,
@@ -370,7 +405,11 @@ describe("createSubagentSession — dispose on creation failure", () => {
 
     await expect(
       createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore" },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+        },
         createSubagentSessionDeps({
           io,
           exec,
@@ -394,7 +433,11 @@ describe("createSubagentSession — dispose on creation failure", () => {
 
     await expect(
       createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore" },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+        },
         createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
       ),
     ).rejects.toThrow("bind failed");
@@ -416,7 +459,7 @@ describe("createSubagentSession — recursion guard", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       defaultDeps(),
     );
 
@@ -431,7 +474,7 @@ describe("createSubagentSession — recursion guard", () => {
     const session = arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       defaultDeps(),
     );
 
@@ -450,7 +493,12 @@ describe("createSubagentSession — the core's own child tools", () => {
       arrangeFactory();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore", askParent: vi.fn() },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+          askParent: vi.fn(),
+        },
         defaultDeps(),
       );
 
@@ -463,7 +511,12 @@ describe("createSubagentSession — the core's own child tools", () => {
       arrangeFactory();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore", askParent: vi.fn() },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+          askParent: vi.fn(),
+        },
         defaultDeps(),
       );
 
@@ -477,7 +530,12 @@ describe("createSubagentSession — the core's own child tools", () => {
       arrangeFactory();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore", askParent: vi.fn() },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+          askParent: vi.fn(),
+        },
         createSubagentSessionDeps({
           io,
           exec,
@@ -497,7 +555,12 @@ describe("createSubagentSession — the core's own child tools", () => {
       const askParent = vi.fn<(question: string) => void>();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore", askParent },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+          askParent,
+        },
         defaultDeps(),
       );
 
@@ -518,7 +581,11 @@ describe("createSubagentSession — the core's own child tools", () => {
       arrangeFactory();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore" },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+        },
         defaultDeps(),
       );
 
@@ -531,7 +598,11 @@ describe("createSubagentSession — the core's own child tools", () => {
       arrangeFactory();
 
       await createSubagentSession(
-        { snapshot: STUB_SNAPSHOT, type: "Explore" },
+        {
+          snapshot: STUB_SNAPSHOT,
+          type: "Explore",
+          turnPolicy: UNLIMITED_TURNS,
+        },
         defaultDeps(),
       );
 
@@ -554,6 +625,7 @@ describe("createSubagentSession — prompt inheritance", () => {
       {
         snapshot: { ...STUB_SNAPSHOT, portablePrompt: "You are a specialist." },
         type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
       },
       defaultDeps(),
     );
@@ -565,7 +637,7 @@ describe("createSubagentSession — prompt inheritance", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -593,7 +665,7 @@ describe("createSubagentSession — Pi built-in extensions", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       createSubagentSessionDeps({
         io,
         exec,
@@ -613,7 +685,7 @@ describe("createSubagentSession — Pi built-in extensions", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       defaultDeps(),
     );
 
@@ -644,7 +716,7 @@ describe("createSubagentSession — MCP tool patterns", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       depsDeclaring(["read", "mcp__github__*"], PARENT_TOOLS),
     );
 
@@ -660,7 +732,7 @@ describe("createSubagentSession — MCP tool patterns", () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
       depsDeclaring(["read", "mcp__github__*"], ["read", "mcp__gitlab__c"]),
     );
 

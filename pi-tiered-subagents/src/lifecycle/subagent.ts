@@ -38,6 +38,7 @@ import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
 import type { ModelSelection } from "#src/models/selection";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { RunConfig } from "#src/runtime";
+import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type {
   CompactionInfo,
   ParentSessionInfo,
@@ -125,7 +126,13 @@ export interface SubagentExecution {
   /** Resolves the registered workspace provider (if any) at run-start. */
   getWorkspaceProvider?: () => WorkspaceProvider | undefined;
   model?: Model<any>;
-  maxTurns?: number;
+  /**
+   * The run's turn ceiling, resolved once at the door.
+   *
+   * Captured with the launch rather than read at run time, so a later change
+   * to the operator's default budget cannot alter accepted work.
+   */
+  turnPolicy: TurnPolicy;
   thinkingLevel?: ThinkingLevel;
   /**
    * How the resolved model was chosen, and why — the decision behind a launch.
@@ -554,11 +561,7 @@ export class Subagent {
               this.announceUpdate(message);
             }
           : undefined,
-        turnLimits: {
-          maxTurns: this.execution.maxTurns,
-          defaultMaxTurns: runConfig?.defaultMaxTurns,
-          wrapUpTurns: runConfig?.wrapUpTurns,
-        },
+        turnPolicy: this.execution.turnPolicy,
         toolNames: this.execution.toolNames,
       });
     } catch (err) {

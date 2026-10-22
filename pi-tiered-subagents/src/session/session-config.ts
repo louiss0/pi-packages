@@ -126,8 +126,6 @@ export interface SessionConfig {
   model: Model<any> | undefined;
   /** Resolved thinking level (undefined → inherit from session). */
   thinkingLevel: ThinkingLevel | undefined;
-  /** Per-agent configured max turns (from agentConfig.maxTurns). */
-  agentMaxTurns: number | undefined;
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -202,15 +200,14 @@ export function assembleSessionConfig(
   // Thinking level: explicit option > agent config > undefined (inherit)
   const thinkingLevel = options.thinkingLevel ?? definition.thinking;
 
-  // Per-agent max turns (combined with per-call maxTurns and defaultMaxTurns by resolveTurnLimits)
-  const agentMaxTurns = definition.maxTurns;
-
+  // The turn ceiling is not resolved here: the door decided it, once, from the
+  // request, the definition, and the operator's captured default. The assembler
+  // must not merge a second policy or read a default of its own.
   return {
     effectiveCwd,
     systemPrompt,
     toolNames,
     model,
     thinkingLevel,
-    agentMaxTurns,
   };
 }

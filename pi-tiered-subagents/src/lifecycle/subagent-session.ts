@@ -22,8 +22,8 @@ import {
   type TurnBudget,
   type TurnBudgetAction,
   TurnBudgetTracker,
-  type TurnLimits,
   type TurnOutcome,
+  type TurnPolicy,
 } from "#src/lifecycle/turn-limits";
 import {
   getSessionContextPercent,
@@ -56,8 +56,11 @@ export interface SubagentSessionMeta {
   /** Child session directory — carried on the completed event as transcript location. */
   sessionDir: string;
   agentName: string;
-  /** The limits every run of this session is held to, resolved at creation. */
-  turnLimits: TurnLimits;
+  /**
+   * The turn ceiling every run of this session is held to, resolved once at the
+   * door. A resume keeps this decision and starts a fresh counter.
+   */
+  turnPolicy: TurnPolicy;
   /** Parent context prepended to the first run's prompt, captured at spawn time. */
   parentContext: string | undefined;
   lifecycle: ChildLifecyclePublisher;
@@ -129,7 +132,7 @@ export class SubagentSession {
   ): Promise<TurnLoopResult> {
     const firstRun = !this.hasRun;
     this.hasRun = true;
-    const tracker = new TurnBudgetTracker(this.meta.turnLimits);
+    const tracker = new TurnBudgetTracker(this.meta.turnPolicy);
     const responseText = await this.promptForAnswer(
       firstRun ? this.withParentContext(prompt) : prompt,
       tracker,

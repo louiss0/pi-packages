@@ -31,6 +31,7 @@ import {
   textResult,
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
+import type { TurnSettings } from "#src/agents/resolver";
 import { renderAgentResult } from "#src/tools/result-renderer";
 import {
   type ModelInfo,
@@ -74,8 +75,7 @@ export interface AgentToolRuntime {
 }
 
 /** Narrow settings accessor — only the fields the Agent tool reads. */
-export type AgentToolSettings = {
-  readonly defaultMaxTurns: number | undefined;
+export type AgentToolSettings = TurnSettings & {
   readonly maxConcurrent: number;
 };
 

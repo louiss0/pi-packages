@@ -19,7 +19,8 @@ import type {
 } from "#src/lifecycle/subagent-manager";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import type { RoutingLadders } from "#src/models/router";
-import { resolveSpawn } from "#src/agents/resolver";
+import { resolveSpawn, type TurnSettings } from "#src/agents/resolver";
+import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -82,12 +83,14 @@ export class SubagentsServiceAdapter implements SubagentsService {
       type: string,
     ) => AgentDefinition | undefined,
     /**
-     * The operator's default turn ceiling, so the service door resolves launches
-     * exactly as the tool door does.
+     * The operator's turn-budget defaults, so the service door resolves launches
+     * exactly as the tool door does. Read when the launch is prepared, so a
+     * later default change reaches only the next launch.
      */
-    private readonly settings: {
-      readonly defaultMaxTurns: number | undefined;
-    } = { defaultMaxTurns: undefined },
+    private readonly settings: TurnSettings = {
+      defaultMaxTurns: undefined,
+      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+    },
   ) {}
 
   spawn(type: string, prompt: string, options?: SpawnOptions): string {
@@ -131,7 +134,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
       model: execution.model,
       modelSelection: execution.modelSelection,
       thinkingDecision: execution.thinkingDecision,
-      maxTurns: execution.effectiveMaxTurns,
+      turnPolicy: execution.turnPolicy,
       inheritContext: execution.inheritContext,
       thinkingLevel: execution.thinking,
       // No toolCallId — an SDK spawn has no originating tool call, and

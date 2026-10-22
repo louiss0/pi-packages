@@ -27,7 +27,7 @@ describe("createResolvedSpawnConfig", () => {
           reason:
             "no model was resolved, so there is no reasoning level to set",
         },
-        effectiveMaxTurns: undefined,
+        turnPolicy: { kind: "unlimited" },
         thinking: undefined,
         inheritContext: false,
         runInBackground: true,
