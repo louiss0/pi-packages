@@ -638,7 +638,12 @@ export class Subagent {
   }
 
   /**
-   * Start execution immediately (foreground / bypassQueue paths).
+   * Start execution without going through the concurrency limiter.
+   *
+   * Production admission always goes through `scheduleVia`, so this is the
+   * direct-entry seam tests use to drive a record without a limiter; it is not
+   * a bypass any caller can reach.
+   *
    * Stores the run promise so it is awaitable via the `promise` getter.
    */
   start(): void {

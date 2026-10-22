@@ -483,31 +483,42 @@ describe("SubagentManager", () => {
         expect(record.claimed).toBe(true);
       });
 
-      it("runs immediately rather than queueing behind a full concurrency limit", async () => {
-        // Only the first session creation blocks, so the background agent holds
-        // the single limiter slot open while the foreground agent runs.
-        let creations = 0;
-        const factory = vi.fn((_params: CreateSubagentSessionParams) => {
-          creations += 1;
-          return creations === 1
-            ? new Promise<SubagentSession>(() => {})
-            : Promise.resolve(toSubagentSession(createSubagentSessionStub()));
-        });
+      it("queues at capacity rather than running past the cap", async () => {
+        // A foreground run takes the same slot a background run does: waiting
+        // for a result is a delivery choice, not extra capacity.
+        const holderLoop = Promise.withResolvers<TurnLoopResult>();
+        const stubs: Array<ReturnType<typeof createSubagentSessionStub>> = [];
         ({ manager } = createManager({
-          registry: registryWith("Explore", { runInBackground: true }),
           getMaxConcurrent: () => 1,
-          createSubagentSession: factory,
+          // Read-only children, so this exercises the concurrency cap alone.
+          registry: registryWith("worker", {
+            tools: { kind: "explicit", names: ["read", "grep", "find", "ls"] },
+          }),
+          createSubagentSession: vi.fn(async () => {
+            const stub = createSubagentSessionStub();
+            if (stubs.length === 0)
+              stub.runTurnLoop.mockReturnValue(holderLoop.promise);
+            stubs.push(stub);
+            return toSubagentSession(stub);
+          }),
         }));
-        spawnBg(manager, "occupies-the-only-slot");
-
-        // Were this routed through the limiter, the await would never settle.
-        const record = await manager.spawnAndWait(
-          STUB_SNAPSHOT,
-          "Explore",
-          "test",
-          { description: "d" },
+        const holder = spawnBg(manager, "occupies-the-only-slot");
+        await vi.waitFor(() =>
+          expect(manager.getRecord(holder)!.status).toBe("running"),
         );
 
+        const pending = manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
+          description: "d",
+        });
+
+        // Queued, not running: the await has no slot of its own.
+        const queued = manager
+          .listAgents()
+          .find((record) => record.description === "d");
+        expect(queued?.status).toBe("queued");
+
+        holderLoop.resolve(turnLoopResult({ responseText: "held" }));
+        const record = await pending;
         expect(record.status).toBe("completed");
       });
     });
@@ -811,17 +822,21 @@ describe("SubagentManager", () => {
         ]).toEqual(["completed", "resumed"]);
       });
 
-      it("starts a foreground resume at capacity, as a foreground spawn does", async () => {
-        const { x, releaseHolder } = await arrangeResumeAtCapacity();
+      it("queues a foreground resume at capacity, as a background resume does", async () => {
+        const { x, holder, releaseHolder } = await arrangeResumeAtCapacity();
 
         manager.startResume(x, "continue", {
           background: false,
           claimOutcome: true,
         });
 
-        expect(manager.getRecord(x)!.status).toBe("running");
+        // A resumed run consumes the same capacity as a spawned one, whichever
+        // mode it was asked for in.
+        expect(manager.getRecord(x)!.status).toBe("queued");
         releaseHolder();
+        await manager.getRecord(holder)!.promise;
         await manager.getRecord(x)!.promise;
+        expect(manager.getRecord(x)!.status).toBe("completed");
       });
 
       it("refuses a second resume while the first waits", async () => {

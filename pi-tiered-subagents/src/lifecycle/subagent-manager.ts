@@ -1,10 +1,11 @@
 /**
  * subagent-manager.ts - Tracks subagents, background execution, resume support.
  *
- * Background runs, spawned or resumed, are subject to a configurable concurrency
- * limit (default: 4). Excess runs are scheduled on a ConcurrencyLimiter and
- * auto-started as running ones complete. Foreground runs bypass the limiter
- * (they block the parent anyway).
+ * Every run — initial or resumed, background or foreground, spawned or
+ * awaited — is subject to one configurable concurrency limit (default: 4).
+ * Excess runs are scheduled on a ConcurrencyLimiter and auto-started as
+ * running ones complete. There is no public bypass: waiting for a result does
+ * not grant extra execution capacity (ARCHITECTURE-SPEC stories 67 and 68).
  */
 
 import { randomUUID } from "node:crypto";
@@ -265,12 +266,6 @@ export interface AgentSpawnConfig {
    * cannot silently inherit another's policy.
    */
   background: BackgroundRequest;
-  /**
-   * Skip the maxConcurrent queue check for this spawn - start immediately even
-   * if the configured concurrency limit would otherwise queue it. Useful for
-   * callers (e.g. cross-extension RPC) that must not be deferred by the queue.
-   */
-  bypassQueue?: boolean;
   /** Parent abort signal - when aborted, the subagent is also stopped. */
   signal?: AbortSignal;
   /** Per-subagent lifecycle observer — replaces onSessionCreated callback. */
@@ -287,7 +282,7 @@ export class SubagentManager {
     params: CreateSubagentSessionParams,
   ) => Promise<SubagentSession>;
   private readonly limiter: ConcurrencyLimiter;
-  /** Background runs, spawned or resumed, wait for and hold a slot on the limiter. */
+  /** Every run — background, foreground, initial, or resumed — waits for and holds a limiter slot. */
   private readonly admitBackground: RunScheduler = (thunk) =>
     this.limiter.schedule(thunk);
   private readonly baseCwd: string;
@@ -410,10 +405,12 @@ export class SubagentManager {
 
   /**
    * Spawn an agent and wait for completion (foreground use).
-   * Foreground agents bypass the concurrency queue.
+   *
+   * The run takes the same concurrency slot a background run does: waiting for
+   * a result is a delivery choice, not a licence for extra capacity.
    *
    * The caller holds the result, which is a delivery commitment: the agent must
-   * not be queued and must not be announced, whatever its frontmatter declares.
+   * not be announced, whatever its frontmatter declares.
    *
    * Rejects when the named agent type is disabled.
    */
@@ -521,22 +518,14 @@ export class SubagentManager {
       this.observer?.onSubagentCreated(record);
     }
 
-    if (isBackground && !options.bypassQueue) {
-      // Schedule on the limiter — scheduleVia captures the limiter promise
-      // eagerly, so a queued agent is awaitable from spawn; guardedRun guards
-      // against abort-while-queued when the slot frees. The workspace slot is
-      // taken inside the scheduled task, so a child waiting for a concurrency
-      // slot holds no workspace slot.
-      record.scheduleVia((thunk) =>
-        this.admitBackground(() => this.admit(plan, thunk)),
-      );
-      return id;
-    }
-
-    // A foreground child skips the concurrency queue, but not the workspace's
-    // exclusive slot: two children that may change the same files must not
-    // run at once, however they were launched.
-    record.scheduleVia((thunk) => this.admit(plan, thunk));
+    // Every run is admitted through the limiter. scheduleVia captures the
+    // limiter promise eagerly, so a queued agent is awaitable from spawn;
+    // guardedRun guards against abort-while-queued when the slot frees. The
+    // workspace slot is taken inside the scheduled task, so a child waiting
+    // for a concurrency slot holds no workspace slot.
+    record.scheduleVia((thunk) =>
+      this.admitBackground(() => this.admit(plan, thunk)),
+    );
     return id;
   }
 
@@ -602,11 +591,11 @@ export class SubagentManager {
 
   /**
    * Start a resume without waiting for it, handing back the record now running
-   * it, or queued for a concurrency slot when it is a background resume and the
-   * limit is reached. Refuses synchronously, for the same reasons `resume` does.
+   * it, or queued for a concurrency slot when the limit is reached. Refuses
+   * synchronously, for the same reasons `resume` does.
    *
-   * A background resume is admitted through the limiter like a background
-   * spawn; a foreground one starts at once, like a foreground spawn.
+   * A resume is admitted through the same limiter as a spawn, whether it runs
+   * in the background or the caller is awaiting it.
    */
   startResume(
     id: string,
@@ -635,7 +624,6 @@ export class SubagentManager {
       id,
       signal: options.signal,
     };
-    const schedule = options.background ? this.admitBackground : undefined;
     void agent.resume(
       prompt,
       {
@@ -643,9 +631,7 @@ export class SubagentManager {
         signal: options.signal,
         claimOutcome: options.claimOutcome,
       },
-      schedule
-        ? (thunk) => schedule(() => this.admit(resumePlan, thunk))
-        : (thunk) => this.admit(resumePlan, thunk),
+      (thunk) => this.admitBackground(() => this.admit(resumePlan, thunk)),
     );
     return { kind: "started", record: agent };
   }

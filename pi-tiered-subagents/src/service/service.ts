@@ -152,7 +152,6 @@ export interface SpawnOptions {
   thinkingLevel?: string;
   inheritContext?: boolean;
   foreground?: boolean;
-  bypassQueue?: boolean;
 }
 
 /** The public service contract for cross-extension subagent access. */

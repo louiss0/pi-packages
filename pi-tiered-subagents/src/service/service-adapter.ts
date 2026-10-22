@@ -137,7 +137,6 @@ export class SubagentsServiceAdapter implements SubagentsService {
       // No toolCallId — an SDK spawn has no originating tool call, and
       // Subagent.toolCallId reporting undefined there is the truth.
       parentSession: { parentSessionFile, parentSessionId },
-      bypassQueue: options?.bypassQueue,
       // A caller that names `foreground` has committed; one that omits it has
       // not, so the agent's own frontmatter decides and background is the
       // SDK-door default.
