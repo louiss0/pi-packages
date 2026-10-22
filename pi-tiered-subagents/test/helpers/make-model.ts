@@ -22,3 +22,26 @@ export function makeModel(overrides: Partial<Model<any>> = {}): Model<any> {
     ...overrides,
   };
 }
+
+/**
+ * A model that does extended reasoning, with the levels the SDK reports for
+ * one: every level but `xhigh` and `max`, which the SDK only counts as
+ * supported when the model names them.
+ */
+export function makeReasoningModel(
+  overrides: Partial<Model<any>> = {},
+): Model<any> {
+  return makeModel({
+    id: "claude-sonnet-5",
+    name: "Claude Sonnet 5",
+    reasoning: true,
+    thinkingLevelMap: {
+      off: "off",
+      minimal: "minimal",
+      low: "low",
+      medium: "medium",
+      high: "high",
+    },
+    ...overrides,
+  });
+}

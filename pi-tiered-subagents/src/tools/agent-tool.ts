@@ -295,7 +295,7 @@ ${guidelines}
         thinking: Type.Optional(
           Type.String({
             description:
-              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level.",
+              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level. A level the chosen model does not support is clamped to one it does, and the result says so.",
           }),
         ),
         max_turns: Type.Optional(

@@ -107,6 +107,10 @@ export class SubagentRuntime {
     return {
       parentModel: this.currentCtx?.model,
       modelRegistry: registry,
+      // The effort the parent is running at: the reasoning fallback needs it,
+      // because a child that keeps the parent's model must not work harder
+      // than the parent did.
+      parentThinkingLevel: this.currentCtx?.thinkingLevel,
       // The models the session can run are a session fact, so the routing
       // context is built here, per request.
       routing: routingContext(

@@ -51,6 +51,12 @@ export function createResolvedSpawnConfig(
         source: "inherited",
         reason: "the parent has no model to step down from",
       },
+      thinkingDecision: {
+        applicable: false,
+        source: "none",
+        clamped: false,
+        reason: "no model was resolved, so there is no reasoning level to set",
+      },
       effectiveMaxTurns: undefined,
       thinking: undefined,
       inheritContext: false,

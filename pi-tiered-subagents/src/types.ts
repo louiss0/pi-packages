@@ -67,6 +67,13 @@ export interface SessionContext {
   readonly modelRegistry: ModelRegistry;
   getSystemPrompt(): string;
   /**
+   * The effort the session is running at, when the session has one.
+   *
+   * A child that keeps the parent's model must not work harder than the
+   * parent did, so the reasoning fallback reads it.
+   */
+  readonly thinkingLevel?: ThinkingLevel;
+  /**
    * Whether Pi has granted the project trust.
    *
    * A project the operator has not trusted contributes no agent definitions:

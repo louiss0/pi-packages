@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
-import { makeModel } from "#test/helpers/make-model";
+import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 
 /** The registry with the shipped specialists and no files. */
 const testRegistry = new AgentRegistry(() => ({
@@ -312,7 +312,7 @@ describe("resolveSpawnConfig — invocation fields", () => {
     const result = resolveSpawnConfig(
       params(),
       registry,
-      makeModelInfo(),
+      makeModelInfo({ parentModel: makeReasoningModel() }),
       defaultSettings,
     );
     if ("error" in result) return;
@@ -324,11 +324,24 @@ describe("resolveSpawnConfig — invocation fields", () => {
     const result = resolveSpawnConfig(
       params({ thinking: "high" }),
       registry,
-      makeModelInfo(),
+      makeModelInfo({ parentModel: makeReasoningModel() }),
       defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.thinking).toBe("high");
+  });
+
+  it("discards the thinking level for a model that does not reason", () => {
+    const registry = registryWith("worker", { thinking: "low" });
+    const result = resolveSpawnConfig(
+      params(),
+      registry,
+      makeModelInfo({ parentModel: makeModel() }),
+      defaultSettings,
+    );
+    if ("error" in result) return;
+    expect(result.execution.thinking).toBeUndefined();
+    expect(result.execution.thinkingDecision.applicable).toBe(false);
   });
 
   it("rejects a thinking level Pi does not know", () => {
@@ -360,7 +373,7 @@ describe("resolveSpawnConfig — detailBase and tags", () => {
     const result = resolveSpawnConfig(
       params({ thinking: "high" }),
       testRegistry,
-      makeModelInfo(),
+      makeModelInfo({ parentModel: makeReasoningModel() }),
       defaultSettings,
     );
     if ("error" in result) return;

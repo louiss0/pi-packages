@@ -21,6 +21,7 @@ import {
 } from "#src/models/selection";
 import type { ModelRegistry } from "#src/models/registry";
 import type { RoutingContext } from "#src/models/router";
+import { type ThinkingDecision, resolveThinking } from "#src/thinking/resolve";
 import {
   isBelowMinimumTurns,
   MIN_MAX_TURNS,
@@ -39,6 +40,8 @@ export interface ModelInfo {
   modelRegistry: ModelRegistry | undefined;
   /** The profiles and strategies the automatic routing uses. */
   routing: RoutingContext;
+  /** The effort the parent was running at, when the parent has one. */
+  parentThinkingLevel?: ThinkingLevel;
 }
 
 /** Identity: who is being spawned. */
@@ -57,6 +60,8 @@ export interface SpawnExecution {
   model: Model<any> | undefined;
   /** How the model was chosen, and why. */
   modelSelection: ModelSelection;
+  /** The reasoning level, and what was decided about it. */
+  thinkingDecision: ThinkingDecision;
   effectiveMaxTurns: number | undefined;
   thinking: ThinkingLevel | undefined;
   inheritContext: boolean;
@@ -145,7 +150,17 @@ export function resolveSpawnConfig(
   if (!modelChoice.ok) return { error: modelChoice.error };
   const model = modelChoice.selection.model;
 
-  const thinking = resolvedConfig.thinking;
+  // The reasoning level follows the model: what a model can do is a property of
+  // the model, so the level is resolved once the model is known.
+  const thinkingDecision = resolveThinking({
+    requested: thinkingFromParams,
+    defined: resolvedConfig.thinking,
+    model,
+    parentLevel: modelInfo.parentThinkingLevel,
+    // The parent's model was kept when nothing below it was available.
+    parentModelKept: modelChoice.selection.source === "inherited",
+  });
+  const thinking = thinkingDecision.level;
   const inheritContext = resolvedConfig.inheritContext;
   const runInBackground = resolvedConfig.runInBackground;
 
@@ -176,12 +191,14 @@ export function resolveSpawnConfig(
     notes: [
       ...buildMinimumTurnsNote(resolvedConfig.maxTurns),
       ...buildModelNote(modelChoice.selection),
+      ...buildThinkingNote(thinkingDecision),
     ],
     execution: {
       prompt: params.prompt as string,
       description: params.description as string,
       model,
       modelSelection: modelChoice.selection,
+      thinkingDecision,
       effectiveMaxTurns,
       thinking,
       inheritContext,
@@ -189,6 +206,20 @@ export function resolveSpawnConfig(
     },
     presentation: { agentTags, detailBase },
   };
+}
+
+/**
+ * Advise that the reasoning level was not the one that was asked for, or that
+ * it does not apply.
+ */
+function buildThinkingNote(decision: ThinkingDecision): string[] {
+  if (!decision.applicable) {
+    return [`Note: ${decision.reason}.`];
+  }
+  if (decision.clamped) {
+    return [`Note: ${decision.reason}.`];
+  }
+  return [];
 }
 
 /**

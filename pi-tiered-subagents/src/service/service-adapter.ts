@@ -19,6 +19,7 @@ import type {
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { routingContext, type RoutingLadders } from "#src/models/router";
 import { selectModel } from "#src/models/selection";
+import { resolveThinking } from "#src/thinking/resolve";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -119,6 +120,15 @@ export class SubagentsServiceAdapter implements SubagentsService {
     }
     const model = selection.selection.model;
 
+    // The reasoning level follows the model, the way it does at the tool door.
+    const thinking = resolveThinking({
+      requested: this.resolveThinkingLevel(options?.thinkingLevel),
+      defined: definition?.thinking,
+      model,
+      parentLevel: this.runtime.currentCtx.thinkingLevel,
+      parentModelKept: selection.selection.source === "inherited",
+    });
+
     const snapshot = this.runtime.buildSnapshot(inheritContext);
     const { parentSessionFile, parentSessionId } =
       this.runtime.getSessionInfo();
@@ -129,7 +139,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
       // Subagent.toolCallId reporting undefined there is the truth.
       parentSession: { parentSessionFile, parentSessionId },
       maxTurns: options?.maxTurns,
-      thinkingLevel: this.resolveThinkingLevel(options?.thinkingLevel),
+      thinkingLevel: thinking.level,
       inheritContext,
       bypassQueue: options?.bypassQueue,
       // A caller that names `foreground` has committed; one that omits it has
