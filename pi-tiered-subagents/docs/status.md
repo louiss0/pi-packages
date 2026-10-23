@@ -16,7 +16,7 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,272 tests, all passing (one skipped) |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,280 tests, all passing (one skipped) |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -468,7 +468,7 @@ below are ARCHITECTURE-SPEC's own.
 | Public queue-bypass exemption removed | 68 | Done — see *One concurrency cap for every run*. |
 | Turn budget resolved once into a closed policy | 51–55 | Done — see *The turn policy*. |
 | `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` enabled | 104, 105 | Done — see *The type system as a seam*. |
-| One authoritative preparation authority for both doors | 10–23 | Not started. The existing `src/agents/resolver.ts` is the shared resolver, but preparation does not yet produce an accepted-or-rejected plan as one value, and the parent's model, thinking, tools, and cwd are still read at their use rather than captured once at invocation. |
+| One authoritative preparation authority for both doors | 10–23 | Partial — see *One preparation authority*. Selection, thinking validation, and turn-default capture are one operation (`LaunchPreparer`), both doors consume the same prepared value through the session-scoped `Subagents` seam, and the captured definition travels to execution. Asynchronous preparation, launch signals, and copied parent-input capture (the live `Model`/`ModelRegistry` in the snapshot) are not yet done. |
 | Model and reasoning decisions captured as owned values | 38–50 | Not started. The decisions are resolved once and reported, but they still hold live SDK shapes rather than owned identities and capabilities. |
 | Child-shaping settings captured; operational settings live | 56, 57 | Not started. |
 | Async programmatic launch, explicit run, shared resume | 60–66 | Not started. Launch still returns a synchronous result; there is no separate `run`. |
@@ -513,6 +513,31 @@ two.
 The new `src/lifecycle/session-owner.ts` is the only file the manager,
 the lifecycle handlers, and the two doors all import from, so a future
 `Subagents` module can take this seam over without rippling through them.
+
+## One preparation authority
+
+A request is prepared once, no matter which door it arrives through.
+`src/agents/launch-preparer.ts` is the authority: it refreshes the file
+layers, selects the definition, validates the caller's thinking level,
+and captures the operator turn defaults and parent model facts with the
+request. Selection is honest — an unknown id and a disabled id are
+distinct rejections, never a substitute role, so a programmatic typo
+can no longer become a synthetic shipped definition.
+
+`src/service/subagents.ts` is the session-scoped seam both doors use:
+capture the owner, prepare, capture the parent snapshot and session
+identity, then accept into the manager. The tool adapter and the
+service adapter translate their own vocabulary into one request and
+consume the same prepared value; neither reads the registry, settings,
+or model facts on its own.
+
+The selected definition is copied at preparation and travels with the
+launch into execution. The manager prefers a door-supplied definition
+(internal callers without one keep the manager's own checked path),
+and the session assembler builds the child's prompt and tools from the
+captured definition rather than reselecting from mutable registry
+state. Disabling or editing a definition after a launch is prepared
+changes future requests only.
 
 ## The Pi 1.3.0 upgrade, verified across the workspace
 
