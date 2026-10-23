@@ -174,6 +174,12 @@ export interface SubagentSessionDeps {
   io: SubagentSessionIO;
   exec: ShellExec;
   registry: AgentDefinitionLookup;
+  /**
+   * Session-scoped SDK model bridge. It stays at this creation boundary rather
+   * than travelling in queued work; captured identities are exact, so this
+   * collaborator may materialize but never reselect.
+   */
+  modelRegistry: () => ModelRegistry;
   /** Publishes the child-execution lifecycle so consumers can observe it. */
   lifecycle: ChildLifecyclePublisher;
   /**
@@ -258,6 +264,7 @@ export async function createSubagentSession(
   deps: SubagentSessionDeps,
 ): Promise<SubagentSession> {
   const { snapshot, type } = params;
+  const modelRegistry = deps.modelRegistry();
   const parentSessionId = params.parentSession?.parentSessionId;
   deps.lifecycle.spawning(defined({ agentName: type, parentSessionId }));
 
@@ -272,7 +279,7 @@ export async function createSubagentSession(
       cwd: snapshot.cwd,
       parentSystemPrompt: snapshot.systemPrompt,
       parentModelIdentity: snapshot.parentModelIdentity,
-      modelRegistry: snapshot.modelRegistry,
+      modelRegistry,
       activeToolNames: snapshot.activeToolNames,
       definition: params.definition,
       childShaping: params.childShaping,
@@ -358,7 +365,7 @@ export async function createSubagentSession(
     agentDir,
     sessionManager,
     settingsManager: sessionSettings,
-    modelRegistry: snapshot.modelRegistry,
+    modelRegistry,
     tools: [...toolNames, ...childTools.map((tool) => tool.name)],
     customTools: childTools,
     excludeTools: EXCLUDED_TOOL_NAMES,

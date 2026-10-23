@@ -57,10 +57,9 @@ describe("buildParentSnapshot", () => {
     expect(snapshot.parentModelIdentity).toBeUndefined();
   });
 
-  it("captures modelRegistry from ctx", () => {
-    const registry = { find: vi.fn(), getAvailable: vi.fn(() => []) };
-    const snapshot = buildParentSnapshot(makeCtx({ modelRegistry: registry }));
-    expect(snapshot.modelRegistry).toBe(registry);
+  it("does not carry the live model registry into accepted work", () => {
+    const snapshot = buildParentSnapshot(makeCtx());
+    expect(snapshot).not.toHaveProperty("modelRegistry");
   });
 
   it("sets parentContext to undefined when inheritContext is false", () => {

@@ -14,6 +14,5 @@ export const STUB_CTX = {} as unknown as ExtensionContext;
 export const STUB_SNAPSHOT: ParentSnapshot = defined({
   cwd: "/test",
   systemPrompt: "test prompt",
-  modelRegistry: { find: () => undefined, getAll: () => [] },
   activeToolNames: ["read", "bash"],
 });

@@ -236,15 +236,20 @@ describe("createSubagentSession — assembly", () => {
     const snapshot = {
       ...STUB_SNAPSHOT,
       parentModelIdentity: parentModel,
-      modelRegistry: {
-        find: vi.fn(() => parentModel),
-        getAll: vi.fn(() => [parentModel]),
-      },
+    };
+    const modelRegistry = {
+      find: vi.fn(() => parentModel),
+      getAll: vi.fn(() => [parentModel]),
     };
 
     await createSubagentSession(
       { snapshot, type: "Explore", turnPolicy: UNLIMITED_TURNS },
-      defaultDeps(),
+      createSubagentSessionDeps({
+        io,
+        exec,
+        registry: mockAgentLookup,
+        modelRegistry,
+      }),
     );
 
     // The durable capture is the identity; the session's registry is only the
@@ -261,8 +266,8 @@ describe("createSubagentSession — assembly", () => {
       parentModelIdentity: { provider: "anthropic", id: "claude-sonnet-5" },
     };
 
-    // STUB_SNAPSHOT's registry finds nothing — the session no longer reports
-    // the model the launch was asked under.
+    // The creation boundary's registry finds nothing — the session no longer
+    // reports the model the launch was asked under.
     await expect(
       createSubagentSession(
         { snapshot, type: "Explore", turnPolicy: UNLIMITED_TURNS },

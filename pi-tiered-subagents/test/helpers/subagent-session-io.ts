@@ -5,6 +5,7 @@ import { defaultDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { AssemblerIO } from "#src/session/session-config";
+import type { ModelRegistry } from "#src/models/registry";
 import type { PromptInheritance, ShellExec } from "#src/types";
 import { createMockSession } from "#test/helpers/mock-session";
 
@@ -100,6 +101,7 @@ export function createSubagentSessionDeps(overrides?: {
   io?: ReturnType<typeof createSubagentSessionIO>;
   exec?: ShellExec;
   registry?: AgentDefinitionLookup;
+  modelRegistry?: ModelRegistry;
   lifecycle?: ReturnType<typeof createChildLifecycleMock>;
   resolvePromptInheritance?: (
     provider: string | undefined,
@@ -110,6 +112,8 @@ export function createSubagentSessionDeps(overrides?: {
     io: overrides?.io ?? createSubagentSessionIO(),
     exec: overrides?.exec ?? vi.fn(),
     registry: overrides?.registry ?? createAgentLookup(),
+    modelRegistry: () =>
+      overrides?.modelRegistry ?? { find: () => undefined, getAll: () => [] },
     lifecycle: overrides?.lifecycle ?? createChildLifecycleMock(),
     resolvePromptInheritance:
       overrides?.resolvePromptInheritance ??

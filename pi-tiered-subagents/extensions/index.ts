@@ -316,6 +316,18 @@ export default function (pi: ExtensionAPI) {
     },
     exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
     registry,
+    // The registry is a session-scoped execution collaborator, not launch
+    // data. Ownership prevents work from crossing a confirmed session switch;
+    // exact captured identities prevent this bridge from rerouting a child.
+    modelRegistry: () => {
+      const modelRegistry = runtime.currentCtx?.modelRegistry;
+      if (!modelRegistry) {
+        throw new Error(
+          "The parent session ended before the child model could be materialized.",
+        );
+      }
+      return modelRegistry;
+    },
     lifecycle: createChildLifecyclePublisher((channel, data) =>
       pi.events.emit(channel, data),
     ),

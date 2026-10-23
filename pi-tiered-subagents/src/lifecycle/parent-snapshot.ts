@@ -4,7 +4,6 @@
 
 import { buildParentContext } from "#src/session/context";
 import type { ExactModelIdentity } from "#src/models/identity";
-import type { ModelRegistry } from "#src/models/registry";
 import { defined } from "#src/optional";
 import type { SessionContext } from "#src/types";
 
@@ -34,11 +33,9 @@ export interface ParentPromptOptions {
  * Plain data snapshot of the parent session state captured at spawn time.
  * Replaces live `ExtensionContext` references so queued agents don't read stale state.
  *
- * Every field is an owned value: text, names, and identities. The one
- * exception is `modelRegistry`, the narrow structural bridge the child's
- * session creation uses to inherit providers — the model *decisions*
- * (the parent's identity, the resolved selection) are owned facts, not
- * live objects, so a queued launch cannot silently reroute.
+ * Every field is an owned value: text, names, and identities. Live SDK
+ * collaborators stay at the child-session creation boundary rather than
+ * travelling with accepted or queued work.
  */
 export interface ParentSnapshot {
   /** Parent working directory. */
@@ -56,8 +53,6 @@ export interface ParentSnapshot {
    * reports is an explicit failure, never a silent substitution (story 42).
    */
   parentModelIdentity?: ExactModelIdentity;
-  /** Model registry for resolving config.model strings and creating sessions. */
-  modelRegistry: ModelRegistry;
   /**
    * The tools the parent session had active when the request was made.
    *
@@ -95,7 +90,6 @@ export function buildParentSnapshot(
   return {
     cwd: ctx.cwd,
     systemPrompt: ctx.getSystemPrompt(),
-    modelRegistry: ctx.modelRegistry,
     // Copied, so a parent that changes its active tools later cannot widen a
     // queued child's capabilities.
     activeToolNames: [...activeToolNames],
