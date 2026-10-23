@@ -1,6 +1,0 @@
-docs(pi-tiered-subagents): record child-shaping capture as delivered
-
-Stories 56 and 57 move to done: the three settings that shape what a
-child is are captured and copied at preparation, while operational
-controls stay live per the specification's read-contract table. Test
-count to 2,284.
