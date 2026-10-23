@@ -16,7 +16,7 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,280 tests, all passing (one skipped) |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,284 tests, all passing (one skipped) |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -468,9 +468,9 @@ below are ARCHITECTURE-SPEC's own.
 | Public queue-bypass exemption removed | 68 | Done — see *One concurrency cap for every run*. |
 | Turn budget resolved once into a closed policy | 51–55 | Done — see *The turn policy*. |
 | `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` enabled | 104, 105 | Done — see *The type system as a seam*. |
-| One authoritative preparation authority for both doors | 10–23 | Partial — see *One preparation authority*. Selection, thinking validation, and turn-default capture are one operation (`LaunchPreparer`), both doors consume the same prepared value through the session-scoped `Subagents` seam, and the captured definition travels to execution. Asynchronous preparation, launch signals, and copied parent-input capture (the live `Model`/`ModelRegistry` in the snapshot) are not yet done. |
+| One authoritative preparation authority for both doors | 10–23 | Partial — see *One preparation authority*. Selection, thinking validation, turn-default capture, and child-shaping capture are one operation (`LaunchPreparer`), both doors consume the same prepared value through the session-scoped `Subagents` seam, and the captured definition travels to execution. Asynchronous preparation, launch signals, and copied parent-input capture (the live `Model`/`ModelRegistry` in the snapshot) are not yet done. |
 | Model and reasoning decisions captured as owned values | 38–50 | Not started. The decisions are resolved once and reported, but they still hold live SDK shapes rather than owned identities and capabilities. |
-| Child-shaping settings captured; operational settings live | 56, 57 | Not started. |
+| Child-shaping settings captured; operational settings live | 56, 57 | Done — see *One preparation authority*. Mid-run updates, the exclusion list, and prompt inheritance are captured and copied at preparation; concurrency, retention, and interrupt policy stay live. |
 | Async programmatic launch, explicit run, shared resume | 60–66 | Not started. Launch still returns a synchronous result; there is no separate `run`. |
 | Cancellation, delivery, and lifetime | 77–91 | Partial — see *Session ownership*. Sessions refuse launches for ended sessions, hold live children through a tentative switch, cancel on a confirmed switch, and refuse resumes a later session did not ask for. The narrower delivery and lifetime story (the observation and notification halves) is not yet touched. |
 | Terminal presentation extracted to a UI library | 92–100 | Not started. The renderer vocabulary exists in `src/ui/`, but it is still inside the runtime package. |
