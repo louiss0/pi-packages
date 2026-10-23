@@ -10,7 +10,6 @@ import {
 } from "#src/service/subagents";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
-import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
 import {
@@ -58,9 +57,10 @@ export function createToolDeps(
 ): AgentToolFixture {
   const runtime: SubagentsRuntime & { getModelInfo(): ModelInfo } = {
     currentCtx: {},
-    buildSnapshot: vi.fn(
-      (_inheritContext: boolean): ParentSnapshot => STUB_SNAPSHOT,
-    ),
+    captureLaunchInputs: vi.fn(() => ({
+      snapshot: STUB_SNAPSHOT,
+      parentContext: "parent conversation",
+    })),
     getModelInfo: vi.fn(() => ({
       parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }),
       modelRegistry: {
@@ -102,8 +102,13 @@ export function createToolDeps(
   };
   const fixture = { ...defaults, ...defined(overrides) };
   const preparer = new LaunchPreparer({
-    registry: fixture.registry,
-    reload: () => fixture.registry.reload(),
+    // The fixture re-reads through the registry's loader so a definition edit
+    // between two executes is visible to the second request, matching the
+    // production loader's fresh read per preparation.
+    loadScopes: async () => {
+      fixture.registry.reload();
+      return fixture.registry.currentScopes();
+    },
     modelInfo: () => fixture.runtime.getModelInfo(),
     turnSettings: () => fixture.settings,
     childShaping: () => ({

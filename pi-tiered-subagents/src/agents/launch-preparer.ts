@@ -10,7 +10,8 @@
  */
 
 import type { AgentDefinition } from "#src/agents/definition";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
+import type { LoadedScopes } from "#src/agents/loader";
+import { buildCatalog } from "#src/agents/registry";
 import type {
   ModelInfo,
   ResolvedSpawnConfig,
@@ -81,7 +82,8 @@ export type LaunchPreparationRejection =
   | "unknown-agent"
   | "disabled-agent"
   | "invalid-thinking"
-  | "configuration";
+  | "configuration"
+  | "cancelled";
 
 /** Preparation is an expected-value boundary; implementation failures still throw. */
 export type LaunchPreparationOutcome =
@@ -94,9 +96,13 @@ export type LaunchPreparationOutcome =
 
 /** Dependencies are the small live reads preparation needs at invocation. */
 export interface LaunchPreparerDeps {
-  readonly registry: AgentDefinitionLookup;
-  /** Refresh mutable on-disk configuration once, before selecting this request. */
-  readonly reload: () => void;
+  /**
+   * Load one preparation's definition scopes asynchronously.
+   *
+   * Each call owns its result: concurrent preparations never select through
+   * the mutable live registry. Cancellation propagates from `signal`.
+   */
+  readonly loadScopes: (signal?: AbortSignal) => Promise<LoadedScopes>;
   /** Parent model facts are read before resolution can yield. */
   readonly modelInfo: () => ModelInfo;
   /** Operator turn defaults are captured with this request. */
@@ -110,14 +116,32 @@ export class LaunchPreparer {
 
   /**
    * Prepare one launch from its caller vocabulary into a selected definition and
-   * fully resolved spawn config. This method is synchronous today; its boundary
-   * is deliberately before snapshot capture and manager acceptance so loading
-   * can become asynchronous without moving caller policy into either door.
+   * fully resolved spawn config.
+   *
+   * Asynchronous so configuration loading never blocks the host event loop
+   * (ARCHITECTURE-SPEC story 60). Every session-facing input is captured
+   * before the first await, so nothing a later turn changes can reach this
+   * request (story 15). A caller's signal cancels preparation before
+   * acceptance; cancellation is an expected rejection, not an exception
+   * (story 77).
    */
-  prepare(request: LaunchRequest): LaunchPreparationOutcome {
-    this.deps.reload();
+  async prepare(
+    request: LaunchRequest,
+    signal?: AbortSignal,
+  ): Promise<LaunchPreparationOutcome> {
+    // Capture the invocation-time facts first. These reads must reflect the
+    // request, not the moment the definition files finished loading.
+    const modelInfo = this.deps.modelInfo();
+    const turnSettings = { ...this.deps.turnSettings() };
+    const childShapingCapture = this.deps.childShaping();
 
-    const selection = this.deps.registry.select(request.type);
+    if (signal?.aborted) return cancelledRejection();
+
+    const scopes = await this.deps.loadScopes(signal);
+    if (signal?.aborted) return cancelledRejection();
+
+    const registry = buildCatalog(scopes);
+    const selection = registry.select(request.type);
     if (!selection.ok) {
       return {
         kind: "rejected",
@@ -149,8 +173,8 @@ export class LaunchPreparer {
         runInBackground: request.runInBackground,
         rawType: request.type as SubagentType,
       }),
-      modelInfo: this.deps.modelInfo(),
-      settings: { ...this.deps.turnSettings() },
+      modelInfo,
+      settings: turnSettings,
     });
 
     if ("error" in config) {
@@ -161,13 +185,22 @@ export class LaunchPreparer {
       };
     }
 
-    const childShaping = copyChildShaping(this.deps.childShaping());
+    const childShaping = copyChildShaping(childShapingCapture);
 
     return {
       kind: "prepared",
       value: { definition, config, childShaping },
     };
   }
+}
+
+/** The expected rejection for a caller that cancelled before preparation finished. */
+function cancelledRejection(): LaunchPreparationOutcome {
+  return {
+    kind: "rejected",
+    reason: "cancelled",
+    message: "The launch was cancelled before preparation completed.",
+  };
 }
 
 /** Copy nested child-shaping values: a prepared launch cannot track settings edits. */

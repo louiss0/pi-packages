@@ -6,7 +6,12 @@
  */
 
 import { defined } from "#src/optional";
-import type { BackgroundRequest } from "#src/agents/invocation";
+import type {
+  LaunchOptions,
+  LaunchRejected,
+  LaunchResult,
+  RunResult,
+} from "#src/service/service";
 import type {
   ResumeCallOptions,
   ResumeOutcome,
@@ -16,7 +21,6 @@ import type { Subagents, SubagentsManager } from "#src/service/subagents";
 import type {
   ResumeOptions,
   ResumeResult,
-  SpawnOptions,
   SubagentRecord,
   SubagentsService,
 } from "#src/service/service";
@@ -42,33 +46,97 @@ export class SubagentsServiceAdapter implements SubagentsService {
     private readonly subagents: Subagents,
   ) {}
 
-  spawn(type: string, prompt: string, options?: SpawnOptions): string {
-    const prepared = this.subagents.prepareLaunch({
-      type,
-      prompt,
-      ...defined({
-        description: options?.description,
-        model: options?.model,
-        thinking: options?.thinkingLevel,
-        maxTurns: options?.maxTurns,
-        inheritContext: options?.inheritContext,
-        runInBackground:
-          options?.foreground === undefined ? undefined : !options.foreground,
-      }),
-    });
-    if (prepared.kind === "rejected") throw new Error(prepared.message);
-
-    // A caller that names `foreground` has committed; one that omits it has
-    // not, so the agent's own frontmatter decides.
-    const background: BackgroundRequest =
-      options?.foreground === undefined
-        ? { kind: "default", isBackground: true }
-        : { kind: "explicit", isBackground: !options.foreground };
-    const outcome = this.subagents.spawn(prepared.value, background);
-    if (outcome.kind === "rejected") {
-      throw new Error(`Launch refused: ${outcome.reason}`);
+  /**
+   * Prepare and accept a background launch.
+   *
+   * The caller's signal cancels preparation only; once acceptance returns,
+   * the manager owns the child and the signal is detached (story 78).
+   */
+  async launch(
+    type: string,
+    prompt: string,
+    options?: LaunchOptions,
+  ): Promise<LaunchResult> {
+    const prepared = await this.subagents.prepareLaunch(
+      {
+        type,
+        prompt,
+        ...defined({
+          description: options?.description,
+          model: options?.model,
+          thinking: options?.thinkingLevel,
+          maxTurns: options?.maxTurns,
+          inheritContext: options?.inheritContext,
+        }),
+      },
+      undefined,
+      options?.signal,
+    );
+    if (prepared.kind === "rejected") {
+      return {
+        kind: "rejected",
+        reason: prepared.reason,
+        message: prepared.message,
+      };
     }
-    return outcome.value;
+
+    // A service launch is committed to background delivery: the ID-returning
+    // operation hands off, exactly as the inherited synchronous spawn did.
+    const outcome = this.subagents.spawn(prepared.value, {
+      kind: "explicit",
+      isBackground: true,
+    });
+    if (outcome.kind === "rejected") {
+      return refused(outcome.reason);
+    }
+    return { kind: "accepted", id: outcome.value };
+  }
+
+  /**
+   * Prepare, accept, and await one foreground run.
+   *
+   * The caller's signal cancels preparation before acceptance and, after it,
+   * stops the queued or running child this call owns. The resolved outcome is
+   * claimed here, so nothing else announces it.
+   */
+  async run(
+    type: string,
+    prompt: string,
+    options?: LaunchOptions,
+  ): Promise<RunResult> {
+    const prepared = await this.subagents.prepareLaunch(
+      {
+        type,
+        prompt,
+        ...defined({
+          description: options?.description,
+          model: options?.model,
+          thinking: options?.thinkingLevel,
+          maxTurns: options?.maxTurns,
+          inheritContext: options?.inheritContext,
+        }),
+      },
+      undefined,
+      options?.signal,
+    );
+    if (prepared.kind === "rejected") {
+      return {
+        kind: "rejected",
+        reason: prepared.reason,
+        message: prepared.message,
+      };
+    }
+
+    const outcome = await this.subagents.spawnAndWait(
+      prepared.value,
+      defined({
+        signal: options?.signal,
+      }),
+    );
+    if (outcome.kind === "rejected") {
+      return refused(outcome.reason);
+    }
+    return { kind: "settled", record: toSubagentRecord(outcome.value) };
   }
 
   getRecord(id: string): SubagentRecord | undefined {
@@ -128,6 +196,21 @@ export class SubagentsServiceAdapter implements SubagentsService {
     return this.manager.registerWorkspaceProvider(provider);
   }
 }
+/** The refusal sentence for a launch the manager turned away at acceptance. */
+function refused(reason: LaunchRejected["reason"]): LaunchRejected {
+  const message =
+    reason === "no-active-session"
+      ? "No active session — cannot launch agents outside a session."
+      : reason === "session-ended"
+        ? "Session ended before the launch was accepted."
+        : reason === "unknown-agent"
+          ? "The agent type is no longer in the catalog."
+          : reason === "disabled-agent"
+            ? "The agent type has been disabled."
+            : "The launch was cancelled before the launch was accepted.";
+  return { kind: "rejected", reason, message };
+}
+
 /**
  * Convert an internal Subagent to a serializable SubagentRecord.
  *

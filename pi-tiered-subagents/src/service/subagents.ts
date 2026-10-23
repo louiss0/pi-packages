@@ -31,7 +31,10 @@ import type { ParentSessionInfo } from "#src/types";
 /** Parent capture operations needed at the acceptance boundary. */
 export interface SubagentsRuntime {
   readonly currentCtx: unknown | undefined;
-  buildSnapshot(inheritContext: boolean): ParentSnapshot;
+  captureLaunchInputs(): {
+    readonly snapshot: ParentSnapshot;
+    readonly parentContext: string | undefined;
+  };
   getSessionInfo(): {
     readonly parentSessionFile: string;
     readonly parentSessionId: string;
@@ -76,7 +79,8 @@ export type SubagentsPreparationOutcome =
         | "unknown-agent"
         | "disabled-agent"
         | "invalid-thinking"
-        | "configuration";
+        | "configuration"
+        | "cancelled";
       readonly message: string;
     };
 
@@ -94,13 +98,17 @@ export class Subagents {
 
   /**
    * Capture ownership before preparation, then capture the parent values the
-   * selected launch needs. This is synchronous, so later async definition
-   * loading can move behind this operation without changing invocation facts.
+   * Capture ownership and every parent input before the first await, then
+   * let the preparation authority resolve the request. Nothing is re-read
+   * from the live session after the await: the owner, snapshot values, and
+   * session identity are invocation-time facts, and the manager re-validates
+   * ownership atomically at acceptance, with no intervening asynchronous gap.
    */
-  prepareLaunch(
+  async prepareLaunch(
     request: LaunchRequest,
     toolCallId?: string,
-  ): SubagentsPreparationOutcome {
+    signal?: AbortSignal,
+  ): Promise<SubagentsPreparationOutcome> {
     const owner = this.manager.currentOwner();
     if (!owner || !this.runtime.currentCtx) {
       return {
@@ -110,13 +118,22 @@ export class Subagents {
       };
     }
 
-    const prepared = this.preparer.prepare(request);
+    // The one capture operation (story 16): every parent slice the launch
+    // needs is taken here, before preparation can yield.
+    const inputs = this.runtime.captureLaunchInputs();
+    const { parentSessionFile, parentSessionId } =
+      this.runtime.getSessionInfo();
+
+    const prepared = await this.preparer.prepare(request, signal);
     if (prepared.kind === "rejected") return prepared;
 
     const { config } = prepared.value;
-    const snapshot = this.runtime.buildSnapshot(
-      config.execution.inheritContext,
-    );
+    // The conversation was captured with the request; only its attachment
+    // waits on the resolved definition.
+    const snapshot =
+      config.execution.inheritContext && inputs.parentContext
+        ? { ...inputs.snapshot, parentContext: inputs.parentContext }
+        : inputs.snapshot;
     const declaredTools = resolveChildToolNames(
       config.identity.definition.tools,
       snapshot.activeToolNames,
@@ -130,8 +147,6 @@ export class Subagents {
         `agent ${config.identity.subagentType}: tools pattern ${pattern} matched no tool the parent had when the request was made`,
       );
     }
-    const { parentSessionFile, parentSessionId } =
-      this.runtime.getSessionInfo();
     const parentSession: ParentSessionInfo = {
       parentSessionFile,
       parentSessionId,
@@ -151,11 +166,17 @@ export class Subagents {
     };
   }
 
-  /** Accept a prepared background-capable launch without waiting for a slot. */
+  /**
+   * Accept a prepared background-capable launch without waiting for a slot.
+   *
+   * No signal is taken here: acceptance hands ownership to the manager, so a
+   * short-lived caller cannot take accepted background work down with it
+   * (ARCHITECTURE-SPEC story 78). Cancelling after acceptance is
+   * `abort(id)`.
+   */
   spawn(
     launch: PreparedSubagentsLaunch,
     background: BackgroundRequest,
-    signal?: AbortSignal,
   ): LaunchOutcome<string> {
     const { identity, execution } = launch.config;
     const options: AgentSpawnConfig = {
@@ -173,7 +194,6 @@ export class Subagents {
       ...defined({
         modelIdentity: execution.modelIdentity,
         thinkingLevel: execution.thinking,
-        signal,
       }),
     };
     return this.manager.spawn(

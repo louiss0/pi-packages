@@ -192,7 +192,7 @@ An entry naming anything other than `model`, `thinking`, `max_turns`, `inherit_c
 A lock is never silent: when a caller passes a value for a locked field, the tool result says which agent locked which parameters.
 
 A lock binds the `subagent` tool only.
-[`SubagentsService.spawn`](../README.md#for-extension-authors) is a programmatic caller rather than a model guessing at harness settings, so its options win regardless.
+[`SubagentsService`](../README.md#for-extension-authors) `launch`/`run` are programmatic callers rather than a model guessing at harness settings, so their options win regardless.
 
 ### Tool selection
 

@@ -6,7 +6,15 @@
  *
  *   const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
  *   const svc = getSubagentsService();
- *   svc?.spawn("Explore", "Check for stale TODOs");
+ *   const result = await svc?.launch("Explore", "Check for stale TODOs");
+ *   if (result?.kind === "accepted") console.log(result.id);
+ *
+ * The launch surface is a deliberate breaking replacement for the inherited
+ * synchronous `spawn(): string` (ARCHITECTURE-SPEC stories 60–66 and 76):
+ * acceptance is asynchronous, expected failures are discriminated values
+ * rather than exceptions, and foreground settlement is the explicit `run`
+ * operation rather than an ambiguous `foreground` flag on an ID-returning
+ * method.
  */
 
 import type { ResumeRefusal, SubagentStatus } from "#src/lifecycle/subagent";
@@ -139,8 +147,8 @@ export type ResumeResult =
   | { kind: "resumed"; record: SubagentRecord }
   | { kind: "refused"; reason: ResumeRefusalReason };
 
-/** Options for spawning an agent via the service. */
-export interface SpawnOptions {
+/** Options shared by `launch` and `run`. */
+export interface LaunchOptions {
   description?: string;
   model?: string;
   /**
@@ -151,13 +159,83 @@ export interface SpawnOptions {
   maxTurns?: number;
   thinkingLevel?: string;
   inheritContext?: boolean;
-  foreground?: boolean;
+  /**
+   * Cancels the operation while preparation is in flight. For `launch`, the
+   * signal detaches the moment acceptance returns: accepted background work
+   * belongs to the manager, and cancelling the caller must not take it down
+   * (story 78) — use `abort(id)` afterwards. For `run`, the signal stays
+   * connected and stopping it cancels the queued or running child the call
+   * owns (story 80).
+   */
+  signal?: AbortSignal;
 }
+
+/** Why a launch or run was refused before any child existed. */
+export type LaunchRejectionReason =
+  | "no-active-session"
+  | "session-ended"
+  | "unknown-agent"
+  | "disabled-agent"
+  | "invalid-thinking"
+  | "configuration"
+  | "cancelled";
+
+/** The expected refusal shape: an ordinary answer, never an exception. */
+export interface LaunchRejected {
+  readonly kind: "rejected";
+  readonly reason: LaunchRejectionReason;
+  readonly message: string;
+}
+
+/**
+ * What a `launch` produced.
+ *
+ * `accepted` means the manager owns an identified child record — not that the
+ * run succeeded or even started. A refusal means no record exists.
+ */
+export type LaunchResult =
+  | { readonly kind: "accepted"; readonly id: string }
+  | LaunchRejected;
+
+/**
+ * What a `run` produced.
+ *
+ * `settled` carries the terminal by-value record: the child finished as
+ * completed, stopped, or error, and `record.status` says which. A refusal
+ * means no record exists.
+ */
+export type RunResult =
+  | { readonly kind: "settled"; readonly record: SubagentRecord }
+  | LaunchRejected;
 
 /** The public service contract for cross-extension subagent access. */
 export interface SubagentsService {
-  /** Spawn an agent. Returns the agent ID immediately. */
-  spawn(type: string, prompt: string, options?: SpawnOptions): string;
+  /**
+   * Prepare and accept a background launch.
+   *
+   * Resolves once the manager owns an identified child record; it does not
+   * wait for a concurrency slot or SDK session creation (story 63). An
+   * expected refusal resolves with its reason rather than throwing (story 61).
+   */
+  launch(
+    type: string,
+    prompt: string,
+    options?: LaunchOptions,
+  ): Promise<LaunchResult>;
+
+  /**
+   * Prepare, accept, and await one foreground run.
+   *
+   * The run takes the same concurrency slot a background launch does, and the
+   * resolved record's outcome is claimed by this call: nothing else announces
+   * it (story 64). `options.signal` cancels preparation before acceptance and
+   * stops the queued or running child after it (story 80).
+   */
+  run(
+    type: string,
+    prompt: string,
+    options?: LaunchOptions,
+  ): Promise<RunResult>;
 
   /** Get a snapshot of an agent's current state. */
   getRecord(id: string): SubagentRecord | undefined;

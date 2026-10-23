@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import { defined } from "#src/optional";
-import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { SubagentState } from "#src/lifecycle/subagent-state";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import type { RoutingLadders } from "#src/models/router";
@@ -308,7 +307,10 @@ function makeRuntimeStub(
 ): ServiceTestRuntime {
   return {
     currentCtx: makeStubCtx(),
-    buildSnapshot: vi.fn((_: boolean): ParentSnapshot => STUB_SNAPSHOT),
+    captureLaunchInputs: vi.fn(() => ({
+      snapshot: STUB_SNAPSHOT,
+      parentContext: "parent conversation",
+    })),
     getSessionInfo: vi.fn(() => ({
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "parent-session-123",
@@ -326,8 +328,7 @@ function makeServiceAdapter(
   })),
 ): SubagentsServiceAdapter {
   const preparer = new LaunchPreparer({
-    registry,
-    reload: () => registry.reload(),
+    loadScopes: async () => registry.currentScopes(),
     modelInfo: (): ModelInfo => {
       const ctx = runtime.currentCtx;
       if (!ctx) return { ladders: LADDERS };
@@ -467,18 +468,21 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
   });
 });
 
-describe("SubagentsServiceAdapter — spawn", () => {
-  it("throws when currentCtx is undefined (no active session)", () => {
+describe("SubagentsServiceAdapter — launch and run", () => {
+  it("rejects with no-active-session when currentCtx is undefined", async () => {
     const svc = makeServiceAdapter(
       createManagerStub(),
       makeRuntimeStub({ currentCtx: undefined }),
     );
-    expect(() => svc.spawn("Explore", "do something")).toThrow(
-      /no active session/i,
-    );
+    const result = await svc.launch("Explore", "do something");
+
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: "no-active-session",
+    });
   });
 
-  it("resolves a named model exactly against the session's registry", () => {
+  it("resolves a named model exactly against the session's registry", async () => {
     const registry = {
       find: (provider: string, id: string) =>
         provider === "anthropic" && id === "claude-sonnet-5"
@@ -491,17 +495,22 @@ describe("SubagentsServiceAdapter — spawn", () => {
         makeModel({ id: "claude-sonnet-5", provider: "anthropic" }),
       ],
     };
+    const mgr = createManagerStub();
     const svc = makeServiceAdapter(
-      createManagerStub(),
+      mgr,
       makeRuntimeStub({
         currentCtx: { ...makeStubCtx(), modelRegistry: registry },
       }),
     );
-    svc.spawn("Explore", "check TODOs", { model: "anthropic/claude-sonnet-5" });
-    expect(svc).toBeDefined();
+    const result = await svc.launch("Explore", "check TODOs", {
+      model: "anthropic/claude-sonnet-5",
+    });
+
+    expect(result).toEqual({ kind: "accepted", id: "spawned-id" });
+    expect(mgr.spawn).toHaveBeenCalled();
   });
 
-  it("throws when a named model cannot be resolved exactly", () => {
+  it("rejects when a named model cannot be resolved exactly", async () => {
     const registry = {
       find: () => undefined,
       getAll: () => [],
@@ -513,27 +522,43 @@ describe("SubagentsServiceAdapter — spawn", () => {
         currentCtx: { ...makeStubCtx(), modelRegistry: registry },
       }),
     );
-    expect(() => svc.spawn("Explore", "task", { model: "bad-model" })).toThrow(
-      /provider\/modelId|Model not found/,
-    );
+    const result = await svc.launch("Explore", "task", {
+      model: "bad-model",
+    });
+
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: "configuration",
+    });
+    if (result.kind === "rejected") {
+      expect(result.message).toMatch(/provider\/modelId|Model not found/);
+    }
   });
 
   describe("thinking level", () => {
-    it("throws for an unrecognized level rather than letting the SDK clamp it to off", () => {
+    it("rejects an unrecognized level rather than letting the SDK clamp it to off", async () => {
       const svc = makeServiceAdapter(createManagerStub());
 
-      expect(() =>
-        svc.spawn("Explore", "task", { thinkingLevel: "turbo" }),
-      ).toThrow(
-        'Invalid thinking level "turbo". Valid levels: off, minimal, low, medium, high, xhigh, max.',
-      );
+      const result = await svc.launch("Explore", "task", {
+        thinkingLevel: "turbo",
+      });
+
+      expect(result).toMatchObject({
+        kind: "rejected",
+        reason: "invalid-thinking",
+      });
+      if (result.kind === "rejected") {
+        expect(result.message).toBe(
+          'Invalid thinking level "turbo". Valid levels: off, minimal, low, medium, high, xhigh, max.',
+        );
+      }
     });
 
-    it("passes a recognized level through to the manager", () => {
+    it("passes a recognized level through to the manager", async () => {
       const mgr = createManagerStub();
       const svc = makeServiceAdapter(mgr);
 
-      svc.spawn("Explore", "task", { thinkingLevel: "xhigh" });
+      await svc.launch("Explore", "task", { thinkingLevel: "xhigh" });
 
       expect(mgr.spawn).toHaveBeenCalledWith(
         expect.anything(),
@@ -543,11 +568,11 @@ describe("SubagentsServiceAdapter — spawn", () => {
       );
     });
 
-    it("leaves the level unset when the caller omits it", () => {
+    it("leaves the level unset when the caller omits it", async () => {
       const mgr = createManagerStub();
       const svc = makeServiceAdapter(mgr);
 
-      svc.spawn("Explore", "task");
+      await svc.launch("Explore", "task");
 
       // No key at all rather than a key holding undefined: "the caller named no
       // level" is what the manager should read, and a present-and-undefined
@@ -557,7 +582,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
     });
   });
 
-  it("delegates to manager.spawn with resolved model", () => {
+  it("delegates to manager.spawn with the resolved model identity", async () => {
     const resolvedModel = makeModel({
       id: "claude-sonnet-5",
       provider: "anthropic",
@@ -577,11 +602,11 @@ describe("SubagentsServiceAdapter — spawn", () => {
         currentCtx: { ...makeStubCtx(), modelRegistry: registry },
       }),
     );
-    const id = svc.spawn("Explore", "check TODOs", {
+    const result = await svc.launch("Explore", "check TODOs", {
       model: "anthropic/claude-sonnet-5",
       maxTurns: 5,
     });
-    expect(id).toBe("spawned-id");
+    expect(result).toEqual({ kind: "accepted", id: "spawned-id" });
     expect(mgr.spawn).toHaveBeenCalledWith(
       expect.anything(), // snapshot
       "Explore",
@@ -596,17 +621,16 @@ describe("SubagentsServiceAdapter — spawn", () => {
     );
   });
 
-  it("hands the resolved decision onto the spawn", () => {
+  it("hands the resolved decision onto the run and settles with the record", async () => {
     const mgr = createManagerStub();
     const svc = makeServiceAdapter(mgr);
-    svc.spawn("Explore", "task", {
+    const result = await svc.run("Explore", "task", {
       thinkingLevel: "low",
       inheritContext: false,
       maxTurns: 4,
-      foreground: true,
     });
 
-    expect(mgr.spawn).toHaveBeenCalledWith(
+    expect(mgr.spawnAndWait).toHaveBeenCalledWith(
       expect.anything(), // snapshot
       "Explore",
       "task",
@@ -616,6 +640,10 @@ describe("SubagentsServiceAdapter — spawn", () => {
         turnPolicy: { kind: "limited", maxTurns: 4, wrapUpTurns: 2 },
       }),
     );
+    expect(result.kind).toBe("settled");
+    if (result.kind === "settled") {
+      expect(result.record.type).toBeDefined();
+    }
   });
 
   /**
@@ -625,11 +653,11 @@ describe("SubagentsServiceAdapter — spawn", () => {
    * stray toolCallId would fail rather than be absorbed.
    */
   describe("parent session", () => {
-    it("passes the runtime's session identity, without a toolCallId", () => {
+    it("passes the runtime's session identity, without a toolCallId", async () => {
       const mgr = createManagerStub();
       const svc = makeServiceAdapter(mgr);
 
-      svc.spawn("Explore", "check TODOs");
+      await svc.launch("Explore", "check TODOs");
 
       expect(mgr.spawn).toHaveBeenCalledWith(
         expect.anything(), // snapshot
@@ -646,65 +674,75 @@ describe("SubagentsServiceAdapter — spawn", () => {
   });
 
   /**
-   * A caller that names `foreground` has committed to a mode; one that omits it
-   * has not, and the agent's own frontmatter decides. The manager reads the
-   * `kind` to tell those apart, so each case must pin the whole request object —
-   * the isBackground value alone cannot distinguish an explicit answer from a
-   * default that happens to agree.
+   * `launch` is committed to background delivery; `run` is committed to
+   * caller-owned foreground settlement. The ambiguous `foreground` flag is
+   * gone: the operation itself states the delivery mode (stories 64 and 66).
    */
-  describe("background mode", () => {
-    function spawnAndCaptureBackground(options?: { foreground?: boolean }) {
+  describe("delivery mode", () => {
+    it("commits launch to background handoff", async () => {
       const mgr = createManagerStub();
       const svc = makeServiceAdapter(mgr);
-      svc.spawn("worker", "plan work", options);
-      return mgr.spawn;
-    }
 
-    it("defers to the agent config when foreground is omitted", () => {
-      const spawn = spawnAndCaptureBackground();
+      await svc.launch("worker", "plan work");
 
-      expect(spawn).toHaveBeenCalledWith(
-        expect.anything(), // snapshot
-        "worker",
-        "plan work",
-        expect.objectContaining({
-          background: { kind: "default", isBackground: true },
-        }),
-      );
-    });
-
-    it("commits to foreground when foreground is true", () => {
-      const spawn = spawnAndCaptureBackground({ foreground: true });
-
-      expect(spawn).toHaveBeenCalledWith(
-        expect.anything(), // snapshot
-        "worker",
-        "plan work",
-        expect.objectContaining({
-          background: { kind: "explicit", isBackground: false },
-        }),
-      );
-    });
-
-    it("commits to background when foreground is false", () => {
-      const spawn = spawnAndCaptureBackground({ foreground: false });
-
-      expect(spawn).toHaveBeenCalledWith(
-        expect.anything(), // snapshot
+      expect(mgr.spawn).toHaveBeenCalledWith(
+        expect.anything(),
         "worker",
         "plan work",
         expect.objectContaining({
           background: { kind: "explicit", isBackground: true },
         }),
       );
+      expect(mgr.spawnAndWait).not.toHaveBeenCalled();
+    });
+
+    it("commits run to foreground settlement through the same preparation", async () => {
+      const mgr = createManagerStub();
+      const svc = makeServiceAdapter(mgr);
+
+      await svc.run("worker", "plan work");
+
+      expect(mgr.spawnAndWait).toHaveBeenCalledWith(
+        expect.anything(),
+        "worker",
+        "plan work",
+        expect.anything(),
+      );
+      expect(mgr.spawn).not.toHaveBeenCalled();
+    });
+
+    it("passes the run signal through so cancelling run stops the work", async () => {
+      const mgr = createManagerStub();
+      const svc = makeServiceAdapter(mgr);
+      const controller = new AbortController();
+
+      await svc.run("worker", "plan work", { signal: controller.signal });
+
+      expect(mgr.spawnAndWait).toHaveBeenCalledWith(
+        expect.anything(),
+        "worker",
+        "plan work",
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
+
+    it("detaches the launch signal from accepted background work", async () => {
+      const mgr = createManagerStub();
+      const svc = makeServiceAdapter(mgr);
+      const controller = new AbortController();
+
+      await svc.launch("worker", "plan work", { signal: controller.signal });
+
+      const options = mgr.spawn.mock.calls[0]![3];
+      expect(options).not.toHaveProperty("signal");
     });
   });
 
-  it("uses truncated prompt as default description", () => {
+  it("uses truncated prompt as default description", async () => {
     const mgr = createManagerStub();
     const svc = makeServiceAdapter(mgr);
     const longPrompt = "x".repeat(200);
-    svc.spawn("Explore", longPrompt);
+    await svc.launch("Explore", longPrompt);
     expect(mgr.spawn).toHaveBeenCalledWith(
       expect.anything(), // snapshot
       "Explore",
@@ -713,23 +751,18 @@ describe("SubagentsServiceAdapter — spawn", () => {
     );
   });
 
-  it("uses provided description over default", () => {
+  it("uses provided description over default", async () => {
     const mgr = createManagerStub();
     const svc = makeServiceAdapter(mgr);
-    svc.spawn("Explore", "long prompt here", { description: "short desc" });
+    await svc.launch("Explore", "long prompt here", {
+      description: "short desc",
+    });
     expect(mgr.spawn).toHaveBeenCalledWith(
       expect.anything(), // snapshot
       "Explore",
       "long prompt here",
       expect.objectContaining({ description: "short desc" }),
     );
-  });
-
-  it("does not call resolveModel when no model option is provided", () => {
-    const resolveModel = vi.fn();
-    const svc = makeServiceAdapter(createManagerStub());
-    svc.spawn("Explore", "quick check");
-    expect(resolveModel).not.toHaveBeenCalled();
   });
 });
 

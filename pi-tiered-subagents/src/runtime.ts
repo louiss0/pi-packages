@@ -12,6 +12,7 @@ import {
   type ParentPromptOptions,
   type ParentSnapshot,
 } from "#src/lifecycle/parent-snapshot";
+import { buildParentContext } from "#src/session/context";
 import type { RoutingLadders } from "#src/models/router";
 import type { ModelInfo } from "#src/tools/spawn-config";
 import type { SessionContext } from "#src/types";
@@ -107,6 +108,32 @@ export class SubagentRuntime {
       this.listActiveTools(),
       this.listRegisteredTools(),
     );
+  }
+
+  /**
+   * Capture every parent input a launch needs before its first asynchronous
+   * step (ARCHITECTURE-SPEC stories 15 and 16).
+   *
+   * The snapshot excludes the conversation text, which is the one input whose
+   * need depends on the resolved definition; it is captured here too, so a
+   * later parent turn cannot change what an accepted child inherits. The
+   * caller attaches it when the resolved definition asks for it.
+   */
+  captureLaunchInputs(): {
+    snapshot: ParentSnapshot;
+    parentContext: string | undefined;
+  } {
+    const ctx = this.currentCtx!;
+    return {
+      snapshot: buildParentSnapshot(
+        ctx,
+        false,
+        this.lastPromptOptions,
+        this.listActiveTools(),
+        this.listRegisteredTools(),
+      ),
+      parentContext: buildParentContext(ctx) || undefined,
+    };
   }
 
   /** Extract model info from the current session context. */

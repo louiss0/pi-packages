@@ -65,14 +65,40 @@ export interface AgentDefinitionLookup {
 export class AgentRegistry implements AgentDefinitionLookup {
   private definitions = new Map<string, AgentDefinition>();
   private loadErrors: string[] = [];
+  private scopes: LoadedScopes;
 
   constructor(private readonly load: () => LoadedScopes) {
-    this.reload();
+    this.scopes = load();
+    this.rebuild();
   }
 
   /** Re-read the file layers and rebuild the merged definitions. */
   reload(): void {
-    const { global, project } = this.load();
+    this.scopes = this.load();
+    this.rebuild();
+  }
+
+  /**
+   * The scopes of the last reload, with their arrays copied.
+   *
+   * Preparation builds an immutable catalog from these instead of selecting
+   * through this mutable registry (ARCHITECTURE-SPEC story 29).
+   */
+  currentScopes(): LoadedScopes {
+    return {
+      global: {
+        definitions: [...this.scopes.global.definitions],
+        errors: [...this.scopes.global.errors],
+      },
+      project: {
+        definitions: [...this.scopes.project.definitions],
+        errors: [...this.scopes.project.errors],
+      },
+    };
+  }
+
+  private rebuild(): void {
+    const { global, project } = this.scopes;
     this.loadErrors = [...global.errors, ...project.errors];
     this.definitions = buildDefinitions(global, project);
   }
@@ -108,33 +134,45 @@ export class AgentRegistry implements AgentDefinitionLookup {
    * are failures: neither is answered with another agent.
    */
   select(id: string): AgentSelection {
-    const normalized = normalizeAgentId(id);
-    const definition = this.definitions.get(normalized);
-    if (!definition) {
-      const available = this.enabledIds();
-      return {
-        ok: false,
-        reason: "unknown-agent",
-        error:
-          `Unknown agent type "${normalized}".` +
-          (available.length > 0
-            ? ` Available types: ${available.join(", ")}.`
-            : " No agent types are available."),
-      };
-    }
-    if (!definition.enabled) {
-      return {
-        ok: false,
-        reason: "disabled-agent",
-        error: `Agent "${normalized}" is disabled.`,
-      };
-    }
-    return { ok: true, definition };
+    return selectFrom(this.definitions, id);
   }
 
   /** The problems found while reading the file layers, if any. */
   errors(): readonly string[] {
     return this.loadErrors;
+  }
+}
+
+/**
+ * Build an immutable catalog for one preparation from already-loaded scopes.
+ *
+ * Each preparation owns its catalog: concurrent launches never select
+ * through the mutable live registry, so one request cannot observe another
+ * request's half-refreshed definitions.
+ */
+export function buildCatalog(scopes: LoadedScopes): AgentDefinitionLookup {
+  return new Catalog(buildDefinitions(scopes.global, scopes.project));
+}
+
+/** An immutable lookup over one preparation's merged definitions. */
+class Catalog implements AgentDefinitionLookup {
+  constructor(private readonly definitions: Map<string, AgentDefinition>) {}
+
+  /** Every definition, in identifier order. */
+  list(): readonly AgentDefinition[] {
+    return [...this.definitions.values()].sort((a, b) =>
+      a.id.localeCompare(b.id),
+    );
+  }
+
+  /** The definition for an identifier, or undefined when there is none. */
+  find(id: string): AgentDefinition | undefined {
+    return this.definitions.get(normalizeAgentId(id));
+  }
+
+  /** The definition for an identifier, or the reason there is none. */
+  select(id: string): AgentSelection {
+    return selectFrom(this.definitions, id);
   }
 }
 
@@ -159,6 +197,43 @@ function buildDefinitions(
   applyScope(definitions, project, "project");
 
   return definitions;
+}
+
+/**
+ * The selection both lookup implementations answer with.
+ *
+ * An unknown identifier and a disabled one are different failures, and both
+ * are failures: neither is answered with another agent.
+ */
+function selectFrom(
+  definitions: Map<string, AgentDefinition>,
+  id: string,
+): AgentSelection {
+  const normalized = normalizeAgentId(id);
+  const definition = definitions.get(normalized);
+  if (!definition) {
+    const available = [...definitions.values()]
+      .filter((candidate) => candidate.enabled)
+      .map((candidate) => candidate.id)
+      .sort();
+    return {
+      ok: false,
+      reason: "unknown-agent",
+      error:
+        `Unknown agent type "${normalized}".` +
+        (available.length > 0
+          ? ` Available types: ${available.join(", ")}.`
+          : " No agent types are available."),
+    };
+  }
+  if (!definition.enabled) {
+    return {
+      ok: false,
+      reason: "disabled-agent",
+      error: `Agent "${normalized}" is disabled.`,
+    };
+  }
+  return { ok: true, definition };
 }
 
 /** Apply one scope's definitions onto the merged set. */

@@ -23,7 +23,10 @@ import {
   SettingsManager as SdkSettingsManager,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { loadDefinitionScopes } from "#src/agents/loader";
+import {
+  loadDefinitionScopes,
+  loadDefinitionScopesAsync,
+} from "#src/agents/loader";
 import { AgentRegistry } from "#src/agents/registry";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import { DefinitionErrorReporter } from "#src/agents/report";
@@ -220,16 +223,28 @@ export default function (pi: ExtensionAPI) {
   });
   settings.load();
 
-  // Both caller doors share one preparation authority. Its configuration
-  // refresh, parent model view, and operator turn defaults are captured at the
-  // request boundary rather than reconstructed independently by each adapter.
+  // Both caller doors share one preparation authority. Each preparation loads
+  // its own immutable definition catalog asynchronously, so overlapping
+  // requests never select through the mutable live registry (stories 29 and
+  // 60). Parent model facts and operator defaults are captured at the
+  // invocation boundary rather than reconstructed independently by each
+  // adapter.
   const launchPreparer = new LaunchPreparer({
-    registry,
-    reload: () => {
-      refreshDefinitions();
+    loadScopes: (signal) =>
+      loadDefinitionScopesAsync(
+        {
+          globalDir: getAgentDir(),
+          cwd: process.cwd(),
+        },
+        signal,
+      ),
+    // Profiles live in files the operator can edit; refresh them at capture
+    // time, before preparation can yield, so the request sees the profiles in
+    // force when it was made.
+    modelInfo: () => {
       refreshProfiles();
+      return runtime.getModelInfo();
     },
-    modelInfo: () => runtime.getModelInfo(),
     turnSettings: () => settings,
     childShaping: () => settings.captureChildShaping(),
   });

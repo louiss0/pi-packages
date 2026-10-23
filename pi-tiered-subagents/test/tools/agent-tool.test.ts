@@ -93,16 +93,36 @@ describe("AgentTool", () => {
     expect(def.description).not.toContain(`- Use ${name} for `);
   });
 
-  it("calls registry.reload() on each execute", async () => {
-    const deps = createToolDeps();
-    const reloadSpy = vi.spyOn(deps.registry, "reload");
-    await execute(deps, {
+  it("loads a fresh definition catalog on each execute", async () => {
+    // Preparation loads the definition files per request rather than
+    // refreshing one mutable registry: a file edit between two executes is
+    // visible to the second request only.
+    let disabled = false;
+    const registry = new AgentRegistry(() => ({
+      global: {
+        definitions: disabled
+          ? [{ id: "worker", patch: { enabled: false }, path: "w.md" }]
+          : [],
+        errors: [],
+      },
+      project: { definitions: [], errors: [] },
+    }));
+    const deps = createToolDeps({ registry });
+
+    const first = await execute(deps, {
       prompt: "test",
       description: "test",
       subagent_type: "worker",
     });
-    expect(reloadSpy).toHaveBeenCalledOnce();
-    reloadSpy.mockRestore();
+    expect(textOf(first)).not.toContain("disabled");
+
+    disabled = true;
+    const second = await execute(deps, {
+      prompt: "test",
+      description: "test",
+      subagent_type: "worker",
+    });
+    expect(textOf(second)).toContain("disabled");
   });
 });
 

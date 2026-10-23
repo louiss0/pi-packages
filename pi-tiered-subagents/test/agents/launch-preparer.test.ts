@@ -1,8 +1,5 @@
-import { describe, expect, it } from "vitest";
-import type { AgentDefinition } from "#src/agents/definition";
-import { defaultDefinition } from "#src/agents/definition";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
-import { AgentRegistry } from "#src/agents/registry";
+import { describe, expect, it, vi } from "vitest";
+import type { LoadedScopes } from "#src/agents/loader";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelInfo, TurnSettings } from "#src/agents/resolver";
@@ -13,25 +10,31 @@ const modelInfo: ModelInfo = {
   ladders: { profiles: new Map(), strategies: new Map() },
 };
 
-function registryWithWorker(): AgentRegistry {
-  return new AgentRegistry(() => ({
-    global: { definitions: [], errors: [] },
+/** One scope holding a single definition patch. */
+function scopesWith(
+  definitions: LoadedScopes["global"]["definitions"],
+): LoadedScopes {
+  return {
+    global: { definitions, errors: [] },
     project: { definitions: [], errors: [] },
-  }));
+  };
+}
+
+function workerScopes(): LoadedScopes {
+  return scopesWith([{ id: "worker", patch: {}, path: "worker.md" }]);
 }
 
 function makePreparer(
-  registry: AgentDefinitionLookup,
+  loadScopes: (() => LoadedScopes) | LoadedScopes = workerScopes,
   options: {
-    reload?: () => void;
     modelInfo?: () => ModelInfo;
     turnSettings?: () => TurnSettings;
     childShaping?: () => ChildShapingSettings;
   } = {},
 ): LaunchPreparer {
   return new LaunchPreparer({
-    registry,
-    reload: options.reload ?? (() => {}),
+    loadScopes: async () =>
+      typeof loadScopes === "function" ? loadScopes() : loadScopes,
     modelInfo: options.modelInfo ?? (() => modelInfo),
     turnSettings:
       options.turnSettings ??
@@ -65,11 +68,8 @@ function request(
 }
 
 describe("LaunchPreparer", () => {
-  it("rejects an unknown requested agent instead of synthesizing a definition", () => {
-    const registry = registryWithWorker();
-    const outcome = makePreparer(registry).prepare(
-      request({ type: "missing" }),
-    );
+  it("rejects an unknown requested agent instead of synthesizing a definition", async () => {
+    const outcome = await makePreparer().prepare(request({ type: "missing" }));
 
     expect(outcome).toEqual({
       kind: "rejected",
@@ -78,33 +78,25 @@ describe("LaunchPreparer", () => {
     });
   });
 
-  it("preserves the registry's disabled-agent distinction", () => {
-    const registry = new AgentRegistry(() => ({
-      global: {
-        definitions: [
-          { id: "worker", patch: { enabled: false }, path: "worker.md" },
-        ],
-        errors: [],
-      },
-      project: { definitions: [], errors: [] },
-    }));
+  it("preserves the disabled-agent distinction", async () => {
+    const outcome = await makePreparer(
+      scopesWith([{ id: "worker", patch: { enabled: false }, path: "w.md" }]),
+    ).prepare(request());
 
-    expect(makePreparer(registry).prepare(request())).toMatchObject({
+    expect(outcome).toMatchObject({
       kind: "rejected",
       reason: "disabled-agent",
       message: 'Agent "worker" is disabled.',
     });
   });
 
-  it("rejects invalid thinking at the shared boundary", () => {
+  it("rejects invalid thinking at the shared boundary", async () => {
     expect(
-      makePreparer(registryWithWorker()).prepare(
-        request({ thinking: "turbo" }),
-      ),
+      await makePreparer().prepare(request({ thinking: "turbo" })),
     ).toMatchObject({ kind: "rejected", reason: "invalid-thinking" });
   });
 
-  it("captures model identity and reasoning as owned launch values", () => {
+  it("captures model identity and reasoning as owned launch values", async () => {
     const parentModel = makeReasoningModel({
       provider: "anthropic",
       id: "claude-sonnet-5",
@@ -114,7 +106,7 @@ describe("LaunchPreparer", () => {
       getAll: () => [parentModel],
       getAvailable: () => [parentModel],
     };
-    const outcome = makePreparer(registryWithWorker(), {
+    const outcome = await makePreparer(workerScopes(), {
       modelInfo: () => ({
         parentModel,
         modelRegistry: registry,
@@ -150,19 +142,35 @@ describe("LaunchPreparer", () => {
     }
   });
 
-  it("captures the operator turn defaults into the prepared decision", () => {
-    const registry = registryWithWorker();
+  it("captures the operator turn defaults before the definition load yields", async () => {
     let turnSettings: TurnSettings = {
       defaultMaxTurns: 8,
       wrapUpTurns: 3,
     };
-    const preparer = makePreparer(registry, {
-      turnSettings: () => turnSettings,
+    const order: string[] = [];
+    const preparer = new LaunchPreparer({
+      loadScopes: async () => {
+        order.push("load");
+        // A settings edit lands while the load is in flight; the request must
+        // keep the values from when it was made.
+        turnSettings = { defaultMaxTurns: 20, wrapUpTurns: 5 };
+        return workerScopes();
+      },
+      modelInfo: () => modelInfo,
+      turnSettings: () => {
+        order.push("settings");
+        return turnSettings;
+      },
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
     });
 
-    const outcome = preparer.prepare(request());
-    turnSettings = { defaultMaxTurns: 20, wrapUpTurns: 5 };
+    const outcome = await preparer.prepare(request());
 
+    expect(order).toEqual(["settings", "load"]);
     expect(outcome).toMatchObject({
       kind: "prepared",
       value: {
@@ -175,18 +183,17 @@ describe("LaunchPreparer", () => {
     });
   });
 
-  it("copies definition tool capabilities so a later catalog mutation cannot widen the plan", () => {
+  it("copies definition tool capabilities so a later catalog mutation cannot widen the plan", async () => {
     const names = ["read"];
-    const definition: AgentDefinition = {
-      ...defaultDefinition("worker", "shipped"),
-      tools: { kind: "explicit", names },
-    };
-    const registry: AgentDefinitionLookup = {
-      select: () => ({ ok: true, definition }),
-      find: () => definition,
-      list: () => [definition],
-    };
-    const outcome = makePreparer(registry).prepare(request());
+    const outcome = await makePreparer(
+      scopesWith([
+        {
+          id: "worker",
+          patch: { tools: { kind: "explicit" as const, names } },
+          path: "worker.md",
+        },
+      ]),
+    ).prepare(request());
     names.push("bash");
 
     expect(outcome.kind).toBe("prepared");
@@ -202,18 +209,17 @@ describe("LaunchPreparer", () => {
     }
   });
 
-  it("captures child-shaping settings so later edits reach only the next launch", () => {
-    const registry = registryWithWorker();
+  it("captures child-shaping settings so later edits reach only the next launch", async () => {
     let captured: ChildShapingSettings = {
       midRunUpdates: true,
       excludedExtensionPackages: ["old-package"],
       promptInheritance: { anthropic: "portable" as const },
     };
-    const preparer = makePreparer(registry, {
+    const preparer = makePreparer(workerScopes(), {
       childShaping: () => captured,
     });
 
-    const outcome = preparer.prepare(request());
+    const outcome = await preparer.prepare(request());
     captured = {
       midRunUpdates: false,
       excludedExtensionPackages: ["new-package"],
@@ -228,5 +234,91 @@ describe("LaunchPreparer", () => {
         promptInheritance: { anthropic: "portable" },
       });
     }
+  });
+
+  it("gives each preparation its own catalog, unaffected by a concurrent reload", async () => {
+    // The definition files change between two overlapping preparations; each
+    // request still selects from the scopes loaded for it.
+    let disabled = false;
+    const preparer = new LaunchPreparer({
+      loadScopes: async () =>
+        scopesWith([
+          {
+            id: "worker",
+            patch: disabled ? { enabled: false } : {},
+            path: "worker.md",
+          },
+        ]),
+      modelInfo: () => modelInfo,
+      turnSettings: () => ({
+        defaultMaxTurns: undefined,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      }),
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
+    });
+
+    const firstPromise = preparer.prepare(request());
+    disabled = true;
+    const secondPromise = preparer.prepare(request());
+    const [first, second] = await Promise.all([firstPromise, secondPromise]);
+
+    expect(first).toMatchObject({ kind: "prepared" });
+    expect(second).toMatchObject({
+      kind: "rejected",
+      reason: "disabled-agent",
+    });
+  });
+
+  it("rejects without loading when the signal is already aborted", async () => {
+    const loadScopes = vi.fn(async () => workerScopes());
+    const preparer = new LaunchPreparer({
+      loadScopes,
+      modelInfo: () => modelInfo,
+      turnSettings: () => ({
+        defaultMaxTurns: undefined,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      }),
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    const outcome = await preparer.prepare(request(), controller.signal);
+
+    expect(outcome).toMatchObject({ kind: "rejected", reason: "cancelled" });
+    expect(loadScopes).not.toHaveBeenCalled();
+  });
+
+  it("rejects when cancellation lands during the definition load", async () => {
+    const controller = new AbortController();
+    const preparer = new LaunchPreparer({
+      loadScopes: () =>
+        new Promise<LoadedScopes>((resolve) => {
+          controller.abort();
+          resolve(workerScopes());
+        }),
+      modelInfo: () => modelInfo,
+      turnSettings: () => ({
+        defaultMaxTurns: undefined,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      }),
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
+    });
+
+    const outcome = await preparer.prepare(request(), controller.signal);
+
+    expect(outcome).toMatchObject({ kind: "rejected", reason: "cancelled" });
   });
 });

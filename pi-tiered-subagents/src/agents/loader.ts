@@ -32,6 +32,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type {
@@ -90,12 +91,31 @@ export interface DefinitionSources {
   readonly cwd: string;
 }
 
-/** Read both file scopes. */
+/** Read both file scopes through the legacy synchronous registry path. */
 export function loadDefinitionScopes(sources: DefinitionSources): LoadedScopes {
   return {
     global: loadDefinitionScope(join(sources.globalDir, "agents")),
     project: loadDefinitionScope(join(sources.cwd, ".pi", "agents")),
   };
+}
+
+/**
+ * Read both file scopes asynchronously for one launch request.
+ *
+ * Each call owns its result. Concurrent preparations never select through the
+ * mutable live registry, so one request cannot observe another request's
+ * half-refreshed catalog.
+ */
+export async function loadDefinitionScopesAsync(
+  sources: DefinitionSources,
+  signal?: AbortSignal,
+): Promise<LoadedScopes> {
+  const [global, project] = await Promise.all([
+    loadDefinitionScopeAsync(join(sources.globalDir, "agents"), signal),
+    loadDefinitionScopeAsync(join(sources.cwd, ".pi", "agents"), signal),
+  ]);
+  throwIfAborted(signal);
+  return { global, project };
 }
 
 /**
@@ -150,6 +170,73 @@ export function loadDefinitionScope(dir: string): LoadedScope {
     definitions: scope.definitions,
     errors: [...errors, ...scope.errors],
   };
+}
+
+/**
+ * Asynchronously read every definition file in one directory.
+ *
+ * A missing directory remains an empty scope. Other directory failures retain
+ * the inherited behavior of producing no definitions, while unreadable files
+ * are reported individually. Cancellation is different: it propagates so the
+ * launch boundary can return the expected `cancelled` rejection.
+ */
+export async function loadDefinitionScopeAsync(
+  dir: string,
+  signal?: AbortSignal,
+): Promise<LoadedScope> {
+  throwIfAborted(signal);
+
+  let names: string[];
+  try {
+    names = (await readdir(dir)).filter((file) => file.endsWith(".md")).sort();
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    if (isMissingPathError(err)) return { definitions: [], errors: [] };
+    debugLog("readdir agents dir", err);
+    return { definitions: [], errors: [] };
+  }
+
+  const files: DefinitionFile[] = [];
+  const errors: string[] = [];
+  for (const name of names) {
+    throwIfAborted(signal);
+    const path = join(dir, name);
+    try {
+      const content = await readFile(path, {
+        encoding: "utf-8",
+        ...defined({ signal }),
+      });
+      files.push({ name, content, path });
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      debugLog("readFile agent file", err);
+      errors.push(`Could not read the agent definition at ${path}.`);
+    }
+  }
+
+  throwIfAborted(signal);
+  const scope = collectDefinitions(files);
+  return {
+    definitions: scope.definitions,
+    errors: [...errors, ...scope.errors],
+  };
+}
+
+/** Stop before starting another filesystem operation after caller cancellation. */
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw (
+    signal.reason ?? new DOMException("The operation was aborted", "AbortError")
+  );
+}
+
+/** Whether a failed directory read means the optional scope does not exist. */
+function isMissingPathError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as Error & { code?: string }).code === "ENOENT"
+  );
 }
 
 /**

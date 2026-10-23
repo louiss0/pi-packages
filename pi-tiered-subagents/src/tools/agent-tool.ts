@@ -33,10 +33,7 @@ import {
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
 import { renderAgentResult } from "#src/tools/result-renderer";
-import type {
-  ResolvedSpawnConfig,
-  SpawnPresentation,
-} from "#src/tools/spawn-config";
+import type { SpawnPresentation } from "#src/tools/spawn-config";
 import type { Subagent } from "#src/types";
 import { type AgentDetails, getDisplayName, type Theme } from "#src/ui/display";
 import { GLYPHS } from "#src/ui/glyphs";
@@ -84,7 +81,28 @@ export class AgentTool {
     onUpdate: ((update: AgentToolResult<AgentDetails>) => void) | undefined,
     _ctx: ExtensionContext,
   ) {
-    const prepared = this.subagents.prepareLaunch(
+    // ---- Resume existing agent ----
+    // Resume dispatches before any new-launch preparation: continuing an
+    // existing child must not load definitions or resolve a model for an
+    // unrelated new launch (ARCHITECTURE-SPEC story 72).
+    if (params.resume) {
+      const id = params.resume as string;
+      const detailBase = this.resumeDetailBase(id, params);
+      // Only the caller's explicit flag: an agent file's run_in_background
+      // default describes how that type spawns, not how a resume is collected.
+      if (params.run_in_background === true) {
+        return this.resumeInBackground(id, params.prompt as string, detailBase);
+      }
+      return this.resumeExisting(
+        id,
+        params.prompt as string,
+        signal,
+        onUpdate,
+        detailBase,
+      );
+    }
+
+    const prepared = await this.subagents.prepareLaunch(
       {
         type: params.subagent_type as string,
         prompt: params.prompt as string,
@@ -98,28 +116,11 @@ export class AgentTool {
         }),
       },
       toolCallId,
+      signal,
     );
     if (prepared.kind === "rejected") return textResult(prepared.message);
     const launch = prepared.value;
     const { config } = launch;
-
-    // ---- Resume existing agent ----
-    if (params.resume) {
-      const id = params.resume as string;
-      const prompt = params.prompt as string;
-      // Only the caller's explicit flag: an agent file's run_in_background
-      // default describes how that type spawns, not how a resume is collected.
-      if (params.run_in_background === true) {
-        return this.resumeInBackground(id, prompt, config);
-      }
-      return this.resumeExisting(
-        id,
-        prompt,
-        signal,
-        onUpdate,
-        config.presentation.detailBase,
-      );
-    }
 
     // ---- Background execution ----
     if (config.execution.runInBackground) {
@@ -132,6 +133,30 @@ export class AgentTool {
 
     // ---- Foreground execution — stream progress via onUpdate ----
     return runForeground(this.subagents, { config, launch }, signal, onUpdate);
+  }
+
+  /**
+   * The presentation a resume reports under, without preparing a launch.
+   *
+   * The caller's own `subagent_type` names the display, as it did when a
+   * resume still prepared a launch it never used; the record's type is the
+   * fallback for a caller that names none.
+   */
+  private resumeDetailBase(
+    id: string,
+    params: Record<string, unknown>,
+  ): SpawnPresentation["detailBase"] {
+    const recordType = this.manager.getRecord(id)?.type;
+    const type =
+      (params.subagent_type as string | undefined) ?? recordType ?? id;
+    const definition = this.registry.find(type);
+    const prompt = params.prompt as string;
+    return {
+      displayName: definition?.displayName ?? type,
+      description:
+        (params.description as string | undefined) ?? prompt.slice(0, 80),
+      subagentType: type,
+    };
   }
 
   /**
@@ -187,7 +212,7 @@ export class AgentTool {
   private resumeInBackground(
     id: string,
     prompt: string,
-    config: ResolvedSpawnConfig,
+    detailBase: SpawnPresentation["detailBase"],
   ) {
     const start = this.manager.startResume(id, prompt, { background: true });
     if (start.kind === "refused") {
@@ -200,9 +225,9 @@ export class AgentTool {
           ? "Agent resume queued in background."
           : "Agent resumed in background.",
         id: start.record.id,
-        displayName: config.identity.displayName,
-        description: config.execution.description,
-        detailBase: config.presentation.detailBase,
+        displayName: detailBase.displayName,
+        description: detailBase.description,
+        detailBase,
         outputFile: start.record.outputFile,
         queuePosition: queued
           ? { maxConcurrent: this.settings.maxConcurrent }

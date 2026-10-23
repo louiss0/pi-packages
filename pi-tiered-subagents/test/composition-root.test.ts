@@ -302,7 +302,7 @@ describe("composition root: widget activation", () => {
 
     // The reported path: a command handler spawning through the published
     // service, so nothing in the parent loop ever emits a tool call.
-    getSubagentsService()!.spawn("worker", "hi", {
+    await getSubagentsService()!.launch("worker", "hi", {
       description: "child",
     });
 
@@ -327,7 +327,7 @@ describe("composition root: widget activation", () => {
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
 
-    getSubagentsService()!.spawn("worker", "hi", {
+    await getSubagentsService()!.launch("worker", "hi", {
       description: "child",
     });
     await vi.advanceTimersByTimeAsync(300);
@@ -391,7 +391,7 @@ describe("composition root: widget teardown", () => {
       {},
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
-    getSubagentsService()!.spawn("worker", "hi", {
+    await getSubagentsService()!.launch("worker", "hi", {
       description: "child",
     });
     await vi.advanceTimersByTimeAsync(300);

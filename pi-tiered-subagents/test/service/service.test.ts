@@ -21,26 +21,54 @@ describe("SubagentsService accessors", () => {
   });
 
   it("publishSubagentsService stores service on globalThis", () => {
-    const mock = { spawn: () => "id" } as unknown as SubagentsService;
+    const mock = {
+      launch: async () => ({ kind: "accepted" as const, id: "id" }),
+      run: async () => ({
+        kind: "rejected" as const,
+        reason: "cancelled" as const,
+        message: "x",
+      }),
+    } as unknown as SubagentsService;
     publishSubagentsService(mock);
     expect((globalThis as Record<symbol, unknown>)[SERVICE_KEY]).toBe(mock);
   });
 
   it("getSubagentsService retrieves the published service", () => {
-    const mock = { spawn: () => "id" } as unknown as SubagentsService;
+    const mock = {
+      launch: async () => ({ kind: "accepted" as const, id: "id" }),
+      run: async () => ({
+        kind: "rejected" as const,
+        reason: "cancelled" as const,
+        message: "x",
+      }),
+    } as unknown as SubagentsService;
     publishSubagentsService(mock);
     expect(getSubagentsService()).toBe(mock);
   });
 
   it("unpublishSubagentsService removes the service from globalThis", () => {
-    const mock = { spawn: () => "id" } as unknown as SubagentsService;
+    const mock = {
+      launch: async () => ({ kind: "accepted" as const, id: "id" }),
+      run: async () => ({
+        kind: "rejected" as const,
+        reason: "cancelled" as const,
+        message: "x",
+      }),
+    } as unknown as SubagentsService;
     publishSubagentsService(mock);
     unpublishSubagentsService();
     expect(getSubagentsService()).toBeUndefined();
   });
 
   it("getSubagentsService returns undefined after unpublish", () => {
-    const mock = { spawn: () => "id" } as unknown as SubagentsService;
+    const mock = {
+      launch: async () => ({ kind: "accepted" as const, id: "id" }),
+      run: async () => ({
+        kind: "rejected" as const,
+        reason: "cancelled" as const,
+        message: "x",
+      }),
+    } as unknown as SubagentsService;
     publishSubagentsService(mock);
     unpublishSubagentsService();
     expect(
@@ -52,7 +80,14 @@ describe("SubagentsService accessors", () => {
     const upstreamKey = Symbol.for("@gotgenes/pi-subagents:service");
     expect(SERVICE_KEY).not.toBe(upstreamKey);
 
-    const mock = { spawn: () => "id" } as unknown as SubagentsService;
+    const mock = {
+      launch: async () => ({ kind: "accepted" as const, id: "id" }),
+      run: async () => ({
+        kind: "rejected" as const,
+        reason: "cancelled" as const,
+        message: "x",
+      }),
+    } as unknown as SubagentsService;
     publishSubagentsService(mock);
     expect(
       (globalThis as Record<symbol, unknown>)[upstreamKey],

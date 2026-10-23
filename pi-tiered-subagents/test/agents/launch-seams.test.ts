@@ -7,6 +7,19 @@
  * selection and records.
  */
 
+/**
+ * The nth recorded entry of a mock — a call tuple, a result, or an order stamp.
+ *
+ * Every use is preceded by an assertion that the call happened, so "no call"
+ * is a failed expectation rather than something the type system must allow for.
+ */
+function callAt<T>(values: readonly T[], index = 0): T {
+  const value = values[index];
+  if (value === undefined)
+    throw new Error(`expected entry #${index} to be recorded`);
+  return value;
+}
+
 import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -47,8 +60,7 @@ function registryWith(
 
 function createPreparer(registry: AgentRegistry, modelInfo: () => ModelInfo) {
   return new LaunchPreparer({
-    registry,
-    reload: () => registry.reload(),
+    loadScopes: async () => registry.currentScopes(),
     modelInfo,
     turnSettings: () => ({
       defaultMaxTurns: undefined,
@@ -302,11 +314,19 @@ describe("the service door", () => {
     };
     const runtime = {
       currentCtx: {} as never,
-      buildSnapshot: vi.fn((inheritContext: boolean) => ({
-        ...STUB_SNAPSHOT,
-        ...defined({
-          parentContext: inheritContext ? "parent conversation" : undefined,
-        }),
+      // The capture answers with the request-time facts; attaching the
+      // conversation to the snapshot is the seam's decision, from the
+      // resolved definition.
+      captureLaunchInputs: vi.fn(() => ({
+        snapshot: {
+          ...STUB_SNAPSHOT,
+          registeredToolNames: [
+            "read",
+            "mcp__github__get_issue",
+            "mcp__gitlab__get_issue",
+          ],
+        },
+        parentContext: "parent conversation",
       })),
       getSessionInfo: vi.fn(() => ({
         parentSessionFile: "/sessions/parent.jsonl",
@@ -342,50 +362,50 @@ describe("the service door", () => {
     return { adapter, manager, runtime };
   }
 
-  it("starts a debug spawn from the parent's conversation", () => {
-    const { adapter, runtime } = makeAdapter({
+  it("attaches the captured conversation for a spawn that inherits it", async () => {
+    const { adapter, manager } = makeAdapter({
       ...defaultDefinition("debug", "shipped"),
       inheritContext: true,
     });
-    adapter.spawn("debug", "diagnose it");
-    expect(runtime.buildSnapshot).toHaveBeenCalledWith(true);
+    await adapter.launch("debug", "diagnose it");
+
+    expect(manager.spawn).toHaveBeenCalledWith(
+      expect.objectContaining({ parentContext: "parent conversation" }),
+      "debug",
+      "diagnose it",
+      expect.anything(),
+    );
   });
 
-  it("lets the caller ask for a fresh conversation instead", () => {
-    const { adapter, runtime } = makeAdapter({
+  it("leaves the conversation off when the caller asks for a fresh one", async () => {
+    const { adapter, manager } = makeAdapter({
       ...defaultDefinition("debug", "shipped"),
       inheritContext: true,
     });
-    adapter.spawn("debug", "diagnose it", { inheritContext: false });
-    expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
+    await adapter.launch("debug", "diagnose it", { inheritContext: false });
+
+    const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
+    expect(snapshot).not.toHaveProperty("parentContext");
   });
 
-  it("starts a specialist with a fresh conversation", () => {
-    const { adapter, runtime } = makeAdapter({
+  it("starts a specialist with a fresh conversation", async () => {
+    const { adapter, manager } = makeAdapter({
       ...defaultDefinition("worker", "shipped"),
       inheritContext: false,
     });
-    adapter.spawn("worker", "do it");
-    expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
+    await adapter.launch("worker", "do it");
+
+    const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
+    expect(snapshot).not.toHaveProperty("parentContext");
   });
 
-  it("expands MCP patterns against request-time registered names before acceptance", () => {
-    const { adapter, manager, runtime } = makeAdapter({
+  it("expands MCP patterns against request-time registered names before acceptance", async () => {
+    const { adapter, manager } = makeAdapter({
       ...defaultDefinition("worker", "shipped"),
       tools: { kind: "explicit", names: ["read", "mcp__github__*"] },
     });
-    const registeredToolNames = [
-      "read",
-      "mcp__github__get_issue",
-      "mcp__gitlab__get_issue",
-    ];
-    runtime.buildSnapshot.mockReturnValue({
-      ...STUB_SNAPSHOT,
-      registeredToolNames,
-    });
 
-    adapter.spawn("worker", "do it");
-    registeredToolNames.push("mcp__github__delete_repo");
+    await adapter.launch("worker", "do it");
 
     expect(manager.spawn).toHaveBeenCalledWith(
       expect.anything(),
@@ -397,28 +417,52 @@ describe("the service door", () => {
     );
   });
 
-  it("rejects an unknown programmatic type before creating a manager record", () => {
+  it("rejects an unknown programmatic type before creating a manager record", async () => {
     const { adapter, manager } = makeAdapter();
 
-    expect(() => adapter.spawn("unknown-role", "do it")).toThrow(
-      /Unknown agent type "unknown-role"/,
-    );
+    const result = await adapter.launch("unknown-role", "do it");
+
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: "unknown-agent",
+    });
+    if (result.kind === "rejected") {
+      expect(result.message).toContain('Unknown agent type "unknown-role"');
+    }
     expect(manager.spawn).not.toHaveBeenCalled();
   });
 
-  it("rejects a disabled programmatic type before creating a manager record", () => {
+  it("rejects a disabled programmatic type before creating a manager record", async () => {
     const { adapter, manager } = makeAdapter({
       ...defaultDefinition("worker", "shipped"),
       enabled: false,
     });
 
-    expect(() => adapter.spawn("worker", "do it")).toThrow(/disabled/);
+    const result = await adapter.launch("worker", "do it");
+
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: "disabled-agent",
+    });
+    expect(manager.spawn).not.toHaveBeenCalled();
+  });
+
+  it("rejects without a record when the launch signal aborts during preparation", async () => {
+    const { adapter, manager } = makeAdapter();
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await adapter.launch("worker", "do it", {
+      signal: controller.signal,
+    });
+
+    expect(result).toMatchObject({ kind: "rejected", reason: "cancelled" });
     expect(manager.spawn).not.toHaveBeenCalled();
   });
 });
 
 describe("both doors resolve alike", () => {
-  it("gives the tool door and the service door the same resolution", () => {
+  it("gives the tool door and the service door the same resolution", async () => {
     // The two doors ask the same question in different words; one resolver
     // answers it, so they cannot drift apart.
     const ladders = {
@@ -471,7 +515,10 @@ describe("both doors resolve alike", () => {
     };
     const runtime = {
       currentCtx: { modelRegistry: haikuRegistry } as never,
-      buildSnapshot: vi.fn(() => STUB_SNAPSHOT),
+      captureLaunchInputs: vi.fn(() => ({
+        snapshot: STUB_SNAPSHOT,
+        parentContext: "parent conversation",
+      })),
       getSessionInfo: vi.fn(() => ({
         parentSessionFile: "/sessions/parent.jsonl",
         parentSessionId: "session-1",
@@ -486,18 +533,17 @@ describe("both doors resolve alike", () => {
       manager,
       new Subagents(manager, runtime, preparer),
     );
-    adapter.spawn("worker", "do it", {
+    await adapter.run("worker", "do it", {
       description: "d",
       model: "anthropic/claude-haiku-4-5",
       thinkingLevel: "low",
       inheritContext: false,
       maxTurns: 3,
-      foreground: true,
     });
 
     // The service door hands the shared resolution to the manager exactly as
     // the tool door computed it, so the two cannot disagree about a launch.
-    expect(manager.spawn).toHaveBeenCalledWith(
+    expect(manager.spawnAndWait).toHaveBeenCalledWith(
       expect.anything(),
       "worker",
       "do it",
@@ -510,7 +556,6 @@ describe("both doors resolve alike", () => {
         // resolution carries a decision rather than a level — the same call
         // shape both doors produce.
         thinkingDecision: tool.execution.thinkingDecision,
-        background: { kind: "explicit", isBackground: false },
       }),
     );
     expect(tool.execution.runInBackground).toBe(false);

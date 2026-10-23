@@ -46,8 +46,17 @@ v25.0.1, which is itself a friendly fork of
   ```ts
   const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
   const svc = getSubagentsService();
-  svc?.spawn("Explore", "Check for stale TODOs");
+  const result = await svc?.launch("Explore", "Check for stale TODOs");
+  if (result?.kind === "accepted") console.log(result.id);
+  else if (result) console.warn(result.reason, result.message);
   ```
+
+  The launch surface is a deliberate breaking replacement for a synchronous
+  `spawn(): string`: `launch()` accepts into background handoff,
+  `run()` prepares, accepts, and awaits one foreground run to its settled
+  record, and expected failures resolve as `{ kind: "rejected", reason, message }`
+  rather than throwing. A `launch` signal cancels preparation only and detaches
+  after acceptance; a `run` signal stops the queued or running work it owns.
 
   The service is published on `globalThis` under this package's own symbol key,
   `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`.
