@@ -229,10 +229,17 @@ describe("the assembler's tool selection", () => {
   });
 
   it("takes the prompt-inheritance strategy from the launch capture, not the live resolver", () => {
+    const parentModel = makeModel({
+      provider: "anthropic",
+      id: "claude-sonnet-5",
+    });
     const ctx = {
       ...base,
-      modelRegistry,
-      parentModel: makeModel({ provider: "anthropic", id: "claude-sonnet-5" }),
+      modelRegistry: {
+        find: () => parentModel,
+        getAll: () => [parentModel],
+      },
+      parentModelIdentity: { provider: "anthropic", id: "claude-sonnet-5" },
       childShaping: {
         midRunUpdates: true,
         excludedExtensionPackages: [],

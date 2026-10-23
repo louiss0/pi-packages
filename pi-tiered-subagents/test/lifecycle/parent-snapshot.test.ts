@@ -41,10 +41,20 @@ describe("buildParentSnapshot", () => {
     expect(snapshot.systemPrompt).toBe("my prompt");
   });
 
-  it("captures model from ctx", () => {
+  it("captures the parent's model as an owned identity", () => {
     const model = { id: "claude-haiku", provider: "anthropic" };
     const snapshot = buildParentSnapshot(makeCtx({ model }));
-    expect(snapshot.model).toBe(model);
+    expect(snapshot.parentModelIdentity).toEqual({
+      provider: "anthropic",
+      id: "claude-haiku",
+    });
+    // The owned value is a copy, not the session's object.
+    expect(snapshot.parentModelIdentity).not.toBe(model);
+  });
+
+  it("captures no identity when the parent model has no provider", () => {
+    const snapshot = buildParentSnapshot(makeCtx({ model: { id: "x" } }));
+    expect(snapshot.parentModelIdentity).toBeUndefined();
   });
 
   it("captures modelRegistry from ctx", () => {

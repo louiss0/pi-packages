@@ -197,7 +197,7 @@ describe("assembleSessionConfig — model resolution", () => {
     expect(result.model).toBeUndefined();
   });
 
-  it("options.model wins over config model and parent model", () => {
+  it("options.model wins over the parent's captured identity", () => {
     const explicitModel = makeModel({
       provider: "anthropic",
       id: "claude-opus-4",
@@ -211,7 +211,7 @@ describe("assembleSessionConfig — model resolution", () => {
       "Explore",
       {
         ...ctx,
-        parentModel: makeModel({ provider: "anthropic", id: "claude-haiku-4" }),
+        parentModelIdentity: { provider: "anthropic", id: "claude-haiku-4" },
       },
       { model: explicitModel },
       mockEnv,
@@ -220,6 +220,54 @@ describe("assembleSessionConfig — model resolution", () => {
     );
 
     expect(result.model).toBe(explicitModel);
+    // The identity never materializes: the launch's own model won.
+    expect(mockRegistry.find).not.toHaveBeenCalled();
+  });
+
+  it("materializes the parent's model from the captured identity", () => {
+    const parentModel = makeModel({
+      provider: "anthropic",
+      id: "claude-haiku-4",
+    });
+    mockRegistry.find.mockReturnValueOnce(parentModel);
+
+    const result = assembleSessionConfig(
+      "Explore",
+      {
+        ...ctx,
+        parentModelIdentity: { provider: "anthropic", id: "claude-haiku-4" },
+      },
+      {},
+      mockEnv,
+      mockAgentLookup,
+      mockIO,
+    );
+
+    expect(result.model).toBe(parentModel);
+    expect(mockRegistry.find).toHaveBeenCalledWith(
+      "anthropic",
+      "claude-haiku-4",
+    );
+  });
+
+  it("fails explicitly when the captured identity can no longer be resolved", () => {
+    // The session no longer reports the model the launch was asked under.
+    // That is an execution failure, not permission to run another model.
+    mockRegistry.find.mockReturnValueOnce(undefined);
+
+    expect(() =>
+      assembleSessionConfig(
+        "Explore",
+        {
+          ...ctx,
+          parentModelIdentity: { provider: "anthropic", id: "claude-haiku-4" },
+        },
+        {},
+        mockEnv,
+        mockAgentLookup,
+        mockIO,
+      ),
+    ).toThrow(/no longer reports/);
   });
 
   it("uses the model the door resolved", () => {
@@ -249,9 +297,16 @@ describe("assembleSessionConfig — model resolution", () => {
       id: "claude-haiku-4",
     });
 
+    mockRegistry.find.mockReturnValueOnce(parentModel);
     const result = assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel },
+      {
+        ...ctx,
+        parentModelIdentity: {
+          provider: parentModel.provider,
+          id: parentModel.id,
+        },
+      },
       {},
       mockEnv,
       mockAgentLookup,
@@ -271,9 +326,16 @@ describe("assembleSessionConfig — model resolution", () => {
       definition: exploreConfig({ model: "anthropic/unknown-model" }),
     });
 
+    mockRegistry.find.mockReturnValueOnce(parentModel);
     const result = assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel },
+      {
+        ...ctx,
+        parentModelIdentity: {
+          provider: parentModel.provider,
+          id: parentModel.id,
+        },
+      },
       {},
       mockEnv,
       mockAgentLookup,
@@ -288,21 +350,23 @@ describe("assembleSessionConfig — model resolution", () => {
       provider: "anthropic",
       id: "claude-haiku-4",
     });
-    const foundModel = makeModel({
-      provider: "anthropic",
-      id: "claude-opus-4",
-    });
     mockSelect.mockReturnValueOnce({
       ok: true,
       definition: exploreConfig({ model: "anthropic/claude-opus-4" }),
     });
-    // Model exists in registry but NOT in available set
-    mockRegistry.find.mockReturnValueOnce(foundModel);
-    mockRegistry.getAvailable.mockReturnValueOnce([]);
+    // The definition's own model does not resolve (the door's job);
+    // the child takes the parent's captured identity instead.
 
+    mockRegistry.find.mockReturnValueOnce(parentModel);
     const result = assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel },
+      {
+        ...ctx,
+        parentModelIdentity: {
+          provider: parentModel.provider,
+          id: parentModel.id,
+        },
+      },
       {},
       mockEnv,
       mockAgentLookup,
@@ -322,9 +386,16 @@ describe("assembleSessionConfig — model resolution", () => {
       definition: exploreConfig({ model: "claude-opus-4" }),
     }); // no provider/ prefix
 
+    mockRegistry.find.mockReturnValueOnce(parentModel);
     const result = assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel },
+      {
+        ...ctx,
+        parentModelIdentity: {
+          provider: parentModel.provider,
+          id: parentModel.id,
+        },
+      },
       {},
       mockEnv,
       mockAgentLookup,
@@ -340,9 +411,16 @@ describe("assembleSessionConfig — model resolution", () => {
       id: "claude-haiku-4",
     });
 
+    mockRegistry.find.mockReturnValueOnce(parentModel);
     const result = assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel },
+      {
+        ...ctx,
+        parentModelIdentity: {
+          provider: parentModel.provider,
+          id: parentModel.id,
+        },
+      },
       {},
       mockEnv,
       mockAgentLookup,
@@ -451,12 +529,15 @@ describe("assembleSessionConfig — prompt inheritance", () => {
   });
 
   it("asks about the provider of the child's own resolved model", () => {
-    const parentModel = makeModel({ provider: "anthropic", id: "sonnet" });
     const childModel = makeModel({ provider: "claude-bridge", id: "opus" });
 
     assembleSessionConfig(
       "Explore",
-      { ...ctx, parentModel, resolvePromptInheritance },
+      {
+        ...ctx,
+        parentModelIdentity: { provider: "anthropic", id: "sonnet" },
+        resolvePromptInheritance,
+      },
       { model: childModel },
       mockEnv,
       mockAgentLookup,
@@ -479,7 +560,7 @@ describe("assembleSessionConfig — prompt inheritance", () => {
       "Explore",
       {
         ...ctx,
-        parentModel: makeModel({ provider: "anthropic", id: "sonnet" }),
+        parentModelIdentity: { provider: "anthropic", id: "sonnet" },
         resolvePromptInheritance,
       },
       { model: bridgeModel },
@@ -493,12 +574,17 @@ describe("assembleSessionConfig — prompt inheritance", () => {
 
   it("passes the resolved strategy to the prompt builder", () => {
     resolvePromptInheritance.mockImplementation(() => "portable");
+    // The identity's provider keys the strategy without needing the live
+    // object; the model itself materializes through the registry bridge.
+    mockRegistry.find.mockReturnValueOnce(
+      makeModel({ provider: "claude-bridge", id: "opus" }),
+    );
 
     assembleSessionConfig(
       "Explore",
       {
         ...ctx,
-        parentModel: makeModel({ provider: "claude-bridge", id: "opus" }),
+        parentModelIdentity: { provider: "claude-bridge", id: "opus" },
         resolvePromptInheritance,
       },
       {},
@@ -508,6 +594,7 @@ describe("assembleSessionConfig — prompt inheritance", () => {
     );
 
     expect(strategyPassedToPrompt()).toBe("portable");
+    expect(resolvePromptInheritance).toHaveBeenCalledWith("claude-bridge");
   });
 
   it("hands the prompt builder the parent's portable parts", () => {

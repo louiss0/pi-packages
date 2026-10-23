@@ -20,6 +20,7 @@ import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
 import { STUB_CTX, STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { makeModel } from "#test/helpers/make-model";
 import {
   createAgentLookup,
   createChildLifecycleMock,
@@ -224,6 +225,51 @@ describe("createSubagentSession — assembly", () => {
       sessionSettings,
       ["captured-package"],
     );
+  });
+
+  it("materializes the parent's captured model identity for the child session", async () => {
+    arrangeFactory();
+    const parentModel = makeModel({
+      provider: "anthropic",
+      id: "claude-sonnet-5",
+    });
+    const snapshot = {
+      ...STUB_SNAPSHOT,
+      parentModelIdentity: parentModel,
+      modelRegistry: {
+        find: vi.fn(() => parentModel),
+        getAll: vi.fn(() => [parentModel]),
+      },
+    };
+
+    await createSubagentSession(
+      { snapshot, type: "Explore", turnPolicy: UNLIMITED_TURNS },
+      defaultDeps(),
+    );
+
+    // The durable capture is the identity; the session's registry is only the
+    // materialization bridge. The child gets the model the launch was asked
+    // under, resolved at creation time — not a live object carried in a queue.
+    expect(io.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: parentModel }),
+    );
+  });
+
+  it("fails the run explicitly when the captured identity no longer resolves", async () => {
+    const snapshot = {
+      ...STUB_SNAPSHOT,
+      parentModelIdentity: { provider: "anthropic", id: "claude-sonnet-5" },
+    };
+
+    // STUB_SNAPSHOT's registry finds nothing — the session no longer reports
+    // the model the launch was asked under.
+    await expect(
+      createSubagentSession(
+        { snapshot, type: "Explore", turnPolicy: UNLIMITED_TURNS },
+        defaultDeps(),
+      ),
+    ).rejects.toThrow(/no longer reports/);
+    expect(io.createSession).not.toHaveBeenCalled();
   });
 
   it("creates the session's settings manager exactly once and reuses it", async () => {

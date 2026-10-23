@@ -18,6 +18,7 @@ import {
   capturedPromptInheritance,
   type ChildShapingSettings,
 } from "#src/agents/launch-preparer";
+import type { ExactModelIdentity } from "#src/models/identity";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
 import type { ModelRegistry } from "#src/models/registry";
@@ -59,8 +60,8 @@ export interface AssemblerIO {
  * Narrow context the assembler reads from the parent session.
  * Tests construct plain objects satisfying this interface — no SDK mocking needed.
  *
- * The assembler never inspects model internals, only passes them through; the
- * model was already resolved by the door.
+ * The assembler never inspects model internals beyond the provider, only
+ * passes them through; the launch's model was already resolved by the door.
  */
 export interface AssemblerContext {
   /** Parent working directory (overridable via options.cwd). */
@@ -84,8 +85,8 @@ export interface AssemblerContext {
    * resolver — a queued child keeps the policy it was asked under.
    */
   childShaping?: ChildShapingSettings;
-  /** Parent's current model instance (fallback when agent config has no model). */
-  parentModel?: Model<any>;
+  /** Parent's current model as the identity captured with the request. */
+  parentModelIdentity?: ExactModelIdentity;
   /** Model registry for resolving config.model strings. */
   modelRegistry: ModelRegistry;
   /**
@@ -206,14 +207,17 @@ function assembleWithDefinition(
       ? [...ctx.toolNames]
       : resolveChildToolNames(definition.tools, ctx.activeToolNames);
 
-  // Model resolution: explicit option > config model string > parent model.
-  // Resolved before the prompt because the child's provider is what selects a
-  // prompt-inheritance strategy; the two computations are otherwise
-  // independent, so the order is free.
-  // The model was already resolved by the door: the request's own choice, the
-  // definition's, or the automatic step down the parent's ladder. The assembler
-  // only passes it through, so the two doors cannot resolve differently.
-  const model = options.model ?? ctx.parentModel;
+  // Model resolution: the launch's resolved model wins. Otherwise the child
+  // takes the parent's model, materialized from the identity captured with
+  // the request — never re-selected from the current session. The provider
+  // that selects a prompt-inheritance strategy comes from whichever identity
+  // won, so that decision needs no live object.
+  const model =
+    options.model ??
+    (ctx.parentModelIdentity
+      ? materializeParentModel(ctx, ctx.parentModelIdentity)
+      : undefined);
+  const provider = options.model?.provider ?? ctx.parentModelIdentity?.provider;
 
   // Build system prompt from the resolved definition. The strategy is keyed
   // on the child's own provider, so a per-spawn model override moves the child
@@ -226,8 +230,8 @@ function assembleWithDefinition(
       systemPrompt: ctx.parentSystemPrompt,
       cwd: ctx.cwd,
       strategy: ctx.childShaping
-        ? capturedPromptInheritance(ctx.childShaping, model?.provider)
-        : (ctx.resolvePromptInheritance?.(model?.provider) ?? "full"),
+        ? capturedPromptInheritance(ctx.childShaping, provider)
+        : (ctx.resolvePromptInheritance?.(provider) ?? "full"),
       ...defined({ portablePrompt: ctx.parentPortablePrompt }),
     },
     io.loadProjectContext,
@@ -246,4 +250,27 @@ function assembleWithDefinition(
     model,
     thinkingLevel,
   };
+}
+
+/**
+ * Materialize the parent's model from the identity captured with the request.
+ *
+ * The identity is the durable fact; the session's registry is only the
+ * materialization bridge. An identity the session no longer reports is an
+ * explicit failure (ARCHITECTURE-SPEC story 42): execution must not silently
+ * substitute another model for the one the launch was asked under.
+ */
+function materializeParentModel(
+  ctx: AssemblerContext,
+  identity: ExactModelIdentity,
+): Model<any> {
+  const found = ctx.modelRegistry.find(identity.provider, identity.id);
+  if (!found) {
+    throw new Error(
+      `The launch was asked under the parent's model ` +
+        `${identity.provider}/${identity.id}, which the session no longer ` +
+        `reports. Refusing to start the child on a different model.`,
+    );
+  }
+  return found;
 }

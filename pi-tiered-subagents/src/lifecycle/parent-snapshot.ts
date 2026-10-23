@@ -2,8 +2,8 @@
  * parent-snapshot.ts — Capture parent session state as a plain data snapshot.
  */
 
-import type { Model } from "@earendil-works/pi-ai";
 import { buildParentContext } from "#src/session/context";
+import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelRegistry } from "#src/models/registry";
 import { defined } from "#src/optional";
 import type { SessionContext } from "#src/types";
@@ -33,6 +33,12 @@ export interface ParentPromptOptions {
 /**
  * Plain data snapshot of the parent session state captured at spawn time.
  * Replaces live `ExtensionContext` references so queued agents don't read stale state.
+ *
+ * Every field is an owned value: text, names, and identities. The one
+ * exception is `modelRegistry`, the narrow structural bridge the child's
+ * session creation uses to inherit providers — the model *decisions*
+ * (the parent's identity, the resolved selection) are owned facts, not
+ * live objects, so a queued launch cannot silently reroute.
  */
 export interface ParentSnapshot {
   /** Parent working directory. */
@@ -40,13 +46,16 @@ export interface ParentSnapshot {
   /** Parent's effective system prompt (for append-mode agents). */
   systemPrompt: string;
   /**
-   * Parent's current model instance (fallback when agent config has no model).
+   * The parent's model as an owned identity, captured with the request
+   * (ARCHITECTURE-SPEC stories 15 and 40).
    *
-   * Absent, rather than present-and-undefined, when the parent has no model:
-   * a snapshot is read long after the capture, and a key that was there at
-   * capture time means "the parent had a model" either way it is spelled.
+   * Absent, rather than present-and-undefined, when the parent has no model
+   * or none with a provider: a snapshot is read long after the capture, and
+   * the identity — not the live SDK object — is the durable fact. Execution
+   * materializes it through the model bridge; a model the session no longer
+   * reports is an explicit failure, never a silent substitution (story 42).
    */
-  model?: Model<any>;
+  parentModelIdentity?: ExactModelIdentity;
   /** Model registry for resolving config.model strings and creating sessions. */
   modelRegistry: ModelRegistry;
   /**
@@ -91,11 +100,23 @@ export function buildParentSnapshot(
     // queued child's capabilities.
     activeToolNames: [...activeToolNames],
     ...defined({
-      model: ctx.model,
+      parentModelIdentity: parentModelIdentity(ctx.model),
       parentContext: parentContext || undefined,
       portablePrompt: buildPortablePrompt(promptOptions),
     }),
   };
+}
+
+/**
+ * The parent's model as an owned identity, when the parent runs one with a
+ * provider. The identity is the durable fact; the live SDK object stays in
+ * the session and is materialized from it at execution.
+ */
+function parentModelIdentity(
+  model: { provider?: string; id: string } | undefined,
+): ExactModelIdentity | undefined {
+  if (!model?.provider) return undefined;
+  return { provider: model.provider, id: model.id };
 }
 
 /**

@@ -267,7 +267,7 @@ export async function createSubagentSession(
     defined({
       cwd: snapshot.cwd,
       parentSystemPrompt: snapshot.systemPrompt,
-      parentModel: snapshot.model,
+      parentModelIdentity: snapshot.parentModelIdentity,
       modelRegistry: snapshot.modelRegistry,
       activeToolNames: snapshot.activeToolNames,
       definition: params.definition,
