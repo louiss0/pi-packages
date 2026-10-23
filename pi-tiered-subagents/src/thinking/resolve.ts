@@ -23,15 +23,15 @@
  * midpoint, and never silently down to "off" on a reasoning model.
  */
 
-import {
-  clampThinkingLevel,
-  getSupportedThinkingLevels,
-  type Model,
-} from "@earendil-works/pi-ai";
+import { type Model } from "@earendil-works/pi-ai";
 import {
   THINKING_LEVELS,
   type SubagentThinkingLevel,
 } from "#src/config/thinking-level";
+import {
+  supportedLevels as adapterSupportedLevels,
+  clampLevel as adapterClampLevel,
+} from "#src/agents/sdk-adapter";
 
 /** The levels, in ascending order of effort. */
 const EFFORT: readonly SubagentThinkingLevel[] = THINKING_LEVELS;
@@ -117,7 +117,7 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
     };
   }
 
-  const supported = getSupportedThinkingLevels(
+  const supported = adapterSupportedLevels(
     model,
   ) as readonly SubagentThinkingLevel[];
   const nonOff = supported.filter((level) => level !== "off");
@@ -202,7 +202,7 @@ function explicit(
     };
   }
 
-  const clamped = clampThinkingLevel(model, requested) as SubagentThinkingLevel;
+  const clamped = adapterClampLevel(requested, model) as SubagentThinkingLevel;
   return {
     level: clamped,
     applicable: true,
