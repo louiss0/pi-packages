@@ -1,9 +1,0 @@
-docs(pi-tiered-subagents): record session ownership as delivered
-
-The Status doc gets a section that explains the new LaunchOutcome / SessionOwner
-seam, what each switch-handshake call does, and which story 83/84/77-91 row it
-moves into "Partial". The 38-50 row had dropped out of an earlier edit; put
-back.
-
-Piece 1 closes; Piece 2 (one authoritative preparation authority) is the
-next item on the table.
