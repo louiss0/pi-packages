@@ -16,7 +16,7 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,258 tests, all passing (one skipped) |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,272 tests, all passing (one skipped) |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -472,10 +472,47 @@ below are ARCHITECTURE-SPEC's own.
 | Model and reasoning decisions captured as owned values | 38–50 | Not started. The decisions are resolved once and reported, but they still hold live SDK shapes rather than owned identities and capabilities. |
 | Child-shaping settings captured; operational settings live | 56, 57 | Not started. |
 | Async programmatic launch, explicit run, shared resume | 60–66 | Not started. Launch still returns a synchronous result; there is no separate `run`. |
-| Cancellation, delivery, and lifetime | 77–91 | Not started. |
+| Cancellation, delivery, and lifetime | 77–91 | Partial — see *Session ownership*. Sessions refuse launches for ended sessions, hold live children through a tentative switch, cancel on a confirmed switch, and refuse resumes a later session did not ask for. The narrower delivery and lifetime story (the observation and notification halves) is not yet touched. |
 | Terminal presentation extracted to a UI library | 92–100 | Not started. The renderer vocabulary exists in `src/ui/`, but it is still inside the runtime package. |
 | Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; the UI-package flags, lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
 | Independent ownership and migration cleanup | — | Not started. |
+
+## Session ownership
+
+A launch is no longer accepted by whoever happens to hold the manager. Every
+request carries a `SessionOwner` token — a generation and the session id Pi
+shows the operator — and the manager accepts it only while that token names
+the live session. The generation is the identity; the id is only the name. A
+session that restarts with the same id still gets a fresh generation, so a
+token prepared before a restart can never be accepted after it.
+
+Refusal is a value, not an exception. `LaunchOutcome` separates "accepted"
+from "rejected", and `LaunchRejection` names why. Both doors — the tool
+door (`src/tools/`) and the service door (`src/service/`) — stamp the same
+token shape on every launch, and translate the rejection into their own
+message.
+
+The switch handshake is three calls, because "switching" is not one moment:
+
+- `beginOwnerEnd` stops accepting new launches and leaves running children
+  alone — Pi may still abandon the switch.
+- `beginOwner` on the same id restores the session; the existing children
+  keep running.
+- `beginOwner` on a different id is the switch taking effect; only then are
+  the previous session's children cancelled.
+
+`endOwner` is shutdown: refuse, then cancel. Resume is refused with
+`stale-session` for a child a later session did not ask for, even when the id
+is known and the child is otherwise resumable.
+
+14 characterization tests pin this behaviour. They were checked against
+deliberate mutations: reusing a generation fails four of them; cancelling
+eagerly in `session_before_switch` — the bug story 84 warns about — fails
+two.
+
+The new `src/lifecycle/session-owner.ts` is the only file the manager,
+the lifecycle handlers, and the two doors all import from, so a future
+`Subagents` module can take this seam over without rippling through them.
 
 ## The Pi 1.3.0 upgrade, verified across the workspace
 
