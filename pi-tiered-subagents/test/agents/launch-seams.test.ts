@@ -369,6 +369,34 @@ describe("the service door", () => {
     expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
   });
 
+  it("expands MCP patterns against request-time registered names before acceptance", () => {
+    const { adapter, manager, runtime } = makeAdapter({
+      ...defaultDefinition("worker", "shipped"),
+      tools: { kind: "explicit", names: ["read", "mcp__github__*"] },
+    });
+    const registeredToolNames = [
+      "read",
+      "mcp__github__get_issue",
+      "mcp__gitlab__get_issue",
+    ];
+    runtime.buildSnapshot.mockReturnValue({
+      ...STUB_SNAPSHOT,
+      registeredToolNames,
+    });
+
+    adapter.spawn("worker", "do it");
+    registeredToolNames.push("mcp__github__delete_repo");
+
+    expect(manager.spawn).toHaveBeenCalledWith(
+      expect.anything(),
+      "worker",
+      "do it",
+      expect.objectContaining({
+        toolNames: ["read", "mcp__github__get_issue"],
+      }),
+    );
+  });
+
   it("rejects an unknown programmatic type before creating a manager record", () => {
     const { adapter, manager } = makeAdapter();
 

@@ -61,6 +61,12 @@ export interface ParentSnapshot {
    * the child was asked for — not as it is when the slot opens.
    */
   activeToolNames: readonly string[];
+  /**
+   * Every tool name registered in the parent when the request was made.
+   * MCP wildcard declarations expand against this copy before acceptance, so
+   * a server connecting later cannot widen queued work.
+   */
+  registeredToolNames: readonly string[];
   /** Pre-built parent conversation text (when inheritContext was requested). */
   parentContext?: string;
   /**
@@ -85,6 +91,7 @@ export function buildParentSnapshot(
   inheritContext?: boolean,
   promptOptions?: ParentPromptOptions,
   activeToolNames: readonly string[] = [],
+  registeredToolNames: readonly string[] = [],
 ): ParentSnapshot {
   const parentContext = inheritContext ? buildParentContext(ctx) : undefined;
   return {
@@ -93,6 +100,7 @@ export function buildParentSnapshot(
     // Copied, so a parent that changes its active tools later cannot widen a
     // queued child's capabilities.
     activeToolNames: [...activeToolNames],
+    registeredToolNames: [...registeredToolNames],
     ...defined({
       parentModelIdentity: parentModelIdentity(ctx.model),
       parentContext: parentContext || undefined,

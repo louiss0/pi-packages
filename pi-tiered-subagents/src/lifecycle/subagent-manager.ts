@@ -18,6 +18,7 @@ import { resolveChildToolNames } from "#src/agents/definition";
 import type { AgentDefinition, ToolSelection } from "#src/agents/definition";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelSelection } from "#src/models/selection";
+import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { AgentSelection } from "#src/agents/registry";
 import { debugLog } from "#src/debug";
@@ -265,6 +266,8 @@ export interface AgentSpawnConfig {
    * queued child keeps the update policy it was asked under.
    */
   childShaping?: ChildShapingSettings;
+  /** Exact capability allowlist captured by shared preparation. */
+  toolNames?: readonly string[];
   /** Exact model choice captured by preparation; materialized at child creation. */
   modelIdentity?: ExactModelIdentity;
   /**
@@ -637,10 +640,13 @@ export class SubagentManager {
     // runtime and the child can never disagree about what it may do — and a
     // definition edited while the child waited cannot hand it a shell it was
     // not cleared for.
-    const toolNames = resolveChildToolNames(
-      resolved.tools,
-      snapshot.activeToolNames,
-    );
+    const toolNames =
+      options.toolNames !== undefined
+        ? [...options.toolNames]
+        : expandMcpToolPatterns(
+            resolveChildToolNames(resolved.tools, snapshot.activeToolNames),
+            snapshot.registeredToolNames,
+          ).toolNames;
     const impact = classifyWorkspaceImpact(toolNames);
     // The workspace the child works in: the parent's directory when the
     // request was made. Two parents in one directory share one slot.

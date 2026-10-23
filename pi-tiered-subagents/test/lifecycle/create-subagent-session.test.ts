@@ -796,31 +796,18 @@ describe("createSubagentSession — Pi built-in extensions", () => {
   });
 });
 
-describe("createSubagentSession — MCP tool patterns", () => {
-  const PARENT_TOOLS = [
-    "read",
-    "mcp__github__a",
-    "mcp__github__b",
-    "mcp__gitlab__c",
-  ];
-
-  function depsDeclaring(toolNames: string[], parentTools: string[]) {
-    return createSubagentSessionDeps({
-      io,
-      exec,
-      registry: createAgentLookup({
-        tools: { kind: "explicit", names: toolNames },
-      }),
-      listParentToolNames: () => parentTools,
-    });
-  }
-
-  it("admits the parent's tools a pattern matches, and loads MCP for them", async () => {
+describe("createSubagentSession — prepared MCP tools", () => {
+  it("uses the exact expanded allowlist and loads MCP for it", async () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
-      depsDeclaring(["read", "mcp__github__*"], PARENT_TOOLS),
+      {
+        snapshot: STUB_SNAPSHOT,
+        type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
+        toolNames: ["read", "mcp__github__a", "mcp__github__b"],
+      },
+      defaultDeps(),
     );
 
     expect(io.createSession).toHaveBeenCalledWith(
@@ -831,12 +818,17 @@ describe("createSubagentSession — MCP tool patterns", () => {
     expect(loadedBuiltinNames()).toEqual(["mcp"]);
   });
 
-  it("admits nothing and loads no MCP for a pattern the parent's tools do not match", async () => {
+  it("does not reinterpret an already-expanded allowlist", async () => {
     arrangeFactory();
 
     await createSubagentSession(
-      { snapshot: STUB_SNAPSHOT, type: "Explore", turnPolicy: UNLIMITED_TURNS },
-      depsDeclaring(["read", "mcp__github__*"], ["read", "mcp__gitlab__c"]),
+      {
+        snapshot: STUB_SNAPSHOT,
+        type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
+        toolNames: ["read"],
+      },
+      defaultDeps(),
     );
 
     expect(io.createSession).toHaveBeenCalledWith(

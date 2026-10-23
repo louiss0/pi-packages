@@ -113,6 +113,7 @@ describe("SubagentRuntime context query methods", () => {
       true,
       undefined,
       [],
+      [],
     );
     expect(result).toBe(STUB_SNAPSHOT);
   });
@@ -127,6 +128,7 @@ describe("SubagentRuntime context query methods", () => {
       ctx,
       false,
       undefined,
+      [],
       [],
     );
   });
@@ -149,6 +151,7 @@ describe("SubagentRuntime context query methods", () => {
         false,
         options,
         [],
+        [],
       );
     });
 
@@ -167,6 +170,7 @@ describe("SubagentRuntime context query methods", () => {
         ctx,
         false,
         latest,
+        [],
         [],
       );
     });

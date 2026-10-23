@@ -14,6 +14,7 @@ import type {
   LaunchRequest,
   PreparedLaunch,
 } from "#src/agents/launch-preparer";
+import { resolveChildToolNames } from "#src/agents/definition";
 import type { BackgroundRequest } from "#src/agents/invocation";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
@@ -22,7 +23,9 @@ import type {
   SubagentLifecycleObserver,
 } from "#src/lifecycle/subagent";
 import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
+import { debugNote } from "#src/debug";
 import { defined } from "#src/optional";
+import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
 import type { ParentSessionInfo } from "#src/types";
 
 /** Parent capture operations needed at the acceptance boundary. */
@@ -58,6 +61,8 @@ export interface PreparedSubagentsLaunch {
   readonly owner: SessionOwner;
   readonly config: PreparedLaunch["config"];
   readonly childShaping: ChildShapingSettings;
+  /** Exact capability allowlist captured and expanded before acceptance. */
+  readonly toolNames: readonly string[];
   readonly snapshot: ParentSnapshot;
   readonly parentSession: ParentSessionInfo;
 }
@@ -112,6 +117,19 @@ export class Subagents {
     const snapshot = this.runtime.buildSnapshot(
       config.execution.inheritContext,
     );
+    const declaredTools = resolveChildToolNames(
+      config.identity.definition.tools,
+      snapshot.activeToolNames,
+    );
+    const { toolNames, unmatchedPatterns } = expandMcpToolPatterns(
+      declaredTools,
+      snapshot.registeredToolNames,
+    );
+    for (const pattern of unmatchedPatterns) {
+      debugNote(
+        `agent ${config.identity.subagentType}: tools pattern ${pattern} matched no tool the parent had when the request was made`,
+      );
+    }
     const { parentSessionFile, parentSessionId } =
       this.runtime.getSessionInfo();
     const parentSession: ParentSessionInfo = {
@@ -126,6 +144,7 @@ export class Subagents {
         owner,
         config,
         childShaping: prepared.value.childShaping,
+        toolNames,
         snapshot,
         parentSession,
       },
@@ -150,6 +169,7 @@ export class Subagents {
       background,
       owner: launch.owner,
       childShaping: launch.childShaping,
+      toolNames: launch.toolNames,
       ...defined({
         modelIdentity: execution.modelIdentity,
         thinkingLevel: execution.thinking,
@@ -180,6 +200,7 @@ export class Subagents {
       parentSession: launch.parentSession,
       owner: launch.owner,
       childShaping: launch.childShaping,
+      toolNames: launch.toolNames,
       ...defined({
         modelIdentity: execution.modelIdentity,
         thinkingLevel: execution.thinking,

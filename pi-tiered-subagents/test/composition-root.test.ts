@@ -583,7 +583,7 @@ describe("composition root: agent definitions", () => {
 });
 
 describe("composition root: parent tool list", () => {
-  it("reads the parent's registered tools when a child asks, not when the extension loads", async () => {
+  it("captures the parent's registered tools when the child is requested", async () => {
     vi.mocked(createSubagentSession).mockClear();
     vi.mocked(createSubagentSession).mockResolvedValue(
       toSubagentSession(
@@ -597,6 +597,11 @@ describe("composition root: parent tool list", () => {
       {},
       makeSessionStartCtx(makeParentRegistry().registry, makeRecordingUI()),
     );
+    // An MCP server may connect after extension load but before this request.
+    vi.mocked(pi.getAllTools).mockReturnValue([
+      { name: "read" },
+      { name: "mcp__github__get_issue" },
+    ]);
     await tools.get("subagent").execute(
       "tool-call-1",
       {
@@ -608,15 +613,16 @@ describe("composition root: parent tool list", () => {
       undefined,
       undefined,
     );
-    const deps = callAt(vi.mocked(createSubagentSession).mock.calls)[1];
+    const params = callAt(vi.mocked(createSubagentSession).mock.calls)[0];
 
-    // An MCP server connects in the background, so its tools register after load.
+    // A later registration cannot widen this accepted child's exact list.
     vi.mocked(pi.getAllTools).mockReturnValue([
       { name: "read" },
       { name: "mcp__github__get_issue" },
+      { name: "mcp__github__delete_repo" },
     ]);
 
-    expect(deps.listParentToolNames()).toEqual([
+    expect(params.snapshot.registeredToolNames).toEqual([
       "read",
       "mcp__github__get_issue",
     ]);

@@ -48,6 +48,9 @@ export class SubagentRuntime {
    */
   private listActiveTools: () => string[];
 
+  /** Every registered parent tool name, captured for MCP wildcard expansion. */
+  private listRegisteredTools: () => string[];
+
   /**
    * The routing ladders the automatic model selection walks.
    */
@@ -62,8 +65,10 @@ export class SubagentRuntime {
   constructor(
     listActiveTools: () => string[] = () => [],
     ladders: RoutingLadders = { profiles: new Map(), strategies: new Map() },
+    listRegisteredTools: () => string[] = () => [],
   ) {
     this.listActiveTools = listActiveTools;
+    this.listRegisteredTools = listRegisteredTools;
     this.ladders = ladders;
   }
 
@@ -100,6 +105,7 @@ export class SubagentRuntime {
       inheritContext,
       this.lastPromptOptions,
       this.listActiveTools(),
+      this.listRegisteredTools(),
     );
   }
 
@@ -135,6 +141,7 @@ export class SubagentRuntime {
 export function createSubagentRuntime(
   listActiveTools: () => string[] = () => [],
   ladders: RoutingLadders = { profiles: new Map(), strategies: new Map() },
+  listRegisteredTools: () => string[] = () => [],
 ): SubagentRuntime {
-  return new SubagentRuntime(listActiveTools, ladders);
+  return new SubagentRuntime(listActiveTools, ladders, listRegisteredTools);
 }

@@ -26,6 +26,7 @@ function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
       excludedExtensionPackages: [],
       promptInheritance: {},
     },
+    toolNames: ["read", "bash"],
     snapshot: STUB_SNAPSHOT,
     parentSession: {
       parentSessionFile: "/sessions/parent.jsonl",

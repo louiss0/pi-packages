@@ -15,4 +15,5 @@ export const STUB_SNAPSHOT: ParentSnapshot = defined({
   cwd: "/test",
   systemPrompt: "test prompt",
   activeToolNames: ["read", "bash"],
+  registeredToolNames: ["read", "bash"],
 });

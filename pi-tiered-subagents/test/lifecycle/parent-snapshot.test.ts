@@ -62,6 +62,23 @@ describe("buildParentSnapshot", () => {
     expect(snapshot).not.toHaveProperty("modelRegistry");
   });
 
+  it("copies registered tool names for request-time MCP expansion", () => {
+    const registered = ["read", "mcp__github__get_issue"];
+    const snapshot = buildParentSnapshot(
+      makeCtx(),
+      false,
+      undefined,
+      ["read"],
+      registered,
+    );
+    registered.push("mcp__github__delete_repo");
+
+    expect(snapshot.registeredToolNames).toEqual([
+      "read",
+      "mcp__github__get_issue",
+    ]);
+  });
+
   it("sets parentContext to undefined when inheritContext is false", () => {
     const snapshot = buildParentSnapshot(makeCtx(), false);
     expect(snapshot.parentContext).toBeUndefined();

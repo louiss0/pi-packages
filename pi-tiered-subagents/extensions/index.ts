@@ -143,7 +143,11 @@ export default function (pi: ExtensionAPI) {
   // ---- Runtime: all mutable extension state in one place ----
   // The active tools are read from Pi at request time, so a definition that
   // inherits its tools follows the parent's current selection.
-  const runtime = createSubagentRuntime(() => pi.getActiveTools(), ladders);
+  const runtime = createSubagentRuntime(
+    () => pi.getActiveTools(),
+    ladders,
+    () => pi.getAllTools().map((tool) => tool.name),
+  );
 
   const refreshProfiles = (): void => {
     // The profiles live in the settings file, which the settings module owns:
@@ -337,9 +341,6 @@ export default function (pi: ExtensionAPI) {
     // than a value because only the assembler knows the child's provider.
     resolvePromptInheritance: (provider) =>
       settings.promptInheritanceFor(provider),
-    // Read per child rather than once: an MCP server connects in the
-    // background, so its tools register after this extension loads.
-    listParentToolNames: () => pi.getAllTools().map((tool) => tool.name),
   };
 
   // ConcurrencyLimiter: schedules background run thunks FIFO against the limit.

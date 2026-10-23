@@ -26,7 +26,6 @@ import {
 } from "#src/agents/launch-preparer";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { SUBAGENT_TOOL_NAMES } from "#src/agents/definition";
-import { debugNote } from "#src/debug";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
@@ -37,7 +36,6 @@ import {
 } from "#src/session/ask-parent-tool";
 import { builtinExtensionsFor } from "#src/session/builtin-extensions";
 import type { EnvInfo } from "#src/session/env";
-import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
 import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelRegistry } from "#src/models/registry";
 import { defined } from "#src/optional";
@@ -190,11 +188,6 @@ export interface SubagentSessionDeps {
    * reaches it in.
    */
   resolvePromptInheritance: (provider: string | undefined) => PromptInheritance;
-  /**
-   * Names of the tools the parent session has registered, read when a child is
-   * created. An agent's `mcp__<server>__*` tool patterns expand against them.
-   */
-  listParentToolNames: () => readonly string[];
 }
 
 /** Per-spawn parameters — the fields that vary per child session. */
@@ -301,15 +294,7 @@ export async function createSubagentSession(
     deps.io.assemblerIO,
   );
 
-  const { toolNames, unmatchedPatterns } = expandMcpToolPatterns(
-    cfg.toolNames,
-    deps.listParentToolNames(),
-  );
-  for (const pattern of unmatchedPatterns) {
-    debugNote(
-      `agent ${type}: tools pattern ${pattern} matched no tool the parent has`,
-    );
-  }
+  const toolNames = cfg.toolNames;
 
   const agentDir = deps.io.getAgentDir();
   const sessionSettings = deps.io.createSettingsManager(

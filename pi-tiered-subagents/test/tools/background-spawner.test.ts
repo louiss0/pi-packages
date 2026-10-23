@@ -43,6 +43,7 @@ function makeParams(
       excludedExtensionPackages: [],
       promptInheritance: {},
     },
+    toolNames: ["read", "bash"],
     snapshot: STUB_SNAPSHOT,
     parentSession: overrides.parentSession ?? {
       parentSessionFile: "/sessions/parent.jsonl",
