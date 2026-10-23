@@ -59,4 +59,26 @@ export const GLYPHS = {
 } as const;
 
 /** Braille spinner frames for the animated running indicator. */
-export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+export const SPINNER = [
+  "⠋",
+  "⠙",
+  "⠹",
+  "⠸",
+  "⠼",
+  "⠴",
+  "⠦",
+  "⠧",
+  "⠇",
+  "⠏",
+] as const satisfies readonly string[];
+
+/**
+ * The spinner frame for `index`, wrapping around the cycle.
+ *
+ * A named read rather than a raw index, so an out-of-range frame is a defined
+ * frame instead of a hole a renderer would have to guard against.
+ */
+export function spinnerAt(index: number): string {
+  const frame = ((index % SPINNER.length) + SPINNER.length) % SPINNER.length;
+  return SPINNER[frame] ?? SPINNER[0];
+}

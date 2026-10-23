@@ -16,6 +16,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
 import type { ModelRegistry } from "#src/models/registry";
 import { routingContext, type RoutingLadders } from "#src/models/router";
+import { defined } from "#src/optional";
 import { type ModelSelection, selectModel } from "#src/models/selection";
 import { type ThinkingDecision, resolveThinking } from "#src/thinking/resolve";
 
@@ -76,31 +77,35 @@ export function resolveLaunchModel(
 
   const selection = selectModel(
     {
-      requestedModel: request.requestedModel,
-      definitionModel: request.definitionModel,
-      parentModel: context.parentModel,
+      ...defined({
+        requestedModel: request.requestedModel,
+        definitionModel: request.definitionModel,
+        parentModel: context.parentModel,
+      }),
     },
     context.registry,
     routingContext(context.ladders, available),
   );
   if (!selection.ok) return { ok: false, error: selection.error };
 
-  const thinkingDecision = resolveThinking({
-    requested: request.requestedThinking,
-    defined: request.definitionThinking,
-    model: selection.selection.model,
-    parentLevel: context.parentThinkingLevel,
-    // The parent's model was kept when nothing below it was available.
-    parentModelKept: selection.selection.source === "inherited",
-  });
+  const thinkingDecision = resolveThinking(
+    defined({
+      // The parent's model was kept when nothing below it was available.
+      parentModelKept: selection.selection.source === "inherited",
+      model: selection.selection.model,
+      requested: request.requestedThinking,
+      defined: request.definitionThinking,
+      parentLevel: context.parentThinkingLevel,
+    }),
+  );
 
   return {
     ok: true,
-    resolved: {
-      model: selection.selection.model,
+    resolved: defined({
       modelSelection: selection.selection,
-      thinking: thinkingDecision.level,
       thinkingDecision,
-    },
+      model: selection.selection.model,
+      thinking: thinkingDecision.level,
+    }),
   };
 }

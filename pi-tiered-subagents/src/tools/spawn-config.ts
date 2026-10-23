@@ -7,6 +7,7 @@
  * answers the same question through the same function.
  */
 
+import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import {
   resolveSpawn,
@@ -64,17 +65,19 @@ export function resolveSpawnConfig(
   const selection = registry.select(rawType);
   if (!selection.ok) return { error: selection.error };
 
-  return resolveSpawn({
-    definition: selection.definition,
-    prompt: params.prompt as string,
-    description: params.description as string | undefined,
-    requestedModel: params.model as string | undefined,
-    requestedThinking: thinkingFromParams,
-    requestedMaxTurns: params.max_turns as number | undefined,
-    inheritContext: params.inherit_context as boolean | undefined,
-    runInBackground: params.run_in_background as boolean | undefined,
-    rawType,
-    modelInfo,
-    settings,
-  });
+  return resolveSpawn(
+    defined({
+      definition: selection.definition,
+      prompt: params.prompt as string,
+      requestedThinking: thinkingFromParams,
+      rawType,
+      modelInfo,
+      settings,
+      description: params.description as string | undefined,
+      requestedModel: params.model as string | undefined,
+      requestedMaxTurns: params.max_turns as number | undefined,
+      inheritContext: params.inherit_context as boolean | undefined,
+      runInBackground: params.run_in_background as boolean | undefined,
+    }),
+  );
 }

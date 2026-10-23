@@ -2,6 +2,7 @@ import { debugLog } from "#src/debug";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { getLifetimeTotal } from "#src/lifecycle/usage";
+import { defined } from "#src/optional";
 import {
   renderQuestionAffordance,
   renderRunUpdates,
@@ -156,18 +157,18 @@ export function buildNotificationDetails(
 ): NotificationDetails {
   const totalTokens = getLifetimeTotal(record.lifetimeUsage);
 
-  return {
+  return defined({
     id: record.id,
     description: record.description,
     status: record.status,
     toolUses: record.toolUses,
     totalTokens,
     durationMs: record.completedAt ? record.completedAt - record.startedAt : 0,
+    resultPreview: buildResultPreview(record, resultMaxLen),
     outputFile: record.outputFile,
     error: record.error,
-    resultPreview: buildResultPreview(record, resultMaxLen),
     turnBudget: record.turnBudget,
-  };
+  });
 }
 
 /** The renderer's preview text: the (truncated) result, or why there is none. */

@@ -7,12 +7,12 @@
  * Behavior (abort, steer buffering) lives here rather than on SubagentManager.
  */
 
+import { debugLog } from "#src/debug";
 import type { Model } from "@earendil-works/pi-ai";
 import type {
   AgentSessionEvent,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { debugLog } from "#src/debug";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { subscribeSubagentObserver } from "#src/lifecycle/record-observer";
@@ -36,6 +36,7 @@ import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
 import type { ModelSelection } from "#src/models/selection";
+import { defined } from "#src/optional";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { RunConfig } from "#src/runtime";
 import type { TurnPolicy } from "#src/lifecycle/turn-limits";
@@ -317,14 +318,28 @@ export class Subagent {
   private readonly execution: SubagentExecution;
   private readonly workspaceBracket: WorkspaceBracket;
 
-  subagentSession?: SubagentSession;
+  // A backing field, not an optional property: releaseSession() clears it, and
+  // "cleared" is a value this class holds between calls.
+  private subagentSession: SubagentSession | undefined;
+
+  /**
+   * The single writer of {@link subagentSession}: the run that created one
+   * attaches it, releaseSession() passes `undefined`.
+   *
+   * Public because it is also how a passive fixture — a record that must read
+   * as session-ready without ever running — takes the same path production
+   * takes, rather than reaching into a private field.
+   */
+  attachSession(session: SubagentSession | undefined): void {
+    this.subagentSession = session;
+  }
 
   // Retained after releaseSession() disposes the heavy session, so outputFile
   // (transcript pointer) survives and the resume path can tell "released" from
   // "never had a session."
-  private _releasedOutputFile?: string;
-  private _releasedModel?: Model<any>;
-  private _releasedThinkingLevel?: ThinkingLevel;
+  private _releasedOutputFile: string | undefined;
+  private _releasedModel: Model<any> | undefined;
+  private _releasedThinkingLevel: ThinkingLevel | undefined;
   private _sessionReleased = false;
   /** True once releaseSession() has freed a live session (distinct from never having had one). */
   get sessionReleased(): boolean {
@@ -543,27 +558,31 @@ export class Subagent {
     }
 
     const runConfig = this.execution.getRunConfig?.();
+    let session: SubagentSession;
     try {
-      this.subagentSession = await this.execution.createSubagentSession({
-        snapshot: this.execution.snapshot,
-        type: this.type,
-        cwd,
-        parentSession: this.execution.parentSession,
-        model: this.execution.model,
-        thinkingLevel: this.execution.thinkingLevel,
-        // The session outlives this run, so a question goes to whichever run is
-        // under way when the child asks it.
-        askParent: (question) => {
-          this.currentRun.setPendingQuestion(question);
-        },
-        notifyParent: this.canSendUpdates(runConfig)
-          ? (message) => {
-              this.announceUpdate(message);
-            }
-          : undefined,
-        turnPolicy: this.execution.turnPolicy,
-        toolNames: this.execution.toolNames,
-      });
+      session = await this.execution.createSubagentSession(
+        defined({
+          snapshot: this.execution.snapshot,
+          type: this.type,
+          askParent: (question: string) => {
+            this.currentRun.setPendingQuestion(question);
+          },
+          cwd,
+          parentSession: this.execution.parentSession,
+          model: this.execution.model,
+          thinkingLevel: this.execution.thinkingLevel,
+          // A run whose config suppresses announcements has nothing to announce
+          // through, so the child gets no channel at all rather than a dead one.
+          notifyParent: this.canSendUpdates(runConfig)
+            ? (message: string) => {
+                this.announceUpdate(message);
+              }
+            : undefined,
+          turnPolicy: this.execution.turnPolicy,
+          toolNames: this.execution.toolNames,
+        }),
+      );
+      this.attachSession(session);
     } catch (err) {
       // The factory disposed its own session on a post-creation failure.
       this.fail(run, err);
@@ -572,7 +591,7 @@ export class Subagent {
 
     this.flushPendingSteers();
     this.execution.observer?.onSessionCreated?.(this);
-    await this.runOnSession(run, this.subagentSession, this.execution.prompt);
+    await this.runOnSession(run, session, this.execution.prompt);
   }
 
   /**
@@ -929,7 +948,7 @@ export class Subagent {
     this._releasedOutputFile = session.outputFile;
     this._releasedModel = session.model;
     this._releasedThinkingLevel = session.thinkingLevel;
-    this.subagentSession = undefined;
+    this.attachSession(undefined);
     this._sessionReleased = true;
     await disposeQuietly(session, "child session release");
   }

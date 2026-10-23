@@ -1,4 +1,5 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { defined } from "#src/optional";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
 import {
@@ -60,22 +61,22 @@ export async function runForeground(
       params.snapshot,
       identity.subagentType,
       execution.prompt,
-      {
+      defined({
         description: execution.description,
-        model: execution.model,
         modelSelection: execution.modelSelection,
         thinkingDecision: execution.thinkingDecision,
         turnPolicy: execution.turnPolicy,
         inheritContext: execution.inheritContext,
-        thinkingLevel: execution.thinking,
         signal,
         parentSession: params.parentSession,
         observer: {
-          onSessionCreated: (agent) => {
+          onSessionCreated: (agent: Subagent) => {
             recordRef = agent;
           },
         },
-      },
+        model: execution.model,
+        thinkingLevel: execution.thinking,
+      }),
     );
   } catch (err) {
     return textResult(err instanceof Error ? err.message : String(err));

@@ -21,7 +21,7 @@ import type {
 
 /** Owns the child workspace lifecycle: prepare at run-start, dispose at run-end. */
 export class WorkspaceBracket {
-  private prepared?: Workspace;
+  private prepared: Workspace | undefined;
   private disposedWorkspace = false;
 
   constructor(
@@ -54,8 +54,9 @@ export class WorkspaceBracket {
   async prepare(ctx: WorkspacePrepareContext): Promise<string | undefined> {
     const provider = this.resolveProvider();
     if (!provider) return undefined;
-    this.prepared = await provider.prepare(ctx);
-    return this.prepared?.cwd;
+    const prepared = await provider.prepare(ctx);
+    this.prepared = prepared;
+    return prepared?.cwd;
   }
 
   /**

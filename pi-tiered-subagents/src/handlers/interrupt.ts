@@ -31,8 +31,8 @@ interface InterruptCtx {
  * change applies to the very next interrupt without re-wiring.
  */
 export class InterruptHandler {
-  private latched?: AbortSignal;
-  private detach?: () => void;
+  private latched: AbortSignal | undefined;
+  private detach: (() => void) | undefined;
 
   constructor(
     private readonly manager: InterruptManager,

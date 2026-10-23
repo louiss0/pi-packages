@@ -69,9 +69,12 @@ const DATE_QUALIFIER = /^\d{8}$/;
 export function candidateJoins(candidates: readonly string[]): string[] {
   const joins: string[] = [];
   for (let start = 0; start < candidates.length; start++) {
+    // The suffix from each position is the set of joins that start there, so
+    // iterating the suffixes rather than an index pair keeps every segment a
+    // defined value rather than a possibly-absent read.
     let joined = "";
-    for (let end = start; end < candidates.length; end++) {
-      joined = joined === "" ? candidates[end] : `${joined}-${candidates[end]}`;
+    for (const segment of candidates.slice(start)) {
+      joined = joined === "" ? segment : `${joined}-${segment}`;
       joins.push(joined);
     }
   }

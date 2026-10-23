@@ -30,6 +30,8 @@ export const PREVIEW_CHARS = 200;
  * `preview` is bounded at `PREVIEW_CHARS` by its producer.
  */
 export interface GetResultDetails {
+  // A read view over a live record: every optional also takes an explicit
+  // `undefined`, so a fixture can clear a defaulted field in one call.
   agentId: string;
   displayName: string;
   status: SubagentStatus;
@@ -42,13 +44,13 @@ export interface GetResultDetails {
   /** Pre-formatted duration string. */
   duration: string;
   /** First non-empty line of the result body, clipped. Never the whole result. */
-  preview?: string;
-  error?: string;
+  preview?: string | undefined;
+  error?: string | undefined;
   /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget;
+  turnBudget?: TurnBudget | undefined;
   /** Whether the conversation was requested, so the expanded view can say where it went. */
   verbose: boolean;
-  transcriptPath?: string;
+  transcriptPath?: string | undefined;
   /** The model's `provider/id`; optional because details persisted by older versions lack it. */
   modelName?: string;
 }

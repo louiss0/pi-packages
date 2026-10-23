@@ -226,8 +226,10 @@ export class TranscriptContent {
     const messages = this.options.source.getMessages();
     if (this.hasRewrittenHistory(messages)) this.reset();
     if (messages.length === this.consumedCount) return;
-    for (let i = this.consumedCount; i < messages.length; i++)
-      this.consumeMessage(messages[i]);
+    // The unread suffix, so each message is a defined value rather than an
+    // indexed read that could fall past the end.
+    for (const message of messages.slice(this.consumedCount))
+      this.consumeMessage(message);
     this.consumedCount = messages.length;
     this.lastConsumed = messages.at(-1);
     this.settledRows = undefined;

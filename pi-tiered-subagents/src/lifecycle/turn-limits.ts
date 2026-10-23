@@ -204,7 +204,7 @@ export class TurnBudgetTracker {
  */
 export function wrappedUpAtTurnLimit(outcome: {
   status: string;
-  turnBudget?: TurnBudget;
+  turnBudget?: TurnBudget | undefined;
 }): boolean {
   return (
     outcome.status === "completed" && outcome.turnBudget?.phase === "warned"

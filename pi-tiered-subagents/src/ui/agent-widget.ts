@@ -6,6 +6,7 @@
  */
 
 import type { TuiMode } from "@earendil-works/pi-tui";
+import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type {
@@ -23,7 +24,9 @@ import { renderWidgetLines, type WidgetAgent } from "#src/ui/widget-renderer";
 interface AgentSummary {
   readonly id: string;
   readonly status: string;
-  readonly completedAt?: number;
+  // A read view over a live record, so the optional takes an explicit
+  // `undefined` — a record's getter answers that for "never finished".
+  readonly completedAt?: number | undefined;
 }
 
 /** Lightweight state snapshot used by AgentWidget.update() to decide what to show. */
@@ -228,23 +231,26 @@ export class AgentWidget implements SubagentManagerObserver {
 
   /** Project a live Subagent record onto a pure-data WidgetAgent snapshot. */
   private toWidgetAgent(record: Subagent): WidgetAgent {
-    return {
+    // Every optional field is attached only when the record has one: an absent
+    // key and a key explicitly set to undefined are different facts, and only
+    // the first one says "the record never had one".
+    return defined({
       id: record.id,
       type: record.type,
       status: record.status,
       description: record.description,
       toolUses: record.toolUses,
       startedAt: record.startedAt,
-      completedAt: record.completedAt,
-      error: record.error,
       lifetimeUsage: record.lifetimeUsage,
       compactionCount: record.compactionCount,
-      turnBudget: record.turnBudget,
       activeTools: record.activeTools,
       responseText: record.responseText,
-      contextPercent: record.getContextPercent(),
+      completedAt: record.completedAt,
+      error: record.error,
+      turnBudget: record.turnBudget,
       model: record.model,
-    };
+      contextPercent: record.getContextPercent(),
+    });
   }
 
   /** Delegate rendering to the pure widget-renderer module. */

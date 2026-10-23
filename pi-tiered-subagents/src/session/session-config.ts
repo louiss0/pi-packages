@@ -11,6 +11,7 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
+import { defined } from "#src/optional";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
@@ -192,7 +193,7 @@ export function assembleSessionConfig(
       systemPrompt: ctx.parentSystemPrompt,
       cwd: ctx.cwd,
       strategy: ctx.resolvePromptInheritance?.(model?.provider) ?? "full",
-      portablePrompt: ctx.parentPortablePrompt,
+      ...defined({ portablePrompt: ctx.parentPortablePrompt }),
     },
     io.loadProjectContext,
   );

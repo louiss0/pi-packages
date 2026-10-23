@@ -5,6 +5,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { buildParentContext } from "#src/session/context";
 import type { ModelRegistry } from "#src/models/registry";
+import { defined } from "#src/optional";
 import type { SessionContext } from "#src/types";
 
 /**
@@ -38,8 +39,14 @@ export interface ParentSnapshot {
   cwd: string;
   /** Parent's effective system prompt (for append-mode agents). */
   systemPrompt: string;
-  /** Parent's current model instance (fallback when agent config has no model). */
-  model: Model<any> | undefined;
+  /**
+   * Parent's current model instance (fallback when agent config has no model).
+   *
+   * Absent, rather than present-and-undefined, when the parent has no model:
+   * a snapshot is read long after the capture, and a key that was there at
+   * capture time means "the parent had a model" either way it is spelled.
+   */
+  model?: Model<any>;
   /** Model registry for resolving config.model strings and creating sessions. */
   modelRegistry: ModelRegistry;
   /**
@@ -79,12 +86,15 @@ export function buildParentSnapshot(
   return {
     cwd: ctx.cwd,
     systemPrompt: ctx.getSystemPrompt(),
-    model: ctx.model,
     modelRegistry: ctx.modelRegistry,
+    // Copied, so a parent that changes its active tools later cannot widen a
+    // queued child's capabilities.
     activeToolNames: [...activeToolNames],
-
-    parentContext: parentContext || undefined,
-    portablePrompt: buildPortablePrompt(promptOptions),
+    ...defined({
+      model: ctx.model,
+      parentContext: parentContext || undefined,
+      portablePrompt: buildPortablePrompt(promptOptions),
+    }),
   };
 }
 

@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
 import { renderSpawnNotes, textResult } from "#src/tools/helpers";
@@ -58,19 +59,19 @@ export function spawnBackground(
       params.snapshot,
       identity.subagentType,
       execution.prompt,
-      {
+      defined({
         parentSession: params.parentSession,
         description: execution.description,
-        model: execution.model,
         modelSelection: execution.modelSelection,
         thinkingDecision: execution.thinkingDecision,
         turnPolicy: execution.turnPolicy,
         inheritContext: execution.inheritContext,
-        thinkingLevel: execution.thinking,
         // resolveSpawnConfig already merged the agent's frontmatter and AgentTool
         // routed here on the result, so this door has committed.
-        background: { kind: "explicit", isBackground: true },
-      },
+        background: { kind: "explicit", isBackground: true } as const,
+        model: execution.model,
+        thinkingLevel: execution.thinking,
+      }),
     );
   } catch (err) {
     return textResult(err instanceof Error ? err.message : String(err));
@@ -78,18 +79,20 @@ export function spawnBackground(
 
   const record = manager.getRecord(id);
   const isQueued = record?.status === "queued";
-  return renderBackgroundLaunch({
-    headline: `Agent ${isQueued ? "queued" : "started"} in background.`,
-    id,
-    displayName: identity.displayName,
-    description: execution.description,
-    detailBase: presentation.detailBase,
-    notes,
-    outputFile: record?.outputFile,
-    queuePosition: isQueued
-      ? { maxConcurrent: params.settings.maxConcurrent }
-      : undefined,
-  });
+  return renderBackgroundLaunch(
+    defined({
+      headline: `Agent ${isQueued ? "queued" : "started"} in background.`,
+      id,
+      displayName: identity.displayName,
+      description: execution.description,
+      detailBase: presentation.detailBase,
+      notes,
+      outputFile: record?.outputFile,
+      queuePosition: isQueued
+        ? { maxConcurrent: params.settings.maxConcurrent }
+        : undefined,
+    }),
+  );
 }
 
 /**

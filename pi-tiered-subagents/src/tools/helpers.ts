@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { isShippedSpecialist } from "#src/agents/shipped";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
@@ -9,7 +10,12 @@ import {
   modelLabel,
 } from "#src/ui/display";
 
-/** Build AgentDetails from a base + record-specific fields. */
+/**
+ * Build AgentDetails from a base + record-specific fields.
+ *
+ * `record` is a read view over a live subagent, so its optionals accept an
+ * explicit `undefined` — see the note on `StatusOutcome`.
+ */
 export function buildDetails(
   base: Pick<
     AgentDetails,
@@ -18,27 +24,29 @@ export function buildDetails(
   record: {
     toolUses: number;
     startedAt: number;
-    completedAt?: number;
+    completedAt?: number | undefined;
     status: string;
-    error?: string;
-    id?: string;
+    error?: string | undefined;
+    id?: string | undefined;
     lifetimeUsage: LifetimeUsage;
     /** The model the agent runs; unknown for an inherited model until its session exists. */
-    model?: ModelIdentity;
-    turnBudget?: TurnBudget;
+    model?: ModelIdentity | undefined;
+    turnBudget?: TurnBudget | undefined;
   },
   overrides?: Partial<AgentDetails>,
 ): AgentDetails {
   return {
     ...base,
-    modelName: modelLabel(record.model) ?? base.modelName,
     toolUses: record.toolUses,
     tokens: formatLifetimeTokens(record),
     durationMs: (record.completedAt ?? Date.now()) - record.startedAt,
     status: record.status as AgentDetails["status"],
-    agentId: record.id,
-    error: record.error,
-    turnBudget: record.turnBudget,
+    ...defined({
+      modelName: modelLabel(record.model) ?? base.modelName,
+      agentId: record.id,
+      error: record.error,
+      turnBudget: record.turnBudget,
+    }),
     ...overrides,
   };
 }

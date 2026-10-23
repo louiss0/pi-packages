@@ -34,6 +34,7 @@ import type { RunKind } from "#src/lifecycle/subagent-run";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceGate, WorkspaceGateRegistry } from "#src/scheduling/gate";
+import { defined } from "#src/optional";
 import {
   classifyWorkspaceImpact,
   type WorkspaceImpact,
@@ -117,8 +118,8 @@ interface WorkspacePlan {
   readonly impact: WorkspaceImpact;
   /** The child's id — the slot's holder while the child runs. */
   readonly id: string;
-  /** The lever that cancels a wait for the slot. */
-  readonly signal: AbortSignal | undefined;
+  /** The lever that cancels a wait for the slot, when the caller named one. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -284,7 +285,7 @@ export interface AgentSpawnConfig {
 export class SubagentManager {
   private agents = new Map<string, Subagent>();
   private sweepInterval: ReturnType<typeof setInterval>;
-  private readonly observer?: SubagentManagerObserver;
+  private readonly observer: SubagentManagerObserver | undefined;
   private readonly createSubagentSession: (
     params: CreateSubagentSessionParams,
   ) => Promise<SubagentSession>;
@@ -293,8 +294,8 @@ export class SubagentManager {
   private readonly admitBackground: RunScheduler = (thunk) =>
     this.limiter.schedule(thunk);
   private readonly baseCwd: string;
-  private getRunConfig?: () => RunConfig;
-  private getRetentionPolicy?: () => RetentionPolicy;
+  private getRunConfig: (() => RunConfig) | undefined;
+  private getRetentionPolicy: (() => RetentionPolicy) | undefined;
   private readonly registry: SpawnTypeResolver;
   private readonly reloadDefinitions: (() => void) | undefined;
   /**
@@ -311,7 +312,7 @@ export class SubagentManager {
    * ones it was spawned with — the answer is recorded once, at the spawn.
    */
   private readonly workspacePlans = new Map<string, WorkspacePlan>();
-  private _workspaceProvider?: WorkspaceProvider;
+  private _workspaceProvider: WorkspaceProvider | undefined;
 
   /** The registered workspace provider, or undefined when none is registered. */
   get workspaceProvider(): WorkspaceProvider | undefined {
@@ -356,6 +357,13 @@ export class SubagentManager {
   /** Compose a per-agent lifecycle observer from manager and spawn-config concerns. */
   private buildObserver(options: AgentSpawnConfig): SubagentLifecycleObserver {
     return {
+      // A session-created hook is optional: the observer takes the forwarding
+      // callback or omits the key, never a key holding undefined.
+      ...defined({
+        onSessionCreated: options.observer?.onSessionCreated
+          ? (agent: Subagent) => options.observer!.onSessionCreated!(agent)
+          : undefined,
+      }),
       onRunStarted: (agent, kind) => {
         try {
           this.observer?.onSubagentRunStarted(agent, kind);
@@ -363,14 +371,6 @@ export class SubagentManager {
           debugLog("onSubagentRunStarted observer", err);
         }
       },
-      onSessionCreated: options.observer?.onSessionCreated
-        ? (agent) => options.observer!.onSessionCreated!(agent)
-        : undefined,
-      // Terminal transitions are reported for every agent. Whether the parent
-      // needs telling is the notification layer's decision, made from the
-      // carrier claim; suppressing the observer here would also suppress the
-      // lifecycle event and the session-history record, which are facts about
-      // the run rather than announcements.
       onRunFinished: (agent, kind) => {
         try {
           this.observer?.onSubagentRunFinished(agent, kind);
@@ -387,6 +387,11 @@ export class SubagentManager {
       onCompacted: (agent, info) => {
         this.observer?.onSubagentCompacted(agent, info);
       },
+      // Terminal transitions are reported for every agent. Whether the parent
+      // needs telling is the notification layer's decision, made from the
+      // carrier claim; suppressing the observer here would also suppress the
+      // lifecycle event and the session-history record, which are facts about
+      // the run rather than announcements.
     };
   }
 
@@ -494,7 +499,14 @@ export class SubagentManager {
     // The workspace the child works in: the parent's directory when the
     // request was made. Two parents in one directory share one slot.
     const gate = this.workspaceGates.gateFor(snapshot.cwd);
-    const plan: WorkspacePlan = { gate, impact, id, signal: options.signal };
+    const plan: WorkspacePlan = {
+      gate,
+      impact,
+      id,
+      // A caller that named no signal has none; the field is absent rather
+      // than present-and-undefined, so the gate cannot mistake the two.
+      ...defined({ signal: options.signal }),
+    };
     this.workspacePlans.set(id, plan);
     const record = new Subagent({
       id,
@@ -507,16 +519,18 @@ export class SubagentManager {
         prompt,
         baseCwd: this.baseCwd,
         observer: this.buildObserver(options),
-        getRunConfig: this.getRunConfig,
         getWorkspaceProvider: () => this._workspaceProvider,
-        model: options.model,
         turnPolicy: options.turnPolicy,
-        thinkingLevel: options.thinkingLevel,
-        modelSelection: options.modelSelection,
-        thinkingDecision: options.thinkingDecision,
-        parentSession: options.parentSession,
-        signal: options.signal,
         toolNames,
+        ...defined({
+          getRunConfig: this.getRunConfig,
+          model: options.model,
+          thinkingLevel: options.thinkingLevel,
+          modelSelection: options.modelSelection,
+          thinkingDecision: options.thinkingDecision,
+          parentSession: options.parentSession,
+          signal: options.signal,
+        }),
       },
     });
     this.agents.set(id, record);
@@ -629,14 +643,16 @@ export class SubagentManager {
       gate,
       impact,
       id,
-      signal: options.signal,
+      ...defined({ signal: options.signal }),
     };
     void agent.resume(
       prompt,
       {
         background: options.background,
-        signal: options.signal,
-        claimOutcome: options.claimOutcome,
+        ...defined({
+          signal: options.signal,
+          claimOutcome: options.claimOutcome,
+        }),
       },
       (thunk) => this.admitBackground(() => this.admit(resumePlan, thunk)),
     );

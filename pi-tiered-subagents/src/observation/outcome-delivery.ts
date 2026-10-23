@@ -70,11 +70,18 @@ const WRAPPED_UP: StatusMeaning = {
 /**
  * Only what the status presentations read: the status, the error an error
  * label names, and the budget that qualifies a completed run.
+ *
+ * A read view over a live record, so its optionals accept an explicit
+ * `undefined`: a record's getters answer `undefined` for "not decided", and a
+ * renderer told "there is no error here" does not care whether that arrived as
+ * an absent key or a present one. Producers of configuration and snapshots use
+ * `defined()` instead — there, "unset" and "set to nothing" are different facts
+ * worth preserving.
  */
 export interface StatusOutcome {
   status: SubagentStatus;
-  error?: string;
-  turnBudget?: TurnBudget;
+  error?: string | undefined;
+  turnBudget?: TurnBudget | undefined;
 }
 
 function statusMeaning(outcome: StatusOutcome): StatusMeaning | undefined {
@@ -135,8 +142,10 @@ export function renderStatusNote(outcome: StatusOutcome): string {
  */
 export interface OutcomeBody {
   status: SubagentStatus;
-  result: string | undefined;
-  error: string | undefined;
+  // A read view over a live record, so the optionals take an explicit
+  // `undefined` — see the note on `StatusOutcome`.
+  result?: string | undefined;
+  error?: string | undefined;
   /** Whether the agent was stopped before the limiter ever admitted it. */
   stoppedWhileQueued: boolean;
 }
@@ -207,9 +216,9 @@ export function renderWorkspaceNotice(notice: string | undefined): string {
  */
 export interface OutcomeAddenda {
   id: string;
-  runUpdates?: readonly string[];
-  workspaceNotice?: string;
-  pendingQuestion?: string;
+  runUpdates?: readonly string[] | undefined;
+  workspaceNotice?: string | undefined;
+  pendingQuestion?: string | undefined;
   /**
    * Why a resume would be refused; undefined when one would be accepted.
    *

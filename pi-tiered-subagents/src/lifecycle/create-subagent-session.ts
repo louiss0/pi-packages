@@ -34,6 +34,7 @@ import { builtinExtensionsFor } from "#src/session/builtin-extensions";
 import type { EnvInfo } from "#src/session/env";
 import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
 import type { ModelRegistry } from "#src/models/registry";
+import { defined } from "#src/optional";
 import {
   NotifyParentTool,
   type UpdateAnnouncer,
@@ -242,7 +243,7 @@ export async function createSubagentSession(
 ): Promise<SubagentSession> {
   const { snapshot, type } = params;
   const parentSessionId = params.parentSession?.parentSessionId;
-  deps.lifecycle.spawning({ agentName: type, parentSessionId });
+  deps.lifecycle.spawning(defined({ agentName: type, parentSessionId }));
 
   // Resolve working directory upfront - needed for detectEnv before assembly.
   const effectiveCwd = params.cwd ?? snapshot.cwd;
@@ -251,21 +252,21 @@ export async function createSubagentSession(
   // Assemble session configuration (synchronous, no SDK objects).
   const cfg = assembleSessionConfig(
     type,
-    {
+    defined({
       cwd: snapshot.cwd,
       parentSystemPrompt: snapshot.systemPrompt,
-      parentPortablePrompt: snapshot.portablePrompt,
       parentModel: snapshot.model,
       modelRegistry: snapshot.modelRegistry,
       activeToolNames: snapshot.activeToolNames,
       toolNames: params.toolNames,
       resolvePromptInheritance: deps.resolvePromptInheritance,
-    },
-    {
+      parentPortablePrompt: snapshot.portablePrompt,
+    }),
+    defined({
       cwd: params.cwd,
       model: params.model,
       thinkingLevel: params.thinkingLevel,
-    },
+    }),
     env,
     deps.registry,
     deps.io.assemblerIO,
@@ -321,9 +322,9 @@ export async function createSubagentSession(
     cfg.effectiveCwd,
     sessionDir,
   );
-  sessionManager.newSession({
-    parentSession: params.parentSession?.parentSessionId,
-  });
+  sessionManager.newSession(
+    defined({ parentSession: params.parentSession?.parentSessionId }),
+  );
   const sessionId = sessionManager.getSessionId();
 
   const childTools = buildChildTools(params);
@@ -333,30 +334,32 @@ export async function createSubagentSession(
     sessionManager,
     settingsManager: sessionSettings,
     modelRegistry: snapshot.modelRegistry,
-    model: cfg.model,
     tools: [...toolNames, ...childTools.map((tool) => tool.name)],
     customTools: childTools,
     excludeTools: EXCLUDED_TOOL_NAMES,
     resourceLoader: loader,
-    thinkingLevel: cfg.thinkingLevel,
+    ...defined({ model: cfg.model, thinkingLevel: cfg.thinkingLevel }),
   });
 
-  const subagentSession = new SubagentSession(session, {
-    outputFile: sessionManager.getSessionFile(),
-    sessionId,
-    sessionDir,
-    agentName: type,
-    turnPolicy: params.turnPolicy,
-    parentContext: snapshot.parentContext,
-    lifecycle: deps.lifecycle,
-  });
+  const subagentSession = new SubagentSession(
+    session,
+    defined({
+      sessionId,
+      sessionDir,
+      agentName: type,
+      turnPolicy: params.turnPolicy,
+      lifecycle: deps.lifecycle,
+      outputFile: sessionManager.getSessionFile(),
+      parentContext: snapshot.parentContext,
+    }),
+  );
 
   // Publish session-created before bindExtensions() so observers (e.g. the
   // permission system) can register the child synchronously and have their
   // entry in place for the first permission check during child extension
   // initialization. The event bus dispatches synchronously, so a synchronous
   // subscriber completes before this returns.
-  deps.lifecycle.sessionCreated({ sessionId, parentSessionId });
+  deps.lifecycle.sessionCreated(defined({ sessionId, parentSessionId }));
 
   try {
     // Bind extensions so that session_start fires and extensions can initialize.
@@ -372,7 +375,7 @@ export async function createSubagentSession(
   // Every child session_start handler has now run, so this is the first — and
   // only — moment a parent can observe what the child's extensions installed.
   // Deliberately outside the try above: a child whose binding threw never ran.
-  deps.lifecycle.bound({ sessionId, parentSessionId });
+  deps.lifecycle.bound(defined({ sessionId, parentSessionId }));
 
   return subagentSession;
 }

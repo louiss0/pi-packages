@@ -7,6 +7,7 @@
  */
 
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { defined } from "#src/optional";
 import { formatLifetimeTokens } from "#src/tools/helpers";
 import type { SpawnPresentation } from "#src/tools/spawn-config";
 import type { Subagent } from "#src/types";
@@ -53,10 +54,8 @@ export function startProgressStream(params: ProgressStreamParams): () => void {
     const toolUses = record?.toolUses ?? 0;
     const details: AgentDetails = {
       ...detailBase,
-      modelName: modelLabel(record?.model) ?? detailBase.modelName,
       toolUses,
       tokens: record ? formatLifetimeTokens(record) : "",
-      turnBudget: record?.turnBudget,
       durationMs: Date.now() - startedAt,
       status: "running",
       activity: describeActivity(
@@ -64,6 +63,10 @@ export function startProgressStream(params: ProgressStreamParams): () => void {
         record?.responseText ?? "",
       ),
       spinnerFrame: spinnerFrame % SPINNER.length,
+      ...defined({
+        modelName: modelLabel(record?.model) ?? detailBase.modelName,
+        turnBudget: record?.turnBudget,
+      }),
     };
     onUpdate?.({
       content: [{ type: "text", text: `${toolUses} tool uses...` }],

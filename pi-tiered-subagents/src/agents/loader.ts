@@ -44,6 +44,7 @@ import {
   thinkingLevelError,
 } from "#src/config/thinking-level";
 import { debugLog } from "#src/debug";
+import { defined } from "#src/optional";
 
 /** One definition file, as read from disk. */
 export interface LoadedDefinition {
@@ -206,19 +207,21 @@ export function parseDefinitionContent(content: string): AgentDefinitionPatch {
   const { frontmatter: fm, body } = parseFrontmatter(content);
 
   return {
-    displayName: stringField(fm.display_name),
-    description: stringField(fm.description),
-    // The body is the standing instructions. An empty body inherits the
-    // instructions of the layer below, so a configuration-only override stays
-    // concise.
-    instructions: body.trim() === "" ? undefined : body.trim(),
-    tools: toolSelection(fm.tools),
-    model: stringField(fm.model),
-    thinking: thinkingField(fm.thinking),
-    maxTurns: numberField(fm.max_turns),
-    inheritContext: booleanField(fm.inherit_context),
-    runInBackground: booleanField(fm.run_in_background),
-    enabled: booleanField(fm.enabled),
+    ...defined({
+      displayName: stringField(fm.display_name),
+      description: stringField(fm.description),
+      // The body is the standing instructions. An empty body inherits the
+      // instructions of the layer below, so a configuration-only override stays
+      // concise.
+      instructions: body.trim() === "" ? undefined : body.trim(),
+      tools: toolSelection(fm.tools),
+      model: stringField(fm.model),
+      thinking: thinkingField(fm.thinking),
+      maxTurns: numberField(fm.max_turns),
+      inheritContext: booleanField(fm.inherit_context),
+      runInBackground: booleanField(fm.run_in_background),
+      enabled: booleanField(fm.enabled),
+    }),
   };
 }
 

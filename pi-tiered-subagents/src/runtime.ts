@@ -6,6 +6,7 @@
  * Follows the same pattern as pi-permission-system's ExtensionRuntime.
  */
 
+import { defined } from "#src/optional";
 import {
   buildParentSnapshot,
   type ParentPromptOptions,
@@ -105,16 +106,16 @@ export class SubagentRuntime {
   /** Extract model info from the current session context. */
   getModelInfo(): ModelInfo {
     const registry = this.currentCtx?.modelRegistry;
-    return {
+    return defined({
+      // The routing ladders the model selection walks.
+      ladders: this.ladders,
       parentModel: this.currentCtx?.model,
       modelRegistry: registry,
       // The effort the parent is running at: the reasoning fallback needs it,
       // because a child that keeps the parent's model must not work harder
       // than the parent did.
       parentThinkingLevel: this.currentCtx?.thinkingLevel,
-      // The routing ladders the model selection walks.
-      ladders: this.ladders,
-    };
+    });
   }
 
   /** Extract session identity from the current session context. */

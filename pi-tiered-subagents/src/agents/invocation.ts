@@ -14,6 +14,7 @@
 
 import type { AgentDefinition } from "#src/agents/definition";
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
+import { defined } from "#src/optional";
 
 /** The resolved per-run settings of one launch. */
 export interface ResolvedInvocation {
@@ -78,11 +79,15 @@ export function resolveInvocation(
 ): ResolvedInvocation {
   const model = params.model ?? definition.model;
   return {
-    model,
     modelFromParams: params.model !== undefined,
-    thinking: params.thinking ?? definition.thinking,
-    maxTurns: params.maxTurns ?? definition.maxTurns,
     inheritContext: params.inheritContext ?? definition.inheritContext,
     runInBackground: params.runInBackground ?? definition.runInBackground,
+    // A definition that names no model, level, or ceiling leaves the key
+    // absent, so a later reader cannot mistake "unset" for "set to nothing".
+    ...defined({
+      model,
+      thinking: params.thinking ?? definition.thinking,
+      maxTurns: params.maxTurns ?? definition.maxTurns,
+    }),
   };
 }

@@ -21,6 +21,7 @@
  */
 
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
+import { defined } from "#src/optional";
 
 /**
  * How a definition selects the tools the child may use.
@@ -135,13 +136,16 @@ export function mergeDefinition(
     description: merged(patch.description, base.description, ""),
     instructions: mergedInstructions(patch.instructions, base.instructions),
     tools: mergedTools(patch.tools, base.tools),
-    model: mergedOptional(patch.model, base.model),
-    thinking: mergedOptional(patch.thinking, base.thinking),
-    maxTurns: mergedOptional(patch.maxTurns, base.maxTurns),
     inheritContext: merged(patch.inheritContext, base.inheritContext, false),
     runInBackground: merged(patch.runInBackground, base.runInBackground, false),
     enabled: merged(patch.enabled, base.enabled, true),
     origin,
+    // A cleared optional choice is an absent key, not a key holding undefined.
+    ...defined({
+      model: mergedOptional(patch.model, base.model),
+      thinking: mergedOptional(patch.thinking, base.thinking),
+      maxTurns: mergedOptional(patch.maxTurns, base.maxTurns),
+    }),
   };
 }
 

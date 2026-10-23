@@ -87,8 +87,10 @@ export interface RunOutcomeInit {
 /** One run of a subagent (the initial run or a resume): its outcome, and the handles it holds until it ends. */
 export class SubagentRun implements RunOutcome {
   private readonly controller = new AbortController();
-  private detachCallerSignal?: () => void;
-  private unsubscribeObserver?: () => void;
+  // Backing fields, not optional properties: "cleared" is a value here, and
+  // `undefined` is how a released handle is held.
+  private detachCallerSignal: (() => void) | undefined;
+  private unsubscribeObserver: (() => void) | undefined;
 
   // The run's transition state, mutated only through the transitions below.
   private _status: SubagentStatus;
@@ -96,12 +98,12 @@ export class SubagentRun implements RunOutcome {
     return this._status;
   }
 
-  private _result?: string;
+  private _result: string | undefined;
   get result(): string | undefined {
     return this._result;
   }
 
-  private _error?: string;
+  private _error: string | undefined;
   get error(): string | undefined {
     return this._error;
   }
@@ -118,7 +120,7 @@ export class SubagentRun implements RunOutcome {
     return this._startedAt;
   }
 
-  private _completedAt?: number;
+  private _completedAt: number | undefined;
   get completedAt(): number | undefined {
     return this._completedAt;
   }
@@ -126,7 +128,7 @@ export class SubagentRun implements RunOutcome {
   // The question this run ended its turn with, if it declared one. Part of the
   // outcome like _result, and set while the run is under way by ask_parent.
   // Pending until a resume answers it: the run that resume starts replaces this one.
-  private _pendingQuestion?: string;
+  private _pendingQuestion: string | undefined;
   get pendingQuestion(): string | undefined {
     return this._replaced ? undefined : this._pendingQuestion;
   }
@@ -141,14 +143,14 @@ export class SubagentRun implements RunOutcome {
   // What the workspace reported at a teardown with no result text to fold it
   // into. Part of the outcome like _result, and set at the disposal that
   // produced it. Undefined for a run whose addendum rode the result instead.
-  private _workspaceNotice?: string;
+  private _workspaceNotice: string | undefined;
   get workspaceNotice(): string | undefined {
     return this._workspaceNotice;
   }
 
   // The run's turn budget, live: the turn loop reports it before the first turn
   // and after each boundary, so the last report is already the outcome's.
-  private _turnBudget?: TurnBudget;
+  private _turnBudget: TurnBudget | undefined;
   get turnBudget(): TurnBudget | undefined {
     return this._turnBudget;
   }
@@ -165,7 +167,7 @@ export class SubagentRun implements RunOutcome {
   }
 
   // Result delivery — whether the parent has collected this run's outcome.
-  private _consumedAt?: number;
+  private _consumedAt: number | undefined;
   get consumedAt(): number | undefined {
     return this._consumedAt;
   }

@@ -49,8 +49,8 @@ export interface TurnLoopOptions {
 
 /** Session-level facts known at creation, supplied by the factory. */
 export interface SubagentSessionMeta {
-  /** Path to the persisted session JSONL file, if the session was persisted. */
-  outputFile: string | undefined;
+  /** Path to the persisted session JSONL file, absent for a headless session. */
+  outputFile?: string;
   /** Child session id — the registry key carried on session-created/disposed events. */
   sessionId: string;
   /** Child session directory — carried on the completed event as transcript location. */
@@ -61,8 +61,8 @@ export interface SubagentSessionMeta {
    * door. A resume keeps this decision and starts a fresh counter.
    */
   turnPolicy: TurnPolicy;
-  /** Parent context prepended to the first run's prompt, captured at spawn time. */
-  parentContext: string | undefined;
+  /** Parent context prepended to the first run's prompt, absent when none was inherited. */
+  parentContext?: string;
   lifecycle: ChildLifecyclePublisher;
 }
 
@@ -355,14 +355,11 @@ function collectTurnFailure(session: AgentSession) {
 
 /** How the session's last assistant message ended, read from its history. */
 function readLastTurnFailure(session: AgentSession): string | undefined {
-  for (let i = session.messages.length - 1; i >= 0; i--) {
-    const msg = session.messages[i];
-    if (msg.role !== "assistant") continue;
-    if (msg.stopReason !== "error") return undefined;
-
-    return msg.errorMessage || PROVIDER_ERROR_WITHOUT_MESSAGE;
-  }
-  return undefined;
+  // `findLast` walks the history newest-first without an index that could
+  // read past the end, and narrows the message to its assistant variant.
+  const last = session.messages.findLast((msg) => msg.role === "assistant");
+  if (!last || last.stopReason !== "error") return undefined;
+  return last.errorMessage || PROVIDER_ERROR_WITHOUT_MESSAGE;
 }
 
 /** The custom-message type the turn-budget warning is sent as. */
@@ -411,13 +408,11 @@ function collectResponseText(session: AgentSession) {
 
 /** Get the last assistant text from the completed session history. */
 function getLastAssistantText(session: AgentSession): string {
-  for (let i = session.messages.length - 1; i >= 0; i--) {
-    const msg = session.messages[i];
-    if (msg.role !== "assistant") continue;
-    const text = extractText(msg.content).trim();
-    if (text) return text;
-  }
-  return "";
+  const texts = session.messages
+    .filter((msg) => msg.role === "assistant")
+    .map((msg) => extractText(msg.content).trim())
+    .filter((text) => text !== "");
+  return texts.at(-1) ?? "";
 }
 
 /**

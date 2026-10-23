@@ -13,7 +13,7 @@ import {
 } from "#src/lifecycle/turn-limits";
 import type { AgentDetails, Theme } from "#src/ui/display";
 import { formatMs, formatTurnBudget } from "#src/ui/display";
-import { GLYPHS, SPINNER } from "#src/ui/glyphs";
+import { GLYPHS, spinnerAt } from "#src/ui/glyphs";
 
 // ---- Dispatcher ----
 
@@ -38,7 +38,7 @@ export function renderAgentResult(
 
 /** Render running/partial status: spinner + stats + activity line. */
 export function renderRunning(details: AgentDetails, theme: Theme): string {
-  const frame = SPINNER[details.spinnerFrame ?? 0];
+  const frame = spinnerAt(details.spinnerFrame ?? 0);
   const s = renderStats(details, theme);
   let line = theme.fg("accent", frame) + (s ? " " + s : "");
   line +=
@@ -133,7 +133,9 @@ export function renderFailed(details: AgentDetails, theme: Theme): string {
  * for a run that wrapped up at its turn limit.
  */
 export function renderOutcomeIcon(
-  outcome: { status: SubagentStatus; turnBudget?: TurnBudget },
+  // A read view over a live record, so the optional takes an explicit
+  // `undefined` — see the note on `StatusOutcome`.
+  outcome: { status: SubagentStatus; turnBudget?: TurnBudget | undefined },
   theme: Theme,
 ): string {
   if (wrappedUpAtTurnLimit(outcome)) return renderWrappedUpIcon(theme);

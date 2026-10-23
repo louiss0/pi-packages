@@ -6,6 +6,7 @@ import type {
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type {
@@ -226,19 +227,21 @@ export class AgentTool {
       return textResult(resumeRefusalMessage(start.reason, id));
     }
     const queued = start.record.status === "queued";
-    return renderBackgroundLaunch({
-      headline: queued
-        ? "Agent resume queued in background."
-        : "Agent resumed in background.",
-      id: start.record.id,
-      displayName: config.identity.displayName,
-      description: config.execution.description,
-      detailBase: config.presentation.detailBase,
-      outputFile: start.record.outputFile,
-      queuePosition: queued
-        ? { maxConcurrent: this.settings.maxConcurrent }
-        : undefined,
-    });
+    return renderBackgroundLaunch(
+      defined({
+        headline: queued
+          ? "Agent resume queued in background."
+          : "Agent resumed in background.",
+        id: start.record.id,
+        displayName: config.identity.displayName,
+        description: config.execution.description,
+        detailBase: config.presentation.detailBase,
+        outputFile: start.record.outputFile,
+        queuePosition: queued
+          ? { maxConcurrent: this.settings.maxConcurrent }
+          : undefined,
+      }),
+    );
   }
 
   toToolDefinition() {

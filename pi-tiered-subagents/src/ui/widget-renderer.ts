@@ -28,7 +28,7 @@ import {
   type ModelIdentity,
   type Theme,
 } from "#src/ui/display";
-import { GLYPHS, SPINNER } from "#src/ui/glyphs";
+import { GLYPHS, spinnerAt } from "#src/ui/glyphs";
 
 // ── Data interfaces ──────────────────────────────────────────────────────────
 
@@ -40,19 +40,19 @@ export interface WidgetAgent {
   readonly description: string;
   readonly toolUses: number;
   readonly startedAt: number;
-  readonly completedAt?: number;
-  readonly error?: string;
-  readonly lifetimeUsage?: Readonly<LifetimeUsage>;
+  readonly completedAt?: number | undefined;
+  readonly error?: string | undefined;
+  readonly lifetimeUsage?: Readonly<LifetimeUsage> | undefined;
   readonly compactionCount: number;
   // Live activity (folded from the former WidgetActivity — precomputed by AgentWidget)
   /** The run's turn budget; absent until its turn loop starts. */
-  readonly turnBudget?: TurnBudget;
+  readonly turnBudget?: TurnBudget | undefined;
   readonly activeTools: ReadonlyMap<string, string>;
   readonly responseText: string;
   /** Context-window utilisation (0–100), or null when unavailable. */
   readonly contextPercent: number | null;
   /** The model the agent runs, once known. */
-  readonly model?: ModelIdentity;
+  readonly model?: ModelIdentity | undefined;
 }
 
 // ── Per-agent rendering ──────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export function renderRunningLines(
   parts.push(elapsed);
   const statsText = parts.join(" · ");
 
-  const frame = SPINNER[spinnerFrame % SPINNER.length];
+  const frame = spinnerAt(spinnerFrame);
   const activityText = describeActivity(agent.activeTools, agent.responseText);
 
   const header = `${theme.fg("accent", frame)} ${theme.bold(name)}${modelTag(agent, theme)}  ${theme.fg("muted", agent.description)} ${theme.fg("dim", "·")} ${theme.fg("dim", statsText)}`;
@@ -270,15 +270,15 @@ function assembleWithinBudget(
   // Fix last connector: swap ├─ → └─.
   if (lines.length > 1) {
     const last = lines.length - 1;
-    lines[last] = lines[last].replace("\u251C\u2500", "\u2514\u2500");
-    if (runningLines.length > 0 && !queuedLine) {
-      if (last >= 2) {
-        lines[last - 1] = lines[last - 1].replace(
-          "\u251C\u2500",
-          "\u2514\u2500",
-        );
-        lines[last] = lines[last].replace("\u2502  ", "   ");
-      }
+    // Both reads are of an index the loop above just proved in range, so the
+    // guard is on presence rather than on trust.
+    const lastLine = lines[last];
+    const previousLine = lines[last - 1];
+    if (lastLine === undefined) return lines;
+    lines[last] = lastLine.replace("\u251C\u2500", "\u2514\u2500");
+    if (runningLines.length > 0 && !queuedLine && previousLine !== undefined) {
+      lines[last - 1] = previousLine.replace("\u251C\u2500", "\u2514\u2500");
+      lines[last] = (lines[last] ?? lastLine).replace("\u2502  ", "   ");
     }
   }
   return lines;

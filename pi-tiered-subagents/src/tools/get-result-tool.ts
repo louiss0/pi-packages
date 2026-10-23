@@ -5,6 +5,7 @@ import type {
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { RunOutcome } from "#src/lifecycle/subagent-run";
 import {
@@ -134,7 +135,7 @@ export class GetResultTool {
         }
         claim.release();
         return bound?.expired
-          ? { run, waitExpiredAfter: params.timeout }
+          ? defined({ run, waitExpiredAfter: params.timeout })
           : { run };
       } finally {
         bound?.dispose();
@@ -153,31 +154,36 @@ export class GetResultTool {
   ): AgentReport {
     const outcome = collected.run;
     return {
-      id: record.id,
-      displayName: getDisplayName(record.type, this.registry),
-      status: outcome.status,
-      toolUses: record.toolUses,
-      tokens: formatLifetimeTokens(record),
-      contextPercent: record.getContextPercent(),
-      compactionCount: record.compactionCount,
-      duration: formatDuration(outcome.startedAt, outcome.completedAt),
-      description: record.description,
-      result: outcome.result,
-      error: outcome.error,
-      turnBudget: outcome.turnBudget,
-      stoppedWhileQueued: outcome.stoppedWhileQueued,
-      conversation: verbose ? record.getConversation() : undefined,
-      // Transcript pointer: lets the parent read the full session from disk,
-      // and covers verbose after the live session was released (no conversation).
-      transcriptPath: record.outputFile,
-      runUpdates: outcome.runUpdates,
-      pendingQuestion: outcome.pendingQuestion,
+      ...defined({
+        id: record.id,
+        displayName: getDisplayName(record.type, this.registry),
+        status: outcome.status,
+        toolUses: record.toolUses,
+        tokens: formatLifetimeTokens(record),
+        contextPercent: record.getContextPercent(),
+        compactionCount: record.compactionCount,
+        duration: formatDuration(outcome.startedAt, outcome.completedAt),
+        description: record.description,
+        stoppedWhileQueued: outcome.stoppedWhileQueued,
+        resumedWhileWaiting: outcome.replaced,
+        runUpdates: outcome.runUpdates,
+        result: outcome.result,
+        error: outcome.error,
+        turnBudget: outcome.turnBudget,
+        pendingQuestion: outcome.pendingQuestion,
+        workspaceNotice: outcome.workspaceNotice,
+        conversation: verbose ? record.getConversation() : undefined,
+        // Transcript pointer: lets the parent read the full session from disk,
+        // and covers verbose after the live session was released (no conversation).
+        transcriptPath: record.outputFile,
+        waitExpiredAfter: collected.waitExpiredAfter,
+        progress: outcome.status === "running" ? progressOf(record) : undefined,
+      }),
+      // These two stay required-with-a-value: an absent key would read as
+      // "resumable" and "model unknown" by omission, which is exactly the
+      // fail-open each field is documented to close.
       resumeRefusal: record.resumeRefusal,
-      workspaceNotice: outcome.workspaceNotice,
       model: modelLabel(record.model),
-      resumedWhileWaiting: outcome.replaced,
-      waitExpiredAfter: collected.waitExpiredAfter,
-      progress: outcome.status === "running" ? progressOf(record) : undefined,
     };
   }
 
@@ -192,7 +198,7 @@ export class GetResultTool {
     outcome: RunOutcome,
     verbose: boolean,
   ): GetResultDetails {
-    return {
+    return defined({
       agentId: record.id,
       displayName: getDisplayName(record.type, this.registry),
       status: outcome.status,
@@ -202,13 +208,13 @@ export class GetResultTool {
       contextPercent: record.getContextPercent(),
       compactionCount: record.compactionCount,
       duration: formatDuration(outcome.startedAt, outcome.completedAt),
+      verbose,
+      transcriptPath: record.outputFile,
       preview: buildPreview(outcome.result),
       error: outcome.error,
       turnBudget: outcome.turnBudget,
-      verbose,
-      transcriptPath: record.outputFile,
       modelName: modelLabel(record.model),
-    };
+    });
   }
 
   toToolDefinition() {

@@ -5,12 +5,14 @@
  * (stripping non-serializable fields), and session gating.
  */
 
+import { defined } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import { defaultDefinition } from "#src/agents/definition";
 import {
   parseThinkingLevel,
   thinkingLevelError,
 } from "#src/config/thinking-level";
+import type { BackgroundRequest } from "#src/agents/invocation";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type {
   AgentSpawnConfig,
@@ -102,25 +104,27 @@ export class SubagentsServiceAdapter implements SubagentsService {
 
     // The one resolver answers both doors: the caller's own answers, then the
     // definition's, then the automatic routing.
-    const resolution = resolveSpawn({
-      definition:
-        this.resolveDefinition?.(type) ?? defaultDefinition(type, "shipped"),
-      prompt,
-      description: options?.description,
-      requestedModel: options?.model,
-      requestedThinking: this.resolveThinkingLevel(options?.thinkingLevel),
-      requestedMaxTurns: options?.maxTurns,
-      inheritContext: options?.inheritContext,
-      runInBackground:
-        options?.foreground === undefined ? undefined : !options.foreground,
-      modelInfo: {
-        parentModel: this.runtime.currentCtx.model,
-        modelRegistry: this.runtime.currentCtx.modelRegistry,
-        ladders: this.ladders,
-        parentThinkingLevel: this.runtime.currentCtx.thinkingLevel,
-      },
-      settings: this.settings,
-    });
+    const resolution = resolveSpawn(
+      defined({
+        definition:
+          this.resolveDefinition?.(type) ?? defaultDefinition(type, "shipped"),
+        prompt,
+        requestedModel: options?.model,
+        requestedThinking: this.resolveThinkingLevel(options?.thinkingLevel),
+        requestedMaxTurns: options?.maxTurns,
+        inheritContext: options?.inheritContext,
+        runInBackground:
+          options?.foreground === undefined ? undefined : !options.foreground,
+        description: options?.description,
+        modelInfo: defined({
+          parentModel: this.runtime.currentCtx.model,
+          modelRegistry: this.runtime.currentCtx.modelRegistry,
+          parentThinkingLevel: this.runtime.currentCtx.thinkingLevel,
+          ladders: this.ladders,
+        }),
+        settings: this.settings,
+      }),
+    );
     if ("error" in resolution) {
       throw new Error(resolution.error);
     }
@@ -129,25 +133,31 @@ export class SubagentsServiceAdapter implements SubagentsService {
     const snapshot = this.runtime.buildSnapshot(execution.inheritContext);
     const { parentSessionFile, parentSessionId } =
       this.runtime.getSessionInfo();
-    return this.manager.spawn(snapshot, type, prompt, {
-      description: execution.description,
-      model: execution.model,
-      modelSelection: execution.modelSelection,
-      thinkingDecision: execution.thinkingDecision,
-      turnPolicy: execution.turnPolicy,
-      inheritContext: execution.inheritContext,
-      thinkingLevel: execution.thinking,
-      // No toolCallId — an SDK spawn has no originating tool call, and
-      // Subagent.toolCallId reporting undefined there is the truth.
-      parentSession: { parentSessionFile, parentSessionId },
-      // A caller that names `foreground` has committed; one that omits it has
-      // not, so the agent's own frontmatter decides and background is the
-      // SDK-door default.
-      background:
-        options?.foreground === undefined
-          ? { kind: "default", isBackground: true }
-          : { kind: "explicit", isBackground: !options.foreground },
-    });
+    // A caller that names `foreground` has committed; one that omits it has
+    // not, so the agent's own frontmatter decides and background is the
+    // SDK-door default.
+    const background: BackgroundRequest =
+      options?.foreground === undefined
+        ? { kind: "default", isBackground: true }
+        : { kind: "explicit", isBackground: !options.foreground };
+    return this.manager.spawn(
+      snapshot,
+      type,
+      prompt,
+      defined({
+        description: execution.description,
+        modelSelection: execution.modelSelection,
+        thinkingDecision: execution.thinkingDecision,
+        turnPolicy: execution.turnPolicy,
+        inheritContext: execution.inheritContext,
+        // No toolCallId — an SDK spawn has no originating tool call, and
+        // Subagent.toolCallId reporting undefined there is the truth.
+        parentSession: { parentSessionFile, parentSessionId },
+        background,
+        model: execution.model,
+        thinkingLevel: execution.thinking,
+      }),
+    );
   }
 
   getRecord(id: string): SubagentRecord | undefined {
@@ -177,13 +187,17 @@ export class SubagentsServiceAdapter implements SubagentsService {
     prompt: string,
     options?: ResumeOptions,
   ): Promise<ResumeResult> {
-    const outcome = await this.manager.resume(id, prompt, {
-      // Nothing in the parent's turn waits on a service resume, so it runs in
-      // the background, as a service spawn does by default.
-      background: true,
-      claimOutcome: options?.claimOutcome,
-      signal: options?.signal,
-    });
+    const outcome = await this.manager.resume(
+      id,
+      prompt,
+      defined({
+        // Nothing in the parent's turn waits on a service resume, so it runs in
+        // the background, as a service spawn does by default.
+        background: true,
+        claimOutcome: options?.claimOutcome,
+        signal: options?.signal,
+      }),
+    );
     // A refusal is the same value on both sides; only the resumed arm crosses
     // the by-value boundary the snapshot draws.
     return outcome.kind === "refused"

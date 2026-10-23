@@ -17,6 +17,8 @@ import {
 
 /** The data a get_subagent_result report renders from — only what the formatter reads. */
 export interface AgentReport {
+  // A read view over a live record: every optional also takes an explicit
+  // `undefined`, so a fixture can clear a defaulted field in one call.
   id: string;
   displayName: string;
   status: SubagentStatus;
@@ -28,39 +30,40 @@ export interface AgentReport {
   /** Pre-formatted duration string. */
   duration: string;
   description: string;
-  result: string | undefined;
-  error: string | undefined;
+  /** The result text, absent when the run produced none. */
+  result?: string | undefined;
+  error?: string | undefined;
   /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget;
+  turnBudget?: TurnBudget | undefined;
   /** Whether the agent was stopped before the limiter ever admitted it. */
   stoppedWhileQueued: boolean;
   /** Present only when verbose was requested and a conversation is available. */
-  conversation?: string;
+  conversation?: string | undefined;
   /** Persisted transcript path; rendered as a pointer so the parent can read it directly. */
-  transcriptPath?: string;
+  transcriptPath?: string | undefined;
   /** The updates the agent sent while this call's carrier held the outcome. */
-  runUpdates?: readonly string[];
+  runUpdates?: readonly string[] | undefined;
   /** The question the agent ended its turn with, when it declared one. */
-  pendingQuestion?: string;
+  pendingQuestion?: string | undefined;
   /**
    * Why a resume would be refused; undefined when one would be accepted.
    * Required, for the reason `OutcomeAddenda` gives.
    */
   resumeRefusal: ResumeRefusal | undefined;
   /** Where a teardown with no result text to carry it saved the agent's work. */
-  workspaceNotice?: string;
+  workspaceNotice?: string | undefined;
   /**
-   * The model's `provider/id`; undefined while an inherited model is still unknown.
+   * The model's `provider/id`; absent while an inherited model is still unknown.
    * Required, so a report builder cannot leave it out by omission.
    */
   model: string | undefined;
   /**
    * The run this report describes was replaced by a resume before the call's
-   * wait returned, so the agent is running again.
+   * wait returned, so the agent is running again. Absent when it was not.
    */
   resumedWhileWaiting?: boolean;
   /** The bound, in seconds, of a wait that ended at it with the agent still queued or running. */
-  waitExpiredAfter?: number;
+  waitExpiredAfter?: number | undefined;
   /** What a running agent is doing and when it last moved; absent for any other status. */
   progress?: ReportProgress;
 }

@@ -29,6 +29,7 @@ import {
   type TurnPolicy,
 } from "#src/lifecycle/turn-limits";
 import type { SubagentType, ThinkingLevel } from "#src/types";
+import { defined } from "#src/optional";
 import {
   type AgentDetails,
   buildInvocationTags,
@@ -37,8 +38,10 @@ import {
 
 /** Model info extracted from the parent session context. */
 export interface ModelInfo {
-  parentModel: Model<any> | undefined;
-  modelRegistry: ModelRegistry | undefined;
+  /** The parent model, when the parent is running one. */
+  parentModel?: Model<any>;
+  /** The registry to resolve names against, when the parent has one. */
+  modelRegistry?: ModelRegistry;
   /** The routing ladders the automatic model selection walks. */
   ladders: RoutingLadders;
   /** The effort the parent was running at, when the parent has one. */
@@ -58,7 +61,8 @@ export interface SpawnIdentity {
 export interface SpawnExecution {
   prompt: string;
   description: string;
-  model: Model<any> | undefined;
+  /** The resolved model, when the launch has one. */
+  model?: Model<any>;
   /** How the model was chosen, and why. */
   modelSelection: ModelSelection;
   /** The reasoning level, and what was decided about it. */
@@ -71,7 +75,8 @@ export interface SpawnExecution {
    * operator's default cannot alter accepted work.
    */
   turnPolicy: TurnPolicy;
-  thinking: ThinkingLevel | undefined;
+  /** The reasoning level, when the child reasons at one. */
+  thinking?: ThinkingLevel;
   inheritContext: boolean;
   runInBackground: boolean;
 }
@@ -154,18 +159,20 @@ export function resolveSpawn(
   // The doors narrow the level before it reaches this merge; one they cannot
   // narrow is rejected there rather than clamped by the SDK down to "off".
   const resolvedInvocation = resolveInvocation(request.definition, {
-    model: request.requestedModel,
-    thinking: request.requestedThinking,
-    maxTurns: request.requestedMaxTurns,
-    inheritContext: request.inheritContext,
-    runInBackground: request.runInBackground,
+    ...defined({
+      model: request.requestedModel,
+      thinking: request.requestedThinking,
+      maxTurns: request.requestedMaxTurns,
+      inheritContext: request.inheritContext,
+      runInBackground: request.runInBackground,
+    }),
   });
 
   // Resolve the model and the reasoning level, through the same resolver the
   // invocation merge answers for: the request's own choice, then the
   // definition's, then the automatic step down the parent's ladder.
   const launch = resolveLaunchModel(
-    {
+    defined({
       requestedModel: resolvedInvocation.modelFromParams
         ? resolvedInvocation.model
         : undefined,
@@ -174,12 +181,14 @@ export function resolveSpawn(
         : resolvedInvocation.model,
       requestedThinking: request.requestedThinking,
       definitionThinking: resolvedInvocation.thinking,
-    },
+    }),
     {
       registry: request.modelInfo.modelRegistry,
       ladders: request.modelInfo.ladders,
-      parentModel: request.modelInfo.parentModel,
-      parentThinkingLevel: request.modelInfo.parentThinkingLevel,
+      ...defined({
+        parentModel: request.modelInfo.parentModel,
+        parentThinkingLevel: request.modelInfo.parentThinkingLevel,
+      }),
     },
   );
   if (!launch.ok) return { error: launch.error };
@@ -193,17 +202,21 @@ export function resolveSpawn(
   // the operator's default, captured here so a later default change reaches
   // only the next launch.
   const turnPolicy = resolveTurnPolicy({
-    resolvedMaxTurns: resolvedInvocation.maxTurns,
-    defaultMaxTurns: request.settings.defaultMaxTurns,
+    ...defined({
+      resolvedMaxTurns: resolvedInvocation.maxTurns,
+      defaultMaxTurns: request.settings.defaultMaxTurns,
+    }),
     wrapUpTurns: request.settings.wrapUpTurns,
   });
 
-  const { tags: invocationTags } = buildInvocationTags({
-    thinking,
-    maxTurns: resolvedInvocation.maxTurns,
-    inheritContext,
-    runInBackground,
-  });
+  const { tags: invocationTags } = buildInvocationTags(
+    defined({
+      thinking,
+      inheritContext,
+      runInBackground,
+      maxTurns: resolvedInvocation.maxTurns,
+    }),
+  );
   const agentTags = invocationTags;
 
   const subagentType = request.definition.id;
@@ -225,13 +238,12 @@ export function resolveSpawn(
     execution: {
       prompt: request.prompt,
       description,
-      model,
       modelSelection,
       thinkingDecision,
       turnPolicy,
-      thinking,
       inheritContext,
       runInBackground,
+      ...defined({ model, thinking }),
     },
     presentation: {
       agentTags,
@@ -239,8 +251,10 @@ export function resolveSpawn(
         displayName,
         description,
         subagentType,
-        modelName,
-        tags: agentTags.length > 0 ? agentTags : undefined,
+        ...defined({
+          modelName,
+          tags: agentTags.length > 0 ? agentTags : undefined,
+        }),
       },
     },
   };
