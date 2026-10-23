@@ -29,6 +29,7 @@ import {
   writeJson,
   writeNumber,
 } from "#src/shared-settings";
+import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { PromptInheritance } from "#src/types";
 export interface SubagentsSettings {
   maxConcurrent?: number;
@@ -239,6 +240,19 @@ export class SettingsManager {
   promptInheritanceFor(provider: string | undefined): PromptInheritance {
     if (provider === undefined) return "full";
     return this._promptInheritance[provider] ?? "full";
+  }
+
+  /**
+   * The child-shaping settings as one copied value, for capture at launch
+   * preparation. Operational settings (concurrency, retention, interrupt
+   * policy) are read live by the manager and are not part of this snapshot.
+   */
+  captureChildShaping(): ChildShapingSettings {
+    return {
+      midRunUpdates: this._midRunUpdates,
+      excludedExtensionPackages: [...this._excludedExtensionPackages],
+      promptInheritance: { ...this._promptInheritance },
+    };
   }
 
   // ── Lifecycle methods ──

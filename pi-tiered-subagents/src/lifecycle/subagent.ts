@@ -10,6 +10,7 @@
 import { debugLog } from "#src/debug";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition } from "#src/agents/definition";
+import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type {
   AgentSessionEvent,
   ToolDefinition,
@@ -130,6 +131,12 @@ export interface SubagentExecution {
   model?: Model<any>;
   /** The definition selected by preparation; execution must not reload it. */
   definition?: AgentDefinition;
+  /**
+   * The child-shaping settings captured with the launch, when the door
+   * prepared one. Preferred over the live run config and the live
+   * prompt-inheritance resolver at execution.
+   */
+  childShaping?: ChildShapingSettings;
   /**
    * The run's turn ceiling, resolved once at the door.
    *
@@ -575,7 +582,12 @@ export class Subagent {
       }
     }
 
-    const runConfig = this.execution.getRunConfig?.();
+    // A captured decision wins over the live read: a queued child keeps the
+    // update policy in force when it was asked for (story 56). Only internal
+    // callers that never went through preparation fall back to the live config.
+    const runConfig = this.execution.childShaping
+      ? { midRunUpdates: this.execution.childShaping.midRunUpdates }
+      : this.execution.getRunConfig?.();
     let session: SubagentSession;
     try {
       session = await this.execution.createSubagentSession(
@@ -598,6 +610,7 @@ export class Subagent {
             : undefined,
           turnPolicy: this.execution.turnPolicy,
           definition: this.execution.definition,
+          childShaping: this.execution.childShaping,
           toolNames: this.execution.toolNames,
         }),
       );

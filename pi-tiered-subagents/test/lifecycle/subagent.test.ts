@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { defined } from "#src/optional";
+import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import {
   Subagent,
@@ -184,6 +185,7 @@ function createRunnableAgent(overrides?: {
   createSubagentSession?: SessionFactory;
   observer?: SubagentLifecycleObserver;
   getRunConfig?: () => RunConfig;
+  childShaping?: ChildShapingSettings;
   parentSession?: {
     toolCallId?: string;
     parentSessionFile?: string;
@@ -209,6 +211,7 @@ function createRunnableAgent(overrides?: {
       snapshot: STUB_SNAPSHOT,
       prompt: "do something",
       getRunConfig: overrides?.getRunConfig,
+      childShaping: overrides?.childShaping,
       turnPolicy: overrides?.turnPolicy ?? UNLIMITED_TURNS,
       parentSession: overrides?.parentSession,
       signal: overrides?.signal,
@@ -1281,6 +1284,26 @@ describe("Subagent", () => {
       await agent.run();
 
       expect(params().notifyParent).toBeTypeOf("function");
+    });
+
+    it("prefers the launch-captured update policy over the live run config", async () => {
+      const { factory, params } = createFactory();
+      const agent = createRunnableAgent({
+        createSubagentSession: factory,
+        isBackground: true,
+        // The live config says on; the launch captured off. The capture wins,
+        // because a queued child keeps the policy it was asked under (story 56).
+        getRunConfig: () => updatesOn,
+        childShaping: {
+          midRunUpdates: false,
+          excludedExtensionPackages: [],
+          promptInheritance: {},
+        },
+      });
+
+      await agent.run();
+
+      expect(params().notifyParent).toBeUndefined();
     });
 
     it("reports a background child's update to the lifecycle observer", async () => {

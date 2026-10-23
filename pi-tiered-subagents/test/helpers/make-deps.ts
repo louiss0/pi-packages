@@ -106,6 +106,11 @@ export function createToolDeps(
     reload: () => fixture.registry.reload(),
     modelInfo: () => fixture.runtime.getModelInfo(),
     turnSettings: () => fixture.settings,
+    childShaping: () => ({
+      midRunUpdates: true,
+      excludedExtensionPackages: [],
+      promptInheritance: {},
+    }),
   });
   return {
     ...fixture,

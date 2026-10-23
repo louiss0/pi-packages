@@ -54,6 +54,11 @@ function createPreparer(registry: AgentRegistry, modelInfo: () => ModelInfo) {
       defaultMaxTurns: undefined,
       wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
     }),
+    childShaping: () => ({
+      midRunUpdates: true,
+      excludedExtensionPackages: [],
+      promptInheritance: {},
+    }),
   });
 }
 
@@ -220,6 +225,38 @@ describe("the assembler's tool selection", () => {
       { isGitRepo: false, branch: "", platform: "linux" },
       expect.anything(),
       assemblerIO.loadProjectContext,
+    );
+  });
+
+  it("takes the prompt-inheritance strategy from the launch capture, not the live resolver", () => {
+    const ctx = {
+      ...base,
+      modelRegistry,
+      parentModel: makeModel({ provider: "anthropic", id: "claude-sonnet-5" }),
+      childShaping: {
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: { anthropic: "portable" as const },
+      },
+      // The live resolver says "full"; the capture says "portable". The
+      // capture wins: a queued child keeps the policy it was asked under.
+      resolvePromptInheritance: () => "full" as const,
+    };
+    assembleSessionConfig(
+      "worker",
+      ctx,
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("worker", {}),
+      assemblerIO,
+    );
+
+    expect(assemblerIO.buildAgentPrompt).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ strategy: "portable" }),
+      expect.anything(),
     );
   });
 });

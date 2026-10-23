@@ -186,14 +186,43 @@ describe("createSubagentSession — assembly", () => {
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
+    // No capture on this path: the second argument is present-but-undefined,
+    // telling the factory to read the current setting as before.
     expect(io.createLoaderSettingsManager).toHaveBeenCalledWith(
       sessionSettings,
+      undefined,
     );
     expect(io.createResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ settingsManager: loaderSettings }),
     );
     expect(io.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ settingsManager: sessionSettings }),
+    );
+  });
+
+  it("hands the launch-captured exclusion list to the loader settings view", async () => {
+    const sessionSettings = { marker: "session" };
+    io.createSettingsManager.mockReturnValue(sessionSettings);
+
+    await createSubagentSession(
+      {
+        snapshot: STUB_SNAPSHOT,
+        type: "Explore",
+        turnPolicy: UNLIMITED_TURNS,
+        childShaping: {
+          midRunUpdates: true,
+          excludedExtensionPackages: ["captured-package"],
+          promptInheritance: {},
+        },
+      },
+      createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
+    );
+
+    // The list travels with the launch: the factory passes it on rather than
+    // letting the composition root read the current setting at creation time.
+    expect(io.createLoaderSettingsManager).toHaveBeenCalledWith(
+      sessionSettings,
+      ["captured-package"],
     );
   });
 

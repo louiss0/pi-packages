@@ -22,7 +22,7 @@ import {
   thinkingLevelError,
 } from "#src/config/thinking-level";
 import { defined } from "#src/optional";
-import type { SubagentType } from "#src/types";
+import type { PromptInheritance, SubagentType } from "#src/types";
 
 /** Caller-specific names translated into one preparation request. */
 export interface LaunchRequest {
@@ -41,6 +41,39 @@ export interface LaunchRequest {
 export interface PreparedLaunch {
   readonly definition: AgentDefinition;
   readonly config: ResolvedSpawnConfig;
+  /**
+   * The child-shaping settings in force when the request was made.
+   *
+   * Operational controls (concurrency, retention, interrupt policy) stay
+   * live; these three shape what a child *is*, so a queued child keeps the
+   * policy it was asked under rather than adopting a later edit
+   * (ARCHITECTURE-SPEC stories 56 and 57).
+   */
+  readonly childShaping: ChildShapingSettings;
+}
+
+/**
+ * The settings that shape a child, captured with the launch.
+ *
+ * Copied at capture: the excluded list and the inheritance record are fresh
+ * arrays/objects, so later settings edits reach only the next launch.
+ */
+export interface ChildShapingSettings {
+  /** Whether a background child gets the `notify_parent` channel. */
+  readonly midRunUpdates: boolean;
+  /** The extension packages the child's resource loader must not resolve. */
+  readonly excludedExtensionPackages: readonly string[];
+  /** Per-provider prompt-inheritance strategy; unlisted providers inherit "full". */
+  readonly promptInheritance: Readonly<Record<string, PromptInheritance>>;
+}
+
+/** Resolve the strategy a child on `provider` adopts from captured settings. */
+export function capturedPromptInheritance(
+  captured: ChildShapingSettings,
+  provider: string | undefined,
+): PromptInheritance {
+  if (provider === undefined) return "full";
+  return captured.promptInheritance[provider] ?? "full";
 }
 
 /** Expected failures while preparing a caller request. */
@@ -68,6 +101,8 @@ export interface LaunchPreparerDeps {
   readonly modelInfo: () => ModelInfo;
   /** Operator turn defaults are captured with this request. */
   readonly turnSettings: () => TurnSettings;
+  /** Child-shaping settings are captured with this request. */
+  readonly childShaping: () => ChildShapingSettings;
 }
 
 export class LaunchPreparer {
@@ -126,8 +161,24 @@ export class LaunchPreparer {
       };
     }
 
-    return { kind: "prepared", value: { definition, config } };
+    const childShaping = copyChildShaping(this.deps.childShaping());
+
+    return {
+      kind: "prepared",
+      value: { definition, config, childShaping },
+    };
   }
+}
+
+/** Copy nested child-shaping values: a prepared launch cannot track settings edits. */
+function copyChildShaping(
+  captured: ChildShapingSettings,
+): ChildShapingSettings {
+  return {
+    midRunUpdates: captured.midRunUpdates,
+    excludedExtensionPackages: [...captured.excludedExtensionPackages],
+    promptInheritance: { ...captured.promptInheritance },
+  };
 }
 
 /** Copy nested definition values: a prepared launch cannot track registry edits. */

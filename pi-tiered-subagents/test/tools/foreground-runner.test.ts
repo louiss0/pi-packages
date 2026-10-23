@@ -22,6 +22,11 @@ function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
     overrides.config ?? createResolvedSpawnConfig({ description: "fg task" });
   const launch: PreparedSubagentsLaunch = overrides.launch ?? {
     config,
+    childShaping: {
+      midRunUpdates: true,
+      excludedExtensionPackages: [],
+      promptInheritance: {},
+    },
     snapshot: STUB_SNAPSHOT,
     parentSession: {
       parentSessionFile: "/sessions/parent.jsonl",

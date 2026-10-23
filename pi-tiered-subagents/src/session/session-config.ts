@@ -14,6 +14,10 @@ import type { Model } from "@earendil-works/pi-ai";
 import { defined } from "#src/optional";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { AgentDefinition } from "#src/agents/definition";
+import {
+  capturedPromptInheritance,
+  type ChildShapingSettings,
+} from "#src/agents/launch-preparer";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
 import type { ModelRegistry } from "#src/models/registry";
@@ -74,6 +78,12 @@ export interface AssemblerContext {
   ) => PromptInheritance;
   /** The definition captured by preparation; absent only for direct assembler callers. */
   definition?: AgentDefinition;
+  /**
+   * The child-shaping settings captured with the launch. When present, the
+   * prompt-inheritance strategy comes from this record rather than the live
+   * resolver — a queued child keeps the policy it was asked under.
+   */
+  childShaping?: ChildShapingSettings;
   /** Parent's current model instance (fallback when agent config has no model). */
   parentModel?: Model<any>;
   /** Model registry for resolving config.model strings. */
@@ -215,7 +225,9 @@ function assembleWithDefinition(
     {
       systemPrompt: ctx.parentSystemPrompt,
       cwd: ctx.cwd,
-      strategy: ctx.resolvePromptInheritance?.(model?.provider) ?? "full",
+      strategy: ctx.childShaping
+        ? capturedPromptInheritance(ctx.childShaping, model?.provider)
+        : (ctx.resolvePromptInheritance?.(model?.provider) ?? "full"),
       ...defined({ portablePrompt: ctx.parentPortablePrompt }),
     },
     io.loadProjectContext,

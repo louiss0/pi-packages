@@ -1,0 +1,25 @@
+feat(pi-tiered-subagents): capture child-shaping settings with the launch
+
+Three settings decide what a child is: whether it gets the mid-run
+update channel, which extension packages its resource loader must not
+resolve, and which prompt-inheritance strategy its provider adopts. All
+three used to be read when the child's session was created, so a child
+queued behind a concurrency slot adopted whatever the settings said at
+that later moment, not what they said when it was asked for.
+
+Now LaunchPreparer captures them with the request, copies them, and the
+capture travels with the prepared launch to execution. A run's update
+policy comes from the capture rather than the live run config; the
+assembler resolves prompt inheritance from the captured per-provider
+record rather than the live resolver; and the session factory hands the
+captured exclusion list to the loader settings view, with the
+composition root falling back to the current setting only for callers
+that never went through preparation.
+
+Operational controls (concurrency, retention, interrupt policy) stay
+live, as the specification's read-contract table says they should.
+
+Tests pin the capture in four places: preparation keeps the values in
+force at request time, execution prefers the capture over a live config
+that disagrees, the assembler takes the strategy from the capture, and
+the factory forwards the captured exclusion list. 2,284 tests passing.

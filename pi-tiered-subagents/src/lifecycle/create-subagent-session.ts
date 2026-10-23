@@ -20,6 +20,10 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinition } from "#src/agents/definition";
+import {
+  capturedPromptInheritance,
+  type ChildShapingSettings,
+} from "#src/agents/launch-preparer";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { SUBAGENT_TOOL_NAMES } from "#src/agents/definition";
 import { debugNote } from "#src/debug";
@@ -143,7 +147,10 @@ export interface SessionFactoryIO {
    * The composition root decides whether any package extensions are excluded;
    * the identity function reproduces the child's default full inheritance.
    */
-  createLoaderSettingsManager: (parent: SettingsManager) => SettingsManager;
+  createLoaderSettingsManager: (
+    parent: SettingsManager,
+    excludedExtensionPackages?: readonly string[],
+  ) => SettingsManager;
   createSession: (
     opts: CreateSessionOptions,
   ) => Promise<{ session: AgentSession }>;
@@ -208,6 +215,8 @@ export interface CreateSubagentSessionParams {
   turnPolicy: TurnPolicy;
   /** The definition captured by preparation; execution must not reselect it. */
   definition?: AgentDefinition;
+  /** The child-shaping settings captured with the launch, when the door prepared one. */
+  childShaping?: ChildShapingSettings;
   /**
    * The tools the child was given, resolved when the request was made.
    *
@@ -262,8 +271,12 @@ export async function createSubagentSession(
       modelRegistry: snapshot.modelRegistry,
       activeToolNames: snapshot.activeToolNames,
       definition: params.definition,
+      childShaping: params.childShaping,
       toolNames: params.toolNames,
-      resolvePromptInheritance: deps.resolvePromptInheritance,
+      resolvePromptInheritance: params.childShaping
+        ? (provider: string | undefined) =>
+            capturedPromptInheritance(params.childShaping!, provider)
+        : deps.resolvePromptInheritance,
       parentPortablePrompt: snapshot.portablePrompt,
     }),
     defined({
@@ -291,7 +304,10 @@ export async function createSubagentSession(
     cfg.effectiveCwd,
     agentDir,
   );
-  const loaderSettings = deps.io.createLoaderSettingsManager(sessionSettings);
+  const loaderSettings = deps.io.createLoaderSettingsManager(
+    sessionSettings,
+    params.childShaping?.excludedExtensionPackages,
+  );
 
   // Children inherit the parent's skills and every extension the composition
   // root did not exclude (#696), plus the Pi built-ins their tools call for —

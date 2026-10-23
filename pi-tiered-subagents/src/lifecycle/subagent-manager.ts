@@ -16,6 +16,7 @@ import {
 } from "#src/agents/invocation";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { AgentDefinition, ToolSelection } from "#src/agents/definition";
+import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelSelection } from "#src/models/selection";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { AgentSelection } from "#src/agents/registry";
@@ -258,6 +259,12 @@ export interface AgentSpawnConfig {
   description: string;
   /** Definition selected and copied by LaunchPreparer; absent only for internal legacy callers. */
   definition?: AgentDefinition;
+  /**
+   * The child-shaping settings captured with the launch (story 56). When
+   * present, execution uses these instead of the live run config, so a
+   * queued child keeps the update policy it was asked under.
+   */
+  childShaping?: ChildShapingSettings;
   model?: Model<any>;
   /**
    * The run's turn ceiling, resolved once by the door that prepared the launch.
@@ -661,6 +668,7 @@ export class SubagentManager {
         getWorkspaceProvider: () => this._workspaceProvider,
         turnPolicy: options.turnPolicy,
         definition,
+        ...defined({ childShaping: options.childShaping }),
         toolNames,
         ...defined({
           getRunConfig: this.getRunConfig,

@@ -38,6 +38,11 @@ function makeParams(
   const config = overrides.config ?? makeConfig();
   const launch = overrides.launch ?? {
     config,
+    childShaping: {
+      midRunUpdates: true,
+      excludedExtensionPackages: [],
+      promptInheritance: {},
+    },
     snapshot: STUB_SNAPSHOT,
     parentSession: overrides.parentSession ?? {
       parentSessionFile: "/sessions/parent.jsonl",

@@ -4,6 +4,7 @@ import { defaultDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { AgentRegistry } from "#src/agents/registry";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
+import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelInfo, TurnSettings } from "#src/agents/resolver";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
@@ -24,6 +25,7 @@ function makePreparer(
     reload?: () => void;
     modelInfo?: () => ModelInfo;
     turnSettings?: () => TurnSettings;
+    childShaping?: () => ChildShapingSettings;
   } = {},
 ): LaunchPreparer {
   return new LaunchPreparer({
@@ -35,6 +37,13 @@ function makePreparer(
       (() => ({
         defaultMaxTurns: undefined,
         wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      })),
+    childShaping:
+      options.childShaping ??
+      (() => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
       })),
   });
 }
@@ -142,6 +151,34 @@ describe("LaunchPreparer", () => {
       expect(outcome.value.config.identity.definition.tools).toEqual({
         kind: "explicit",
         names: ["read"],
+      });
+    }
+  });
+
+  it("captures child-shaping settings so later edits reach only the next launch", () => {
+    const registry = registryWithWorker();
+    let captured: ChildShapingSettings = {
+      midRunUpdates: true,
+      excludedExtensionPackages: ["old-package"],
+      promptInheritance: { anthropic: "portable" as const },
+    };
+    const preparer = makePreparer(registry, {
+      childShaping: () => captured,
+    });
+
+    const outcome = preparer.prepare(request());
+    captured = {
+      midRunUpdates: false,
+      excludedExtensionPackages: ["new-package"],
+      promptInheritance: {},
+    };
+
+    expect(outcome.kind).toBe("prepared");
+    if (outcome.kind === "prepared") {
+      expect(outcome.value.childShaping).toEqual({
+        midRunUpdates: true,
+        excludedExtensionPackages: ["old-package"],
+        promptInheritance: { anthropic: "portable" },
       });
     }
   });

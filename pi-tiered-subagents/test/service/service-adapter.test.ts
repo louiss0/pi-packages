@@ -344,6 +344,11 @@ function makeServiceAdapter(
       defaultMaxTurns: undefined,
       wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
     }),
+    childShaping: () => ({
+      midRunUpdates: true,
+      excludedExtensionPackages: [],
+      promptInheritance: {},
+    }),
   });
   return new SubagentsServiceAdapter(
     manager,

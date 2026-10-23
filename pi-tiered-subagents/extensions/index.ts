@@ -227,6 +227,7 @@ export default function (pi: ExtensionAPI) {
     },
     modelInfo: () => runtime.getModelInfo(),
     turnSettings: () => settings,
+    childShaping: () => settings.captureChildShaping(),
   });
 
   // Observer: receives agent lifecycle notifications and dispatches events/notifications.
@@ -252,8 +253,13 @@ export default function (pi: ExtensionAPI) {
       createSettingsManager: (cwd, dir) => SdkSettingsManager.create(cwd, dir),
       // The exclusion policy is resolved here, at the composition root, so the
       // assembly factory stays free of it and gets a ready-made settings view.
-      createLoaderSettingsManager: (parent) => {
-        const excluded = new Set(settings.excludedExtensionPackages);
+      createLoaderSettingsManager: (parent, capturedExcluded) => {
+        // A launch prepared through the shared seam carries its excluded
+        // package list with it (story 56); children of older callers read the
+        // current setting, as before.
+        const excluded = new Set(
+          capturedExcluded ?? settings.excludedExtensionPackages,
+        );
         if (excluded.size === 0) return parent;
         return SdkSettingsManager.fromStorage(
           createExcludedPackagesStorage(parent, excluded),

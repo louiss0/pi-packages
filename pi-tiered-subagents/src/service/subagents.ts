@@ -9,6 +9,7 @@
  */
 
 import type {
+  ChildShapingSettings,
   LaunchPreparer,
   LaunchRequest,
   PreparedLaunch,
@@ -56,6 +57,7 @@ export interface SubagentsManager {
 export interface PreparedSubagentsLaunch {
   readonly owner: SessionOwner;
   readonly config: PreparedLaunch["config"];
+  readonly childShaping: ChildShapingSettings;
   readonly snapshot: ParentSnapshot;
   readonly parentSession: ParentSessionInfo;
 }
@@ -120,7 +122,13 @@ export class Subagents {
 
     return {
       kind: "prepared",
-      value: { owner, config, snapshot, parentSession },
+      value: {
+        owner,
+        config,
+        childShaping: prepared.value.childShaping,
+        snapshot,
+        parentSession,
+      },
     };
   }
 
@@ -141,6 +149,7 @@ export class Subagents {
       parentSession: launch.parentSession,
       background,
       owner: launch.owner,
+      childShaping: launch.childShaping,
       ...defined({
         model: execution.model,
         thinkingLevel: execution.thinking,
@@ -170,6 +179,7 @@ export class Subagents {
       inheritContext: execution.inheritContext,
       parentSession: launch.parentSession,
       owner: launch.owner,
+      childShaping: launch.childShaping,
       ...defined({
         model: execution.model,
         thinkingLevel: execution.thinking,
