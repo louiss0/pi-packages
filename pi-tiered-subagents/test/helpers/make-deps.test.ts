@@ -101,16 +101,16 @@ describe("createToolDeps", () => {
   });
 
   describe("structural compatibility", () => {
-    it("manager satisfies BackgroundManagerDeps structurally", () => {
-      const { manager } = createToolDeps();
-      const bgManager: BackgroundManagerDeps = manager;
+    it("Subagents satisfies BackgroundManagerDeps structurally", () => {
+      const { subagents } = createToolDeps();
+      const bgManager: BackgroundManagerDeps = subagents;
       expect(bgManager.spawn).toBeTypeOf("function");
       expect(bgManager.getRecord).toBeTypeOf("function");
     });
 
-    it("manager satisfies ForegroundManagerDeps structurally", () => {
-      const { manager } = createToolDeps();
-      const fgManager: ForegroundManagerDeps = manager;
+    it("Subagents satisfies ForegroundManagerDeps structurally", () => {
+      const { subagents } = createToolDeps();
+      const fgManager: ForegroundManagerDeps = subagents;
       expect(fgManager.spawnAndWait).toBeTypeOf("function");
     });
   });

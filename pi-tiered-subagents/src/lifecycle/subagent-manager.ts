@@ -15,7 +15,7 @@ import {
   resolveBackgroundMode,
 } from "#src/agents/invocation";
 import { resolveChildToolNames } from "#src/agents/definition";
-import type { ToolSelection } from "#src/agents/definition";
+import type { AgentDefinition, ToolSelection } from "#src/agents/definition";
 import type { ModelSelection } from "#src/models/selection";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { AgentSelection } from "#src/agents/registry";
@@ -110,6 +110,8 @@ export type ResumeCallOptions = ResumeRunOptions;
 interface ResolvedSpawn {
   type: SubagentType;
   isBackground: boolean;
+  /** The exact definition selected during preparation. */
+  definition: AgentDefinition;
   /** The tools the child will get — the basis of its workspace impact. */
   tools: ToolSelection;
 }
@@ -254,6 +256,8 @@ export interface SubagentManagerOptions {
 
 export interface AgentSpawnConfig {
   description: string;
+  /** Definition selected and copied by LaunchPreparer; absent only for internal legacy callers. */
+  definition?: AgentDefinition;
   model?: Model<any>;
   /**
    * The run's turn ceiling, resolved once by the door that prepared the launch.
@@ -519,7 +523,11 @@ export class SubagentManager {
     prompt: string,
     options: AgentSpawnConfig,
   ): LaunchOutcome<string> {
-    const resolved = this.resolveSpawn(type, options.background);
+    const resolved = this.resolveSpawn(
+      type,
+      options.background,
+      options.definition,
+    );
     if (resolved.kind === "rejected") return resolved;
     return this.create(snapshot, resolved.value, prompt, options);
   }
@@ -546,7 +554,7 @@ export class SubagentManager {
       kind: "explicit",
       isBackground: false,
     };
-    const resolved = this.resolveSpawn(type, foreground);
+    const resolved = this.resolveSpawn(type, foreground, options.definition);
     if (resolved.kind === "rejected") return resolved;
     const started = this.create(snapshot, resolved.value, prompt, {
       ...options,
@@ -575,22 +583,26 @@ export class SubagentManager {
   private resolveSpawn(
     type: string,
     background: BackgroundRequest,
+    preparedDefinition?: AgentDefinition,
   ): LaunchOutcome<ResolvedSpawn> {
-    // Refresh first: a definition file added since the last spawn is a fact
-    // that arrives after the extension loads.
-    this.reloadDefinitions?.();
-    const selection = this.registry.select(type);
-    if (!selection.ok) {
-      // The registry distinguishes an unknown type from a disabled one, so the
-      // reason travels as a value rather than being recovered from the prose.
-      return { kind: "rejected", reason: selection.reason };
+    let definition = preparedDefinition;
+    if (!definition) {
+      // Internal callers that have not moved to LaunchPreparer still use the
+      // manager's checked path. The extension's two launch doors always pass
+      // the definition selected by the shared preparer.
+      this.reloadDefinitions?.();
+      const selection = this.registry.select(type);
+      if (!selection.ok) {
+        return { kind: "rejected", reason: selection.reason };
+      }
+      definition = selection.definition;
     }
-    const definition = selection.definition;
     return {
       kind: "accepted",
       value: {
         type: definition.id,
         isBackground: resolveBackgroundMode(definition, background),
+        definition,
         tools: definition.tools,
       },
     };
@@ -609,7 +621,7 @@ export class SubagentManager {
     if (!this.accepts(options.owner)) {
       return { kind: "rejected", reason: "session-ended" };
     }
-    const { type, isBackground } = resolved;
+    const { type, isBackground, definition } = resolved;
     const id = randomUUID().slice(0, 17);
     // The tools this child will have, resolved once, here: the definition's
     // selection against the parent's active tools as they were when the
@@ -648,6 +660,7 @@ export class SubagentManager {
         observer: this.buildObserver(options),
         getWorkspaceProvider: () => this._workspaceProvider,
         turnPolicy: options.turnPolicy,
+        definition,
         toolNames,
         ...defined({
           getRunConfig: this.getRunConfig,

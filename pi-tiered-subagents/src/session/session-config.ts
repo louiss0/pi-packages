@@ -13,6 +13,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { defined } from "#src/optional";
 import { resolveChildToolNames } from "#src/agents/definition";
+import type { AgentDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { EnvInfo } from "#src/session/env";
 import type { ModelRegistry } from "#src/models/registry";
@@ -71,6 +72,8 @@ export interface AssemblerContext {
   resolvePromptInheritance?: (
     provider: string | undefined,
   ) => PromptInheritance;
+  /** The definition captured by preparation; absent only for direct assembler callers. */
+  definition?: AgentDefinition;
   /** Parent's current model instance (fallback when agent config has no model). */
   parentModel?: Model<any>;
   /** Model registry for resolving config.model strings. */
@@ -155,14 +158,34 @@ export function assembleSessionConfig(
   registry: AgentDefinitionLookup,
   io: AssemblerIO,
 ): SessionConfig {
-  const selection = registry.select(type);
-  if (!selection.ok) {
-    // The spawn door selected the agent already; reaching here means the
-    // definition changed between the two, which is an error, not a fallback.
-    throw new Error(selection.error);
+  const definition = ctx.definition;
+  if (!definition) {
+    const selection = registry.select(type);
+    if (!selection.ok) {
+      // Direct assembler callers still have a checked path. A prepared launch
+      // carries its selected definition and never consults mutable state here.
+      throw new Error(selection.error);
+    }
+    return assembleWithDefinition(
+      type,
+      ctx,
+      options,
+      env,
+      selection.definition,
+      io,
+    );
   }
-  const definition = selection.definition;
+  return assembleWithDefinition(type, ctx, options, env, definition, io);
+}
 
+function assembleWithDefinition(
+  type: SubagentType,
+  ctx: AssemblerContext,
+  options: AssemblerOptions,
+  env: EnvInfo,
+  definition: AgentDefinition,
+  io: AssemblerIO,
+): SessionConfig {
   const effectiveCwd = options.cwd ?? ctx.cwd;
 
   // The tools the child gets: the names the door resolved when the request

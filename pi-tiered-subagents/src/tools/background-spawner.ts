@@ -1,35 +1,23 @@
 import { defined } from "#src/optional";
-import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
-import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
+import type {
+  PreparedSubagentsLaunch,
+  Subagents,
+} from "#src/service/subagents";
 import { renderSpawnNotes, textResult } from "#src/tools/helpers";
 import type {
   ResolvedSpawnConfig,
   SpawnPresentation,
 } from "#src/tools/spawn-config";
-import type { ParentSessionInfo, Subagent } from "#src/types";
 import type { AgentDetails } from "#src/ui/display";
 
 /** Narrow manager interface for the background spawner. */
-export interface BackgroundManagerDeps {
-  spawn(
-    snapshot: ParentSnapshot,
-    type: string,
-    prompt: string,
-    opts: AgentSpawnConfig,
-  ): LaunchOutcome<string>;
-  getRecord(id: string): Subagent | undefined;
-  currentOwner(): SessionOwner | undefined;
-}
+export type BackgroundManagerDeps = Pick<Subagents, "spawn" | "getRecord">;
 
 /** All values the background spawner needs beyond the resolved config. */
 export interface BackgroundParams {
   config: ResolvedSpawnConfig;
-  snapshot: ParentSnapshot;
-  parentSession: ParentSessionInfo;
+  launch: PreparedSubagentsLaunch;
   settings: { readonly maxConcurrent: number };
-  /** The token proving which session asked for this launch. */
-  owner: SessionOwner;
 }
 
 /** What a background launch reports: one shape for every door that returns before the run ends. */
@@ -59,25 +47,13 @@ export function spawnBackground(
 
   let id: string;
   try {
-    const outcome = manager.spawn(
-      params.snapshot,
-      identity.subagentType,
-      execution.prompt,
-      defined({
-        parentSession: params.parentSession,
-        description: execution.description,
-        modelSelection: execution.modelSelection,
-        thinkingDecision: execution.thinkingDecision,
-        turnPolicy: execution.turnPolicy,
-        inheritContext: execution.inheritContext,
-        // resolveSpawnConfig already merged the agent's frontmatter and AgentTool
-        // routed here on the result, so this door has committed.
-        background: { kind: "explicit", isBackground: true } as const,
-        model: execution.model,
-        thinkingLevel: execution.thinking,
-        owner: params.owner,
-      }),
-    );
+    const outcome = manager.spawn(params.launch, {
+      kind: "explicit",
+      isBackground: true,
+    });
+    // The shared Subagents seam carries the captured definition, owner,
+    // snapshot, session identity, and resolved execution fields to acceptance.
+    // Delivery remains background-specific here.
     // A refusal is an expected answer, not a crash: the session this launch
     // belonged to is gone, so it is reported in the door's own words.
     if (outcome.kind === "rejected") {

@@ -19,6 +19,7 @@ import {
   type SettingsManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import type { AgentDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { SUBAGENT_TOOL_NAMES } from "#src/agents/definition";
 import { debugNote } from "#src/debug";
@@ -205,6 +206,8 @@ export interface CreateSubagentSessionParams {
   notifyParent?: UpdateAnnouncer;
   /** The run's turn ceiling, resolved once at the door. Enforced, not re-decided. */
   turnPolicy: TurnPolicy;
+  /** The definition captured by preparation; execution must not reselect it. */
+  definition?: AgentDefinition;
   /**
    * The tools the child was given, resolved when the request was made.
    *
@@ -258,6 +261,7 @@ export async function createSubagentSession(
       parentModel: snapshot.model,
       modelRegistry: snapshot.modelRegistry,
       activeToolNames: snapshot.activeToolNames,
+      definition: params.definition,
       toolNames: params.toolNames,
       resolvePromptInheritance: deps.resolvePromptInheritance,
       parentPortablePrompt: snapshot.portablePrompt,

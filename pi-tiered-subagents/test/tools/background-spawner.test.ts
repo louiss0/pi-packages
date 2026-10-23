@@ -15,6 +15,7 @@ import {
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { TEST_OWNER } from "#test/helpers/owner";
+import type { ParentSessionInfo } from "#src/types";
 import { textOf } from "#test/helpers/text-of";
 
 function makeConfig(
@@ -29,18 +30,26 @@ function makeConfig(
   });
 }
 
-function makeParams(overrides: Patch<BackgroundParams> = {}): BackgroundParams {
-  return {
-    config: makeConfig(),
+function makeParams(
+  overrides: Patch<BackgroundParams> & {
+    parentSession?: ParentSessionInfo;
+  } = {},
+): BackgroundParams {
+  const config = overrides.config ?? makeConfig();
+  const launch = overrides.launch ?? {
+    config,
     snapshot: STUB_SNAPSHOT,
-    parentSession: {
+    parentSession: overrides.parentSession ?? {
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "session-1",
       toolCallId: "tc-1",
     },
-    settings: { maxConcurrent: 4 },
     owner: TEST_OWNER,
-    ...defined(overrides),
+  };
+  return {
+    config,
+    launch,
+    settings: overrides.settings ?? { maxConcurrent: 4 },
   };
 }
 
@@ -118,9 +127,10 @@ describe("spawnBackground", () => {
    * fail here rather than in that issue's work.
    */
   it("commits explicitly to background rather than deferring to frontmatter", () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
 
-    spawnBackground(manager, makeParams());
+    spawnBackground(deps.subagents, makeParams());
 
     expect(manager.spawn).toHaveBeenCalledWith(
       expect.anything(), // snapshot
@@ -133,10 +143,17 @@ describe("spawnBackground", () => {
   });
 
   it("passes parentSession.toolCallId to manager.spawn", () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     spawnBackground(
-      manager,
-      makeParams({ parentSession: { toolCallId: "tc-99" } }),
+      deps.subagents,
+      makeParams({
+        parentSession: {
+          parentSessionFile: "/parent",
+          parentSessionId: "session-1",
+          toolCallId: "tc-99",
+        },
+      }),
     );
     const spawnOpts = (manager.spawn as ReturnType<typeof vi.fn>).mock
       .calls[0]![3];
@@ -144,9 +161,9 @@ describe("spawnBackground", () => {
   });
 
   it("returns text result with agent ID and description", () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
     const result = spawnBackground(
-      manager,
+      deps.subagents,
       makeParams({
         config: makeConfig({ description: "my task" }),
       }),
@@ -166,7 +183,7 @@ describe("spawnBackground", () => {
       },
     });
     const result = spawnBackground(
-      deps.manager,
+      deps.subagents,
       makeParams({ settings: { maxConcurrent: 4 } }),
     );
     expect(textOf(result)).toContain("queued");
@@ -174,8 +191,8 @@ describe("spawnBackground", () => {
   });
 
   it("mentions 'started' in result when record is running", () => {
-    const { manager } = createToolDeps();
-    const result = spawnBackground(manager, makeParams());
+    const deps = createToolDeps();
+    const result = spawnBackground(deps.subagents, makeParams());
     expect(textOf(result)).toContain("started");
   });
 
@@ -193,14 +210,14 @@ describe("spawnBackground", () => {
         getRecord: vi.fn().mockReturnValue(record),
       },
     });
-    const result = spawnBackground(deps.manager, makeParams());
+    const result = spawnBackground(deps.subagents, makeParams());
     expect(textOf(result)).toContain("/sessions/bg.jsonl");
   });
 
   it("leads the result with the spawn's notes", () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
     const result = spawnBackground(
-      manager,
+      deps.subagents,
       makeParams({
         config: makeConfig({
           notes: ["Note: max_turns 1 is below the minimum."],
@@ -213,8 +230,8 @@ describe("spawnBackground", () => {
   });
 
   it("leads the result with the launch message when there are no notes", () => {
-    const { manager } = createToolDeps();
-    const result = spawnBackground(manager, makeParams());
+    const deps = createToolDeps();
+    const result = spawnBackground(deps.subagents, makeParams());
     expect(textOf(result)).toMatch(/^Agent (started|queued) in background\./);
   });
 
@@ -234,7 +251,7 @@ describe("spawnBackground", () => {
         },
       });
 
-      const result = spawnBackground(deps.manager, makeParams());
+      const result = spawnBackground(deps.subagents, makeParams());
 
       expect(textOf(result)).toBe(
         "Agent started in background.\n" +
@@ -272,7 +289,7 @@ describe("spawnBackground", () => {
       });
 
       const result = spawnBackground(
-        deps.manager,
+        deps.subagents,
         makeParams({ settings: { maxConcurrent: 4 } }),
       );
 
@@ -299,7 +316,7 @@ describe("spawnBackground", () => {
         getRecord: vi.fn(),
       },
     });
-    const result = spawnBackground(deps.manager, makeParams());
+    const result = spawnBackground(deps.subagents, makeParams());
     expect(textOf(result)).toContain("spawn failed");
   });
 });

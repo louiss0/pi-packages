@@ -3,8 +3,9 @@ import {
   type ForegroundParams,
   runForeground,
 } from "#src/tools/foreground-runner";
-import { defined, type Patch } from "#src/optional";
+import type { Patch } from "#src/optional";
 import type { Subagent } from "#src/types";
+import type { PreparedSubagentsLaunch } from "#src/service/subagents";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { makeModel } from "#test/helpers/make-model";
 import { createResolvedSpawnConfig } from "#test/helpers/make-spawn-config";
@@ -17,16 +18,18 @@ import { TEST_OWNER } from "#test/helpers/owner";
 import { textOf } from "#test/helpers/text-of";
 
 function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
-  return {
-    config: createResolvedSpawnConfig({ description: "fg task" }),
+  const config =
+    overrides.config ?? createResolvedSpawnConfig({ description: "fg task" });
+  const launch: PreparedSubagentsLaunch = overrides.launch ?? {
+    config,
     snapshot: STUB_SNAPSHOT,
     parentSession: {
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "session-1",
     },
     owner: TEST_OWNER,
-    ...defined(overrides),
   };
+  return { config, launch };
 }
 
 describe("runForeground", () => {
@@ -39,9 +42,9 @@ describe("runForeground", () => {
   });
 
   it("returns completion message with tool use count on success", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -52,7 +55,8 @@ describe("runForeground", () => {
   });
 
   it("surfaces a declared question as answerable, naming the resume call", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -64,7 +68,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -76,7 +80,8 @@ describe("runForeground", () => {
   });
 
   it("reports a question a released session cannot answer, without naming a resume", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     const released = createTestSubagent({
       id: "agent-5",
       result: "Mapped them.",
@@ -89,7 +94,7 @@ describe("runForeground", () => {
       .mockResolvedValue({ kind: "accepted", value: released });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -103,9 +108,9 @@ describe("runForeground", () => {
   });
 
   it("adds no affordance when the agent asked nothing", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -114,7 +119,8 @@ describe("runForeground", () => {
   });
 
   it("names where a teardown saved the work of an agent that completed", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -123,7 +129,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -133,7 +139,8 @@ describe("runForeground", () => {
   });
 
   it("reports the updates the agent sent while the parent was blocked", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -142,7 +149,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -155,7 +162,8 @@ describe("runForeground", () => {
   });
 
   it("reports the updates of an agent whose run then failed", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -166,7 +174,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -176,7 +184,8 @@ describe("runForeground", () => {
   });
 
   it("names where a teardown saved the work of an agent that failed", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -187,7 +196,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -201,7 +210,8 @@ describe("runForeground", () => {
   // to what the child did before it died. The nudge and get_subagent_result
   // both name it; this carrier did not (#889).
   it("names the transcript of an agent that failed", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -213,7 +223,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -226,7 +236,8 @@ describe("runForeground", () => {
   });
 
   it("omits the transcript line for a failed agent that persisted none", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
+    const { manager } = deps;
     manager.spawnAndWait = vi.fn().mockResolvedValue({
       kind: "accepted",
       value: createTestSubagent({
@@ -236,7 +247,7 @@ describe("runForeground", () => {
     });
 
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -255,7 +266,7 @@ describe("runForeground", () => {
           .mockResolvedValue({ kind: "accepted", value: record }),
       },
     });
-    await runForeground(deps.manager, makeParams(), undefined, undefined);
+    await runForeground(deps.subagents, makeParams(), undefined, undefined);
     expect(record.consumed).toBe(true);
   });
 
@@ -269,7 +280,7 @@ describe("runForeground", () => {
           .mockResolvedValue({ kind: "accepted", value: record }),
       },
     });
-    await runForeground(deps.manager, makeParams(), undefined, undefined);
+    await runForeground(deps.subagents, makeParams(), undefined, undefined);
     expect(record.consumed).toBe(true);
   });
 
@@ -287,7 +298,7 @@ describe("runForeground", () => {
       },
     });
     const result = await runForeground(
-      deps.manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -304,7 +315,7 @@ describe("runForeground", () => {
       },
     });
     const result = await runForeground(
-      deps.manager,
+      deps.subagents,
       makeParams(),
       undefined,
       undefined,
@@ -313,9 +324,9 @@ describe("runForeground", () => {
   });
 
   it("includes the spawn's notes when there are any", async () => {
-    const { manager } = createToolDeps();
+    const deps = createToolDeps();
     const result = await runForeground(
-      manager,
+      deps.subagents,
       makeParams({
         config: createResolvedSpawnConfig({
           notes: ["Note: max_turns 1 is below the minimum."],
@@ -345,7 +356,7 @@ describe("runForeground", () => {
     });
     const onUpdate = vi.fn();
     const runPromise = runForeground(
-      deps.manager,
+      deps.subagents,
       makeParams(),
       undefined,
       onUpdate,
@@ -397,7 +408,7 @@ describe("runForeground", () => {
       });
       const onUpdate = vi.fn();
       const runPromise = runForeground(
-        deps.manager,
+        deps.subagents,
         params(),
         undefined,
         onUpdate,
@@ -425,7 +436,7 @@ describe("runForeground", () => {
         },
       });
       const result = await runForeground(
-        deps.manager,
+        deps.subagents,
         params(),
         undefined,
         undefined,
@@ -462,7 +473,7 @@ describe("runForeground", () => {
     });
     const onUpdate = vi.fn();
     const runPromise = runForeground(
-      deps.manager,
+      deps.subagents,
       makeParams(),
       undefined,
       onUpdate,
@@ -490,7 +501,7 @@ describe("runForeground", () => {
       },
     });
     const onUpdate = vi.fn();
-    await runForeground(deps.manager, makeParams(), undefined, onUpdate);
+    await runForeground(deps.subagents, makeParams(), undefined, onUpdate);
 
     onUpdate.mockClear();
     await vi.advanceTimersByTimeAsync(200);
@@ -529,11 +540,11 @@ describe("runForeground", () => {
       const deps = createToolDeps({
         manager: { ...createToolDeps().manager, spawnAndWait },
       });
-      return { manager: deps.manager, spawnAndWait, resolve };
+      return { subagents: deps.subagents, spawnAndWait, resolve };
     }
 
     it("streams a first update before the agent is spawned", async () => {
-      const { manager, spawnAndWait, resolve } = pendingSpawn();
+      const { subagents, spawnAndWait, resolve } = pendingSpawn();
       const onUpdate = vi.fn();
       let updatesAtSpawn: number | undefined;
       spawnAndWait.mockImplementationOnce(() => {
@@ -544,7 +555,7 @@ describe("runForeground", () => {
         });
       });
 
-      await runForeground(manager, makeParams(), undefined, onUpdate);
+      await runForeground(subagents, makeParams(), undefined, onUpdate);
 
       expect(updatesAtSpawn).toBe(1);
       expect(onUpdate).toHaveBeenNthCalledWith(1, {
@@ -565,10 +576,10 @@ describe("runForeground", () => {
     });
 
     it("streams the record's tool uses, tokens, and activity once its session exists", async () => {
-      const { manager, resolve } = pendingSpawn(running);
+      const { subagents, resolve } = pendingSpawn(running);
       const onUpdate = vi.fn();
       const runPromise = runForeground(
-        manager,
+        subagents,
         makeParams(),
         undefined,
         onUpdate,
@@ -595,11 +606,11 @@ describe("runForeground", () => {
     });
 
     it("advances the spinner one frame per tick, wrapping at the last frame", async () => {
-      const { manager, resolve } = pendingSpawn(running);
+      const { subagents, resolve } = pendingSpawn(running);
       const onUpdate =
         vi.fn<(update: { details: { spinnerFrame?: number } }) => void>();
       const runPromise = runForeground(
-        manager,
+        subagents,
         makeParams(),
         undefined,
         onUpdate,
@@ -615,10 +626,10 @@ describe("runForeground", () => {
     });
 
     it("stops streaming once the agent returns", async () => {
-      const { manager, resolve } = pendingSpawn(running);
+      const { subagents, resolve } = pendingSpawn(running);
       const onUpdate = vi.fn();
       const runPromise = runForeground(
-        manager,
+        subagents,
         makeParams(),
         undefined,
         onUpdate,
@@ -635,9 +646,9 @@ describe("runForeground", () => {
 
   describe("agent ID in the result text", () => {
     it("names the agent ID under the completion header", async () => {
-      const { manager } = createToolDeps();
+      const deps = createToolDeps();
       const result = await runForeground(
-        manager,
+        deps.subagents,
         makeParams(),
         undefined,
         undefined,
@@ -659,7 +670,7 @@ describe("runForeground", () => {
         },
       });
       const result = await runForeground(
-        deps.manager,
+        deps.subagents,
         makeParams(),
         undefined,
         undefined,
@@ -668,9 +679,9 @@ describe("runForeground", () => {
     });
 
     it("keeps the spawn notes ahead of the agent ID line", async () => {
-      const { manager } = createToolDeps();
+      const deps = createToolDeps();
       const result = await runForeground(
-        manager,
+        deps.subagents,
         makeParams({
           config: createResolvedSpawnConfig({
             notes: ["Note: max_turns 1 is below the minimum."],

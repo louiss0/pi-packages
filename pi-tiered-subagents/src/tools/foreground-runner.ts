@@ -1,8 +1,9 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { defined } from "#src/optional";
-import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
-import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
+import type {
+  PreparedSubagentsLaunch,
+  Subagents,
+} from "#src/service/subagents";
 import {
   renderOutcomeAddenda,
   renderOutcomeBody,
@@ -18,26 +19,16 @@ import {
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
-import type { ParentSessionInfo, Subagent } from "#src/types";
+import type { Subagent } from "#src/types";
 import { type AgentDetails, formatMs } from "#src/ui/display";
 
 /** Narrow manager interface for the foreground runner. */
-export interface ForegroundManagerDeps {
-  spawnAndWait(
-    snapshot: ParentSnapshot,
-    type: string,
-    prompt: string,
-    opts: Omit<AgentSpawnConfig, "background">,
-  ): Promise<LaunchOutcome<Subagent>>;
-}
+export type ForegroundManagerDeps = Pick<Subagents, "spawnAndWait">;
 
 /** All values the foreground runner needs beyond the resolved config. */
 export interface ForegroundParams {
   config: ResolvedSpawnConfig;
-  snapshot: ParentSnapshot;
-  parentSession: ParentSessionInfo;
-  /** The token proving which session asked for this launch. */
-  owner: SessionOwner;
+  launch: PreparedSubagentsLaunch;
 }
 
 /**
@@ -78,7 +69,7 @@ export async function runForeground(
   signal: AbortSignal | undefined,
   onUpdate: ((update: AgentToolResult<AgentDetails>) => void) | undefined,
 ) {
-  const { identity, execution, presentation } = params.config;
+  const { identity, presentation } = params.config;
   let recordRef: Subagent | undefined;
   const stopStream = startProgressStream({
     detailBase: presentation.detailBase,
@@ -89,25 +80,14 @@ export async function runForeground(
   let record: Subagent;
   try {
     const outcome = await manager.spawnAndWait(
-      params.snapshot,
-      identity.subagentType,
-      execution.prompt,
+      params.launch,
       defined({
-        description: execution.description,
-        modelSelection: execution.modelSelection,
-        thinkingDecision: execution.thinkingDecision,
-        turnPolicy: execution.turnPolicy,
-        inheritContext: execution.inheritContext,
         signal,
-        parentSession: params.parentSession,
         observer: {
           onSessionCreated: (agent: Subagent) => {
             recordRef = agent;
           },
         },
-        model: execution.model,
-        thinkingLevel: execution.thinking,
-        owner: params.owner,
       }),
     );
     // Refused before a child existed: the session this launch belonged to is

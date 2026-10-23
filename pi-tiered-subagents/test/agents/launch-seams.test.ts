@@ -15,14 +15,18 @@ import {
   resolveChildToolNames,
 } from "#src/agents/definition";
 import { AgentRegistry } from "#src/agents/registry";
+import { LaunchPreparer } from "#src/agents/launch-preparer";
+import type { ModelInfo } from "#src/agents/resolver";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
+import { Subagents } from "#src/service/subagents";
 import { assembleSessionConfig } from "#src/session/session-config";
 import type { AssemblerIO } from "#src/session/session-config";
 import { AgentTool } from "#src/tools/agent-tool";
 import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
+import { createTestSubagent } from "#test/helpers/make-subagent";
 import { makeModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
@@ -39,6 +43,18 @@ function registryWith(
     },
     project: { definitions: [], errors: [] },
   }));
+}
+
+function createPreparer(registry: AgentRegistry, modelInfo: () => ModelInfo) {
+  return new LaunchPreparer({
+    registry,
+    reload: () => registry.reload(),
+    modelInfo,
+    turnSettings: () => ({
+      defaultMaxTurns: undefined,
+      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+    }),
+  });
 }
 
 /** The assembler's IO, stubbed to the two collaborators it uses. */
@@ -59,7 +75,7 @@ describe("the tool door", () => {
     const deps = createToolDeps();
     const tool = new AgentTool(
       deps.manager,
-      deps.runtime,
+      deps.subagents,
       deps.settings,
       deps.registry,
       deps.agentDir,
@@ -82,7 +98,7 @@ describe("the tool door", () => {
     });
     const tool = new AgentTool(
       deps.manager,
-      deps.runtime,
+      deps.subagents,
       deps.settings,
       deps.registry,
       deps.agentDir,
@@ -182,6 +198,30 @@ describe("the assembler's tool selection", () => {
       "bash",
     ]);
   });
+
+  it("assembles from the captured definition instead of reselecting mutable registry state", () => {
+    const captured = {
+      ...defaultDefinition("worker", "shipped"),
+      instructions: "captured instructions",
+    };
+    const config = assembleSessionConfig(
+      "worker",
+      { ...base, definition: captured },
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("worker", { instructions: "replacement instructions" }),
+      assemblerIO,
+    );
+
+    expect(config.systemPrompt).toBe("system prompt");
+    expect(assemblerIO.buildAgentPrompt).toHaveBeenLastCalledWith(
+      { name: "worker", instructions: "captured instructions" },
+      "/tmp",
+      { isGitRepo: false, branch: "", platform: "linux" },
+      expect.anything(),
+      assemblerIO.loadProjectContext,
+    );
+  });
 });
 
 describe("the shipped specialists", () => {
@@ -203,6 +243,10 @@ describe("the service door", () => {
   function makeAdapter(definition?: AgentDefinition) {
     const manager = {
       spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
+      spawnAndWait: vi.fn().mockResolvedValue({
+        kind: "accepted",
+        value: createTestSubagent(),
+      }),
       getRecord: vi.fn(),
       listAgents: vi.fn(() => []),
       abort: vi.fn(),
@@ -225,11 +269,31 @@ describe("the service door", () => {
         parentSessionId: "session-1",
       })),
     };
+    const registry = registryWith(
+      definition?.id ?? "worker",
+      definition
+        ? {
+            displayName: definition.displayName,
+            description: definition.description,
+            instructions: definition.instructions,
+            tools: definition.tools,
+            inheritContext: definition.inheritContext,
+            runInBackground: definition.runInBackground,
+            enabled: definition.enabled,
+            ...defined({
+              model: definition.model,
+              thinking: definition.thinking,
+              maxTurns: definition.maxTurns,
+            }),
+          }
+        : {},
+    );
+    const preparer = createPreparer(registry, () => ({
+      ladders: { profiles: new Map(), strategies: new Map() },
+    }));
     const adapter = new SubagentsServiceAdapter(
       manager,
-      runtime,
-      { profiles: new Map(), strategies: new Map() },
-      () => definition,
+      new Subagents(manager, runtime, preparer),
     );
     return { adapter, manager, runtime };
   }
@@ -260,6 +324,25 @@ describe("the service door", () => {
     adapter.spawn("worker", "do it");
     expect(runtime.buildSnapshot).toHaveBeenCalledWith(false);
   });
+
+  it("rejects an unknown programmatic type before creating a manager record", () => {
+    const { adapter, manager } = makeAdapter();
+
+    expect(() => adapter.spawn("unknown-role", "do it")).toThrow(
+      /Unknown agent type "unknown-role"/,
+    );
+    expect(manager.spawn).not.toHaveBeenCalled();
+  });
+
+  it("rejects a disabled programmatic type before creating a manager record", () => {
+    const { adapter, manager } = makeAdapter({
+      ...defaultDefinition("worker", "shipped"),
+      enabled: false,
+    });
+
+    expect(() => adapter.spawn("worker", "do it")).toThrow(/disabled/);
+    expect(manager.spawn).not.toHaveBeenCalled();
+  });
 });
 
 describe("both doors resolve alike", () => {
@@ -275,6 +358,12 @@ describe("both doors resolve alike", () => {
       id: "claude-haiku-4-5",
       name: "Claude Haiku 4.5",
     });
+    const haikuRegistry = {
+      find: (provider: string, id: string) =>
+        provider === haiku.provider && id === haiku.id ? haiku : undefined,
+      getAll: () => [haiku],
+      getAvailable: () => [haiku],
+    };
 
     const tool = resolveSpawnConfig(
       {
@@ -288,21 +377,17 @@ describe("both doors resolve alike", () => {
         run_in_background: false,
       },
       registryWith("worker", {}),
-      defined({
-        modelRegistry: {
-          find: (provider: string, id: string) =>
-            provider === haiku.provider && id === haiku.id ? haiku : undefined,
-          getAll: () => [haiku],
-          getAvailable: () => [haiku],
-        },
-        ladders,
-      }),
+      defined({ modelRegistry: haikuRegistry, ladders }),
       { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     if ("error" in tool) throw new Error(tool.error);
 
     const manager = {
       spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
+      spawnAndWait: vi.fn().mockResolvedValue({
+        kind: "accepted",
+        value: createTestSubagent(),
+      }),
       getRecord: vi.fn(),
       listAgents: vi.fn(() => []),
       abort: vi.fn(),
@@ -313,25 +398,21 @@ describe("both doors resolve alike", () => {
       currentOwner: vi.fn(() => ({ generation: 1, sessionId: "session-1" })),
     };
     const runtime = {
-      currentCtx: {
-        modelRegistry: {
-          find: (provider: string, id: string) =>
-            provider === haiku.provider && id === haiku.id ? haiku : undefined,
-          getAll: () => [haiku],
-          getAvailable: () => [haiku],
-        },
-      } as never,
+      currentCtx: { modelRegistry: haikuRegistry } as never,
       buildSnapshot: vi.fn(() => STUB_SNAPSHOT),
       getSessionInfo: vi.fn(() => ({
         parentSessionFile: "/sessions/parent.jsonl",
         parentSessionId: "session-1",
       })),
     };
+    const registry = registryWith("worker", {});
+    const preparer = createPreparer(registry, () => ({
+      modelRegistry: haikuRegistry,
+      ladders,
+    }));
     const adapter = new SubagentsServiceAdapter(
       manager,
-      runtime,
-      { profiles: new Map(), strategies: new Map() },
-      () => defaultDefinition("worker", "shipped"),
+      new Subagents(manager, runtime, preparer),
     );
     adapter.spawn("worker", "do it", {
       description: "d",

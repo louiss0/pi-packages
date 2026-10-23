@@ -22,7 +22,7 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
 function makeTool(deps: ReturnType<typeof createToolDeps>) {
   return new AgentTool(
     deps.manager,
-    deps.runtime,
+    deps.subagents,
     deps.settings,
     deps.registry,
     deps.agentDir,

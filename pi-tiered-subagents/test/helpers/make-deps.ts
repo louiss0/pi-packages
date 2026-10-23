@@ -1,6 +1,13 @@
 import { vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
+import { LaunchPreparer } from "#src/agents/launch-preparer";
+import type { ModelInfo } from "#src/agents/resolver";
+import {
+  Subagents,
+  type SubagentsManager,
+  type SubagentsRuntime,
+} from "#src/service/subagents";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
@@ -8,7 +15,6 @@ import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
 import {
   type AgentToolManager,
-  type AgentToolRuntime,
   type AgentToolSettings,
 } from "#src/tools/agent-tool";
 import { makeModel } from "./make-model";
@@ -28,11 +34,13 @@ const defaultRegistry = new AgentRegistry(() => ({
  * can construct the class directly or use individual pieces for spawner/runner tests.
  */
 export type AgentToolFixture = {
-  manager: AgentToolManager;
-  /** Mock runtime satisfying `AgentToolRuntime` (context queries). */
-  runtime: AgentToolRuntime;
+  manager: AgentToolManager & SubagentsManager;
+  /** Mock runtime supplying parent captures and model facts. */
+  runtime: SubagentsRuntime & { getModelInfo(): ModelInfo };
+  subagents: Subagents;
   settings: AgentToolSettings;
   registry: AgentRegistry;
+  preparer: LaunchPreparer;
   agentDir: string;
 };
 
@@ -48,7 +56,8 @@ export type AgentToolFixture = {
 export function createToolDeps(
   overrides: Patch<AgentToolFixture> = {},
 ): AgentToolFixture {
-  const runtime: AgentToolRuntime = {
+  const runtime: SubagentsRuntime & { getModelInfo(): ModelInfo } = {
+    currentCtx: {},
     buildSnapshot: vi.fn(
       (_inheritContext: boolean): ParentSnapshot => STUB_SNAPSHOT,
     ),
@@ -70,7 +79,7 @@ export function createToolDeps(
     })),
   };
 
-  return {
+  const defaults = {
     manager: {
       spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
       spawnAndWait: vi
@@ -90,7 +99,18 @@ export function createToolDeps(
     },
     registry: defaultRegistry,
     agentDir: "/home/user/.pi",
-    ...defined(overrides),
+  };
+  const fixture = { ...defaults, ...defined(overrides) };
+  const preparer = new LaunchPreparer({
+    registry: fixture.registry,
+    reload: () => fixture.registry.reload(),
+    modelInfo: () => fixture.runtime.getModelInfo(),
+    turnSettings: () => fixture.settings,
+  });
+  return {
+    ...fixture,
+    preparer,
+    subagents: new Subagents(fixture.manager, fixture.runtime, preparer),
   };
 }
 

@@ -8,14 +8,13 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
-import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
+import type { TurnSettings } from "#src/agents/resolver";
 import type {
-  AgentSpawnConfig,
   ResumeCallOptions,
   ResumeRefusalReason,
   ResumeStart,
 } from "#src/lifecycle/subagent-manager";
+import type { Subagents } from "#src/service/subagents";
 import {
   renderOutcomeAddenda,
   renderOutcomeBody,
@@ -33,53 +32,25 @@ import {
   textResult,
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
-import type { TurnSettings } from "#src/agents/resolver";
 import { renderAgentResult } from "#src/tools/result-renderer";
-import {
-  type ModelInfo,
-  type ResolvedSpawnConfig,
-  resolveSpawnConfig,
-  type SpawnPresentation,
+import type {
+  ResolvedSpawnConfig,
+  SpawnPresentation,
 } from "#src/tools/spawn-config";
-import type { ParentSessionInfo, Subagent } from "#src/types";
+import type { Subagent } from "#src/types";
 import { type AgentDetails, getDisplayName, type Theme } from "#src/ui/display";
 import { GLYPHS } from "#src/ui/glyphs";
 
 // ---- Deps interfaces ----
 
-/** Narrow manager interface — only the methods the Agent tool calls. */
+/** Narrow manager slice retained for the Agent tool's resume presentation. */
 export interface AgentToolManager {
-  spawn: (
-    snapshot: ParentSnapshot,
-    type: string,
-    prompt: string,
-    opts: AgentSpawnConfig,
-  ) => LaunchOutcome<string>;
-  spawnAndWait: (
-    snapshot: ParentSnapshot,
-    type: string,
-    prompt: string,
-    opts: Omit<AgentSpawnConfig, "background">,
-  ) => Promise<LaunchOutcome<Subagent>>;
   startResume: (
     id: string,
     prompt: string,
     options: ResumeCallOptions,
   ) => ResumeStart;
   getRecord: (id: string) => Subagent | undefined;
-  /**
-   * The session token every launch must carry. Undefined when no session is
-   * active or one is ending, which is what the door turns into a refusal
-   * before it asks for any work.
-   */
-  currentOwner: () => SessionOwner | undefined;
-}
-
-/** Narrow runtime interface — the Agent tool's slice of SubagentRuntime. */
-export interface AgentToolRuntime {
-  buildSnapshot(inheritContext: boolean): ParentSnapshot;
-  getModelInfo(): ModelInfo;
-  getSessionInfo(): { parentSessionFile: string; parentSessionId: string };
 }
 
 /** Narrow settings accessor — only the fields the Agent tool reads. */
@@ -96,7 +67,7 @@ export class AgentTool {
 
   constructor(
     private readonly manager: AgentToolManager,
-    private readonly runtime: AgentToolRuntime,
+    private readonly subagents: Subagents,
     private readonly settings: AgentToolSettings,
     private readonly registry: AgentRegistry,
     private readonly agentDir: string,
@@ -113,38 +84,24 @@ export class AgentTool {
     onUpdate: ((update: AgentToolResult<AgentDetails>) => void) | undefined,
     _ctx: ExtensionContext,
   ) {
-    // Reload custom agents so new .pi/agents/*.md files are picked up without restart
-    this.registry.reload();
-
-    // ---- Config resolution (pure) ----
-    const config = resolveSpawnConfig(
-      params,
-      this.registry,
-      this.runtime.getModelInfo(),
-      this.settings,
-    );
-    if ("error" in config) return textResult(config.error);
-
-    // ---- Boundary extraction (after config so inheritContext is resolved) ----
-    // The session token is read before anything is captured or resolved, so
-    // that a launch belonging to a session which has since ended is refused
-    // here rather than accepted by a session that never asked for it.
-    const owner = this.manager.currentOwner();
-    if (!owner) {
-      return textResult(
-        "No active session — cannot launch agents outside a session.",
-      );
-    }
-    const snapshot = this.runtime.buildSnapshot(
-      config.execution.inheritContext,
-    );
-    const { parentSessionFile, parentSessionId } =
-      this.runtime.getSessionInfo();
-    const parentSession: ParentSessionInfo = {
-      parentSessionFile,
-      parentSessionId,
+    const prepared = this.subagents.prepareLaunch(
+      {
+        type: params.subagent_type as string,
+        prompt: params.prompt as string,
+        ...defined({
+          description: params.description as string | undefined,
+          model: params.model as string | undefined,
+          thinking: params.thinking as string | undefined,
+          maxTurns: params.max_turns as number | undefined,
+          inheritContext: params.inherit_context as boolean | undefined,
+          runInBackground: params.run_in_background as boolean | undefined,
+        }),
+      },
       toolCallId,
-    };
+    );
+    if (prepared.kind === "rejected") return textResult(prepared.message);
+    const launch = prepared.value;
+    const { config } = launch;
 
     // ---- Resume existing agent ----
     if (params.resume) {
@@ -166,22 +123,15 @@ export class AgentTool {
 
     // ---- Background execution ----
     if (config.execution.runInBackground) {
-      return spawnBackground(this.manager, {
+      return spawnBackground(this.subagents, {
         config,
-        snapshot,
-        parentSession,
+        launch,
         settings: this.settings,
-        owner,
       });
     }
 
     // ---- Foreground execution — stream progress via onUpdate ----
-    return runForeground(
-      this.manager,
-      { config, snapshot, parentSession, owner },
-      signal,
-      onUpdate,
-    );
+    return runForeground(this.subagents, { config, launch }, signal, onUpdate);
   }
 
   /**

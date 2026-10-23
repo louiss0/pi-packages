@@ -25,6 +25,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { loadDefinitionScopes } from "#src/agents/loader";
 import { AgentRegistry } from "#src/agents/registry";
+import { LaunchPreparer } from "#src/agents/launch-preparer";
 import { DefinitionErrorReporter } from "#src/agents/report";
 import {
   InterruptHandler,
@@ -52,6 +53,7 @@ import {
   unpublishSubagentsService,
 } from "#src/service/service";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
+import { Subagents } from "#src/service/subagents";
 import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import {
   SETTINGS_EXTENSION_NAME,
@@ -214,6 +216,19 @@ export default function (pi: ExtensionAPI) {
   });
   settings.load();
 
+  // Both caller doors share one preparation authority. Its configuration
+  // refresh, parent model view, and operator turn defaults are captured at the
+  // request boundary rather than reconstructed independently by each adapter.
+  const launchPreparer = new LaunchPreparer({
+    registry,
+    reload: () => {
+      refreshDefinitions();
+      refreshProfiles();
+    },
+    modelInfo: () => runtime.getModelInfo(),
+    turnSettings: () => settings,
+  });
+
   // Observer: receives agent lifecycle notifications and dispatches events/notifications.
   const eventsObserver = new SubagentEventsObserver({
     emit: (channel, data) => pi.events.emit(channel, data),
@@ -338,12 +353,8 @@ export default function (pi: ExtensionAPI) {
 
   // Typed service published via Symbol.for() for cross-extension access.
   // Consumers: const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
-  const service = new SubagentsServiceAdapter(
-    manager,
-    runtime,
-    ladders,
-    (type) => registry.find(type),
-  );
+  const subagents = new Subagents(manager, runtime, launchPreparer);
+  const service = new SubagentsServiceAdapter(manager, subagents);
   publishSubagentsService(service);
 
   const lifecycle = new SessionLifecycleHandler(
@@ -415,7 +426,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool(
     new AgentTool(
       manager,
-      runtime,
+      subagents,
       settings,
       registry,
       getAgentDir(),
