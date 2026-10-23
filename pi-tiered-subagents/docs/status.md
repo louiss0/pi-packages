@@ -15,8 +15,8 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
-| Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,256 tests, all passing (one skipped) |
+| Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,258 tests, all passing (one skipped) |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -58,7 +58,7 @@ body is either inherited (empty) or replaced (non-empty).
 | --- | --- | --- |
 | Five scoped specialists | 6–24 | Done. `explore`, `worker`, `reviewer`, `debug`, `researcher`, with the exact tool lists the specification names. |
 | Normalized identifiers, display names, duplicate reporting | 25–27 | Done. |
-| Layered definitions: shipped → global → trusted project | 28, 37 | Done. A project the operator has not trusted contributes nothing. |
+| Layered definitions: shipped → global → project | 28, 36, 37 | Done. The project layer is read like the global one; see *Trust is Pi's, not this package's* below. |
 | Omission inherits, explicit replaces, null clears, empty stays empty | 29–32 | Done. |
 | The body is the standing instructions | 33–34 | Done. |
 | Unknown and disabled agents are rejected, never redirected | 36 | Done at both doors. |
@@ -68,6 +68,21 @@ body is either inherited (empty) or replaced (non-empty).
 | Parent-only orchestration instructions excluded from children | 47 | Done. The parent's session-resolved layers — its tool surface, its rules, its skills catalogue, its cwd footer — and the harness's own base identity and documentation pointer are cut from the child's inherited identity, so the child inherits neither the parent's tools, per-session guidance, nor the harness's role. The operator's and the project's own words stay, and the package's own base stands in the gap; the parent's orchestration instructions therefore never reach a child through the adopted identity. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md) and [adr/0005](../decisions/0005-subagent-record-admission-policy.md). |
 | Request-time capture of the parent's tools | 48 | Done. |
 | Background by default, foreground on request | 49 | Done. |
+
+### Trust is Pi's, not this package's
+
+The extension used to ask Pi whether the project was trusted, and a project it
+had not blessed contributed nothing — definitions, the project settings layer,
+and the profiles inside it. That was this package's second trust gate, and it
+was both redundant and wrong: the operator decides which projects Pi loads
+extensions into, so a project that got this extension loaded has already been
+blessed, and an untrusted project cannot get the extension loaded in the first
+place.
+
+The check, its inputs, and its rejection path are gone. The project layer is
+read on its own terms, exactly as the global layer is. Nothing about the
+project's configuration becomes reachable that Pi had not already decided was
+reachable.
 
 ## The model selection
 
@@ -224,11 +239,11 @@ child according to that decision.
 The rule is a scheduling promise between this runtime's children, not a
 sandbox: it does not coordinate the parent's own edits, another process in the
 same directory, or what a reader sees while a writer works. A foreground
-child waits for the slot too — it bypasses the concurrency limit, not the
-workspace — and the slot is taken when the child is about to run, so a child
-waiting for a concurrency slot holds none. A child aborted while waiting
-never runs and never holds the slot, and a resume takes the same slot, because
-a resumed child reuses the tools it was spawned with.
+child takes the same slot a background one does, and waits for it. The slot is
+taken when the child is about to run, so a child waiting for a concurrency slot
+holds none. A child aborted while waiting never runs and never holds the slot,
+and a resume takes the same slot, because a resumed child reuses the tools it
+was spawned with.
 
 A child that works in a prepared directory of its own — a worktree from a
 workspace provider — is classified by the tools it has, but shares the slot of
@@ -236,6 +251,83 @@ the directory the request was made in: the prepared directory is not known
 when the request is made.
 
 Recorded in [adr/0009](adr/0009-one-child-at-a-time-may-change-the-workspace.md).
+
+## The turn policy
+
+`src/lifecycle/turn-limits.ts` decides how many turns a child gets, once, before
+any session exists.
+
+The request, the definition, and the operator's settings are reconciled into one
+value at launch and never re-decided. That value is a closed union rather than a
+number with a sentinel:
+
+| Variant | What it means |
+| --- | --- |
+| `{ kind: "limited", maxTurns, wrapUpTurns }` | A ceiling and the wrap-up allowance that goes with it. |
+| `{ kind: "unlimited" }` | A deliberate unlimited request — distinct from a request that said nothing. |
+
+Three things follow from making it a union rather than a number. A deliberately
+unlimited request cannot be accidentally limited further downstream, because
+there is no downstream step that reads a number. The wrap-up allowance is
+carried with the ceiling instead of being looked up again at the session, so a
+child that waits in the queue still enforces the policy it was accepted under. And
+the default budget is applied once, at launch: changing the operator's setting
+later affects the next launch, not a child that is already accepted.
+
+A resumed child keeps the policy its launch captured, and gets a fresh turn
+counter under it.
+
+## One concurrency cap for every run
+
+The concurrency limit is one admission rule for every initial and resumed run.
+The public `bypassQueue` exemption is gone: a foreground child used to be able
+to run past the cap, which meant the cap said nothing reliable about how many
+children ran at once — and a foreground run is exactly the one a user is waiting
+on, so it was the run most likely to be miscounted.
+
+Removing it is a breaking change to the public service surface, and it is the
+honest reading of the setting: the operator sets a cap, and every child respects
+it.
+
+## The type system as a seam
+
+`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are on across `src/`
+and `test/`. Neither was satisfied by widening, by a non-null assertion, or by
+relaxing a type: an indexed read that can miss now handles the miss, and a
+producer that meant to leave a field out has to leave it out rather than write
+`undefined` into it.
+
+That distinction is not decoration. The specification's layering vocabulary
+depends on it — absent means inherit, a value means replace, `null` means clear,
+and an empty list means empty — and a codebase that cannot tell those apart in
+the type system will eventually confuse them at runtime. `src/optional.ts` holds
+the vocabulary so that distinction is written once:
+
+| Helper | For |
+| --- | --- |
+| `defined(fields)` | A producer assembling a strict shape. Filters the undecided entries out, and keeps the keys that cannot be undefined required. |
+| `Patch<T>` | An override bag, where "said nothing" and "said: no value" are the same instruction. |
+| `merge(defaults, patch)` | A fixture whose target admits an explicit undefined, so a test can *clear* a defaulted field rather than override it. |
+
+The read-view interfaces — a widget row, a tool result's details, a report —
+take the opposite position and accept an explicit `undefined` on their optional
+fields. For those, "the getter returned nothing" and "the field is not there" are
+the same fact, and making the type say otherwise would be inventing a
+distinction the runtime does not make.
+
+### The typecheck script
+
+`scripts/typecheck.mjs` runs `tsc` and then reads what it says. `tsc`
+type-checks everything in the program, and the program includes whatever an
+import reaches: `@juanibiapina/pi-extension-settings` ships raw `.ts` sources
+with no `.d.ts`, so twelve diagnostics inside it are compiled as part of ours and
+`skipLibCheck` — declaration files only — does not reach them.
+
+The script partitions the diagnostics. One naming a file in this package fails
+the build; one naming a file under `node_modules` is reported and counted, so a
+dependency that grows new ones is visible here rather than silently absorbed.
+`tsconfig.json` keeps `skipLibCheck` and does not name the dependency — the split
+lives in the script, where it can be read.
 
 ## Inherited behaviour, now characterized
 
@@ -307,6 +399,21 @@ The recovered suite pins the behaviour this derivative must preserve:
    surface, and its documentation pointer now stay with the parent session,
    and the operator's own prompt is what a child adopts. See
    [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md).
+10. **This extension has no trust gate of its own.** Project definitions and
+    the project settings layer used to be skipped unless the extension asked
+    Pi and Pi said yes. That gate is gone — see *Trust is Pi's, not this
+    package's* above. ARCHITECTURE-SPEC stories 36–37.
+11. **A foreground child is subject to the concurrency cap.** The public
+    `bypassQueue` exemption is removed, so one cap governs every initial and
+    resumed run. ARCHITECTURE-SPEC story 68.
+12. **The turn budget is one closed policy, resolved once.** `maxTurns` and
+    the wrap-up allowance are reconciled at launch into a `limited` /
+    `unlimited` union that no later step re-reads. ARCHITECTURE-SPEC stories
+    51–55.
+13. **Both strict optional-property flags are on.** Nothing was widened or
+    asserted to make them pass; `src/optional.ts` holds the vocabulary that
+    makes omission expressible. See *The type system as a seam* above.
+    ARCHITECTURE-SPEC stories 104–105.
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
@@ -348,6 +455,27 @@ delivered. Each item names the user stories it covers.
 | The routing reason in the service door's record | 74 | Done — the record now carries the resolved model decision (source and reason) and the reasoning decision (applicability, source, clamping, and reason), for spawns from either door. |
 | A narrower cut of the inherited identity | 47 | Done. Pi's base identity, its tool surface, and its documentation pointer are not inherited; the operator's own prompt is, and the package's own base stands in the gap. See [adr/0011](adr/0011-the-harness-own-text-is-not-inherited.md). |
 | A bundled public `.d.ts` | — | Settled as *not adopted*: the source-ship model keeps the public surface served from TypeScript source (`exports["."].default` → `./src/service/service.ts`) and ships no build step at all — declarations are not emitted, and Pi compiles the TypeScript rather than a declarations bundle being built. Bundling was set aside. Another package can import the surface by name once a consumer needs it. |
+
+### From ARCHITECTURE-SPEC.md
+
+`ARCHITECTURE-SPEC.md` supersedes `SPEC.md` where the two disagree. Increment 1
+of that specification is delivered; the rest is not started. The story numbers
+below are ARCHITECTURE-SPEC's own.
+
+| Area | Stories | State |
+| --- | --- | --- |
+| Extension-owned trust gating removed | 36, 37 | Done — see *Trust is Pi's, not this package's*. |
+| Public queue-bypass exemption removed | 68 | Done — see *One concurrency cap for every run*. |
+| Turn budget resolved once into a closed policy | 51–55 | Done — see *The turn policy*. |
+| `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` enabled | 104, 105 | Done — see *The type system as a seam*. |
+| One authoritative preparation authority for both doors | 10–23 | Not started. The existing `src/agents/resolver.ts` is the shared resolver, but preparation does not yet produce an accepted-or-rejected plan as one value, and the parent's model, thinking, tools, and cwd are still read at their use rather than captured once at invocation. |
+| Model and reasoning decisions captured as owned values | 38–50 | Not started. The decisions are resolved once and reported, but they still hold live SDK shapes rather than owned identities and capabilities. |
+| Child-shaping settings captured; operational settings live | 56, 57 | Not started. |
+| Async programmatic launch, explicit run, shared resume | 60–66 | Not started. Launch still returns a synchronous result; there is no separate `run`. |
+| Cancellation, delivery, and lifetime | 77–91 | Not started. |
+| Terminal presentation extracted to a UI library | 92–100 | Not started. The renderer vocabulary exists in `src/ui/`, but it is still inside the runtime package. |
+| Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; the UI-package flags, lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
+| Independent ownership and migration cleanup | — | Not started. |
 
 ## The Pi 1.3.0 upgrade, verified across the workspace
 
