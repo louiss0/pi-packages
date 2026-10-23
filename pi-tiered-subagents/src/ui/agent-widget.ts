@@ -6,17 +6,16 @@
  */
 
 import type { TuiMode } from "@earendil-works/pi-tui";
-import { defined } from "#src/optional";
-import type { AgentRegistry } from "#src/agents/registry";
-import type { Subagent } from "#src/lifecycle/subagent";
+import { ERROR_STATUSES, type Theme } from "./display.js";
 import type {
-  SubagentManager,
-  SubagentManagerObserver,
-} from "#src/lifecycle/subagent-manager";
-import type { RunKind } from "#src/lifecycle/subagent-run";
-import type { CompactionInfo } from "#src/types";
-import { ERROR_STATUSES, type Theme } from "#src/ui/display";
-import { renderWidgetLines, type WidgetAgent } from "#src/ui/widget-renderer";
+  AgentDefinitionLookup,
+  WidgetAgent,
+  WidgetAgentIdentity,
+  WidgetSource,
+} from "./view-types.js";
+import { renderWidgetLines } from "./widget-renderer.js";
+
+export type { WidgetSource } from "./view-types.js";
 
 // ---- Types ----
 
@@ -24,8 +23,8 @@ import { renderWidgetLines, type WidgetAgent } from "#src/ui/widget-renderer";
 interface AgentSummary {
   readonly id: string;
   readonly status: string;
-  // A read view over a live record, so the optional takes an explicit
-  // `undefined` — a record's getter answers that for "never finished".
+  // Structural snapshots may omit the timestamp or explicitly report that
+  // the agent has not finished.
   readonly completedAt?: number | undefined;
 }
 
@@ -112,7 +111,7 @@ function animationIntervalMs(mode: TuiMode | undefined): number {
 
 // ---- Widget manager ----
 
-export class AgentWidget implements SubagentManagerObserver {
+export class AgentWidget {
   private uiCtx: UICtx | undefined;
   private widgetFrame = 0;
   /** The pending one-shot animation tick; each tick's `update()` re-arms it while an agent runs. */
@@ -130,8 +129,8 @@ export class AgentWidget implements SubagentManagerObserver {
   private lastStatusText: string | undefined;
 
   constructor(
-    private manager: SubagentManager,
-    private registry: AgentRegistry,
+    private readonly source: WidgetSource,
+    private readonly registry: AgentDefinitionLookup,
   ) {}
 
   /** Set the UI context (captured at session_start). */
@@ -159,30 +158,30 @@ export class AgentWidget implements SubagentManagerObserver {
     this.update();
   }
 
-  // ---- SubagentManagerObserver: react to lifecycle, self-drive the timer ----
+  // ---- Structural lifecycle callbacks: react and self-drive the timer ----
 
   /**
    * A run started, initial or resumed — render, which (re-)arms the animation loop.
    * The record's previous run, if any, has finished lingering or never will, so
    * forget its age: this run's finished row lingers from zero like the first's.
    */
-  onSubagentRunStarted(record: Subagent, _kind: RunKind) {
+  onSubagentRunStarted(record: WidgetAgentIdentity, _kind: unknown) {
     this.finishedTurnAge.delete(record.id);
     this.update();
   }
 
   /** A background subagent was created (queued) — render so the count shows. */
-  onSubagentCreated(_record: Subagent) {
+  onSubagentCreated(_record: WidgetAgentIdentity) {
     this.update();
   }
 
   /** A run finished — render so the finished state is seeded and the refreshed result shown. */
-  onSubagentRunFinished(_record: Subagent, _kind: RunKind) {
+  onSubagentRunFinished(_record: WidgetAgentIdentity, _kind: unknown) {
     this.update();
   }
 
   /** A subagent's session compacted — render to refresh the compaction count. */
-  onSubagentCompacted(_record: Subagent, _info: CompactionInfo) {
+  onSubagentCompacted(_record: WidgetAgentIdentity, _info: unknown) {
     this.update();
   }
 
@@ -213,50 +212,15 @@ export class AgentWidget implements SubagentManagerObserver {
     return age < maxAge;
   }
 
-  /**
-   * Background agents only — the widget's sole audience (ADR-0004 Decision A).
-   * Foreground runs are rendered by the `subagent` tool's inline `onUpdate` stream,
-   * so funneling both `listAgents()` call sites through this accessor applies the
-   * background predicate exactly once at the source.
-   *
-   * The predicate reads the mode of the record's current run, so an agent
-   * resumed in the background shows in the widget regardless of the mode it was
-   * spawned in, and one resumed in the foreground streams inline instead. It
-   * formerly re-derived it from a per-call display snapshot only the tool door
-   * ever built — so every SDK-spawned agent was filtered out permanently (#724).
-   */
-  private listBackgroundAgents(): Subagent[] {
-    return this.manager.listAgents().filter((record) => record.isBackground);
-  }
-
-  /** Project a live Subagent record onto a pure-data WidgetAgent snapshot. */
-  private toWidgetAgent(record: Subagent): WidgetAgent {
-    // Every optional field is attached only when the record has one: an absent
-    // key and a key explicitly set to undefined are different facts, and only
-    // the first one says "the record never had one".
-    return defined({
-      id: record.id,
-      type: record.type,
-      status: record.status,
-      description: record.description,
-      toolUses: record.toolUses,
-      startedAt: record.startedAt,
-      lifetimeUsage: record.lifetimeUsage,
-      compactionCount: record.compactionCount,
-      activeTools: record.activeTools,
-      responseText: record.responseText,
-      completedAt: record.completedAt,
-      error: record.error,
-      turnBudget: record.turnBudget,
-      model: record.modelIdentity,
-      contextPercent: record.getContextPercent(),
-    });
+  /** Background filtering and live-record projection belong to the source adapter. */
+  private listBackgroundAgents(): readonly WidgetAgent[] {
+    return this.source.listAgents();
   }
 
   /** Delegate rendering to the pure widget-renderer module. */
   private renderWidget(tui: TuiSurface, theme: Theme): string[] {
     return renderWidgetLines({
-      agents: this.listBackgroundAgents().map((r) => this.toWidgetAgent(r)),
+      agents: this.listBackgroundAgents(),
       registry: this.registry,
       spinnerFrame: this.widgetFrame,
       terminalWidth: tui.terminal.columns,

@@ -43,22 +43,17 @@ import {
   type TuiMouseEventResult,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
-import {
-  readPersistedRuns,
-  type SessionEntryLike,
-} from "#src/persisted-record";
-import { formatModel, type ModelIdentity, type Theme } from "#src/ui/display";
-import { labeledRule } from "#src/ui/labeled-rule";
-import {
-  type EntryHeading,
-  fileSnapshotSource,
-  listNavigableAgents,
-  liveSource,
-  type NavigableSubagent,
-  type TranscriptSource,
-} from "#src/ui/session-navigation";
-import { TranscriptContent } from "#src/ui/transcript-content";
+import { formatModel } from "./display";
+import type { AgentDefinitionLookup, ModelIdentity, Theme } from "./display";
+import { labeledRule } from "./labeled-rule";
+import { fileSnapshotSource, listNavigableAgents } from "./session-navigation";
+import type {
+  EntryHeading,
+  NavigableSubagent,
+  PersistedNavigationRun,
+  TranscriptSource,
+} from "./session-navigation";
+import { TranscriptContent } from "./transcript-content";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -136,9 +131,9 @@ export interface SessionNavigatorParams {
   /** Working directory for tool-call rendering (relative path display). */
   cwd: string;
   /** Reads a persisted session file for the file-snapshot source. */
-  readFile: (path: string) => string;
-  /** The parent session's entries, whose run records outlive the manager's. */
-  sessionEntries: readonly SessionEntryLike[];
+  readFile: (path: string) => string | Promise<string>;
+  /** Validated past-run projections supplied by the runtime. */
+  persisted: readonly PersistedNavigationRun[];
 }
 
 /** How a scroll move treats following new output; by default it follows when it lands on the bottom. */
@@ -164,10 +159,9 @@ export interface TranscriptPaneOptions {
  * Handler for the `/subagents:sessions` slash command.
  *
  * Lists navigable subagents, lets the operator pick one, and opens its transcript
- * read-only. Receives the agent snapshot (`manager.listAgents()`) rather than the
- * manager, so it stays a reactive consumer with no inbound call into the core.
- * The session's entries add the runs it recorded that the manager no longer
- * holds, such as those from before a `/reload`.
+ * read-only. Receives UI projections with narrow transcript readers rather than
+ * a manager or live sessions. Validated past runs add entries the runtime no
+ * longer holds, such as those from before a `/reload`.
  */
 export class SessionNavigatorHandler {
   async handle({
@@ -176,13 +170,9 @@ export class SessionNavigatorHandler {
     registry,
     cwd,
     readFile,
-    sessionEntries,
+    persisted,
   }: SessionNavigatorParams): Promise<void> {
-    const entries = listNavigableAgents(
-      agents,
-      registry,
-      readPersistedRuns(sessionEntries),
-    );
+    const entries = listNavigableAgents(agents, registry, persisted);
     if (entries.length === 0) {
       ui.notify("No subagent sessions to view.", "info");
       return;
@@ -199,8 +189,8 @@ export class SessionNavigatorHandler {
     try {
       source =
         entry.kind === "live"
-          ? liveSource(entry.record)
-          : fileSnapshotSource(entry.outputFile, readFile);
+          ? entry.source
+          : await fileSnapshotSource(entry.outputFile, readFile);
     } catch {
       ui.notify("Could not read the session transcript file.", "error");
       return;

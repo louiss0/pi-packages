@@ -1,7 +1,10 @@
 import { getMarkdownTheme, initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { AgentSessionEvent, SessionMessage } from "#src/types";
+import type {
+  TranscriptEvent,
+  SessionMessage,
+} from "#src/ui/session-navigation";
 import type { TranscriptSource } from "#src/ui/session-navigation";
 import { TranscriptContent } from "#src/ui/transcript-content";
 import { fakeSource, mockTui } from "#test/helpers/transcript-fixtures";
@@ -266,7 +269,7 @@ describe("TranscriptContent", () => {
           timestamp: 1,
         } as unknown as SessionMessage,
       ];
-      content.apply({ type: "message_end" } as AgentSessionEvent);
+      content.apply({ type: "message_end" } as TranscriptEvent);
       const out = rendered(content);
 
       expect(out).toContain("settling answer");
@@ -444,7 +447,7 @@ describe("TranscriptContent", () => {
 
       (history[1] as unknown as { content: string }).content =
         "mutated in place";
-      content.apply({ type: "agent_end" } as AgentSessionEvent);
+      content.apply({ type: "agent_end" } as TranscriptEvent);
 
       expect(rendered(content)).toContain("mutated in place");
     });
@@ -456,7 +459,7 @@ describe("TranscriptContent", () => {
 
       (history[1] as unknown as { content: string }).content =
         "replaced by compaction";
-      content.apply({ type: "compaction_end" } as AgentSessionEvent);
+      content.apply({ type: "compaction_end" } as TranscriptEvent);
 
       expect(rendered(content)).toContain("replaced by compaction");
     });
@@ -523,7 +526,7 @@ describe("TranscriptContent", () => {
 });
 
 /** A `message_update` carrying an in-flight assistant message with text. */
-function partialAssistant(text: string): AgentSessionEvent {
+function partialAssistant(text: string): TranscriptEvent {
   return {
     type: "message_update",
     message: {
@@ -532,11 +535,11 @@ function partialAssistant(text: string): AgentSessionEvent {
       stopReason: "stop",
       timestamp: 1,
     },
-  } as unknown as AgentSessionEvent;
+  } as unknown as TranscriptEvent;
 }
 
 /** A `message_start` carrying an in-flight assistant message with a thinking trace. */
-function thinkingAssistant(thinking: string): AgentSessionEvent {
+function thinkingAssistant(thinking: string): TranscriptEvent {
   return {
     type: "message_start",
     message: {
@@ -545,7 +548,7 @@ function thinkingAssistant(thinking: string): AgentSessionEvent {
       stopReason: "stop",
       timestamp: 1,
     },
-  } as unknown as AgentSessionEvent;
+  } as unknown as TranscriptEvent;
 }
 
 /**
@@ -553,8 +556,8 @@ function thinkingAssistant(thinking: string): AgentSessionEvent {
  * before notifying listeners, so the event body carries nothing the consumer
  * needs beyond its type.
  */
-function settled(): AgentSessionEvent {
-  return { type: "message_end" } as AgentSessionEvent;
+function settled(): TranscriptEvent {
+  return { type: "message_end" } as TranscriptEvent;
 }
 
 function userMessage(text: string): SessionMessage {

@@ -8,11 +8,13 @@
  * result-renderer.ts pattern used by the subagent tool's renderer.
  */
 
-import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
-import { renderOutcomeIcon } from "#src/tools/result-renderer";
-import type { Theme } from "#src/ui/display";
-import { GLYPHS } from "#src/ui/glyphs";
+import type {
+  AgentStatus as SubagentStatus,
+  TurnBudget,
+} from "./view-types.js";
+import { renderOutcomeIcon } from "./result-renderer.js";
+import type { Theme } from "./display.js";
+import { GLYPHS } from "./glyphs.js";
 
 /** How many report lines the expanded view draws before it defers to the transcript. */
 export const MAX_EXPANDED_LINES = 50;
@@ -32,27 +34,27 @@ export const PREVIEW_CHARS = 200;
 export interface GetResultDetails {
   // A read view over a live record: every optional also takes an explicit
   // `undefined`, so a fixture can clear a defaulted field in one call.
-  agentId: string;
-  displayName: string;
-  status: SubagentStatus;
-  description: string;
-  toolUses: number;
+  readonly agentId: string;
+  readonly displayName: string;
+  readonly status: SubagentStatus;
+  readonly description: string;
+  readonly toolUses: number;
   /** Pre-formatted lifetime token total; "" when zero. */
-  tokens: string;
-  contextPercent: number | null;
-  compactionCount: number;
+  readonly tokens: string;
+  readonly contextPercent: number | null;
+  readonly compactionCount: number;
   /** Pre-formatted duration string. */
-  duration: string;
+  readonly duration: string;
   /** First non-empty line of the result body, clipped. Never the whole result. */
-  preview?: string | undefined;
-  error?: string | undefined;
+  readonly preview?: string | undefined;
+  readonly error?: string | undefined;
   /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget | undefined;
+  readonly turnBudget?: TurnBudget | undefined;
   /** Whether the conversation was requested, so the expanded view can say where it went. */
-  verbose: boolean;
-  transcriptPath?: string | undefined;
+  readonly verbose: boolean;
+  readonly transcriptPath?: string | undefined;
   /** The model's `provider/id`; optional because details persisted by older versions lack it. */
-  modelName?: string;
+  readonly modelName?: string;
 }
 
 /**

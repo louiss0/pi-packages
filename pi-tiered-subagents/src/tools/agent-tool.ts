@@ -1,10 +1,8 @@
 import type {
   AgentToolResult,
   ExtensionContext,
-  ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
@@ -32,11 +30,10 @@ import {
   textResult,
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
-import { renderAgentResult } from "#src/tools/result-renderer";
+import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
 import type { SpawnPresentation } from "#src/tools/spawn-config";
 import type { Subagent } from "#src/types";
-import { type AgentDetails, getDisplayName, type Theme } from "#src/ui/display";
-import { GLYPHS } from "#src/ui/glyphs";
+import { type AgentDetails, getDisplayName } from "#src/ui/display";
 
 // ---- Deps interfaces ----
 
@@ -320,41 +317,7 @@ ${guidelines}
         ),
       }),
 
-      // ---- Custom rendering: inline subagent results ----
-
-      renderCall(args: Record<string, unknown>, theme: Theme) {
-        const displayName = args.subagent_type
-          ? getDisplayName(args.subagent_type as string, registry)
-          : "Subagent";
-        const desc = (args.description as string | undefined) ?? "";
-        return new Text(
-          `${GLYPHS.toolCall} ` +
-            theme.fg("toolTitle", theme.bold(displayName)) +
-            (desc ? "  " + theme.fg("muted", desc) : ""),
-          0,
-          0,
-        );
-      },
-
-      renderResult(
-        result: AgentToolResult<AgentDetails | undefined>,
-        { expanded, isPartial }: ToolRenderResultOptions,
-        theme: Theme,
-      ) {
-        const details = result.details;
-        if (!details) {
-          const text =
-            result.content[0]?.type === "text" ? result.content[0].text : "";
-          return new Text(text, 0, 0);
-        }
-        const resultText =
-          result.content[0]?.type === "text" ? result.content[0].text : "";
-        return new Text(
-          renderAgentResult(details, resultText, expanded, isPartial, theme),
-          0,
-          0,
-        );
-      },
+      ...createAgentToolRenderer((type) => getDisplayName(type, registry)),
 
       execute: (
         toolCallId: string,

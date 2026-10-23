@@ -1,22 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import { AgentRegistry } from "#src/agents/registry";
-import type { PersistedRunSummary } from "#src/persisted-record";
-import type { AgentSessionEvent, SessionMessage } from "#src/types";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
+import type { PersistedNavigationRun } from "#src/ui/session-navigation";
 import {
   fileSnapshotSource,
   listNavigableAgents,
-  liveSource,
-  type NavigableSubagent,
   type NavigationEntry,
-  type TranscriptSource,
 } from "#src/ui/session-navigation";
-import { makeNavigable } from "#test/helpers/make-navigable";
+import { fakeSource } from "#test/helpers/transcript-fixtures";
+import { makeNavigable } from "#test/ui/helpers/make-navigable";
 
-const registry = new AgentRegistry(() => ({
-  global: { definitions: [], errors: [] },
-  project: { definitions: [], errors: [] },
-}));
+const registry = makeDefinitionLookup();
 
 /**
  * The single entry a one-record input produces. These cases assert on one
@@ -35,18 +29,18 @@ describe("listNavigableAgents", () => {
   });
 
   it("makes a session-ready record a live entry", () => {
-    const ready = makeNavigable({ id: "ready", isSessionReady: () => true });
+    const ready = makeNavigable({ id: "ready", transcript: fakeSource() });
     const entries = listNavigableAgents([ready], registry, []);
     expect(entries).toHaveLength(1);
     const entry = onlyEntry(entries);
     expect(entry.kind).toBe("live");
-    expect(entry.kind === "live" && entry.record).toBe(ready);
+    expect(entry.kind === "live" && entry.source).toBe(ready.transcript);
   });
 
   it("makes a released record (no live session, has outputFile) a snapshot entry", () => {
     const released = makeNavigable({
       id: "released",
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: "/tasks/released-1.jsonl",
       description: "Investigate the bug",
       toolUses: 3,
@@ -64,7 +58,7 @@ describe("listNavigableAgents", () => {
   it("drops a record with neither a live session nor an outputFile", () => {
     const gone = makeNavigable({
       id: "gone",
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: undefined,
     });
     expect(listNavigableAgents([gone], registry, [])).toEqual([]);
@@ -101,7 +95,7 @@ describe("listNavigableAgents", () => {
 
     it("names a snapshot entry's agent, mode, and task", () => {
       const released = makeNavigable({
-        isSessionReady: () => false,
+        transcript: undefined,
         outputFile: "/tasks/released-1.jsonl",
         description: "Investigate the bug",
       });
@@ -128,10 +122,10 @@ describe("listNavigableAgents", () => {
   });
 
   it("orders live entries before snapshot ones, and persisted runs last", () => {
-    const live = makeNavigable({ id: "live-1", isSessionReady: () => true });
+    const live = makeNavigable({ id: "live-1", transcript: fakeSource() });
     const released = makeNavigable({
       id: "released-1",
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: "/tasks/x.jsonl",
     });
     const persisted = persistedRun({
@@ -140,9 +134,9 @@ describe("listNavigableAgents", () => {
     });
     const sources = listNavigableAgents([live, released], registry, [
       persisted,
-    ]).map((e) => (e.kind === "live" ? e.record.id : e.outputFile));
+    ]).map((e) => (e.kind === "live" ? e.source : e.outputFile));
     expect(sources).toEqual([
-      "live-1",
+      live.transcript,
       "/tasks/x.jsonl",
       "/tasks/earlier.jsonl",
     ]);
@@ -168,7 +162,7 @@ describe("listNavigableAgents", () => {
     });
 
     it("lists a run the manager still holds once, from the manager", () => {
-      const live = makeNavigable({ id: "earlier", isSessionReady: () => true });
+      const live = makeNavigable({ id: "earlier", transcript: fakeSource() });
       const entries = listNavigableAgents([live], registry, [
         persistedRun({ id: "earlier" }),
       ]);
@@ -186,8 +180,8 @@ describe("listNavigableAgents", () => {
 });
 
 function persistedRun(
-  overrides: Patch<PersistedRunSummary> = {},
-): PersistedRunSummary {
+  overrides: Patch<PersistedNavigationRun> = {},
+): PersistedNavigationRun {
   // `outputFile` defaults to absent for the same reason makeAgent's
   // `completedAt` does: an override bag cannot unset a defaulted value, and
   // "a run that recorded no transcript" is exactly the absent key.
@@ -203,78 +197,6 @@ function persistedRun(
     ...defined(overrides),
   };
 }
-
-describe("liveSource", () => {
-  it("getMessages returns the record's agentMessages", () => {
-    const messages = [
-      { role: "user", content: "hi" },
-    ] as unknown as SessionMessage[];
-    const record = makeNavigable({ agentMessages: messages });
-    expect(liveSource(record).getMessages()).toBe(messages);
-  });
-
-  it("subscribe delegates to subscribeToUpdates and forwards change notifications", () => {
-    let captured: ((event: unknown) => void) | undefined;
-    const unsub = vi.fn();
-    const record = makeNavigable({
-      subscribeToUpdates: vi.fn((fn: (event: unknown) => void) => {
-        captured = fn;
-        return unsub;
-      }) as NavigableSubagent["subscribeToUpdates"],
-    });
-    const onChange = vi.fn();
-    const returned = liveSource(record).subscribe(onChange);
-    expect(record.subscribeToUpdates).toHaveBeenCalledOnce();
-    const event = { type: "turn_end" } as AgentSessionEvent;
-    captured?.(event);
-    // The event is forwarded, not merely counted: the consumer routes on its
-    // type to decide whether a streaming delta or a settled message arrived.
-    expect(onChange).toHaveBeenCalledWith(event);
-    expect(returned).toBe(unsub);
-  });
-
-  it("streaming returns activity state only while running", () => {
-    const activeTools = new Map([["k", "read"]]);
-    const running = makeNavigable({
-      status: "running",
-      activeTools,
-      responseText: "working",
-    });
-    expect(liveSource(running).streaming()).toEqual({
-      activeTools,
-      responseText: "working",
-    });
-
-    const completed = makeNavigable({ status: "completed" });
-    expect(liveSource(completed).streaming()).toBeUndefined();
-  });
-
-  it("sessionModel reads the record's model and thinking level at call time", () => {
-    const record: {
-      -readonly [K in keyof NavigableSubagent]: NavigableSubagent[K];
-    } = makeNavigable();
-    const source = liveSource(record);
-    expect(source.sessionModel()).toEqual({
-      model: undefined,
-      thinkingLevel: undefined,
-    });
-    record.model = { provider: "anthropic", id: "claude-sonnet-5" };
-    record.thinkingLevel = "high";
-    expect(source.sessionModel()).toEqual({
-      model: { provider: "anthropic", id: "claude-sonnet-5" },
-      thinkingLevel: "high",
-    });
-  });
-
-  it("getToolDefinition delegates to the record's getToolDefinition", () => {
-    const def = { name: "read" } as unknown as ReturnType<
-      TranscriptSource["getToolDefinition"]
-    >;
-    const record = makeNavigable({ getToolDefinition: vi.fn(() => def) });
-    expect(liveSource(record).getToolDefinition("read")).toBe(def);
-    expect(record.getToolDefinition).toHaveBeenCalledWith("read");
-  });
-});
 
 describe("fileSnapshotSource", () => {
   const SESSION_JSONL = [
@@ -303,9 +225,9 @@ describe("fileSnapshotSource", () => {
     .map((entry) => JSON.stringify(entry))
     .join("\n");
 
-  it("reads the file, drops the session header, and returns the parsed messages", () => {
+  it("reads the file, drops the session header, and returns the parsed messages", async () => {
     const readFile = vi.fn(() => SESSION_JSONL);
-    const source = fileSnapshotSource("/tasks/agent.jsonl", readFile);
+    const source = await fileSnapshotSource("/tasks/agent.jsonl", readFile);
     expect(readFile).toHaveBeenCalledWith("/tasks/agent.jsonl");
     expect(source.getMessages()).toEqual([
       { role: "user", content: "do the thing" },
@@ -313,8 +235,8 @@ describe("fileSnapshotSource", () => {
     ]);
   });
 
-  it("is a static snapshot: no subscription, no streaming, no tool definitions", () => {
-    const source = fileSnapshotSource(
+  it("is a static snapshot: no subscription, no streaming, no tool definitions", async () => {
+    const source = await fileSnapshotSource(
       "/tasks/agent.jsonl",
       () => SESSION_JSONL,
     );
@@ -324,7 +246,7 @@ describe("fileSnapshotSource", () => {
   });
 
   describe("sessionModel", () => {
-    it("reports the model and thinking level the session recorded", () => {
+    it("reports the model and thinking level the session recorded", async () => {
       const jsonl = [
         SESSION_JSONL,
         JSON.stringify({
@@ -343,14 +265,17 @@ describe("fileSnapshotSource", () => {
           thinkingLevel: "medium",
         }),
       ].join("\n");
-      const source = fileSnapshotSource("/tasks/agent.jsonl", () => jsonl);
+      const source = await fileSnapshotSource(
+        "/tasks/agent.jsonl",
+        () => jsonl,
+      );
       expect(source.sessionModel()).toEqual({
         model: { provider: "anthropic", id: "claude-sonnet-5" },
         thinkingLevel: "medium",
       });
     });
 
-    it("reports the model the last assistant message ran on", () => {
+    it("reports the model the last assistant message ran on", async () => {
       const jsonl = [
         SESSION_JSONL,
         JSON.stringify({
@@ -366,15 +291,18 @@ describe("fileSnapshotSource", () => {
           },
         }),
       ].join("\n");
-      const source = fileSnapshotSource("/tasks/agent.jsonl", () => jsonl);
+      const source = await fileSnapshotSource(
+        "/tasks/agent.jsonl",
+        () => jsonl,
+      );
       expect(source.sessionModel().model).toEqual({
         provider: "openai",
         id: "gpt-6",
       });
     });
 
-    it("reports no model for a session whose entries name none", () => {
-      const source = fileSnapshotSource(
+    it("reports no model for a session whose entries name none", async () => {
+      const source = await fileSnapshotSource(
         "/tasks/agent.jsonl",
         () => SESSION_JSONL,
       );
@@ -382,7 +310,7 @@ describe("fileSnapshotSource", () => {
     });
   });
 
-  it("returns an empty transcript for a header-only file", () => {
+  it("returns an empty transcript for a header-only file", async () => {
     const headerOnly = JSON.stringify({
       type: "session",
       version: 3,
@@ -390,7 +318,10 @@ describe("fileSnapshotSource", () => {
       timestamp: "2026-06-23T00:00:00Z",
       cwd: "/proj",
     });
-    const source = fileSnapshotSource("/tasks/empty.jsonl", () => headerOnly);
+    const source = await fileSnapshotSource(
+      "/tasks/empty.jsonl",
+      () => headerOnly,
+    );
     expect(source.getMessages()).toEqual([]);
   });
 });

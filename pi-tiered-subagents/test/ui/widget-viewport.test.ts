@@ -15,10 +15,9 @@ import {
   TuiMainScreen,
 } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentRegistry } from "#src/agents/registry";
-import type { SubagentManager } from "#src/lifecycle/subagent-manager";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
 import { AgentWidget, type UICtx } from "#src/ui/agent-widget";
-import { createTestSubagent } from "#test/helpers/make-subagent";
+import { makeWidgetAgent } from "#test/ui/helpers/make-widget-agent";
 
 /** A `Terminal` that reports fixed dimensions and discards every write. */
 function fakeTerminal(columns: number, rows: number): Terminal {
@@ -71,22 +70,15 @@ function animateUnderRealRenderer(opts: {
   ticks: number;
 }) {
   const records = Array.from({ length: opts.agents }, (_, i) =>
-    createTestSubagent({
+    makeWidgetAgent({
       id: `a${i}`,
       status: "running",
       completedAt: undefined,
-      isBackground: true,
       description: `task ${i}`,
     }),
   );
-  const manager = { listAgents: () => records } as unknown as SubagentManager;
-  const widget = new AgentWidget(
-    manager,
-    new AgentRegistry(() => ({
-      global: { definitions: [], errors: [] },
-      project: { definitions: [], errors: [] },
-    })),
-  );
+  const manager = { listAgents: () => records };
+  const widget = new AgentWidget(manager, makeDefinitionLookup());
 
   const tui = new TuiMainScreen(
     fakeTerminal(100, opts.rows),
@@ -197,22 +189,15 @@ describe("AgentWidget cadence under Pi's real renderers", () => {
 
   /** Milliseconds until the widget first asks this renderer for a frame. */
   function firstTickAfter(tui: TuiAltScreen | TuiMainScreen): number {
-    const record = createTestSubagent({
+    const record = makeWidgetAgent({
       id: "a1",
       status: "running",
       completedAt: undefined,
-      isBackground: true,
     });
     const manager = {
       listAgents: () => [record],
-    } as unknown as SubagentManager;
-    const widget = new AgentWidget(
-      manager,
-      new AgentRegistry(() => ({
-        global: { definitions: [], errors: [] },
-        project: { definitions: [], errors: [] },
-      })),
-    );
+    };
+    const widget = new AgentWidget(manager, makeDefinitionLookup());
     const theme = {
       fg: (_: string, text: string) => text,
       bold: (text: string) => text,

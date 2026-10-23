@@ -11,10 +11,11 @@ import {
 } from "@earendil-works/pi-tui";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import { AgentRegistry } from "#src/agents/registry";
-import type { SessionMessage } from "#src/types";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
+import type { SessionMessage } from "#src/ui/session-navigation";
 import {
   type EntryHeading,
+  type PersistedNavigationRun,
   listNavigableAgents,
   type SessionModel,
   type TranscriptSource,
@@ -25,13 +26,10 @@ import {
   type SessionNavigatorParams,
   TranscriptPane,
 } from "#src/ui/session-navigator";
-import { makeNavigable } from "#test/helpers/make-navigable";
+import { makeNavigable } from "#test/ui/helpers/make-navigable";
 import { fakeSource, mockTui } from "#test/helpers/transcript-fixtures";
 
-const registry = new AgentRegistry(() => ({
-  global: { definitions: [], errors: [] },
-  project: { definitions: [], errors: [] },
-}));
+const registry = makeDefinitionLookup();
 
 // Pi's per-entry components read the global interactive theme; Pi initializes it
 // at startup before any command runs. Tests must initialize it explicitly.
@@ -686,7 +684,7 @@ describe("SessionNavigatorHandler", () => {
       registry,
       cwd: "/test/cwd",
       readFile: noReadFile,
-      sessionEntries: [],
+      persisted: [],
       ...defined(overrides),
     });
   }
@@ -694,7 +692,7 @@ describe("SessionNavigatorHandler", () => {
   it("notifies and skips the pane when no sessions are navigable", async () => {
     const ui = makeUI();
     const notReady = makeNavigable({
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: undefined,
     });
     await handleWith(ui, [notReady]);
@@ -719,7 +717,13 @@ describe("SessionNavigatorHandler", () => {
         content: [{ type: "text", text: "picked agent reply" }],
       },
     ] as unknown as SessionMessage[];
-    const record = makeNavigable({ agentMessages: messages });
+    const getToolDefinition = vi.fn(() => undefined);
+    const record = makeNavigable({
+      transcript: fakeSource({
+        getMessages: () => messages,
+        getToolDefinition,
+      }),
+    });
     const [label] = (() => {
       // The handler labels entries identically to listNavigableAgents.
       return ["Worker (Test task) · 2 tools · completed · 3.0s"];
@@ -732,7 +736,7 @@ describe("SessionNavigatorHandler", () => {
     // Invariant #423: the handler is a reactive consumer — it sources the
     // transcript and never reads tool definitions off the record itself; only
     // the pane does, lazily, through the TranscriptSource at render time.
-    expect(record.getToolDefinition).not.toHaveBeenCalled();
+    expect(getToolDefinition).not.toHaveBeenCalled();
     // Invoke the captured component factory and render to confirm it is sourced from the picked record.
     expect(
       renderCapturedPane(ui).some((l) => l.includes("picked agent reply")),
@@ -828,7 +832,7 @@ describe("SessionNavigatorHandler", () => {
       startedAt: 1000,
       completedAt: 4000,
       toolUses: 5,
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: "/tasks/e1.jsonl",
     });
     const ui = makeUI(
@@ -845,27 +849,22 @@ describe("SessionNavigatorHandler", () => {
   });
 
   describe("after the manager lost its records (a reload)", () => {
-    const recordEntry = {
-      type: "custom",
-      customType: "subagents:record",
-      data: {
-        id: "e1",
-        type: "worker",
-        description: "Old task",
-        status: "completed",
-        result: "done",
-        startedAt: 1000,
-        completedAt: 4000,
-        outputFile: "/tasks/e1.jsonl",
-        toolUses: 5,
-      },
-    };
+    const recordedRun = {
+      id: "e1",
+      type: "worker",
+      description: "Old task",
+      status: "completed",
+      startedAt: 1000,
+      completedAt: 4000,
+      outputFile: "/tasks/e1.jsonl",
+      toolUses: 5,
+    } satisfies PersistedNavigationRun;
     const label =
       "Worker (Old task) · 5 tools · completed · 3.0s · session released (snapshot)";
 
     it("offers the runs the session recorded", async () => {
       const ui = makeUI(undefined);
-      await handleWith(ui, [], { sessionEntries: [recordEntry] });
+      await handleWith(ui, [], { persisted: [recordedRun] });
       expect(ui.notify).not.toHaveBeenCalled();
       expect(ui.select).toHaveBeenCalledWith("Subagent sessions", [label]);
     });
@@ -881,7 +880,7 @@ describe("SessionNavigatorHandler", () => {
         }),
       );
       const ui = makeUI(label);
-      await handleWith(ui, [], { sessionEntries: [recordEntry], readFile });
+      await handleWith(ui, [], { persisted: [recordedRun], readFile });
       expect(readFile).toHaveBeenCalledWith("/tasks/e1.jsonl");
       expect(mountedPaneFactory(ui)).toEqual(expect.any(Function));
     });
@@ -898,7 +897,7 @@ describe("SessionNavigatorHandler", () => {
       startedAt: 1000,
       completedAt: 4000,
       toolUses: 5,
-      isSessionReady: () => false,
+      transcript: undefined,
       outputFile: "/tasks/e1.jsonl",
     });
     const ui = makeUI(

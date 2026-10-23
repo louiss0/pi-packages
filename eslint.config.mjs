@@ -70,6 +70,34 @@ export default [
     rules: {},
   },
   {
+    files: ['pi-tiered-subagents/src/**/*.ts', 'pi-tiered-subagents/extensions/**/*.ts'],
+    ignores: ['pi-tiered-subagents/src/ui/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@earendil-works/pi-tui', '@earendil-works/pi-tui/*'],
+          message: 'Terminal presentation belongs in the src/ui module.',
+        }],
+      }],
+    },
+  },
+  {
+    files: ['pi-tiered-subagents/src/ui/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@earendil-works/pi-coding-agent',
+          importNames: ['ExtensionAPI'],
+          message: 'Only the runtime extension root owns host registrations.',
+        }],
+        patterns: [{
+          group: ['#src/agents/*', '#src/lifecycle/*', '#src/observation/*', '#src/service/*', '#src/tools/*', '#src/presentation/*', '@code-fixer-23/pi-tiered-subagents', '@code-fixer-23/pi-tiered-subagents/*'],
+          message: 'The UI module consumes owned views/actions, not execution implementation.',
+        }],
+      }],
+    },
+  },
+  {
     // pi-tiered-subagents carries a runtime recovered from an upstream project
     // that deliberately relaxed these rules for its own tree: the Pi SDK types
     // are `Model<any>`-shaped, its `Component` implementations have empty

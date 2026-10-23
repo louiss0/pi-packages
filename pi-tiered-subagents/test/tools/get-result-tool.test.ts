@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import type { TurnLoopResult } from "#src/lifecycle/subagent-session";
-import {
-  MAX_EXPANDED_LINES,
-  PREVIEW_CHARS,
-} from "#src/tools/get-result-renderer";
+import { MAX_EXPANDED_LINES, PREVIEW_CHARS } from "#src/ui/get-result-renderer";
 import {
   type GetResultParams,
   GetResultTool,

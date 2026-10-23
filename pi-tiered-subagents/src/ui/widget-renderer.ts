@@ -6,18 +6,11 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
-import {
-  isActiveStatus,
-  type SubagentStatus,
-} from "#src/lifecycle/subagent-state";
-import {
-  type TurnBudget,
-  wrappedUpAtTurnLimit,
-} from "#src/lifecycle/turn-limits";
-import type { LifetimeUsage } from "#src/lifecycle/usage";
-import { getLifetimeTotal } from "#src/lifecycle/usage";
-import type { SubagentType } from "#src/types";
+import type {
+  AgentDefinitionLookup,
+  TurnBudget,
+  WidgetAgent,
+} from "./view-types.js";
 import {
   describeActivity,
   formatModel,
@@ -25,35 +18,12 @@ import {
   formatSessionTokens,
   formatTurnBudget,
   getDisplayName,
-  type ModelIdentity,
   type Theme,
-} from "#src/ui/display";
-import { GLYPHS, spinnerAt } from "#src/ui/glyphs";
+} from "./display.js";
+import { GLYPHS, spinnerAt } from "./glyphs.js";
+import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
-// ── Data interfaces ──────────────────────────────────────────────────────────
-
-/** Minimal agent snapshot for rendering — no class methods, no mutation surface. */
-export interface WidgetAgent {
-  readonly id: string;
-  readonly type: SubagentType;
-  readonly status: SubagentStatus;
-  readonly description: string;
-  readonly toolUses: number;
-  readonly startedAt: number;
-  readonly completedAt?: number | undefined;
-  readonly error?: string | undefined;
-  readonly lifetimeUsage?: Readonly<LifetimeUsage> | undefined;
-  readonly compactionCount: number;
-  // Live activity (folded from the former WidgetActivity — precomputed by AgentWidget)
-  /** The run's turn budget; absent until its turn loop starts. */
-  readonly turnBudget?: TurnBudget | undefined;
-  readonly activeTools: ReadonlyMap<string, string>;
-  readonly responseText: string;
-  /** Context-window utilisation (0–100), or null when unavailable. */
-  readonly contextPercent: number | null;
-  /** The model the agent runs, once known. */
-  readonly model?: ModelIdentity | undefined;
-}
+export type { WidgetAgent } from "./view-types.js";
 
 // ── Per-agent rendering ──────────────────────────────────────────────────────
 
@@ -108,7 +78,8 @@ export function renderRunningLines(
   const name = getDisplayName(agent.type, registry);
   const elapsed = formatMs(Date.now() - agent.startedAt);
 
-  const tokens = getLifetimeTotal(agent.lifetimeUsage);
+  const usage = agent.lifetimeUsage;
+  const tokens = usage ? usage.input + usage.output + usage.cacheWrite : 0;
   const tokenText =
     tokens > 0
       ? formatSessionTokens(
@@ -195,7 +166,8 @@ function categorizeAgents(
     queued: agents.filter((a) => a.status === "queued"),
     finished: agents.filter(
       (a) =>
-        !isActiveStatus(a.status) &&
+        a.status !== "running" &&
+        a.status !== "queued" &&
         a.completedAt != null &&
         shouldShowFinished(a.id, a.status),
     ),

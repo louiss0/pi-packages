@@ -4,7 +4,7 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: inherited runtime, specified work pending.** The package now typechecks,
-> and passes a 2,256-test characterization suite against Pi 1.3.0. It is loaded
+> and passes 2,314 tests (one skipped) against Pi 1.3.0. It is loaded
 > from TypeScript source, with no build step, so Pi compiles the extension itself.
 > The five scoped specialists, the layered agent definitions, the inherited tool
 > selection, the rejection of unknown agents, the family-aware model selection,
@@ -74,7 +74,9 @@ v25.0.1, which is itself a friendly fork of
   [docs/status.md](docs/status.md).
 
 - **A live widget** and a `/subagents:sessions` transcript viewer, mounted on Pi's
-  own components.
+  own components. All terminal presentation lives in the internal `src/ui/`
+  module, including settings, tool-result, and notification renderers. It is
+  part of this project, not a separate package or extension to enable.
 
 ## Commands
 
@@ -189,8 +191,10 @@ pnpm nx run pi-tiered-subagents:metadata     # package metadata
   [GitHub issue #8](https://github.com/louiss0/pi-packages/issues/8).
 - [Approved architecture and modernization specification](docs/ARCHITECTURE-SPEC.md),
   published as [GitHub issue #9](https://github.com/louiss0/pi-packages/issues/9),
-  with detailed TypeScript/API diagrams and requirements. Implementation is pending;
-  this follow-up supersedes conflicting portions of the original specification.
+  with detailed TypeScript/API diagrams and requirements. Implementation is
+  incremental; the story-92 clarification keeps UI in this project's own module,
+  not a separate package. This follow-up supersedes conflicting portions of the
+  original specification.
 - [Runtime status](docs/status.md) — what is inherited, what changed, what is owed.
 - [Decision records](docs/adr/) — the decisions adopted for this derivative.
 - [Illustrated source guide](docs/how-it-works.html) — open it in a browser.

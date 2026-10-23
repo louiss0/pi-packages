@@ -6,7 +6,7 @@ import type {
   NotificationDetails,
   UpdateDetails,
   WorkspaceNoticeDetails,
-} from "#src/observation/notification";
+} from "#src/ui/notification-renderer";
 import {
   buildPreviewLines,
   buildStatsParts,
@@ -28,7 +28,6 @@ function makeDetails(
   overrides: Patch<NotificationDetails> = {},
 ): NotificationDetails {
   return {
-    id: "agent-1",
     description: "Test agent",
     status: "completed",
     toolUses: 3,
@@ -319,7 +318,6 @@ describe("createNotificationRenderer", () => {
 describe("createUpdateRenderer", () => {
   function makeUpdate(overrides: Patch<UpdateDetails> = {}): UpdateDetails {
     return {
-      id: "agent-1",
       description: "Test agent",
       message: "The bug is in the retry wrapper.",
       ...defined(overrides),
@@ -392,7 +390,6 @@ describe("createWorkspaceNoticeRenderer", () => {
     overrides: Patch<WorkspaceNoticeDetails> = {},
   ): WorkspaceNoticeDetails {
     return {
-      id: "agent-1",
       description: "Test agent",
       notice: "Changes saved to branch `pi-agent-1`.",
       ...defined(overrides),

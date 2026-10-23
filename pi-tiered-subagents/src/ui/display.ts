@@ -6,58 +6,60 @@
  */
 
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
-import type { ResolvedInvocation } from "#src/agents/invocation";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
-import { GLYPHS } from "#src/ui/glyphs";
+import { GLYPHS } from "./glyphs.js";
+import type {
+  AgentDefinitionLookup,
+  AgentStatus,
+  InvocationTags,
+  ModelIdentity,
+  TurnBudget,
+} from "./view-types.js";
+
+export type {
+  AgentDefinitionLookup,
+  InvocationTags,
+  ModelIdentity,
+  TurnBudget,
+} from "./view-types.js";
 
 // ---- Types ----
 
-/** A model as the UI names it. The SDK's `Model` satisfies it structurally. */
-export interface ModelIdentity {
-  readonly provider: string;
-  readonly id: string;
-}
-
-export type Theme = {
+export interface Theme {
   fg(color: ThemeColor, text: string): string;
   bold(text: string): string;
-};
+}
 
 /** Metadata attached to Agent tool results for custom rendering. */
 export interface AgentDetails {
-  displayName: string;
-  description: string;
-  subagentType: string;
-  toolUses: number;
-  tokens: string;
-  durationMs: number;
-  status:
-    | "queued"
-    | "running"
-    | "completed"
-    | "aborted"
-    | "stopped"
-    | "error"
-    | "background";
+  readonly displayName: string;
+  readonly description: string;
+  readonly subagentType: string;
+  readonly toolUses: number;
+  readonly tokens: string;
+  readonly durationMs: number;
+  readonly status: AgentStatus | "background";
   /** Human-readable description of what the agent is currently doing. */
-  activity?: string;
+  readonly activity?: string;
   /** Current spinner frame index (for animated running indicator). */
-  spinnerFrame?: number;
+  readonly spinnerFrame?: number;
   /** The `provider/id` of the model the agent runs (e.g. "anthropic/claude-haiku-4-5"). */
-  modelName?: string;
+  readonly modelName?: string;
   /** Notable config tags (e.g. ["thinking: high", "inherit context"]). */
-  tags?: string[];
-  agentId?: string;
-  error?: string;
+  readonly tags?: readonly string[];
+  readonly agentId?: string;
+  readonly error?: string;
   /** The run's turn budget; absent until its turn loop starts. */
-  turnBudget?: TurnBudget;
+  readonly turnBudget?: TurnBudget;
 }
 
 // ---- Constants ----
 
 /** Statuses that indicate an error/non-success outcome (used for linger behavior and icon rendering). */
-export const ERROR_STATUSES = new Set(["error", "aborted", "stopped"]);
+export const ERROR_STATUSES: ReadonlySet<string> = new Set([
+  "error",
+  "aborted",
+  "stopped",
+]);
 
 /** Tool name → human-readable action for activity descriptions. */
 const TOOL_DISPLAY: Record<string, string> = {
@@ -157,12 +159,6 @@ export function getDisplayName(
   const definition = registry.find(type);
   return definition ? definition.displayName || definition.id : type;
 }
-
-/** The settings a launch resolved, as the tags name them. */
-export type InvocationTags = Pick<
-  ResolvedInvocation,
-  "thinking" | "maxTurns" | "inheritContext" | "runInBackground"
->;
 
 /** Mode label is not included — callers add it where they want it. */
 export function buildInvocationTags(invocation: InvocationTags | undefined): {

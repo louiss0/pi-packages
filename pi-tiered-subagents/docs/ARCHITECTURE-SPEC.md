@@ -4,6 +4,8 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 
 > **Approved design; implementation pending.** Synthesized from the completed maintainer interview, including the final approval of targeted TypeScript/API modernization. This is a follow-up to [issue #8](https://github.com/louiss0/pi-packages/issues/8), not a claim that the proposed architecture is already implemented.
 >
+> **Maintainer clarification (story 92):** terminal presentation is a separate module **inside `pi-tiered-subagents`**, not a separate workspace/npm package. This supersedes the originally published package-extraction requirement; no second package or extension is required.
+>
 > **Authority:** this specification supersedes earlier requirements for extension-owned project-trust gating, foreground concurrency exemptions, mutable launch-time configuration lookup, and preservation of the inherited synchronous programmatic spawn interface. Product behavior not explicitly changed here remains governed by the original specification and accepted decisions.
 
 ## Problem Statement
@@ -20,7 +22,7 @@ Provide one session-scoped `Subagents` module for model-facing and programmatic 
 
 Make asynchronous acceptance distinct from waiting for completion. Apply one concurrency cap to every initial and resumed run, preserve capability-based workspace serialization, and make cancellation and parent-session lifetime explicit. Present records and progress by value rather than exposing live execution objects.
 
-Keep Pi registration and host adaptation at the extension root. Use focused SDK adapters behind package-owned contracts, and extract all terminal presentation into a separate source-shipped UI library that the runtime loads. Use strict, modern TypeScript to enforce the resulting interfaces, backed by behavior tests, focused SDK integration checks, and automatic dependency rules.
+Keep Pi registration and host adaptation at the extension root. Use focused SDK adapters behind package-owned contracts, and extract all terminal presentation into a separate UI module within the same source-shipped project. Use strict, modern TypeScript to enforce the resulting interfaces, backed by behavior tests, focused SDK integration checks, and automatic dependency rules.
 
 ### Visual overview
 
@@ -35,7 +37,7 @@ flowchart TB
     MANAGER[Execution manager<br/>admission and records]
     CHILD[ChildSession interface]
     SDK[SDK-backed adapters]
-    UI[Separate UI library<br/>terminal presentation only]
+    UI[Internal UI module<br/>terminal presentation only]
     ROOT --> TOOL
     TOOL --> APP
     PROG --> APP
@@ -168,9 +170,9 @@ The arrows describe responsibilities and information flow, not a requirement to 
 
 ### Extracted terminal presentation
 
-92. As a maintainer, I want all terminal presentation in a separate UI library, so that the runtime contains no TUI implementation.
+92. As a maintainer, I want all terminal presentation in a separate module inside the pi-tiered-subagents project, so that execution modules contain no TUI implementation.
 93. As a user, I want the runtime to load and register that library, so that extraction does not require enabling a second independent extension.
-94. As a maintainer, I want the dependency to point from runtime extension to UI package only, so that the library never imports execution implementation.
+94. As a maintainer, I want the runtime to adapt to UI-owned contracts, so that the UI module never imports execution implementation.
 95. As a developer, I want UI-owned narrow view/action contracts, so that presentation can be tested without a live manager or SDK child.
 96. As a user, I want the widget, transcript viewer, and settings views preserved, so that architecture improvement does not remove useful workflows.
 97. As a maintainer, I want tool-result and notification renderers moved with the other terminal presentation, so that rendering knowledge is not split across packages.
@@ -196,7 +198,7 @@ The arrows describe responsibilities and information flow, not a requirement to 
 114. As a maintainer, I want focused real offline SDK checks, so that recording mocks are not mistaken for proof that actual binding and tool activation work.
 115. As a developer, I want UI contract tests based on owned views and actions, so that presentation can be extracted without copying lifecycle tests into another package.
 116. As a maintainer, I want behavioral and architecture checks rather than class-shape assertions, so that improvements are not blocked by inherited implementation tests.
-117. As a maintainer, I want verification run through workspace Nx targets, so that the new package and affected siblings respect the repository's tooling policy.
+117. As a maintainer, I want verification run through workspace Nx targets, so that the project and affected siblings respect the repository's tooling policy.
 
 ### Independent ownership and migration cleanup
 
@@ -402,12 +404,12 @@ flowchart TB
     PRESENT --> DEAD[Owner ended<br/>old references reject]
 ```
 
-### 10. UI library and package direction
+### 10. Internal UI module and dependency direction
 
-- Extract one source-shipped UI library under the existing workspace package scope, classified as `project:package`. The runtime remains the loaded extension and depends on the library. The library is not a separately enabled extension and must not import the runtime extension.
+- Extract terminal presentation into `src/ui/` within `pi-tiered-subagents`. Do not create a separate workspace/npm package, package manifest, or independently enabled extension. The runtime remains the loaded extension; the UI module must not import execution implementation.
 - Move all terminal presentation together: widget and related rendering, transcript viewer, settings views, tool-call/result renderers, notification renderers, and presentation helpers.
 - The runtime root retains Pi command/tool/message-renderer registrations and wires the library. The library does not receive ExtensionAPI or register through a hidden host reference.
-- The library defines small structural views/actions for agent summaries, progress, transcript reading, settings edits, and presentation lifetime. The runtime adapts its owned values to them. Do not introduce a third shared-contracts package without a real additional need.
+- The UI module defines small structural views/actions for agent summaries, progress, transcript reading, settings edits, and presentation lifetime. Runtime presentation adapters supply those views. Do not introduce a shared-contracts package.
 - Export local/public structural type surfaces, not inferred concrete foreign classes with private fields. SDK/TUI-specific implementation can remain internal to presentation adapters.
 - Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, turn limits, resume eligibility, or execution status.
 - Preserve useful UI behavior rather than redesigning workflows during extraction. Core execution must behave identically with or without presentation consumers. No separate UI service-readiness/event protocol is needed.
@@ -421,7 +423,7 @@ flowchart LR
         ROOT --> CORE
         CORE --> ADAPT
     end
-    subgraph LIB[UI library: project package]
+    subgraph LIB[UI module: same project]
         PORT[UI-owned structural views and actions]
         W[Widget]
         V[Transcript and settings views]
@@ -432,7 +434,7 @@ flowchart LR
     end
     ROOT --> PORT
     ADAPT --> PORT
-    NOTE[No import from UI library back to runtime extension]
+    NOTE[No import from UI module back to execution implementation]
     LIB -. dependency rule .-> NOTE
 ```
 
@@ -450,15 +452,15 @@ Modernization is normative where it strengthens these seams. It is not permissio
 | `unknown` plus runtime validation | Frontmatter, persisted records, JSON settings, and other untrusted-shaped data | Static types cannot validate input bytes | Malformed input produces typed diagnostics at entry |
 | Local structural interfaces | ChildSession, model/loader adapters, handler inputs, UI views/actions | Fakes and real adapters cross the same seam without class casts | Production and test adapters typecheck against the contract |
 | `Record`/mapped types and ordinary utility types | Complete maps over finite owned vocabularies and deliberate narrow views | Localizes completeness checks without inventing a type framework | Missing required map members fail typecheck |
-| `noUncheckedIndexedAccess` | Enable for the refactored runtime and new UI package, staged as needed | Catalog, ladder, array, and queue reads can be absent | Real handling of absence, not added non-null assertions |
-| `exactOptionalPropertyTypes` | Enable for those packages, staged as needed | Omitted differs from explicitly supplied undefined | Fixtures and builders preserve absent/cleared/empty distinctions |
+| `noUncheckedIndexedAccess` | Enable for the runtime and internal UI module, staged as needed | Catalog, ladder, array, and queue reads can be absent | Real handling of absence, not added non-null assertions |
+| `exactOptionalPropertyTypes` | Enable throughout the project, staged as needed | Omitted differs from explicitly supplied undefined | Fixtures and builders preserve absent/cleared/empty distinctions |
 | Strict typing and unknown catch values | Retain strict mode and strengthen refactored code | Expected rejection differs from arbitrary thrown values | No broad any/unknown-to-concrete escape in core contracts |
 | Type-only imports and named exports | Refactored modules, except framework-required default exports such as the Pi factory | Makes dependency direction and public names explicit | Lint/typecheck; no new namespace-based extension framework |
 
 - Choose an interface for ordinary object contracts and a type alias for discriminated unions/intersections where appropriate. Allow inference when it remains accurate; do not annotate every local variable.
 - Prefer `as const satisfies` to a plain const assertion when checking a fixed table against a contract. Do not force const assertions onto dynamic data or use assertions as validation.
 - Do not solve strictness failures by widening everything to any, adding non-null assertions, or casting through unknown into an SDK class. Any unavoidable SDK compatibility cast must be narrowly contained and justified in the adapter, with an integration check; it cannot leak to caller contracts.
-- Use expected compile failures deliberately in type tests with the appropriate compiler expectation mechanism. Do not add blanket suppression comments or relax the new package merely to copy inherited debt.
+- Use expected compile failures deliberately in type tests with the appropriate compiler expectation mechanism. Do not add blanket suppression comments or relax UI contracts merely to copy inherited debt.
 - Literal precision is not an excuse to build recursive conditional types, a custom generic result framework, branded identifiers everywhere, or an open plugin registry without demonstrated demand.
 
 #### Visual: compile-time policy versus runtime validation
@@ -583,12 +585,12 @@ flowchart LR
 
 ### 13. Tooling, package policy, and architecture checks
 
-- Stay on main unless the maintainer requests another branch. Scaffold the UI package using the local Nx package generator; do not hand-create a competing package structure or use the extension generator for an independently loaded UI extension that was explicitly rejected.
-- Adapt generated output to the library role: no independent Pi registrations or auto-loaded runtime entry point. Keep root-managed dependency versions, source shipping, Nx targets, and the repository's module-dependency policy. Do not add package-level scripts or duplicate shared Pi development dependencies.
-- Link actual workspace dependencies through the package manager, not TypeScript path aliases that conceal missing dependencies.
-- Enforce root-only ExtensionAPI use, SDK-constructor/type isolation from policy modules, one-way runtime-to-UI-library dependencies, no presentation implementation in execution, and owned exported interfaces. Use targeted ESLint/Nx rules and focused architecture checks as appropriate.
+- Stay on main unless the maintainer requests another branch. Keep the UI module inside the existing project: no package scaffolding, workspace dependency, or independent Pi registration is needed for presentation.
+- Keep root-managed dependency versions, source shipping, Nx targets, and the repository's module-dependency policy. Do not add package-level scripts or duplicate shared Pi development dependencies.
+- Any unrelated workspace dependencies must still be linked through the package manager, not hidden behind TypeScript path aliases.
+- Enforce root-only ExtensionAPI use, SDK-constructor/type isolation from policy modules, one-way runtime-to-UI-contract dependencies, no presentation implementation in execution, and owned exported interfaces. Use targeted ESLint/Nx rules and focused architecture checks as appropriate.
 - Checks must encode semantic dependency rules rather than exact class names, constructor order, historical filenames, line counts, or the number of modules. Moving an SDK adapter should not fail a test merely because its old location disappeared.
-- Narrow inherited lint exemptions as the affected code is replaced. Do not spread the old any/non-null exemptions to the new UI package or new contracts.
+- Narrow inherited lint exemptions as the affected code is replaced. Do not spread the old any/non-null exemptions to new UI contracts.
 
 ### 14. Incremental delivery, provenance, and clone removal
 
@@ -659,13 +661,13 @@ flowchart TB
 - Existing composition-root tests protect provider replay, captured prompt wiring, late registration behavior, and widget activation. Consolidate their permissive host doubles into a typed recording fixture that preserves multiple handlers and awaited registration-order dispatch.
 - The historical print-mode regression fixture primarily simulates stale-context delivery failure; do not call it proof of a real SDK print-mode lifecycle. Keep/rename its actual error-containment coverage and add appropriate offline SDK/mode checks.
 - Use a few real SDK integration tests for creation/binding, exact model materialization/provider inheritance, capability allowlist and recursion exclusions across registry refresh, and shutdown ordering. Ordinary tests remain credential-free; no live vendor request is required.
-- Run the applicable Nx typecheck, test, lint, formatting/check, and metadata targets for the runtime, UI library, and affected siblings with the workspace package manager and daemon-disabled verification requested by the existing specification. Inspect resolved project targets rather than inventing commands or flags. Test counts are observed results, not hardcoded acceptance criteria.
+- Run the applicable Nx typecheck, test, lint, formatting/check, and metadata targets for the runtime project (including its UI module) and affected siblings with the workspace package manager and daemon-disabled verification requested by the existing specification. Inspect resolved project targets rather than inventing commands or flags. Test counts are observed results, not hardcoded acceptance criteria.
 
 ## Out of Scope
 
 - Deleting, archiving, or modifying a remote GitHub fork; the removal target is the temporary local migration clone only.
 - Removing upstream credit, MIT notices, the migrated implementation, or unrelated sibling compatibility dependencies.
-- An independently loaded UI extension, extension-to-extension dependency, third contracts package without need, or a new service-discovery protocol for presentation.
+- A separate UI workspace/npm package, independently loaded UI extension, extension-to-extension dependency, contracts package, or new service-discovery protocol for presentation.
 - A replacement family router, fuzzy model names, price-based selection, new model-family promises, executable profiles, or vendor availability research unrelated to the refactor.
 - Extension-owned trust gating, revocation monitoring, trust polling, authorization tokens, or overriding Pi's own trust behavior.
 - Recursive delegation, parent/user-edit coordination, filesystem sandboxing, snapshot-consistent reads, or new worktree/isolation strategies.
@@ -682,7 +684,7 @@ flowchart TB
 
 - The shared caller interface, authoritative preparation operation, immutable catalogs, captured definitions/turn policies/settings, distinct resume path, asynchronous typed acceptance, one concurrency cap, session ownership, cancellation distinctions, structural child-execution seam, owned model values, UI-library extraction, architecture checks, and targeted modernization were explicitly approved.
 - The proposal to keep public contracts unchanged was rejected: breaking redesign is allowed and the launch/run distinction was adopted.
-- The proposal for an independently loaded UI extension was rejected in favor of a separate library loaded by the runtime.
+- The proposal for an independently loaded UI extension was rejected. The originally approved separate-library package was subsequently superseded by the maintainer's explicit story-92 clarification: presentation is an internal module in this project, not a separate package.
 - The proposed extension-level trust revalidation was explicitly rejected and superseded by removal of extension-owned trust code. Do not resurrect it under a different abstraction name.
 - Retirement was clarified to mean the temporary local clone, not a GitHub repository. No deletion has been performed as part of specification writing.
 

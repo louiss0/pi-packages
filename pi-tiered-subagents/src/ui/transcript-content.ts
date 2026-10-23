@@ -28,10 +28,13 @@ import {
   type TUI,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
-import type { AgentSessionEvent, SessionMessage } from "#src/types";
-import { describeActivity } from "#src/ui/display";
-import { GLYPHS } from "#src/ui/glyphs";
-import type { TranscriptSource } from "#src/ui/session-navigation";
+import type {
+  SessionMessage,
+  TranscriptEvent,
+  TranscriptSource,
+} from "./session-navigation";
+import { describeActivity } from "./display";
+import { GLYPHS } from "./glyphs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -120,7 +123,7 @@ export class TranscriptContent {
    * may have rewritten or mutated history in place, so it rebuilds wholesale.
    * Everything else consumes whatever settled since the last check.
    */
-  apply(event?: AgentSessionEvent): void {
+  apply(event?: TranscriptEvent): void {
     const partial = inFlightAssistantMessage(event);
     if (partial) {
       this.updateInFlight(partial);
@@ -389,11 +392,11 @@ type AssistantSessionMessage = Extract<SessionMessage, { role: "assistant" }>;
  * elsewhere in the history, which only a rebuild can pick up.
  */
 function inFlightAssistantMessage(
-  event?: AgentSessionEvent,
+  event?: TranscriptEvent,
 ): AssistantSessionMessage | undefined {
   if (event?.type !== "message_start" && event?.type !== "message_update")
     return undefined;
-  return event.message.role === "assistant" ? event.message : undefined;
+  return event.message?.role === "assistant" ? event.message : undefined;
 }
 
 /**

@@ -1,6 +1,8 @@
 import { vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import type { NavigableSubagent } from "#src/ui/session-navigation";
+import type { liveSource } from "#src/presentation/transcript-adapter";
+
+type NavigableSubagent = Parameters<typeof liveSource>[0];
 
 /**
  * Builds a fully-populated NavigableSubagent for session-navigation tests.

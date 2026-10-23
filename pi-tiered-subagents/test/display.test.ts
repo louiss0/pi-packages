@@ -1,18 +1,14 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { AgentRegistry } from "#src/agents/registry";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
 import {
   formatSessionTokens,
   getDisplayName,
   modelLabel,
   type Theme,
 } from "#src/ui/display";
-import { makeModel } from "#test/helpers/make-model";
 
-const testRegistry = new AgentRegistry(() => ({
-  global: { definitions: [], errors: [] },
-  project: { definitions: [], errors: [] },
-}));
+const testRegistry = makeDefinitionLookup();
 
 describe("Theme", () => {
   it("accepts only Pi theme color names", () => {
@@ -22,36 +18,16 @@ describe("Theme", () => {
 
 describe("getDisplayName", () => {
   it("returns displayName when set", () => {
-    const registry = new AgentRegistry(() => ({
-      global: {
-        definitions: [
-          {
-            id: "my-agent",
-            patch: { displayName: "My Agent" },
-            path: "my-agent.md",
-          },
-        ],
-        errors: [],
-      },
-      project: { definitions: [], errors: [] },
-    }));
+    const registry = makeDefinitionLookup({ "my-agent": "My Agent" });
     expect(getDisplayName("my-agent", registry)).toBe("My Agent");
   });
 
   it("falls back to the identifier when displayName is not set", () => {
-    const registry = new AgentRegistry(() => ({
-      global: {
-        definitions: [
-          { id: "my-agent", patch: { description: "test" }, path: "a.md" },
-        ],
-        errors: [],
-      },
-      project: { definitions: [], errors: [] },
-    }));
+    const registry = makeDefinitionLookup({ "my-agent": undefined });
     expect(getDisplayName("my-agent", registry)).toBe("my-agent");
   });
 
-  it("uses the registry to resolve a shipped specialist's displayName", () => {
+  it("uses the lookup to resolve a specialist's displayName", () => {
     expect(getDisplayName("explore", testRegistry)).toBe("Explore");
   });
 
@@ -111,9 +87,9 @@ describe("formatSessionTokens", () => {
 
 describe("modelLabel", () => {
   it("labels a model as provider/id", () => {
-    expect(
-      modelLabel(makeModel({ provider: "anthropic", id: "claude-haiku-4-5" })),
-    ).toBe("anthropic/claude-haiku-4-5");
+    expect(modelLabel({ provider: "anthropic", id: "claude-haiku-4-5" })).toBe(
+      "anthropic/claude-haiku-4-5",
+    );
   });
 
   it("is undefined while the model is unknown", () => {

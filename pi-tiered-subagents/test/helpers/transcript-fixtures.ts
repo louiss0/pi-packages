@@ -1,7 +1,7 @@
 import type { TUI, TuiMode } from "@earendil-works/pi-tui";
 import { vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import type { SessionMessage } from "#src/types";
+import type { SessionMessage } from "#src/ui/session-navigation";
 import type { TranscriptSource } from "#src/ui/session-navigation";
 
 /**

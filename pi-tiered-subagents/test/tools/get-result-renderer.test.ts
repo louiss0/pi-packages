@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { merge, type Patch } from "#src/optional";
-import type { SubagentStatus } from "#src/lifecycle/subagent-state";
+import type { AgentStatus } from "#src/ui/view-types";
 import {
   type GetResultDetails,
   MAX_EXPANDED_LINES,
   renderGetResultLines,
-} from "#src/tools/get-result-renderer";
+} from "#src/ui/get-result-renderer";
 import type { Theme } from "#src/ui/display";
 
 function makeTheme(): Theme {
@@ -251,7 +251,7 @@ describe("renderGetResultLines", () => {
   });
 
   describe("status glyphs", () => {
-    const cases: ReadonlyArray<[SubagentStatus, string]> = [
+    const cases: ReadonlyArray<[AgentStatus, string]> = [
       ["completed", "[success:✓]"],
       ["stopped", "[dim:■]"],
       ["error", "[error:✗]"],

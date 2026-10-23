@@ -72,6 +72,11 @@ export const SPINNER = [
   "⠏",
 ] as const satisfies readonly string[];
 
+/** Advance presentation metadata without exposing the terminal's frame vocabulary. */
+export function nextSpinnerFrame(index: number): number {
+  return (index + 1) % SPINNER.length;
+}
+
 /**
  * The spinner frame for `index`, wrapping around the cycle.
  *

@@ -1,9 +1,4 @@
-import type {
-  AgentToolResult,
-  ToolRenderResultOptions,
-} from "@earendil-works/pi-coding-agent";
 import { defineTool } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
@@ -11,24 +6,24 @@ import type { RunOutcome } from "#src/lifecycle/subagent-run";
 import {
   type GetResultDetails,
   PREVIEW_CHARS,
-  renderGetResultLines,
-} from "#src/tools/get-result-renderer";
+} from "#src/ui/get-result-renderer";
+import {
+  renderGetResultCall,
+  renderGetResultResult,
+} from "#src/ui/get-result-tool-renderer";
 import {
   type AgentReport,
   formatAgentReport,
 } from "#src/tools/get-result-report";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
 import type { Subagent } from "#src/types";
-import { BoundedLines } from "#src/ui/bounded-lines";
 import {
   describeActivity,
   formatDuration,
   formatMs,
   getDisplayName,
   modelLabel,
-  type Theme,
 } from "#src/ui/display";
-import { GLYPHS } from "#src/ui/glyphs";
 
 // ---- Deps interfaces ----
 
@@ -251,36 +246,8 @@ export class GetResultTool {
           }),
         ),
       }),
-      // ---- Custom rendering: a bounded, Ctrl+O-expandable retrieval row ----
-
-      renderCall(args: GetResultParams, theme: Theme) {
-        const notes = [waitNote(args), args.verbose === true ? "verbose" : ""]
-          .filter(Boolean)
-          .join(", ");
-        return new Text(
-          `${GLYPHS.toolCall} ` +
-            theme.fg("toolTitle", theme.bold("Get Agent Result")) +
-            "  " +
-            theme.fg("muted", args.agent_id) +
-            (notes ? " " + theme.fg("muted", `(${notes})`) : ""),
-          0,
-          0,
-        );
-      },
-
-      renderResult(
-        result: AgentToolResult<GetResultDetails | undefined>,
-        { expanded }: ToolRenderResultOptions,
-        theme: Theme,
-      ) {
-        const reportText =
-          result.content[0]?.type === "text" ? result.content[0].text : "";
-        const details = result.details;
-        if (!details) return new Text(reportText, 0, 0);
-        return new BoundedLines(
-          renderGetResultLines(details, reportText, expanded, theme),
-        );
-      },
+      renderCall: renderGetResultCall,
+      renderResult: renderGetResultResult,
 
       execute: (
         toolCallId: string,
@@ -348,14 +315,6 @@ class WaitBound {
     clearTimeout(this.timer);
     this.detach.abort();
   }
-}
-
-/** The call row's wait note: the bound when the wait has one. */
-function waitNote(args: GetResultParams): string {
-  if (args.wait !== true) return "";
-  return args.timeout === undefined
-    ? "waiting"
-    : `waiting \u2264${args.timeout}s`;
 }
 
 /**

@@ -1,23 +1,18 @@
 import type { TuiMode } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import { AgentRegistry } from "#src/agents/registry";
-import type { Subagent } from "#src/lifecycle/subagent";
-import type { SubagentManager } from "#src/lifecycle/subagent-manager";
-import type { CompactionInfo } from "#src/types";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
+import type { AgentStatus } from "#src/ui/view-types";
 import {
   AgentWidget,
   assembleWidgetState,
   type UICtx,
 } from "#src/ui/agent-widget";
-import {
-  createTestSubagent,
-  makeStubExecution,
-} from "#test/helpers/make-subagent";
+import { makeWidgetAgent } from "#test/ui/helpers/make-widget-agent";
 
 // Minimal agent fixture — only the three fields AgentSummary requires.
 /** A record the widget reads: `completedAt` is present-or-absent, never `undefined`. */
-type AgentRecord = { id: string; status: string; completedAt?: number };
+type AgentRecord = { id: string; status: AgentStatus; completedAt?: number };
 
 // `completedAt` defaults to absent, not to a time: an override bag says "no
 // value" and "say nothing" alike, so a defaulted time would survive every
@@ -68,23 +63,18 @@ function stubTheme() {
 // arg of the most recent setWidget call, where a function means the widget is
 // registered/visible and undefined means it was cleared (the finished agent has
 // aged out).
-// Fixtures default to background so they survive the widget's background-only
-// filter; per-agent `isBackground` overrides the default.
+// The source supplies UI snapshots; background selection belongs to the runtime adapter.
 function makeWidget(
   agents: Array<{
     id: string;
-    status: string;
+    status: AgentStatus;
     completedAt?: number;
-    isBackground?: boolean;
   }>,
 ) {
   const manager = {
-    listAgents: () => agents.map((a) => ({ isBackground: true, ...a })),
-  } as unknown as SubagentManager;
-  const registry = new AgentRegistry(() => ({
-    global: { definitions: [], errors: [] },
-    project: { definitions: [], errors: [] },
-  }));
+    listAgents: () => agents.map((a) => makeWidgetAgent(a)),
+  };
+  const registry = makeDefinitionLookup();
   const widget = new AgentWidget(manager, registry);
   const setWidget = vi.fn<UICtx["setWidget"]>();
   const setStatus = vi.fn<UICtx["setStatus"]>();
@@ -98,7 +88,7 @@ function makeWidget(
  * rather than explicitly `undefined`: the widget tests the key's presence, so
  * "no completion time" has to be the missing key.
  */
-function mutableAgent(id: string, status: string): AgentRecord {
+function mutableAgent(id: string, status: AgentStatus): AgentRecord {
   return { id, status };
 }
 
@@ -268,23 +258,19 @@ describe("assembleWidgetState", () => {
   });
 });
 
-describe("AgentWidget — projection reads activity off Subagent records", () => {
+describe("AgentWidget — presentation reads activity from widget snapshots", () => {
   it("surfaces the turn budget, activeTools, and responseText from the record via renderWidget", () => {
-    const record = createTestSubagent({
+    const record = makeWidgetAgent({
       status: "running",
       completedAt: undefined,
       startedAt: Date.now() - 100,
       turnBudget: { maxTurns: 10, used: 3, phase: "within" },
-      activeTools: ["read"],
-      isBackground: true,
+      activeTools: new Map([["tool-1", "read"]]),
     });
     const manager = {
       listAgents: () => [record],
-    } as unknown as SubagentManager;
-    const registry = new AgentRegistry(() => ({
-      global: { definitions: [], errors: [] },
-      project: { definitions: [], errors: [] },
-    }));
+    };
+    const registry = makeDefinitionLookup();
     const widget = new AgentWidget(manager, registry);
 
     let renderFn:
@@ -309,26 +295,17 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
     expect(allText).toContain("reading");
   });
 
-  it("surfaces the record's model via renderWidget", () => {
-    const record = createTestSubagent({
+  it("surfaces the snapshot's model via renderWidget", () => {
+    const record = makeWidgetAgent({
       status: "running",
       completedAt: undefined,
       startedAt: Date.now() - 100,
-      isBackground: true,
-      execution: makeStubExecution({
-        modelIdentity: { provider: "anthropic", id: "claude-sonnet-5" },
-      }),
+      model: { provider: "anthropic", id: "claude-sonnet-5" },
     });
     const manager = {
       listAgents: () => [record],
-    } as unknown as SubagentManager;
-    const widget = new AgentWidget(
-      manager,
-      new AgentRegistry(() => ({
-        global: { definitions: [], errors: [] },
-        project: { definitions: [], errors: [] },
-      })),
-    );
+    };
+    const widget = new AgentWidget(manager, makeDefinitionLookup());
 
     let renderFn:
       | ((tui: unknown, theme: unknown) => { render(): string[] })
@@ -349,22 +326,15 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
   });
 
   it("surfaces the record's turn budget as a turn-limit wrap-up via renderWidget", () => {
-    const record = createTestSubagent({
+    const record = makeWidgetAgent({
       status: "completed",
       completedAt: Date.now(),
-      isBackground: true,
       turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
     });
     const manager = {
       listAgents: () => [record],
-    } as unknown as SubagentManager;
-    const widget = new AgentWidget(
-      manager,
-      new AgentRegistry(() => ({
-        global: { definitions: [], errors: [] },
-        project: { definitions: [], errors: [] },
-      })),
-    );
+    };
+    const widget = new AgentWidget(manager, makeDefinitionLookup());
 
     let renderFn:
       | ((tui: unknown, theme: unknown) => { render(): string[] })
@@ -443,13 +413,13 @@ describe("AgentWidget — a record that runs again", () => {
     agent.status = "running";
     delete agent.completedAt;
     fixture.widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "resume",
     );
     agent.status = status;
     agent.completedAt = 9000;
     fixture.widget.onSubagentRunFinished(
-      createTestSubagent({ id: "a1", status }),
+      makeWidgetAgent({ id: "a1", status }),
       "resume",
     );
     return fixture;
@@ -483,7 +453,7 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
     vi.useRealTimers();
   });
 
-  const COMPACTION: CompactionInfo = {
+  const COMPACTION = {
     reason: "threshold",
     tokensBefore: 1000,
   };
@@ -495,7 +465,7 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
     expect(vi.getTimerCount()).toBe(0);
 
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
 
@@ -508,9 +478,7 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
       { id: "a1", status: "queued" },
     ]);
 
-    widget.onSubagentCreated(
-      createTestSubagent({ id: "a1", status: "queued" }),
-    );
+    widget.onSubagentCreated(makeWidgetAgent({ id: "a1", status: "queued" }));
 
     expect(vi.getTimerCount()).toBe(0);
     expect(typeof lastContent()).toBe("function");
@@ -522,7 +490,7 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
     ]);
 
     widget.onSubagentRunFinished(
-      createTestSubagent({ id: "a1", status: "completed" }),
+      makeWidgetAgent({ id: "a1", status: "completed" }),
       "initial",
     );
 
@@ -536,7 +504,7 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
     expect(vi.getTimerCount()).toBe(0);
 
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "resume",
     );
 
@@ -550,74 +518,11 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
     ]);
 
     widget.onSubagentCompacted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       COMPACTION,
     );
 
     expect(typeof lastContent()).toBe("function");
-  });
-});
-
-describe("AgentWidget — background-only filtering", () => {
-  function setup(records: Subagent[]) {
-    const manager = { listAgents: () => records } as unknown as SubagentManager;
-    const registry = new AgentRegistry(() => ({
-      global: { definitions: [], errors: [] },
-      project: { definitions: [], errors: [] },
-    }));
-    const widget = new AgentWidget(manager, registry);
-    const setWidgetCalls: unknown[] = [];
-    let renderFn:
-      | ((tui: unknown, theme: unknown) => { render(): string[] })
-      | undefined;
-    const ui: UICtx = {
-      setStatus: () => {},
-      setWidget: (_key, content) => {
-        setWidgetCalls.push(content);
-        if (typeof content === "function")
-          renderFn = content as typeof renderFn;
-      },
-    };
-    widget.setUICtx(ui);
-    const lastContent = () => setWidgetCalls.at(-1);
-    const renderLines = () => renderFn!(stubTui(), stubTheme()).render();
-    return { widget, lastContent, renderLines };
-  }
-
-  it("does not register the widget when only foreground agents exist", () => {
-    const { widget, lastContent } = setup([
-      createTestSubagent({
-        id: "fg1",
-        status: "running",
-        completedAt: undefined,
-        isBackground: false,
-      }),
-    ]);
-    widget.update();
-    expect(lastContent()).toBeUndefined();
-  });
-
-  it("renders only background agents when foreground and background agents are mixed", () => {
-    const { widget, renderLines } = setup([
-      createTestSubagent({
-        id: "bg1",
-        status: "running",
-        completedAt: undefined,
-        description: "background task",
-        isBackground: true,
-      }),
-      createTestSubagent({
-        id: "fg1",
-        status: "running",
-        completedAt: undefined,
-        description: "foreground task",
-        isBackground: false,
-      }),
-    ]);
-    widget.update();
-    const text = renderLines().join("\n");
-    expect(text).toContain("background task");
-    expect(text).not.toContain("foreground task");
   });
 });
 
@@ -634,7 +539,7 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
     const agent = mutableAgent("a1", "running");
     const { widget, lastContent } = makeWidget([agent]);
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(vi.getTimerCount()).toBe(1);
@@ -642,7 +547,7 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
     agent.status = "completed";
     agent.completedAt = 5000;
     widget.onSubagentRunFinished(
-      createTestSubagent({ id: "a1", status: "completed" }),
+      makeWidgetAgent({ id: "a1", status: "completed" }),
       "initial",
     );
 
@@ -657,7 +562,7 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
       mutableAgent("a2", "queued"),
     ]);
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(vi.getTimerCount()).toBe(1);
@@ -665,7 +570,7 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
     agent.status = "completed";
     agent.completedAt = 5000;
     widget.onSubagentRunFinished(
-      createTestSubagent({ id: "a1", status: "completed" }),
+      makeWidgetAgent({ id: "a1", status: "completed" }),
       "initial",
     );
 
@@ -676,14 +581,12 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
   it("starts the timer when a queued agent begins running", () => {
     const agent = mutableAgent("a1", "queued");
     const { widget } = makeWidget([agent]);
-    widget.onSubagentCreated(
-      createTestSubagent({ id: "a1", status: "queued" }),
-    );
+    widget.onSubagentCreated(makeWidgetAgent({ id: "a1", status: "queued" }));
     expect(vi.getTimerCount()).toBe(0);
 
     agent.status = "running";
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
 
@@ -705,21 +608,14 @@ describe("AgentWidget — animation cadence", () => {
    * `tui` — or never invokes, when `tui` is undefined (print/RPC mode).
    */
   function arrangeRunningWidget(tui: ReturnType<typeof stubTui> | undefined) {
-    const record = createTestSubagent({
+    const record = makeWidgetAgent({
       id: "a1",
       status: "running",
       completedAt: undefined,
-      isBackground: true,
     });
     const listAgents = vi.fn(() => [record]);
-    const manager = { listAgents } as unknown as SubagentManager;
-    const widget = new AgentWidget(
-      manager,
-      new AgentRegistry(() => ({
-        global: { definitions: [], errors: [] },
-        project: { definitions: [], errors: [] },
-      })),
-    );
+    const manager = { listAgents };
+    const widget = new AgentWidget(manager, makeDefinitionLookup());
     widget.setUICtx({
       setStatus: () => {},
       setWidget: (_key, content) => {
@@ -828,7 +724,7 @@ describe("AgentWidget.dispose", () => {
   it("clears the update interval", () => {
     const { widget } = makeWidget([{ id: "a1", status: "running" }]);
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(vi.getTimerCount()).toBe(1);
@@ -843,7 +739,7 @@ describe("AgentWidget.dispose", () => {
       { id: "a1", status: "running" },
     ]);
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(setStatus).toHaveBeenLastCalledWith("subagents", "1 running agent");
@@ -861,7 +757,7 @@ describe("AgentWidget.dispose", () => {
     const agent = mutableAgent("a1", "running");
     const { widget, setWidget } = makeWidget([agent]);
     widget.onSubagentRunStarted(
-      createTestSubagent({ id: "a1", status: "running" }),
+      makeWidgetAgent({ id: "a1", status: "running" }),
       "initial",
     );
 

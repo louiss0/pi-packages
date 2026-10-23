@@ -9,7 +9,7 @@
  * Commands:
  */
 
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   createAgentSession,
@@ -77,14 +77,19 @@ import { SettingsManager } from "#src/settings";
 import { AgentTool } from "#src/tools/agent-tool";
 import { GetResultTool } from "#src/tools/get-result-tool";
 import { SteerTool } from "#src/tools/steer-tool";
-import { AgentWidget } from "#src/ui/agent-widget";
+import { createWidgetSource } from "#src/presentation/widget-adapter";
 import {
+  readPersistedNavigationRuns,
+  toNavigableSubagent,
+} from "#src/presentation/transcript-adapter";
+import {
+  AgentWidget,
   createNotificationRenderer,
   createUpdateRenderer,
   createWorkspaceNoticeRenderer,
-} from "#src/ui/notification-renderer";
-import { SessionNavigatorHandler } from "#src/ui/session-navigator";
-import { SubagentsSettingsHandler } from "#src/ui/subagents-settings";
+  SessionNavigatorHandler,
+  SubagentsSettingsHandler,
+} from "#src/ui/index";
 
 export default function (pi: ExtensionAPI) {
   /**
@@ -411,7 +416,7 @@ export default function (pi: ExtensionAPI) {
 
   // Live widget: constructed after the manager (it polls listAgents()) and
   // registered as a lifecycle observer so it self-drives its update timer.
-  const widget = new AgentWidget(manager, registry);
+  const widget = new AgentWidget(createWidgetSource(manager), registry);
   observer.add(widget);
 
   // Give the widget its UI context and its turn ticks. Pi fans an event out to
@@ -496,11 +501,11 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       await sessionNavigator.handle({
         ui: ctx.ui,
-        agents: manager.listAgents(),
+        agents: manager.listAgents().map(toNavigableSubagent),
         registry,
         cwd: ctx.cwd,
-        readFile: (path) => readFileSync(path, "utf8"),
-        sessionEntries: ctx.sessionManager.getEntries(),
+        readFile: (path) => readFile(path, "utf8"),
+        persisted: readPersistedNavigationRuns(ctx.sessionManager.getEntries()),
       });
     },
   });

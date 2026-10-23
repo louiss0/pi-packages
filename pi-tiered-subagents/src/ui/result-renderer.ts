@@ -6,14 +6,14 @@
  * Consumed by the renderResult hook in agent-tool.ts.
  */
 
-import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import {
-  type TurnBudget,
-  wrappedUpAtTurnLimit,
-} from "#src/lifecycle/turn-limits";
-import type { AgentDetails, Theme } from "#src/ui/display";
-import { formatMs, formatTurnBudget } from "#src/ui/display";
-import { GLYPHS, spinnerAt } from "#src/ui/glyphs";
+import type {
+  AgentStatus as SubagentStatus,
+  TurnBudget,
+} from "./view-types.js";
+import type { AgentDetails, Theme } from "./display.js";
+import { formatMs, formatTurnBudget } from "./display.js";
+import { GLYPHS, spinnerAt } from "./glyphs.js";
+import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
 // ---- Dispatcher ----
 
@@ -135,7 +135,10 @@ export function renderFailed(details: AgentDetails, theme: Theme): string {
 export function renderOutcomeIcon(
   // A read view over a live record, so the optional takes an explicit
   // `undefined` — see the note on `StatusOutcome`.
-  outcome: { status: SubagentStatus; turnBudget?: TurnBudget | undefined },
+  outcome: {
+    readonly status: SubagentStatus;
+    readonly turnBudget?: TurnBudget | undefined;
+  },
   theme: Theme,
 ): string {
   if (wrappedUpAtTurnLimit(outcome)) return renderWrappedUpIcon(theme);

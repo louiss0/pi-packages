@@ -1,14 +1,34 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { isTerminalErrorStatus } from "#src/lifecycle/subagent-state";
-import { wrappedUpAtTurnLimit } from "#src/lifecycle/turn-limits";
-import type {
-  NotificationDetails,
-  UpdateDetails,
-  WorkspaceNoticeDetails,
-} from "#src/observation/notification";
-import { formatMs, formatTokens, formatTurnBudget } from "#src/ui/display";
-import { GLYPHS } from "#src/ui/glyphs";
+import type { Component } from "@earendil-works/pi-tui";
+import type { AgentStatus, TurnBudget } from "./view-types.js";
+import { formatMs, formatTokens, formatTurnBudget } from "./display.js";
+import { GLYPHS } from "./glyphs.js";
+import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
+
+/** The completion facts this renderer reads; structurally supplied by the runtime. */
+export interface NotificationDetails {
+  readonly description: string;
+  readonly status: AgentStatus;
+  readonly toolUses: number;
+  readonly totalTokens: number;
+  readonly durationMs: number;
+  readonly outputFile?: string;
+  readonly resultPreview: string;
+  readonly turnBudget?: TurnBudget;
+}
+
+/** A still-running child's message, independent of runtime notification delivery. */
+export interface UpdateDetails {
+  readonly description: string;
+  readonly message: string;
+}
+
+/** What a workspace teardown left behind, not a new outcome. */
+export interface WorkspaceNoticeDetails {
+  readonly description: string;
+  readonly notice: string;
+}
 
 /** Narrow theme interface — only the methods the renderer actually calls. */
 interface RendererTheme {
@@ -18,38 +38,42 @@ interface RendererTheme {
 
 /** Narrow message interface — only the fields the renderer reads. */
 interface RendererMessage {
-  details?: NotificationDetails;
+  readonly details?: NotificationDetails;
 }
 
 /** Narrow message interface for the update renderer. */
 interface UpdateMessage {
-  details?: UpdateDetails;
+  readonly details?: UpdateDetails;
 }
 
 /** Narrow message interface for the workspace-notice renderer. */
 interface WorkspaceNoticeMessage {
-  details?: WorkspaceNoticeDetails;
+  readonly details?: WorkspaceNoticeDetails;
 }
 
 /** Narrow render options — only the fields the renderer reads. */
 interface RenderOptions {
-  expanded: boolean;
+  readonly expanded: boolean;
 }
 
 // ---- Pure helpers (exported for unit testing) ----
 
 /** Resolved status→presentation product: icon glyph/style and status label. */
 export interface StatusPresentation {
-  iconGlyph: string;
-  iconStyle: ThemeColor;
-  statusText: string;
+  readonly iconGlyph: string;
+  readonly iconStyle: ThemeColor;
+  readonly statusText: string;
 }
 
 /** Decide the icon and status label for a notification's status, once. */
 export function resolveStatusPresentation(
   outcome: Pick<NotificationDetails, "status" | "turnBudget">,
 ): StatusPresentation {
-  if (isTerminalErrorStatus(outcome.status))
+  if (
+    outcome.status === "error" ||
+    outcome.status === "aborted" ||
+    outcome.status === "stopped"
+  )
     return {
       iconGlyph: GLYPHS.failure,
       iconStyle: "error",
@@ -99,7 +123,7 @@ export function createNotificationRenderer() {
     message: RendererMessage,
     { expanded }: RenderOptions,
     theme: RendererTheme,
-  ): Text | undefined => {
+  ): Component | undefined => {
     const d = message.details;
     if (!d) return undefined;
 
@@ -148,7 +172,7 @@ export function createUpdateRenderer() {
     message: UpdateMessage,
     { expanded }: RenderOptions,
     theme: RendererTheme,
-  ): Text | undefined => {
+  ): Component | undefined => {
     const d = message.details;
     if (!d) return undefined;
 
@@ -174,7 +198,7 @@ export function createWorkspaceNoticeRenderer() {
     message: WorkspaceNoticeMessage,
     { expanded }: RenderOptions,
     theme: RendererTheme,
-  ): Text | undefined => {
+  ): Component | undefined => {
     const d = message.details;
     if (!d) return undefined;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { merge, type Patch } from "#src/optional";
-import { AgentRegistry } from "#src/agents/registry";
+import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
 import type { Theme } from "#src/ui/display";
 import type { WidgetAgent } from "#src/ui/widget-renderer";
 import {
@@ -18,10 +18,7 @@ function stubTheme(): Theme {
   };
 }
 
-const testRegistry = new AgentRegistry(() => ({
-  global: { definitions: [], errors: [] },
-  project: { definitions: [], errors: [] },
-}));
+const testRegistry = makeDefinitionLookup();
 
 function makeAgent(overrides: Patch<WidgetAgent> = {}): WidgetAgent {
   return merge(

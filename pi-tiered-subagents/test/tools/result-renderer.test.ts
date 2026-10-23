@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
+import type { AgentStatus } from "#src/ui/view-types";
+import type { TurnBudget } from "#src/ui/view-types";
 import {
   renderAgentResult,
   renderBackground,
@@ -11,7 +11,7 @@ import {
   renderStats,
   renderStatusIcon,
   renderStopped,
-} from "#src/tools/result-renderer";
+} from "#src/ui/result-renderer";
 import type { AgentDetails, Theme } from "#src/ui/display";
 
 function makeTheme(): Theme {
@@ -362,7 +362,7 @@ describe("renderAgentResult", () => {
 describe("renderStatusIcon", () => {
   const theme = makeTheme();
 
-  const cases: ReadonlyArray<[SubagentStatus, string]> = [
+  const cases: ReadonlyArray<[AgentStatus, string]> = [
     ["completed", "[success:\u2713]"],
     ["stopped", "[dim:\u25A0]"],
     ["error", "[error:\u2717]"],

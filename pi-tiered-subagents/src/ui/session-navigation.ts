@@ -3,10 +3,10 @@
  *
  * Splits the unit-testable core of the `/subagents:sessions` command from its TUI
  * wiring (`session-navigator.ts`): which subagents are navigable and how a picked
- * agent's transcript is sourced (live, in this slice).
+ * agent's transcript is sourced (live reader or persisted file).
  *
  * The `TranscriptSource` seam decouples *how messages are sourced* (live record
- * here; a file snapshot in a follow-up) from *how they render* — the renderer
+ * or a persisted file snapshot) from *how they render* — the renderer
  * (`session-navigator.ts`, which mounts Pi's per-entry components) talks only to
  * this seam. Rendering lives in the SDK/TUI module because the per-entry
  * components require a `TUI`, `cwd`, and markdown theme.
@@ -15,57 +15,43 @@
 import {
   buildSessionContext,
   parseSessionEntries,
-  type SessionEntry,
-  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentDefinitionLookup } from "#src/agents/registry";
-import {
-  isRunningStatus,
-  type SubagentStatus,
-} from "#src/lifecycle/subagent-state";
-import type { PersistedRunSummary } from "#src/persisted-record";
 import type {
-  AgentSessionEvent,
-  SessionMessage,
-  SubagentType,
-} from "#src/types";
-import {
-  formatDuration,
-  getDisplayName,
-  type ModelIdentity,
-} from "#src/ui/display";
+  SessionContext,
+  SessionEntry,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import { formatDuration, getDisplayName } from "./display";
+import type { AgentDefinitionLookup, ModelIdentity } from "./display";
+import type { AgentStatus } from "./view-types";
+
+/** One message rendered by Pi's public session components. */
+export type SessionMessage = SessionContext["messages"][number];
+
+/** Only the session-event fields the transcript renderer observes. */
+export interface TranscriptEvent {
+  readonly type: string;
+  readonly message?: SessionMessage;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The record fields the navigator reads to label and live-source a transcript. */
-export interface NavigableSubagent {
+/** Label and transcript pointer for a past run; persistence parsing stays in the runtime. */
+export interface PersistedNavigationRun extends LabelFields {
   readonly id: string;
-  readonly type: SubagentType;
-  readonly description: string;
-  readonly status: SubagentStatus;
-  readonly startedAt: number;
-  readonly completedAt: number | undefined;
-  readonly toolUses: number;
-  readonly activeTools: ReadonlyMap<string, string>;
-  readonly responseText: string;
-  readonly agentMessages: readonly SessionMessage[];
-  /** Persisted transcript path, retained after the live session is released. */
   readonly outputFile: string | undefined;
-  /** The model the agent runs, when known. */
-  readonly model: ModelIdentity | undefined;
-  /** The thinking level the agent runs at, when known. */
-  readonly thinkingLevel: string | undefined;
-  isSessionReady(): boolean;
-  subscribeToUpdates(
-    fn: (event: AgentSessionEvent) => void,
-  ): (() => void) | undefined;
-  getToolDefinition(name: string): ToolDefinition | undefined;
+}
+
+/** A UI projection, never a live child session or runtime record. */
+export interface NavigableSubagent extends PersistedNavigationRun {
+  /** Narrow reader supplied by the runtime while a live session is retained. */
+  readonly transcript: TranscriptSource | undefined;
 }
 
 /**
  * A navigable entry plus the label shown in the picker.
  *
- * A `live` entry sources its transcript from the in-memory record; a `snapshot`
+ * A `live` entry sources its transcript from a narrow reader; a `snapshot`
  * entry sources it from the persisted session file (the session was released by
  * the retention sweep, but the record and its transcript pointer survive).
  */
@@ -74,7 +60,7 @@ export type NavigationEntry =
       readonly kind: "live";
       readonly label: string;
       readonly heading: EntryHeading;
-      readonly record: NavigableSubagent;
+      readonly source: TranscriptSource;
     }
   | {
       readonly kind: "snapshot";
@@ -91,9 +77,9 @@ export interface EntryHeading {
 
 /** The fields `buildLabel` reads — shared by the live and snapshot (released-session) label paths. */
 interface LabelFields {
-  readonly type: SubagentType;
+  readonly type: string;
   readonly description: string;
-  readonly status: SubagentStatus;
+  readonly status: AgentStatus;
   readonly startedAt: number;
   readonly completedAt: number | undefined;
   readonly toolUses: number;
@@ -121,7 +107,7 @@ export interface TranscriptSource {
    * a streaming delta and a settled message warrant very different work.
    */
   subscribe(
-    onChange: (event?: AgentSessionEvent) => void,
+    onChange: (event?: TranscriptEvent) => void,
   ): (() => void) | undefined;
   /** Running-agent streaming state, or undefined when not streaming. */
   streaming(): StreamingState | undefined;
@@ -145,16 +131,16 @@ export interface TranscriptSource {
 export function listNavigableAgents(
   agents: readonly NavigableSubagent[],
   registry: AgentDefinitionLookup,
-  persisted: readonly PersistedRunSummary[],
+  persisted: readonly PersistedNavigationRun[],
 ): NavigationEntry[] {
   const live: NavigationEntry[] = [];
   const snapshots: NavigationEntry[] = [];
   for (const record of agents) {
     const heading = buildHeading(record, registry);
-    if (record.isSessionReady()) {
+    if (record.transcript) {
       live.push({
         kind: "live",
-        record,
+        source: record.transcript,
         heading,
         label: buildLabel(record, registry),
       });
@@ -190,11 +176,11 @@ export function listNavigableAgents(
  * streaming, no live tool registry. `readFile` is injected so this module makes
  * no `fs` calls.
  */
-export function fileSnapshotSource(
+export async function fileSnapshotSource(
   outputFile: string,
-  readFile: (path: string) => string,
-): TranscriptSource {
-  const entries = parseSessionEntries(readFile(outputFile));
+  readFile: (path: string) => string | Promise<string>,
+): Promise<TranscriptSource> {
+  const entries = parseSessionEntries(await readFile(outputFile));
   const sessionEntries = entries.filter(
     (entry): entry is SessionEntry => entry.type !== "session",
   );
@@ -215,23 +201,6 @@ export function fileSnapshotSource(
     streaming: () => undefined,
     getToolDefinition: () => undefined,
     sessionModel: () => recorded,
-  };
-}
-
-/** Source a transcript live from an in-memory record (this slice's only source). */
-export function liveSource(record: NavigableSubagent): TranscriptSource {
-  return {
-    getMessages: () => record.agentMessages,
-    subscribe: (onChange) => record.subscribeToUpdates(onChange),
-    streaming: () =>
-      isRunningStatus(record.status)
-        ? { activeTools: record.activeTools, responseText: record.responseText }
-        : undefined,
-    getToolDefinition: (name) => record.getToolDefinition(name),
-    sessionModel: () => ({
-      model: record.model,
-      thinkingLevel: record.thinkingLevel,
-    }),
   };
 }
 

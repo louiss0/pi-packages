@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 100 test files and 17 helpers, recovered from upstream v25.0.1 and adapted |
+| Tests | `test/` — 106 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,298 tests, all passing (one skipped) |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,314 passed, one skipped |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -458,9 +458,10 @@ delivered. Each item names the user stories it covers.
 
 ### From ARCHITECTURE-SPEC.md
 
-`ARCHITECTURE-SPEC.md` supersedes `SPEC.md` where the two disagree. Increment 1
-of that specification is delivered; the rest is not started. The story numbers
-below are ARCHITECTURE-SPEC's own.
+`ARCHITECTURE-SPEC.md` supersedes `SPEC.md` where the two disagree. It also
+records the maintainer's story-92 clarification that UI remains an internal
+module. Delivery is incremental, as recorded below. The story numbers are
+ARCHITECTURE-SPEC's own.
 
 | Area | Stories | State |
 | --- | --- | --- |
@@ -475,9 +476,39 @@ below are ARCHITECTURE-SPEC's own.
 | Child-shaping settings captured; operational settings live | 56, 57 | Done — see *One preparation authority*. Mid-run updates, the exclusion list, and prompt inheritance are captured and copied at preparation; concurrency, retention, and interrupt policy stay live. |
 | Async programmatic launch, explicit run, shared resume | 60–66 | Done — `launch()` (accepts into background) and `run()` (prepares and settles with a claimed by-value record); the inherited synchronous `spawn()` and `foreground` option removed (stories 60–66, 76). |
 | Cancellation, delivery, and lifetime | 77–91 | Partial — see *Session ownership*. Sessions refuse launches for ended sessions, hold live children through a tentative switch, cancel on a confirmed switch, and refuse resumes a later session did not ask for. The narrower delivery and lifetime story (the observation and notification halves) is not yet touched. |
-| Terminal presentation extracted to a UI library | 92–100 | Not started. The renderer vocabulary exists in `src/ui/`, but it is still inside the runtime package. |
-| Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; the UI-package flags, lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
+| Terminal presentation isolated in an internal UI module | 92 | Done under the maintainer's clarified requirement: `src/ui/` remains inside this project, not a separate workspace/npm package. It now owns tool-call/result rendering as well as widgets, transcript/settings views, notifications, and presentation helpers. Runtime adapters supply structural views/readers; no execution module imports `pi-tui`. |
+| Presentation contracts and independence | 93–100 | The root wires the internal module without a second enabled extension. UI no longer imports runtime implementations; focused widget/transcript adapters bridge owned views and live readers. Model-facing text, delivery claims/timing, and persistence remain in the runtime. Further headless/lifetime verification belongs to the remaining architecture work. |
+| Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
 | Independent ownership and migration cleanup | — | Not started. |
+
+## Terminal presentation module
+
+The maintainer clarified story 92 during implementation: presentation is a
+separate **module in this project**, not a separate package. `src/ui/index.ts`
+is its presentation entry point, and `src/ui/README.md` describes the boundary.
+There is no UI workspace project, npm dependency, or independently enabled
+extension.
+
+The tool renderers formerly under `src/tools/` and the inline `Text` construction
+in the two tools now live with the widget, transcript viewer, settings views,
+and notification renderers. The extension root still owns Pi registration.
+Widget projection and persisted/live transcript adaptation live in
+`src/presentation/`; the UI consumes narrow structural contracts rather than
+an execution manager or child session. Persisted transcript reads use an
+injected asynchronous reader.
+
+Presentation tests use those contracts, while runtime-specific background
+filtering and live-transcript forwarding remain covered at the adapters.
+`test/presentation-boundary.test.ts` checks dependency direction, and ESLint
+prohibits `pi-tui` imports outside the UI module and execution imports inside it.
+This is structural separation, not a redesign of workflows or delivery policy.
+
+Verified after extraction with daemon-disabled workspace Nx targets:
+`pnpm nx run-many -t test typecheck lint check metadata` passed for all eight
+projects. The runtime suite passed 106 files (2,314 passed, one skipped). Its
+existing typecheck wrapper still reports and excludes the 12 diagnostics in the
+third-party settings package; no new exclusions were added. Standards and spec
+reviews were completed, with their findings addressed and rechecked.
 
 ## Session ownership
 
