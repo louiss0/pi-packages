@@ -60,6 +60,10 @@ export function createToolDeps(
     captureLaunchInputs: vi.fn(() => ({
       snapshot: STUB_SNAPSHOT,
       parentContext: "parent conversation",
+      parentSession: {
+        parentSessionFile: "/sessions/parent.jsonl",
+        parentSessionId: "session-1",
+      },
     })),
     getModelInfo: vi.fn(() => ({
       parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }),
@@ -72,10 +76,6 @@ export function createToolDeps(
         profiles: new Map(),
         strategies: strategiesByFamily(SHIPPED_STRATEGIES),
       },
-    })),
-    getSessionInfo: vi.fn(() => ({
-      parentSessionFile: "/sessions/parent.jsonl",
-      parentSessionId: "session-1",
     })),
   };
 

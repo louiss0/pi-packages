@@ -114,14 +114,18 @@ export class SubagentRuntime {
    * Capture every parent input a launch needs before its first asynchronous
    * step (ARCHITECTURE-SPEC stories 15 and 16).
    *
-   * The snapshot excludes the conversation text, which is the one input whose
-   * need depends on the resolved definition; it is captured here too, so a
-   * later parent turn cannot change what an accepted child inherits. The
-   * caller attaches it when the resolved definition asks for it.
+   * This is the one capture operation: the snapshot, the conversation text,
+   * and the session identity are taken together, so no caller can read
+   * inconsistent slices of parent state. The snapshot excludes the
+   * conversation text, which is the one input whose need depends on the
+   * resolved definition; it is captured here too, so a later parent turn
+   * cannot change what an accepted child inherits. The caller attaches it
+   * when the resolved definition asks for it.
    */
   captureLaunchInputs(): {
     snapshot: ParentSnapshot;
     parentContext: string | undefined;
+    parentSession: { parentSessionFile: string; parentSessionId: string };
   } {
     const ctx = this.currentCtx!;
     return {
@@ -133,6 +137,7 @@ export class SubagentRuntime {
         this.listRegisteredTools(),
       ),
       parentContext: buildParentContext(ctx) || undefined,
+      parentSession: this.getSessionInfo(),
     };
   }
 

@@ -327,10 +327,10 @@ describe("the service door", () => {
           ],
         },
         parentContext: "parent conversation",
-      })),
-      getSessionInfo: vi.fn(() => ({
-        parentSessionFile: "/sessions/parent.jsonl",
-        parentSessionId: "session-1",
+        parentSession: {
+          parentSessionFile: "/sessions/parent.jsonl",
+          parentSessionId: "session-1",
+        },
       })),
     };
     const registry = registryWith(
@@ -518,10 +518,10 @@ describe("both doors resolve alike", () => {
       captureLaunchInputs: vi.fn(() => ({
         snapshot: STUB_SNAPSHOT,
         parentContext: "parent conversation",
-      })),
-      getSessionInfo: vi.fn(() => ({
-        parentSessionFile: "/sessions/parent.jsonl",
-        parentSessionId: "session-1",
+        parentSession: {
+          parentSessionFile: "/sessions/parent.jsonl",
+          parentSessionId: "session-1",
+        },
       })),
     };
     const registry = registryWith("worker", {});

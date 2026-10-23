@@ -176,6 +176,29 @@ describe("SubagentRuntime context query methods", () => {
     });
   });
 
+  it("captureLaunchInputs takes the snapshot, conversation, and session identity together", () => {
+    // Story 16: one capture operation, so no caller can read inconsistent
+    // slices of parent state.
+    const runtime = createSubagentRuntime();
+    runtime.setSessionContext(makeSessionCtx());
+
+    // Force the snapshot builder to return a valid snapshot.
+    mockBuildParentSnapshot.mockReturnValueOnce(STUB_SNAPSHOT);
+
+    const inputs = runtime.captureLaunchInputs();
+
+    expect(inputs.snapshot).toHaveProperty("registeredToolNames");
+    expect(inputs.snapshot).toHaveProperty("activeToolNames");
+    // The session identity and conversation are captured together (story 16);
+    // the content of parentContext depends on buildParentContext, which is
+    // not mocked here — the structural claim is that it is a property.
+    expect("parentContext" in inputs).toBe(true);
+    expect(inputs.parentSession).toEqual({
+      parentSessionFile: "/sessions/test.jsonl",
+      parentSessionId: "test-session-id",
+    });
+  });
+
   it("getModelInfo returns model and modelRegistry from current context", () => {
     const runtime = createSubagentRuntime();
     const registry = {

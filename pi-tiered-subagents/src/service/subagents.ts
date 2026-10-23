@@ -22,22 +22,31 @@ import type {
   Subagent,
   SubagentLifecycleObserver,
 } from "#src/lifecycle/subagent";
-import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
+import {
+  type LaunchOutcome,
+  ownerCanAccept,
+  type SessionOwner,
+} from "#src/lifecycle/session-owner";
 import { debugNote } from "#src/debug";
 import { defined } from "#src/optional";
 import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
 import type { ParentSessionInfo } from "#src/types";
 
-/** Parent capture operations needed at the acceptance boundary. */
+/**
+ * Parent capture operations needed at the acceptance boundary.
+ *
+ * Exactly one capture operation exists (story 16): a caller takes every
+ * parent slice together, so no door can read inconsistent state.
+ */
 export interface SubagentsRuntime {
   readonly currentCtx: unknown | undefined;
   captureLaunchInputs(): {
     readonly snapshot: ParentSnapshot;
     readonly parentContext: string | undefined;
-  };
-  getSessionInfo(): {
-    readonly parentSessionFile: string;
-    readonly parentSessionId: string;
+    readonly parentSession: {
+      readonly parentSessionFile: string;
+      readonly parentSessionId: string;
+    };
   };
 }
 
@@ -76,6 +85,7 @@ export type SubagentsPreparationOutcome =
       readonly kind: "rejected";
       readonly reason:
         | "no-active-session"
+        | "session-ended"
         | "unknown-agent"
         | "disabled-agent"
         | "invalid-thinking"
@@ -121,11 +131,21 @@ export class Subagents {
     // The one capture operation (story 16): every parent slice the launch
     // needs is taken here, before preparation can yield.
     const inputs = this.runtime.captureLaunchInputs();
-    const { parentSessionFile, parentSessionId } =
-      this.runtime.getSessionInfo();
 
     const prepared = await this.preparer.prepare(request, signal);
     if (prepared.kind === "rejected") return prepared;
+
+    // The request was made under `owner`. If that session has since ended or
+    // been replaced, the preparation's answer belongs to a session that is
+    // gone: refuse before any acceptance work, and let the manager's own
+    // atomic re-check stand as the last word at the commit (story 85).
+    if (!ownerCanAccept(owner, this.manager.currentOwner())) {
+      return {
+        kind: "rejected",
+        reason: "session-ended",
+        message: "Session ended before the launch was accepted.",
+      };
+    }
 
     const { config } = prepared.value;
     // The conversation was captured with the request; only its attachment
@@ -148,8 +168,8 @@ export class Subagents {
       );
     }
     const parentSession: ParentSessionInfo = {
-      parentSessionFile,
-      parentSessionId,
+      parentSessionFile: inputs.parentSession.parentSessionFile,
+      parentSessionId: inputs.parentSession.parentSessionId,
       ...defined({ toolCallId }),
     };
 

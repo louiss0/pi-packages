@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
+import type { LoadedScopes } from "#src/agents/loader";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import { defined } from "#src/optional";
 import { SubagentState } from "#src/lifecycle/subagent-state";
@@ -310,10 +311,10 @@ function makeRuntimeStub(
     captureLaunchInputs: vi.fn(() => ({
       snapshot: STUB_SNAPSHOT,
       parentContext: "parent conversation",
-    })),
-    getSessionInfo: vi.fn(() => ({
-      parentSessionFile: "/sessions/parent.jsonl",
-      parentSessionId: "parent-session-123",
+      parentSession: {
+        parentSessionFile: "/sessions/parent.jsonl",
+        parentSessionId: "parent-session-123",
+      },
     })),
     ...override,
   };
@@ -736,6 +737,47 @@ describe("SubagentsServiceAdapter — launch and run", () => {
       const options = mgr.spawn.mock.calls[0]![3];
       expect(options).not.toHaveProperty("signal");
     });
+  });
+
+  it("rejects session-ended when the owning session is replaced during preparation", async () => {
+    // The launch is asked under one session; Pi replaces it while the
+    // definition files load. The preparation's answer must not attach to the
+    // successor session (ARCHITECTURE-SPEC story 85).
+    let release!: (scopes: LoadedScopes) => void;
+    const registry = new AgentRegistry(() => ({
+      global: { definitions: [], errors: [] },
+      project: { definitions: [], errors: [] },
+    }));
+    const preparer = new LaunchPreparer({
+      loadScopes: () =>
+        new Promise<LoadedScopes>((resolve) => {
+          release = resolve;
+        }),
+      modelInfo: () => ({ ladders: LADDERS }),
+      turnSettings: () => ({
+        defaultMaxTurns: undefined,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      }),
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
+    });
+    const mgr = createManagerStub();
+    const svc = new SubagentsServiceAdapter(
+      mgr,
+      new Subagents(mgr, makeRuntimeStub(), preparer),
+    );
+
+    const launchPromise = svc.launch("Explore", "do it");
+    // The session that asked is gone by the time the load resolves.
+    mgr.currentOwner.mockReturnValue({ generation: 2, sessionId: "next" });
+    release(registry.currentScopes());
+
+    const result = await launchPromise;
+    expect(result).toMatchObject({ kind: "rejected", reason: "session-ended" });
+    expect(mgr.spawn).not.toHaveBeenCalled();
   });
 
   it("uses truncated prompt as default description", async () => {
