@@ -1,7 +1,0 @@
-docs(pi-tiered-subagents): record the shared preparation authority
-
-Increment 2 Piece 2 lands: LaunchPreparer as the one selection and
-resolution authority, the session-scoped Subagents seam both doors
-consume, and the captured definition travelling into execution. The
-10-23 row moves from not-started to partial, with the remaining async
-capture work named honestly.
