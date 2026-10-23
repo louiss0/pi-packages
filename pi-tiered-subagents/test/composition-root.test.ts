@@ -6,6 +6,19 @@
  * `test/session/provider-inheritance.test.ts`, but those tests pass whether or
  * not the root calls it — only this file fails if the wiring is removed.
  */
+/**
+ * The nth recorded entry of a mock — a call tuple, a result, or an order stamp.
+ *
+ * Every use is preceded by an assertion that the call happened, so "no call"
+ * is a failed expectation rather than something the type system must allow for.
+ */
+function callAt<T>(values: readonly T[], index = 0): T {
+  const value = values[index];
+  if (value === undefined)
+    throw new Error(`expected entry #${index} to be recorded`);
+  return value;
+}
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -189,8 +202,7 @@ async function captureSessionFactoryIO(parentRegistry: unknown) {
   );
 
   expect(createSubagentSession).toHaveBeenCalled();
-  const [, deps] = vi.mocked(createSubagentSession).mock.calls[0];
-  return deps;
+  return callAt(vi.mocked(createSubagentSession).mock.calls)[1];
 }
 
 describe("composition root: io.createSession", () => {
@@ -213,7 +225,7 @@ describe("composition root: io.createSession", () => {
 
     // The child is handed a runtime, not the registry the SDK now ignores.
     expect(sdk.createAgentSession).toHaveBeenCalledTimes(1);
-    const [options] = sdk.createAgentSession.mock.calls[0];
+    const options = callAt(sdk.createAgentSession.mock.calls)[0];
     expect(options.modelRuntime).toBe(sdk.childRuntime);
     expect(options).not.toHaveProperty("modelRegistry");
 
@@ -453,7 +465,7 @@ describe("composition root: prompt-inheritance wiring", () => {
       undefined,
     );
 
-    return vi.mocked(createSubagentSession).mock.calls[0];
+    return callAt(vi.mocked(createSubagentSession).mock.calls);
   }
 
   it("captures the parent's prompt options and renders them into the spawn snapshot", async () => {
@@ -596,7 +608,7 @@ describe("composition root: parent tool list", () => {
       undefined,
       undefined,
     );
-    const [, deps] = vi.mocked(createSubagentSession).mock.calls[0];
+    const deps = callAt(vi.mocked(createSubagentSession).mock.calls)[1];
 
     // An MCP server connects in the background, so its tools register after load.
     vi.mocked(pi.getAllTools).mockReturnValue([

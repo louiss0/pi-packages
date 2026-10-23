@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { merge, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import type { Theme } from "#src/ui/display";
 import type { WidgetAgent } from "#src/ui/widget-renderer";
@@ -22,23 +23,25 @@ const testRegistry = new AgentRegistry(() => ({
   project: { definitions: [], errors: [] },
 }));
 
-function makeAgent(overrides: Partial<WidgetAgent> = {}): WidgetAgent {
-  return {
-    id: "agent-1",
-    type: "worker",
-    status: "completed",
-    description: "test task",
-    toolUses: 5,
-    startedAt: 1000,
-    completedAt: 6000,
-    compactionCount: 0,
-    // Activity fields (folded from the former WidgetActivity)
-    turnBudget: { maxTurns: 10, used: 3, phase: "within" },
-    activeTools: new Map(),
-    responseText: "",
-    contextPercent: null,
-    ...overrides,
-  };
+function makeAgent(overrides: Patch<WidgetAgent> = {}): WidgetAgent {
+  return merge(
+    {
+      id: "agent-1",
+      type: "worker",
+      status: "completed",
+      description: "test task",
+      toolUses: 5,
+      startedAt: 1000,
+      completedAt: 6000,
+      compactionCount: 0,
+      // Activity fields (folded from the former WidgetActivity)
+      turnBudget: { maxTurns: 10, used: 3, phase: "within" },
+      activeTools: new Map(),
+      responseText: "",
+      contextPercent: null,
+    },
+    overrides,
+  );
 }
 
 type RenderWidgetLinesParams = Parameters<typeof renderWidgetLines>[0];
@@ -48,18 +51,22 @@ type RenderWidgetLinesParams = Parameters<typeof renderWidgetLines>[0];
  * what the case is about. One place to teach a new parameter.
  */
 function callRenderWidgetLines(
-  overrides: Partial<RenderWidgetLinesParams> = {},
+  overrides: Patch<RenderWidgetLinesParams> = {},
 ): string[] {
-  return renderWidgetLines({
-    agents: [],
-    registry: testRegistry,
-    spinnerFrame: 0,
-    terminalWidth: 200,
-    terminalHeight: 40,
-    theme: stubTheme(),
-    shouldShowFinished: () => true,
-    ...overrides,
-  });
+  return renderWidgetLines(
+    merge(
+      {
+        agents: [],
+        registry: testRegistry,
+        spinnerFrame: 0,
+        terminalWidth: 200,
+        terminalHeight: 40,
+        theme: stubTheme(),
+        shouldShowFinished: () => true,
+      },
+      overrides,
+    ),
+  );
 }
 
 describe("renderFinishedLine", () => {

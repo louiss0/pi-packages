@@ -61,6 +61,19 @@ function makeHandler(settings = makeSettings()) {
   return { handler, settings };
 }
 
+/**
+ * The option list the settings menu rendered, read off its first `select`
+ * call. A menu that never called `select` has no options to assert on, so
+ * the missing call fails here instead of silently comparing `undefined`.
+ */
+function menuOptions(ui: ReturnType<typeof makeMenuUI>): string[] {
+  const [call] = ui.select.mock.calls;
+  const options = call?.[1];
+  if (!Array.isArray(options))
+    throw new Error("the settings menu never opened");
+  return options;
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
@@ -75,7 +88,7 @@ describe("SubagentsSettingsHandler", () => {
     const { handler } = makeHandler();
     const ui = makeMenuUI([undefined]); // cancel immediately
     await handler.handle({ ui });
-    const options = ui.select.mock.calls[0][1] as string[];
+    const options = menuOptions(ui);
     expect(options).toEqual([
       "Max concurrency (current: 4)",
       "Default max turns (current: unlimited)",
@@ -109,7 +122,7 @@ describe("SubagentsSettingsHandler", () => {
     const { handler } = makeHandler(settings);
     const ui = makeMenuUI([undefined]);
     await handler.handle({ ui });
-    const options = ui.select.mock.calls[0][1] as string[];
+    const options = menuOptions(ui);
     expect(options[5]).toBe("Abort all subagents on ESC (current: off)");
   });
 

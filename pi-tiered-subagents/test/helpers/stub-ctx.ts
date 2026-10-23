@@ -7,13 +7,13 @@
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import { defined } from "#src/optional";
 
 export const STUB_CTX = {} as unknown as ExtensionContext;
 
-export const STUB_SNAPSHOT: ParentSnapshot = {
+export const STUB_SNAPSHOT: ParentSnapshot = defined({
   cwd: "/test",
   systemPrompt: "test prompt",
-  model: undefined,
   modelRegistry: { find: () => undefined, getAll: () => [] },
   activeToolNames: ["read", "bash"],
-};
+});

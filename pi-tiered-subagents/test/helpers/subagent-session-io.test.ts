@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { type Patch } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import {
   createAgentLookup,
@@ -98,7 +99,7 @@ describe("createAgentLookup", () => {
   });
 
   it("accepts a partial definition override", () => {
-    const override: Partial<AgentDefinition> = {
+    const override: Patch<AgentDefinition> = {
       displayName: "Custom",
       maxTurns: 7,
     };
@@ -143,7 +144,7 @@ describe("createFactorySession", () => {
   it("stubs retain Mock methods (vi.fn())", () => {
     const session = createFactorySession();
     session.setActiveToolsByName(["read"]);
-    expect(session.setActiveToolsByName.mock.calls[0][0]).toEqual(["read"]);
+    expect(session.setActiveToolsByName).toHaveBeenCalledWith(["read"]);
   });
 
   it("exposes the core's working event bus (subscribe/emit)", () => {

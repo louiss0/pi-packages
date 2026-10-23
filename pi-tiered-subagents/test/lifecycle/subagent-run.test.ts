@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 import { SubagentRun } from "#src/lifecycle/subagent-run";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
@@ -14,7 +15,7 @@ const ALL_STATUSES: SubagentStatus[] = [
 
 /** A run seeded in the given status. */
 function runIn(status: SubagentStatus, completedAt?: number): SubagentRun {
-  return new SubagentRun("initial", true, { status, completedAt });
+  return new SubagentRun("initial", true, defined({ status, completedAt }));
 }
 
 /** A run started with the given caller signal (none by default). */

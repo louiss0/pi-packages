@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 import {
   type ChildLifecyclePublisher,
@@ -89,10 +90,9 @@ describe("createChildLifecyclePublisher", () => {
   it("passes an undefined parentSessionId through unchanged", () => {
     const { emit, publisher } = setup();
 
-    publisher.spawning({
-      agentName: "general-purpose",
-      parentSessionId: undefined,
-    });
+    publisher.spawning(
+      defined({ agentName: "general-purpose", parentSessionId: undefined }),
+    );
 
     expect(emit).toHaveBeenCalledWith(SUBAGENT_CHILD_SPAWNING, {
       agentName: "general-purpose",

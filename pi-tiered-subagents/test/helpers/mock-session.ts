@@ -1,5 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { Mock } from "vitest";
+import { defined } from "#src/optional";
 import { vi } from "vitest";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
@@ -169,5 +170,5 @@ export function createMockSession(
     thinkingLevel: "off",
   };
 
-  return { ...base, ...overrides };
+  return { ...base, ...defined(overrides) };
 }

@@ -4,6 +4,7 @@ import {
   renderBackgroundLaunch,
   spawnBackground,
 } from "#src/tools/background-spawner";
+import { defined, type Patch } from "#src/optional";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { createResolvedSpawnConfig } from "#test/helpers/make-spawn-config";
 import { createTestSubagent } from "#test/helpers/make-subagent";
@@ -23,13 +24,11 @@ function makeConfig(
     prompt: "do something",
     description: "bg task",
     runInBackground: true,
-    ...overrides,
+    ...defined(overrides),
   });
 }
 
-function makeParams(
-  overrides: Partial<BackgroundParams> = {},
-): BackgroundParams {
+function makeParams(overrides: Patch<BackgroundParams> = {}): BackgroundParams {
   return {
     config: makeConfig(),
     snapshot: STUB_SNAPSHOT,
@@ -39,18 +38,21 @@ function makeParams(
       toolCallId: "tc-1",
     },
     settings: { maxConcurrent: 4 },
-    ...overrides,
+    ...defined(overrides),
   };
 }
 
 describe("renderBackgroundLaunch", () => {
-  const detailBase = {
+  // `defined(...)` filters out the explicit `undefined`s: `detailBase`'s type
+  // is `Pick<AgentDetails, ...>`, and `modelName`/`tags` are optional without
+  // `| undefined`, so a raw literal would mismatch.
+  const detailBase = defined({
     displayName: "Explore",
     description: "answer",
     subagentType: "Explore",
     modelName: undefined,
     tags: undefined,
-  };
+  });
 
   it("renders a resumed launch with its output file", () => {
     const result = renderBackgroundLaunch({
@@ -135,7 +137,7 @@ describe("spawnBackground", () => {
       makeParams({ parentSession: { toolCallId: "tc-99" } }),
     );
     const spawnOpts = (manager.spawn as ReturnType<typeof vi.fn>).mock
-      .calls[0][3];
+      .calls[0]![3];
     expect(spawnOpts.parentSession?.toolCallId).toBe("tc-99");
   });
 
@@ -177,8 +179,10 @@ describe("spawnBackground", () => {
 
   it("includes output file path in result when present", () => {
     const record = createTestSubagent({ status: "running" });
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(createMockSession(), "/sessions/bg.jsonl"),
+    record.attachSession(
+      toSubagentSession(
+        createSubagentSessionStub(createMockSession(), "/sessions/bg.jsonl"),
+      ),
     );
     const deps = createToolDeps({
       manager: {
@@ -215,8 +219,10 @@ describe("spawnBackground", () => {
   describe("launch message", () => {
     it("renders the started launch with its output file", () => {
       const record = createTestSubagent({ status: "running" });
-      record.subagentSession = toSubagentSession(
-        createSubagentSessionStub(createMockSession(), "/sessions/bg.jsonl"),
+      record.attachSession(
+        toSubagentSession(
+          createSubagentSessionStub(createMockSession(), "/sessions/bg.jsonl"),
+        ),
       );
       const deps = createToolDeps({
         manager: {

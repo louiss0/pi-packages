@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
+import { defined } from "#src/optional";
 import { AgentTool } from "#src/tools/agent-tool";
 import {
   createToolDeps,
@@ -14,7 +15,7 @@ import { textOf } from "#test/helpers/text-of";
 function makeCtx(overrides: Record<string, unknown> = {}) {
   return {
     ui: { fake: true },
-    ...overrides,
+    ...defined(overrides),
   } as unknown as ExtensionContext;
 }
 
@@ -714,8 +715,8 @@ describe("AgentTool — background execution", () => {
       run_in_background: true,
     });
     const spawnOpts = (deps.manager.spawn as ReturnType<typeof vi.fn>).mock
-      .calls[0][3];
-    expect(spawnOpts.parentSession?.toolCallId).toBe("tc-1");
+      .calls[0]?.[3];
+    expect(spawnOpts?.parentSession?.toolCallId).toBe("tc-1");
   });
 });
 

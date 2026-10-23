@@ -1,3 +1,17 @@
+/**
+ * The nth recorded entry of a mock — a call tuple, a result, or an order stamp.
+ *
+ * Every use is preceded by an assertion that the call happened, so "no call"
+ * is a failed expectation rather than something the type system must allow for.
+ */
+function callAt<T>(values: readonly T[], index = 0): T {
+  const value = values[index];
+  if (value === undefined)
+    throw new Error(`expected entry #${index} to be recorded`);
+  return value;
+}
+
+import { defined } from "#src/optional";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
@@ -188,17 +202,20 @@ function makeSubagentSession(
 ) {
   const lifecycle = metaOverrides?.lifecycle ?? createChildLifecycleMock();
   const hasOutputFile = metaOverrides != null && "outputFile" in metaOverrides;
-  const sub = new SubagentSession(session as unknown as AgentSession, {
-    outputFile: hasOutputFile
-      ? metaOverrides.outputFile
-      : "/sessions/child.jsonl",
-    sessionId: metaOverrides?.sessionId ?? "child-session-default",
-    sessionDir: metaOverrides?.sessionDir ?? "/sessions/dir",
-    agentName: metaOverrides?.agentName ?? "Explore",
-    turnPolicy: metaOverrides?.turnPolicy ?? UNLIMITED,
-    parentContext: metaOverrides?.parentContext,
-    lifecycle,
-  });
+  const sub = new SubagentSession(
+    session as unknown as AgentSession,
+    defined({
+      sessionId: metaOverrides?.sessionId ?? "child-session-default",
+      sessionDir: metaOverrides?.sessionDir ?? "/sessions/dir",
+      agentName: metaOverrides?.agentName ?? "Explore",
+      turnPolicy: metaOverrides?.turnPolicy ?? UNLIMITED,
+      lifecycle,
+      outputFile: hasOutputFile
+        ? metaOverrides.outputFile
+        : "/sessions/child.jsonl",
+      parentContext: metaOverrides?.parentContext,
+    }),
+  );
   return { sub, lifecycle };
 }
 
@@ -1010,8 +1027,10 @@ describe("SubagentSession — dispose", () => {
       type: "session_shutdown",
       reason: "quit",
     });
-    const [shutdownAt] = session.extensionRunner.emit.mock.invocationCallOrder;
-    const [disposeAt] = session.dispose.mock.invocationCallOrder;
+    const shutdownAt = callAt(
+      session.extensionRunner.emit.mock.invocationCallOrder,
+    );
+    const disposeAt = callAt(session.dispose.mock.invocationCallOrder);
     expect(shutdownAt).toBeLessThan(disposeAt);
   });
 

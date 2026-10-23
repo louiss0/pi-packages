@@ -395,7 +395,7 @@ describe("children that may change files", () => {
     ];
     let index = 0;
     const factory = vi.fn(async () => {
-      const turn = turns[index++];
+      const turn = turns[index++]!;
       const stub = createSubagentSessionStub();
       stub.runTurnLoop.mockImplementation(async () => {
         await turn();

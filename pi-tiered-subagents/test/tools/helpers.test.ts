@@ -3,6 +3,7 @@ import {
   type AgentDefinition,
   defaultDefinition,
 } from "#src/agents/definition";
+import { defined, type Patch } from "#src/optional";
 import type { TypeListRegistry } from "#src/tools/helpers";
 import {
   buildAgentGuidelines,
@@ -17,7 +18,7 @@ import { createTestSubagent } from "#test/helpers/make-subagent";
 
 /** Build a minimal TypeListRegistry stub for tests. */
 function makeRegistry(opts: {
-  definitions?: Partial<AgentDefinition>[];
+  definitions?: Patch<AgentDefinition>[];
 }): TypeListRegistry {
   const definitions = (opts.definitions ?? []).map(
     (definition) =>
@@ -297,13 +298,16 @@ describe("buildAgentGuidelines", () => {
 });
 
 describe("buildDetails", () => {
-  const base = {
+  // `defined(...)` strips the explicit `undefined`s: `buildDetails`' `base`
+  // parameter type does not accept `| undefined` for `modelName`/`tags`, and
+  // `Defined<>` keeps every field optional-but-absent.
+  const base = defined({
     displayName: "TestAgent",
     description: "does stuff",
     subagentType: "general-purpose",
     modelName: undefined,
     tags: undefined,
-  };
+  });
   const record = {
     toolUses: 3,
     startedAt: 1000,

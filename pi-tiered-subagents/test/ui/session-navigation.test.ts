@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import type { PersistedRunSummary } from "#src/persisted-record";
 import type { AgentSessionEvent, SessionMessage } from "#src/types";
@@ -7,6 +8,7 @@ import {
   listNavigableAgents,
   liveSource,
   type NavigableSubagent,
+  type NavigationEntry,
   type TranscriptSource,
 } from "#src/ui/session-navigation";
 import { makeNavigable } from "#test/helpers/make-navigable";
@@ -15,6 +17,17 @@ const registry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
   project: { definitions: [], errors: [] },
 }));
+
+/**
+ * The single entry a one-record input produces. These cases assert on one
+ * entry's shape, so reading it by index would leave every use of it possibly
+ * undefined and hide the discriminant narrowing the assertions turn on.
+ */
+function onlyEntry(entries: NavigationEntry[]): NavigationEntry {
+  const [entry] = entries;
+  if (entry === undefined) throw new Error("expected exactly one entry");
+  return entry;
+}
 
 describe("listNavigableAgents", () => {
   it("returns an empty list for no agents", () => {
@@ -25,7 +38,7 @@ describe("listNavigableAgents", () => {
     const ready = makeNavigable({ id: "ready", isSessionReady: () => true });
     const entries = listNavigableAgents([ready], registry, []);
     expect(entries).toHaveLength(1);
-    const [entry] = entries;
+    const entry = onlyEntry(entries);
     expect(entry.kind).toBe("live");
     expect(entry.kind === "live" && entry.record).toBe(ready);
   });
@@ -38,7 +51,7 @@ describe("listNavigableAgents", () => {
       description: "Investigate the bug",
       toolUses: 3,
     });
-    const [entry] = listNavigableAgents([released], registry, []);
+    const entry = onlyEntry(listNavigableAgents([released], registry, []));
     expect(entry.kind).toBe("snapshot");
     expect(entry.kind === "snapshot" && entry.outputFile).toBe(
       "/tasks/released-1.jsonl",
@@ -66,7 +79,7 @@ describe("listNavigableAgents", () => {
       startedAt: 1000,
       completedAt: 4000,
     });
-    const [entry] = listNavigableAgents([record], registry, []);
+    const entry = onlyEntry(listNavigableAgents([record], registry, []));
     // getDisplayName resolves "worker" against the empty registry to its fallback display name.
     expect(entry.label).toBe(
       "Worker (Investigate the bug) · 3 tools · completed · 3.0s",
@@ -79,7 +92,7 @@ describe("listNavigableAgents", () => {
         type: "worker",
         description: "Investigate the bug",
       });
-      const [entry] = listNavigableAgents([record], registry, []);
+      const entry = onlyEntry(listNavigableAgents([record], registry, []));
       expect(entry.heading).toEqual({
         name: "Worker",
         description: "Investigate the bug",
@@ -92,7 +105,7 @@ describe("listNavigableAgents", () => {
         outputFile: "/tasks/released-1.jsonl",
         description: "Investigate the bug",
       });
-      const [entry] = listNavigableAgents([released], registry, []);
+      const entry = onlyEntry(listNavigableAgents([released], registry, []));
       expect(entry.heading).toEqual({
         name: "Worker",
         description: "Investigate the bug",
@@ -100,10 +113,12 @@ describe("listNavigableAgents", () => {
     });
 
     it("carries no mode label for a replace-mode agent", () => {
-      const [entry] = listNavigableAgents(
-        [makeNavigable({ type: "Explore", description: "Find auth files" })],
-        registry,
-        [],
+      const entry = onlyEntry(
+        listNavigableAgents(
+          [makeNavigable({ type: "Explore", description: "Find auth files" })],
+          registry,
+          [],
+        ),
       );
       expect(entry.heading).toEqual({
         name: "Explore",
@@ -135,7 +150,9 @@ describe("listNavigableAgents", () => {
 
   describe("persisted runs", () => {
     it("lists a persisted run with a transcript as a snapshot entry", () => {
-      const entries = listNavigableAgents([], registry, [persistedRun()]);
+      const entries = listNavigableAgents([], registry, [
+        persistedRun({ outputFile: "/tasks/earlier.jsonl" }),
+      ]);
       expect(entries).toEqual([
         {
           kind: "snapshot",
@@ -169,8 +186,11 @@ describe("listNavigableAgents", () => {
 });
 
 function persistedRun(
-  overrides: Partial<PersistedRunSummary> = {},
+  overrides: Patch<PersistedRunSummary> = {},
 ): PersistedRunSummary {
+  // `outputFile` defaults to absent for the same reason makeAgent's
+  // `completedAt` does: an override bag cannot unset a defaulted value, and
+  // "a run that recorded no transcript" is exactly the absent key.
   return {
     id: "earlier",
     type: "worker",
@@ -179,8 +199,8 @@ function persistedRun(
     startedAt: 1000,
     completedAt: 4000,
     toolUses: 7,
-    outputFile: "/tasks/earlier.jsonl",
-    ...overrides,
+    outputFile: undefined,
+    ...defined(overrides),
   };
 }
 

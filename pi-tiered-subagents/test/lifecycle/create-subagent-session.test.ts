@@ -1,3 +1,16 @@
+/**
+ * The nth recorded entry of a mock — a call tuple, a result, or an order stamp.
+ *
+ * Every use is preceded by an assertion that the call happened, so "no call"
+ * is a failed expectation rather than something the type system must allow for.
+ */
+function callAt<T>(values: readonly T[], index = 0): T {
+  const value = values[index];
+  if (value === undefined)
+    throw new Error(`expected entry #${index} to be recorded`);
+  return value;
+}
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CreateSessionOptions,
@@ -206,7 +219,7 @@ describe("createSubagentSession — assembly", () => {
         appendSystemPromptOverride: expect.any(Function),
       }),
     );
-    const loaderOpts = io.createResourceLoader.mock.calls[0][0];
+    const loaderOpts = callAt(io.createResourceLoader.mock.calls)[0];
     expect(loaderOpts.appendSystemPromptOverride()).toEqual([]);
   });
 
@@ -224,7 +237,7 @@ describe("createSubagentSession — assembly", () => {
       createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
     );
 
-    const sm = io.createSessionManager.mock.results[0].value;
+    const sm = callAt(io.createSessionManager.mock.results).value;
     expect(sm.newSession).toHaveBeenCalledWith({
       parentSession: "parent-id-123",
     });
@@ -253,8 +266,10 @@ describe("createSubagentSession — lifecycle ordering", () => {
     );
 
     expect(lifecycle.spawning).toHaveBeenCalledOnce();
-    const spawnOrder = lifecycle.spawning.mock.invocationCallOrder[0];
-    const createdOrder = lifecycle.sessionCreated.mock.invocationCallOrder[0];
+    const spawnOrder = callAt(lifecycle.spawning.mock.invocationCallOrder);
+    const createdOrder = callAt(
+      lifecycle.sessionCreated.mock.invocationCallOrder,
+    );
     expect(spawnOrder).toBeLessThan(createdOrder);
   });
 
@@ -270,8 +285,10 @@ describe("createSubagentSession — lifecycle ordering", () => {
     );
 
     expect(lifecycle.sessionCreated).toHaveBeenCalledOnce();
-    const createdOrder = lifecycle.sessionCreated.mock.invocationCallOrder[0];
-    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
+    const createdOrder = callAt(
+      lifecycle.sessionCreated.mock.invocationCallOrder,
+    );
+    const bindOrder = callAt(session.bindExtensions.mock.invocationCallOrder);
     expect(createdOrder).toBeLessThan(bindOrder);
   });
 
@@ -287,8 +304,8 @@ describe("createSubagentSession — lifecycle ordering", () => {
     );
 
     expect(lifecycle.bound).toHaveBeenCalledOnce();
-    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
-    const boundOrder = lifecycle.bound.mock.invocationCallOrder[0];
+    const bindOrder = callAt(session.bindExtensions.mock.invocationCallOrder);
+    const boundOrder = callAt(lifecycle.bound.mock.invocationCallOrder);
     expect(bindOrder).toBeLessThan(boundOrder);
   });
 
@@ -520,7 +537,9 @@ describe("createSubagentSession — the core's own child tools", () => {
         defaultDeps(),
       );
 
-      const opts = io.createSession.mock.calls[0][0] as CreateSessionOptions;
+      const opts = callAt(
+        io.createSession.mock.calls,
+      )[0] as CreateSessionOptions;
       expect(opts.customTools?.map((tool) => tool.name)).toEqual([
         "ask_parent",
       ]);
@@ -564,7 +583,9 @@ describe("createSubagentSession — the core's own child tools", () => {
         defaultDeps(),
       );
 
-      const opts = io.createSession.mock.calls[0][0] as CreateSessionOptions;
+      const opts = callAt(
+        io.createSession.mock.calls,
+      )[0] as CreateSessionOptions;
       await opts.customTools?.[0]?.execute(
         "tc-1",
         { question: "Which config wins?" },
@@ -606,7 +627,9 @@ describe("createSubagentSession — the core's own child tools", () => {
         defaultDeps(),
       );
 
-      const opts = io.createSession.mock.calls[0][0] as CreateSessionOptions;
+      const opts = callAt(
+        io.createSession.mock.calls,
+      )[0] as CreateSessionOptions;
       expect(opts.customTools).toEqual([]);
     });
   });

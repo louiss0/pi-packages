@@ -60,7 +60,8 @@ describe("ConcurrencyLimiter", () => {
 
       gates.forEach((gate, i) => {
         gate.task.mockImplementation(() => {
-          order.push(labels[i]);
+          // Every index in range: the array is a literal three long.
+          order.push(labels[i]!);
           const { promise, resolve } = Promise.withResolvers<void>();
           gate.resolve = resolve;
           return promise;

@@ -578,7 +578,7 @@ describe("GetResultTool", () => {
     const record = createTestSubagent();
     const stub = createSubagentSessionStub();
     stub.getConversation.mockReturnValue("[User]: hello");
-    record.subagentSession = toSubagentSession(stub);
+    record.attachSession(toSubagentSession(stub));
     const records = new Map([["agent-1", record]]);
     const result = await execute(makeManager(records), {
       agent_id: "agent-1",
@@ -590,8 +590,10 @@ describe("GetResultTool", () => {
 
   it("points to the transcript when verbose is requested but the session was released", async () => {
     const record = createTestSubagent();
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(createMockSession(), "/tasks/agent.jsonl"),
+    record.attachSession(
+      toSubagentSession(
+        createSubagentSessionStub(createMockSession(), "/tasks/agent.jsonl"),
+      ),
     );
     await record.releaseSession();
     const records = new Map([["agent-1", record]]);
@@ -991,7 +993,7 @@ describe("GetResultTool — TUI rendering", () => {
       const record = createTestSubagent();
       const stub = createSubagentSessionStub();
       stub.getConversation.mockReturnValue("[User]: hello");
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
 
       const result = await execute(
         makeManager(new Map([["agent-1", record]])),

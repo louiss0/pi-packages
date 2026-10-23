@@ -296,6 +296,11 @@ describe("NotificationManager", () => {
     return new NotificationManager(args.sendMessage);
   }
 
+  /** The args the manager handed `sendMessage` on its first call. */
+  function firstSendCall(args: ReturnType<typeof makeArgs>) {
+    return args.sendMessage.mock.calls[0]!;
+  }
+
   const baseRecord = createTestSubagent({
     description: "Test",
     result: "Done.",
@@ -314,8 +319,7 @@ describe("NotificationManager", () => {
     const args = makeArgs();
     const system = makeManager(args);
     system.sendCompletion(baseRecord);
-    const content = (args.sendMessage.mock.calls[0][0] as { content: string })
-      .content;
+    const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toContain("get_subagent_result");
   });
 
@@ -329,8 +333,7 @@ describe("NotificationManager", () => {
         sessionReady: true,
       }),
     );
-    const content = (args.sendMessage.mock.calls[0][0] as { content: string })
-      .content;
+    const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toContain("This agent is waiting on an answer:");
     expect(content).toContain("Which config?");
     expect(content).toContain('resume: "agent-3"');
@@ -369,8 +372,7 @@ describe("NotificationManager", () => {
 
     system.sendCompletion(disposed);
 
-    const content = (args.sendMessage.mock.calls[0][0] as { content: string })
-      .content;
+    const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toContain("Which config?");
     expect(content).toContain(
       "it ran in an isolated workspace that has since been removed",
@@ -386,8 +388,7 @@ describe("NotificationManager", () => {
         workspaceNotice: "\n\n---\nChanges saved to branch `pi-agent-3`.",
       }),
     );
-    const content = (args.sendMessage.mock.calls[0][0] as { content: string })
-      .content;
+    const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toContain("Changes saved to branch `pi-agent-3`.");
   });
 
@@ -396,7 +397,7 @@ describe("NotificationManager", () => {
 
     /** The options the manager handed `sendMessage` on its first call. */
     function optionsOf(args: ReturnType<typeof makeArgs>) {
-      return args.sendMessage.mock.calls[0][1] as {
+      return firstSendCall(args)[1] as {
         triggerTurn?: boolean;
         deliverAs?: string;
       };
@@ -457,8 +458,7 @@ describe("NotificationManager", () => {
       result: undefined,
     });
     system.sendCompletion(record);
-    const content = (args.sendMessage.mock.calls[0][0] as { content: string })
-      .content;
+    const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toBe(formatTaskNotification(record, 500));
   });
 

@@ -96,8 +96,8 @@ describe("SteerTool", () => {
   it("sends steer and emits event on success", async () => {
     const record = createTestSubagent({ status: "running" });
     const mockSession = createMockSession();
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(mockSession),
+    record.attachSession(
+      toSubagentSession(createSubagentSessionStub(mockSession)),
     );
     const records = new Map([["agent-1", record]]);
     const manager = makeManager(records);
@@ -119,8 +119,8 @@ describe("SteerTool", () => {
     const record = createTestSubagent({ status: "running" });
     const mockSession = createMockSession();
     mockSession.steer.mockRejectedValue(new Error("session closed"));
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(mockSession),
+    record.attachSession(
+      toSubagentSession(createSubagentSessionStub(mockSession)),
     );
     const records = new Map([["agent-1", record]]);
     const result = await execute(makeManager(records), makeEvents(), {

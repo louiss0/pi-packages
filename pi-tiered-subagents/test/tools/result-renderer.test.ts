@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import {
@@ -22,7 +23,7 @@ function makeTheme(): Theme {
 
 const WARNED: TurnBudget = { maxTurns: 2, used: 3, phase: "warned" };
 
-function makeDetails(overrides: Partial<AgentDetails> = {}): AgentDetails {
+function makeDetails(overrides: Patch<AgentDetails> = {}): AgentDetails {
   return {
     displayName: "TestAgent",
     description: "test task",
@@ -31,7 +32,7 @@ function makeDetails(overrides: Partial<AgentDetails> = {}): AgentDetails {
     tokens: "",
     durationMs: 2000,
     status: "completed",
-    ...overrides,
+    ...defined(overrides),
   };
 }
 

@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
@@ -44,7 +45,7 @@ export type AgentToolFixture = {
  * ```
  */
 export function createToolDeps(
-  overrides: Partial<AgentToolFixture> = {},
+  overrides: Patch<AgentToolFixture> = {},
 ): AgentToolFixture {
   const runtime: AgentToolRuntime = {
     buildSnapshot: vi.fn(
@@ -85,7 +86,7 @@ export function createToolDeps(
     },
     registry: defaultRegistry,
     agentDir: "/home/user/.pi",
-    ...overrides,
+    ...defined(overrides),
   };
 }
 

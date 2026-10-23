@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { merge, type Patch } from "#src/optional";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import {
@@ -13,14 +14,16 @@ import {
   renderWorkspaceNotice,
 } from "#src/observation/outcome-delivery";
 
-function makeOutcome(overrides: Partial<OutcomeBody> = {}): OutcomeBody {
-  return {
-    status: "completed",
-    result: "All done.",
-    error: undefined,
-    stoppedWhileQueued: false,
-    ...overrides,
-  };
+function makeOutcome(overrides: Patch<OutcomeBody> = {}): OutcomeBody {
+  return merge(
+    {
+      status: "completed",
+      result: "All done.",
+      error: undefined,
+      stoppedWhileQueued: false,
+    },
+    overrides,
+  );
 }
 
 describe("status vocabulary", () => {
@@ -325,10 +328,8 @@ describe("renderOutcomeBody", () => {
 });
 
 describe("renderOutcomeAddenda", () => {
-  function makeAddenda(
-    overrides: Partial<OutcomeAddenda> = {},
-  ): OutcomeAddenda {
-    return { id: "agent-1", resumeRefusal: undefined, ...overrides };
+  function makeAddenda(overrides: Patch<OutcomeAddenda> = {}): OutcomeAddenda {
+    return merge({ id: "agent-1", resumeRefusal: undefined }, overrides);
   }
 
   it("renders nothing when the run produced no addenda", () => {

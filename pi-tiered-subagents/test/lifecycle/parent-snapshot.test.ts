@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 
 const { buildParentContextMock } = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     getActiveTools: () => ["read", "bash"],
     isProjectTrusted: () => true,
     sessionManager: { getBranch: vi.fn(() => []) },
-    ...overrides,
+    ...defined(overrides),
   } as unknown as ExtensionContext;
 }
 

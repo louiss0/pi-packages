@@ -10,6 +10,7 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import type { SessionMessage } from "#src/types";
 import {
@@ -325,7 +326,7 @@ describe("TranscriptPane", () => {
 
   describe("footer rule", () => {
     const footerAt = (width: number, keys?: PaneKeys): string =>
-      stripAnsi(makePane({ keys }).render(width).at(-1) ?? "");
+      stripAnsi(makePane(defined({ keys })).render(width).at(-1) ?? "");
 
     it("carries the scroll position on the left and the key hints on the right", () => {
       // Pi binds the top/bottom keys as "ctrl+home"/"ctrl+end" by default, so
@@ -677,7 +678,7 @@ describe("SessionNavigatorHandler", () => {
   function handleWith(
     ui: ReturnType<typeof makeUI>,
     agents: SessionNavigatorParams["agents"],
-    overrides: Partial<Omit<SessionNavigatorParams, "ui" | "agents">> = {},
+    overrides: Patch<Omit<SessionNavigatorParams, "ui" | "agents">> = {},
   ): Promise<void> {
     return new SessionNavigatorHandler().handle({
       ui,
@@ -686,7 +687,7 @@ describe("SessionNavigatorHandler", () => {
       cwd: "/test/cwd",
       readFile: noReadFile,
       sessionEntries: [],
-      ...overrides,
+      ...defined(overrides),
     });
   }
 

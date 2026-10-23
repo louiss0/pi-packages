@@ -5,9 +5,11 @@
  * the remaining SDK-required fields with inert defaults so fixtures satisfy the
  * real `Model<any>` shape without every test call site repeating them.
  */
+import { defined, type Patch } from "#src/optional";
+
 import type { Model } from "@earendil-works/pi-ai";
 
-export function makeModel(overrides: Partial<Model<any>> = {}): Model<any> {
+export function makeModel(overrides: Patch<Model<any>> = {}): Model<any> {
   return {
     id: "test-model",
     name: "Test Model",
@@ -19,7 +21,7 @@ export function makeModel(overrides: Partial<Model<any>> = {}): Model<any> {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 200000,
     maxTokens: 8192,
-    ...overrides,
+    ...defined(overrides),
   };
 }
 
@@ -29,7 +31,7 @@ export function makeModel(overrides: Partial<Model<any>> = {}): Model<any> {
  * supported when the model names them.
  */
 export function makeReasoningModel(
-  overrides: Partial<Model<any>> = {},
+  overrides: Patch<Model<any>> = {},
 ): Model<any> {
   return makeModel({
     id: "claude-sonnet-5",
@@ -42,6 +44,6 @@ export function makeReasoningModel(
       medium: "medium",
       high: "high",
     },
-    ...overrides,
+    ...defined(overrides),
   });
 }

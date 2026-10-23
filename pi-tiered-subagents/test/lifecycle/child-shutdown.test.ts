@@ -1,3 +1,5 @@
+import { defined, type Patch } from "#src/optional";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CHILD_SHUTDOWN_TIMEOUT_MS,
@@ -7,7 +9,7 @@ import {
 
 /** A child session whose runner records what it was asked to emit. */
 function createShutdownCapableSession(
-  overrides: Partial<ShutdownCapableSession> = {},
+  overrides: Patch<ShutdownCapableSession> = {},
 ) {
   const emit = vi.fn(
     (_event: { type: "session_shutdown"; reason: "quit" }): Promise<unknown> =>
@@ -16,7 +18,7 @@ function createShutdownCapableSession(
   const session: ShutdownCapableSession = {
     hasExtensionHandlers: vi.fn((_eventType: string): boolean => true),
     extensionRunner: { emit },
-    ...overrides,
+    ...defined(overrides),
   };
   return { session, emit };
 }

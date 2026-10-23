@@ -1,3 +1,4 @@
+import { merge, type Patch } from "#src/optional";
 import { describe, expect, it } from "vitest";
 import {
   type PersistedSubagentRecord,
@@ -9,22 +10,24 @@ import {
 import { createTestSubagent } from "#test/helpers/make-subagent";
 
 function persistedRecord(
-  overrides: Partial<PersistedSubagentRecord> = {},
+  overrides: Patch<PersistedSubagentRecord> = {},
 ): PersistedSubagentRecord {
-  return {
-    id: "run-1",
-    type: "Explore",
-    description: "map the module",
-    status: "completed",
-    result: "done",
-    error: undefined,
-    turnBudget: undefined,
-    startedAt: 1000,
-    completedAt: 4000,
-    outputFile: "/tasks/run-1.jsonl",
-    toolUses: 7,
-    ...overrides,
-  };
+  return merge(
+    {
+      id: "run-1",
+      type: "Explore",
+      description: "map the module",
+      status: "completed",
+      result: "done",
+      error: undefined,
+      turnBudget: undefined,
+      startedAt: 1000,
+      completedAt: 4000,
+      outputFile: "/tasks/run-1.jsonl",
+      toolUses: 7,
+    },
+    overrides,
+  );
 }
 
 function recordEntry(data: unknown): SessionEntryLike {

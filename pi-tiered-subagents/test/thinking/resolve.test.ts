@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Model } from "@earendil-works/pi-ai";
+import { defined, type Patch } from "#src/optional";
 import { resolveThinking } from "#src/thinking/resolve";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 
 /** A model that supports only the levels named. */
 function modelWithLevels(
   levels: Record<string, string | null>,
-  overrides: Partial<Model<any>> = {},
+  overrides: Patch<Model<any>> = {},
 ): Model<any> {
   return makeModel({
     id: "claude-sonnet-5",
     reasoning: true,
     thinkingLevelMap: levels,
-    ...overrides,
+    ...defined(overrides),
   });
 }
 

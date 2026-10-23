@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { merge, type Patch } from "#src/optional";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import {
   type GetResultDetails,
@@ -15,22 +16,24 @@ function makeTheme(): Theme {
 }
 
 function makeDetails(
-  overrides: Partial<GetResultDetails> = {},
+  overrides: Patch<GetResultDetails> = {},
 ): GetResultDetails {
-  return {
-    agentId: "agent-1",
-    displayName: "Explore",
-    status: "completed",
-    description: "Trace Pi tool-result rendering",
-    toolUses: 44,
-    tokens: "95.9k token",
-    contextPercent: 9,
-    compactionCount: 0,
-    duration: "213.0s",
-    preview: "## Summary",
-    verbose: false,
-    ...overrides,
-  };
+  return merge(
+    {
+      agentId: "agent-1",
+      displayName: "Explore",
+      status: "completed",
+      description: "Trace Pi tool-result rendering",
+      toolUses: 44,
+      tokens: "95.9k token",
+      contextPercent: 9,
+      compactionCount: 0,
+      duration: "213.0s",
+      preview: "## Summary",
+      verbose: false,
+    },
+    overrides,
+  );
 }
 
 const theme = makeTheme();
@@ -267,7 +270,7 @@ describe("renderGetResultLines", () => {
         theme,
       );
 
-      expect(first.startsWith(expected)).toBe(true);
+      expect(first?.startsWith(expected)).toBe(true);
     });
 
     it("leads with the warning glyph for a completed run the harness warned", () => {
@@ -277,7 +280,7 @@ describe("renderGetResultLines", () => {
       });
       const [first] = renderGetResultLines(details, "", false, theme);
 
-      expect(first.startsWith("[warning:\u2713]")).toBe(true);
+      expect(first?.startsWith("[warning:\u2713]")).toBe(true);
     });
   });
 });

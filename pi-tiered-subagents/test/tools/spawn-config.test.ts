@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Model } from "@earendil-works/pi-ai";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
-import { resolveSpawnConfig } from "#src/tools/spawn-config";
+import { resolveSpawnConfig, type ModelInfo } from "#src/tools/spawn-config";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
@@ -28,10 +30,16 @@ function registryWith(
 
 /** Shorthand for building ModelInfo. */
 function makeModelInfo(
-  overrides: Partial<Parameters<typeof resolveSpawnConfig>[2]> = {},
-) {
-  return {
-    parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }),
+  // `parentModel: null` is a knob rather than an override: it says the parent
+  // runs no model at all, which an override bag cannot express — there "said
+  // nothing" and "said: no model" are the same instruction, and this fixture
+  // needs them to differ.
+  overrides: Omit<Patch<ModelInfo>, "parentModel"> & {
+    parentModel?: Model<any> | null;
+  } = {},
+): ModelInfo {
+  const { parentModel, ...rest } = overrides;
+  return defined({
     modelRegistry: {
       find: () => undefined,
       getAll: () => [],
@@ -41,8 +49,13 @@ function makeModelInfo(
       profiles: new Map(),
       strategies: strategiesByFamily(SHIPPED_STRATEGIES),
     },
-    ...overrides,
-  };
+    ...defined(rest),
+    parentModel:
+      parentModel === null
+        ? undefined
+        : (parentModel ??
+          makeModel({ id: "claude-sonnet", name: "Claude Sonnet" })),
+  });
 }
 
 const defaultSettings = {
@@ -56,7 +69,7 @@ function params(overrides: Record<string, unknown> = {}) {
     subagent_type: "worker",
     prompt: "test",
     description: "d",
-    ...overrides,
+    ...defined(overrides),
   };
 }
 
@@ -205,7 +218,7 @@ describe("resolveSpawnConfig — model label", () => {
 
   it("leaves the label unset when no model resolved", () => {
     expect(
-      modelNameFor({}, makeModelInfo({ parentModel: undefined })),
+      modelNameFor({}, makeModelInfo({ parentModel: null })),
     ).toBeUndefined();
   });
 });

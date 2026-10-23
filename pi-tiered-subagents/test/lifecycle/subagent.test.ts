@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { defined } from "#src/optional";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import {
   Subagent,
@@ -98,11 +99,13 @@ function parkLoopUntilSignalled(
   turnLoop: ReturnType<typeof createSubagentSessionStub>["runTurnLoop"],
 ) {
   const gate = Promise.withResolvers<TurnLoopResult>();
+  // Explicit `| undefined` (not `?:`): the loop records whatever the turn
+  // loop was handed, and a missing optional one is a real value here.
   const loop: {
-    signal?: AbortSignal;
-    abortedAtEntry?: boolean;
+    signal: AbortSignal | undefined;
+    abortedAtEntry: boolean | undefined;
     signalled: boolean;
-  } = { signalled: false };
+  } = { signal: undefined, abortedAtEntry: undefined, signalled: false };
   turnLoop.mockImplementation(
     (_prompt: string, { signal }: { signal?: AbortSignal }) => {
       loop.signal = signal;
@@ -150,15 +153,17 @@ function makeSubagent(overrides: MakeSubagentOptions = {}): Subagent {
     startedAt,
     completedAt,
   } = overrides;
-  return new Subagent({
-    id: id ?? "1",
-    type: type ?? "general-purpose",
-    description: description ?? "test",
-    isBackground: isBackground ?? true,
-    execution: execution ?? makeStubExecution(),
-    state,
-    outcome: { status, result, startedAt, completedAt },
-  });
+  return new Subagent(
+    defined({
+      id: id ?? "1",
+      type: type ?? "general-purpose",
+      description: description ?? "test",
+      isBackground: isBackground ?? true,
+      execution: execution ?? makeStubExecution(),
+      state,
+      outcome: defined({ status, result, startedAt, completedAt }),
+    }),
+  );
 }
 
 /** A Subagent wired to a ready session whose messages hold a single user "hi". */
@@ -167,7 +172,7 @@ function makeReadySubagent(): { agent: Subagent } {
   const session = createMockSession();
   session.messages.push({ role: "user", content: "hi" });
   const stub = createSubagentSessionStub(session);
-  agent.subagentSession = toSubagentSession(stub);
+  agent.attachSession(toSubagentSession(stub));
   return { agent };
 }
 
@@ -195,9 +200,7 @@ function createRunnableAgent(overrides?: {
   return makeSubagent({
     id: "run-1",
     description: "run test",
-    isBackground: overrides?.isBackground,
-    status: overrides?.status,
-    execution: {
+    execution: defined({
       createSubagentSession,
       observer,
       snapshot: STUB_SNAPSHOT,
@@ -208,7 +211,14 @@ function createRunnableAgent(overrides?: {
       signal: overrides?.signal,
       baseCwd: overrides?.baseCwd ?? "/base",
       getWorkspaceProvider: provider ? () => provider : undefined,
-    },
+    }),
+    // The run options the overrides bag may not have — feed them through
+    // `defined()` so absent keys drop instead of spreading explicit undefineds
+    // into optional properties that exactOptionalPropertyTypes would reject.
+    ...defined({
+      isBackground: overrides?.isBackground,
+      status: overrides?.status,
+    }),
   });
 }
 
@@ -251,8 +261,14 @@ async function runToOutcome(opts: RunOutcomeOptions) {
   stub.runTurnLoop.mockImplementation(outcomeLoop(loop, ask));
   const agent = createRunnableAgent({
     createSubagentSession: factory,
-    workspaceProvider: workspace ? makeWorkspaceProvider(workspace) : undefined,
-    observer,
+    // `exactOptionalPropertyTypes` rejects explicit undefined on the
+    // `observer`/`workspaceProvider` keys; `defined()` drops absent entries.
+    ...defined({
+      workspaceProvider: workspace
+        ? makeWorkspaceProvider(workspace)
+        : undefined,
+      observer,
+    }),
   });
   await agent.run();
   return { agent, stub, ask };
@@ -269,7 +285,7 @@ function heldWorkspaceAgent(observer?: SubagentLifecycleObserver) {
   return runWithWorkspace({
     responseText: "Mapped the configs.",
     question: "Which one?",
-    observer,
+    ...defined({ observer }),
   });
 }
 
@@ -307,15 +323,17 @@ function createResumableAgent(overrides?: {
 }) {
   const session = overrides?.session ?? createMockSession();
   const stub = overrides?.stub ?? createSubagentSessionStub(session);
-  const agent = makeSubagent({
-    id: "resume-1",
-    description: "resume test",
-    isBackground: overrides?.isBackground,
-    execution: makeStubExecution({ observer: overrides?.observer ?? {} }),
-    status: "completed",
-    result: "first",
-  });
-  agent.subagentSession = toSubagentSession(stub);
+  const agent = makeSubagent(
+    defined({
+      id: "resume-1",
+      description: "resume test",
+      isBackground: overrides?.isBackground,
+      execution: makeStubExecution({ observer: overrides?.observer ?? {} }),
+      status: "completed",
+      result: "first",
+    }),
+  );
+  agent.attachSession(toSubagentSession(stub));
   return { agent, session, stub };
 }
 
@@ -351,7 +369,9 @@ describe("Subagent", () => {
       expect(record.error).toBeUndefined();
       expect(record.completedAt).toBeUndefined();
       expect(record.promise).toBeUndefined();
-      expect(record.subagentSession).toBeUndefined();
+      // isSessionReady() is the public seam; a passive fixture has never run,
+      // so it has no session and the door stays closed.
+      expect(record.isSessionReady()).toBe(false);
     });
 
     it("toolCallId reflects execution.parentSession.toolCallId", () => {
@@ -429,10 +449,12 @@ describe("Subagent", () => {
 
       it("returns outputFile from subagentSession when set", () => {
         const record = makeSubagent();
-        record.subagentSession = toSubagentSession(
-          createSubagentSessionStub(
-            createMockSession(),
-            "/path/to/session.jsonl",
+        record.attachSession(
+          toSubagentSession(
+            createSubagentSessionStub(
+              createMockSession(),
+              "/path/to/session.jsonl",
+            ),
           ),
         );
         expect(record.outputFile).toBe("/path/to/session.jsonl");
@@ -440,8 +462,8 @@ describe("Subagent", () => {
 
       it("returns undefined when subagentSession is set but outputFile is undefined", () => {
         const record = makeSubagent();
-        record.subagentSession = toSubagentSession(
-          createSubagentSessionStub(createMockSession()),
+        record.attachSession(
+          toSubagentSession(createSubagentSessionStub(createMockSession())),
         );
         expect(record.outputFile).toBeUndefined();
       });
@@ -457,7 +479,7 @@ describe("Subagent", () => {
 
       it("returns true when subagentSession is set", () => {
         const agent = makeSubagent();
-        agent.subagentSession = toSubagentSession(createSubagentSessionStub());
+        agent.attachSession(toSubagentSession(createSubagentSessionStub()));
         expect(agent.isSessionReady()).toBe(true);
       });
     });
@@ -467,7 +489,7 @@ describe("Subagent", () => {
         const agent = makeSubagent();
         agent.markCompleted("done");
         const stub = createSubagentSessionStub();
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         const outcome = await agent.steer("hello");
         expect(outcome).toEqual({ kind: "rejected", status: "completed" });
         expect(stub.steer).not.toHaveBeenCalled();
@@ -484,7 +506,7 @@ describe("Subagent", () => {
       it("delivers to the session and returns a delivered outcome when the session is ready", async () => {
         const agent = makeSubagent({ status: "running" });
         const stub = createSubagentSessionStub();
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         const outcome = await agent.steer("go faster");
         expect(outcome).toEqual({ kind: "delivered" });
         expect(stub.steer).toHaveBeenCalledWith("go faster");
@@ -502,7 +524,7 @@ describe("Subagent", () => {
         const agent = makeSubagent();
         const stub = createSubagentSessionStub();
         stub.getConversation.mockReturnValue("[User]: hi");
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         expect(agent.getConversation()).toBe("[User]: hi");
       });
     });
@@ -517,7 +539,7 @@ describe("Subagent", () => {
         const agent = makeSubagent();
         const stub = createSubagentSessionStub();
         stub.getContextPercent.mockReturnValue(55);
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         expect(agent.getContextPercent()).toBe(55);
       });
     });
@@ -531,7 +553,7 @@ describe("Subagent", () => {
       it("delegates to SubagentSession.subscribe when session is ready", () => {
         const agent = makeSubagent();
         const stub = createSubagentSessionStub();
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         const fn = vi.fn();
         const unsub = agent.subscribeToUpdates(fn);
         expect(stub.subscribe).toHaveBeenCalledWith(fn);
@@ -576,7 +598,7 @@ describe("Subagent", () => {
           getToolDefinition: vi.fn(() => def),
         });
         const stub = createSubagentSessionStub(session);
-        agent.subagentSession = toSubagentSession(stub);
+        agent.attachSession(toSubagentSession(stub));
         expect(agent.getToolDefinition("read")).toBe(def);
       });
     });
@@ -679,7 +701,7 @@ describe("Subagent", () => {
     it("disposes the wrapped SubagentSession", async () => {
       const record = makeSubagent();
       const stub = createSubagentSessionStub();
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await record.disposeSession();
       expect(stub.dispose).toHaveBeenCalledOnce();
     });
@@ -689,7 +711,7 @@ describe("Subagent", () => {
       const stub = createSubagentSessionStub();
       const teardown = Promise.withResolvers<void>();
       stub.dispose = vi.fn((): Promise<void> => teardown.promise);
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
 
       let settled = false;
       const pending = record.disposeSession().then(() => {
@@ -709,7 +731,7 @@ describe("Subagent", () => {
       stub.dispose = vi.fn(
         (): Promise<void> => Promise.reject(new Error("teardown failed")),
       );
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await expect(record.disposeSession()).resolves.toBeUndefined();
     });
 
@@ -726,7 +748,7 @@ describe("Subagent", () => {
         createMockSession(),
         "/path/to/session.jsonl",
       );
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await record.releaseSession();
       expect(stub.dispose).toHaveBeenCalledOnce();
       expect(record.isSessionReady()).toBe(false);
@@ -734,10 +756,12 @@ describe("Subagent", () => {
 
     it("captures outputFile so the getter still resolves it after release", async () => {
       const record = makeSubagent();
-      record.subagentSession = toSubagentSession(
-        createSubagentSessionStub(
-          createMockSession(),
-          "/path/to/session.jsonl",
+      record.attachSession(
+        toSubagentSession(
+          createSubagentSessionStub(
+            createMockSession(),
+            "/path/to/session.jsonl",
+          ),
         ),
       );
       await record.releaseSession();
@@ -747,10 +771,12 @@ describe("Subagent", () => {
     it("sets sessionReleased (default false)", async () => {
       const record = makeSubagent();
       expect(record.sessionReleased).toBe(false);
-      record.subagentSession = toSubagentSession(
-        createSubagentSessionStub(
-          createMockSession(),
-          "/path/to/session.jsonl",
+      record.attachSession(
+        toSubagentSession(
+          createSubagentSessionStub(
+            createMockSession(),
+            "/path/to/session.jsonl",
+          ),
         ),
       );
       await record.releaseSession();
@@ -765,7 +791,7 @@ describe("Subagent", () => {
       );
       const teardown = Promise.withResolvers<void>();
       stub.dispose = vi.fn((): Promise<void> => teardown.promise);
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
 
       const first = record.releaseSession();
       expect(record.isSessionReady()).toBe(false);
@@ -782,7 +808,7 @@ describe("Subagent", () => {
         createMockSession(),
         "/path/to/session.jsonl",
       );
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await record.releaseSession();
       await record.releaseSession();
       expect(stub.dispose).toHaveBeenCalledOnce();
@@ -795,7 +821,7 @@ describe("Subagent", () => {
         createMockSession(),
         "/path/to/session.jsonl",
       );
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await record.releaseSession();
       await record.disposeSession();
       expect(stub.dispose).toHaveBeenCalledOnce();
@@ -810,7 +836,7 @@ describe("Subagent", () => {
       stub.dispose = vi.fn(
         (): Promise<void> => Promise.reject(new Error("teardown failed")),
       );
-      record.subagentSession = toSubagentSession(stub);
+      record.attachSession(toSubagentSession(stub));
       await expect(record.releaseSession()).resolves.toBeUndefined();
       expect(record.sessionReleased).toBe(true);
     });
@@ -826,12 +852,14 @@ describe("Subagent", () => {
     const sonnet = { provider: "anthropic", id: "claude-sonnet-5" };
 
     function withLiveSession(execution?: SubagentExecution) {
-      const record = makeSubagent({ execution });
+      const record = makeSubagent(defined({ execution }));
       const session = createMockSession();
       session.model = sonnet;
       session.thinkingLevel = "high";
-      record.subagentSession = toSubagentSession(
-        createSubagentSessionStub(session, "/path/to/session.jsonl"),
+      record.attachSession(
+        toSubagentSession(
+          createSubagentSessionStub(session, "/path/to/session.jsonl"),
+        ),
       );
       return { record, session };
     }
@@ -1772,15 +1800,18 @@ describe("Subagent", () => {
     ): SessionFactory {
       return vi.fn(
         async (_params: CreateSubagentSessionParams) =>
-          new SubagentSession(toAgentSession(session), {
-            outputFile: "/sessions/child.jsonl",
-            sessionId: "child-1",
-            sessionDir: "/sessions",
-            agentName: "Explore",
-            turnPolicy: { kind: "unlimited" },
-            parentContext: undefined,
-            lifecycle: createChildLifecycleMock(),
-          }),
+          new SubagentSession(
+            toAgentSession(session),
+            defined({
+              outputFile: "/sessions/child.jsonl",
+              sessionId: "child-1",
+              sessionDir: "/sessions",
+              agentName: "Explore",
+              turnPolicy: { kind: "unlimited" },
+              parentContext: undefined,
+              lifecycle: createChildLifecycleMock(),
+            }),
+          ),
       );
     }
 
@@ -1982,8 +2013,10 @@ describe("Subagent", () => {
       it("sets the subagentSession with a session", async () => {
         const agent = createRunnableAgent();
         await agent.run();
-        expect(agent.subagentSession).toBeDefined();
-        expect(agent.subagentSession!.session).toBeDefined();
+        // isSessionReady() is the public seam; the inner AgentSession is
+        // required by SubagentSession's constructor, so it is set whenever the
+        // outer session is.
+        expect(agent.isSessionReady()).toBe(true);
       });
 
       it("releases the observer subscription after the run completes", async () => {
@@ -2039,7 +2072,7 @@ describe("Subagent", () => {
         // toStrictEqual, not toHaveBeenCalledWith: the latter compares with toEqual
         // semantics, which ignore an explicitly-undefined key — so it cannot see a
         // vacant field reappearing on the seam context.
-        expect(prepare.mock.calls[0][0]).toStrictEqual({
+        expect(prepare.mock.calls[0]?.[0]).toStrictEqual({
           agentId: "run-1",
           agentType: "general-purpose",
           baseCwd: "/parent",

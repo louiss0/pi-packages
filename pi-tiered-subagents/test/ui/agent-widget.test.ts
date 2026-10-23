@@ -1,5 +1,6 @@
 import type { TuiMode } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { SubagentManager } from "#src/lifecycle/subagent-manager";
@@ -16,14 +17,17 @@ import {
 } from "#test/helpers/make-subagent";
 
 // Minimal agent fixture — only the three fields AgentSummary requires.
-function makeAgent(
-  overrides: { id?: string; status?: string; completedAt?: number } = {},
-) {
+/** A record the widget reads: `completedAt` is present-or-absent, never `undefined`. */
+type AgentRecord = { id: string; status: string; completedAt?: number };
+
+// `completedAt` defaults to absent, not to a time: an override bag says "no
+// value" and "say nothing" alike, so a defaulted time would survive every
+// `completedAt: undefined` and turn "never finished" into "finished at 5000".
+function makeAgent(overrides: Patch<AgentRecord> = {}): AgentRecord {
   return {
     id: "agent-1",
     status: "completed",
-    completedAt: 5000,
-    ...overrides,
+    ...defined(overrides),
   };
 }
 
@@ -88,6 +92,15 @@ function makeWidget(
   widget.setUICtx({ setStatus, setWidget });
   const lastContent = () => setWidget.mock.lastCall?.[1];
   return { widget, lastContent, setWidget, setStatus };
+}
+
+/**
+ * A record for the tests that mutate it in place. `completedAt` starts absent
+ * rather than explicitly `undefined`: the widget tests the key's presence, so
+ * "no completion time" has to be the missing key.
+ */
+function mutableAgent(id: string, status: string): AgentRecord {
+  return { id, status };
 }
 
 describe("assembleWidgetState", () => {
@@ -418,7 +431,7 @@ describe("AgentWidget — a record that runs again", () => {
   // The fixture is mutated in place between notifications: makeWidget's
   // listAgents() reads the same object on every update.
   function settleRunAgain(status: "completed" | "error") {
-    const agent: { id: string; status: string; completedAt?: number } = {
+    const agent: AgentRecord = {
       id: "a1",
       status,
       completedAt: 5000,
@@ -429,7 +442,7 @@ describe("AgentWidget — a record that runs again", () => {
     expect(fixture.lastContent()).toBeUndefined();
 
     agent.status = "running";
-    agent.completedAt = undefined;
+    delete agent.completedAt;
     fixture.widget.onSubagentRunStarted(
       createTestSubagent({ id: "a1", status: "running" }),
       "resume",
@@ -619,22 +632,16 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
   });
 
   it("stops the timer when the last running agent finishes, leaving the widget registered", () => {
-    const agents = [
-      {
-        id: "a1",
-        status: "running",
-        completedAt: undefined as number | undefined,
-      },
-    ];
-    const { widget, lastContent } = makeWidget(agents);
+    const agent = mutableAgent("a1", "running");
+    const { widget, lastContent } = makeWidget([agent]);
     widget.onSubagentRunStarted(
       createTestSubagent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(vi.getTimerCount()).toBe(1);
 
-    agents[0].status = "completed";
-    agents[0].completedAt = 5000;
+    agent.status = "completed";
+    agent.completedAt = 5000;
     widget.onSubagentRunFinished(
       createTestSubagent({ id: "a1", status: "completed" }),
       "initial",
@@ -645,27 +652,19 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
   });
 
   it("stops the timer when a run finishes while another agent is still queued", () => {
-    const agents = [
-      {
-        id: "a1",
-        status: "running",
-        completedAt: undefined as number | undefined,
-      },
-      {
-        id: "a2",
-        status: "queued",
-        completedAt: undefined as number | undefined,
-      },
-    ];
-    const { widget, lastContent } = makeWidget(agents);
+    const agent = mutableAgent("a1", "running");
+    const { widget, lastContent } = makeWidget([
+      agent,
+      mutableAgent("a2", "queued"),
+    ]);
     widget.onSubagentRunStarted(
       createTestSubagent({ id: "a1", status: "running" }),
       "initial",
     );
     expect(vi.getTimerCount()).toBe(1);
 
-    agents[0].status = "completed";
-    agents[0].completedAt = 5000;
+    agent.status = "completed";
+    agent.completedAt = 5000;
     widget.onSubagentRunFinished(
       createTestSubagent({ id: "a1", status: "completed" }),
       "initial",
@@ -676,20 +675,14 @@ describe("AgentWidget — the animation timer tracks running agents", () => {
   });
 
   it("starts the timer when a queued agent begins running", () => {
-    const agents = [
-      {
-        id: "a1",
-        status: "queued",
-        completedAt: undefined as number | undefined,
-      },
-    ];
-    const { widget } = makeWidget(agents);
+    const agent = mutableAgent("a1", "queued");
+    const { widget } = makeWidget([agent]);
     widget.onSubagentCreated(
       createTestSubagent({ id: "a1", status: "queued" }),
     );
     expect(vi.getTimerCount()).toBe(0);
 
-    agents[0].status = "running";
+    agent.status = "running";
     widget.onSubagentRunStarted(
       createTestSubagent({ id: "a1", status: "running" }),
       "initial",
@@ -866,14 +859,8 @@ describe("AgentWidget.dispose", () => {
   // the resulting observer notification reaches update() synchronously. Disposal
   // drops the UICtx so that update() can no longer re-register what it released.
   it("leaves a later update() inert, so a terminal transition cannot re-register it", () => {
-    const agents = [
-      {
-        id: "a1",
-        status: "running",
-        completedAt: undefined as number | undefined,
-      },
-    ];
-    const { widget, setWidget } = makeWidget(agents);
+    const agent = mutableAgent("a1", "running");
+    const { widget, setWidget } = makeWidget([agent]);
     widget.onSubagentRunStarted(
       createTestSubagent({ id: "a1", status: "running" }),
       "initial",
@@ -882,8 +869,8 @@ describe("AgentWidget.dispose", () => {
     widget.dispose();
     const callsAfterDispose = setWidget.mock.calls.length;
 
-    agents[0].status = "stopped";
-    agents[0].completedAt = 5000;
+    agent.status = "stopped";
+    agent.completedAt = 5000;
     widget.update();
 
     expect(setWidget.mock.calls.length).toBe(callsAfterDispose);

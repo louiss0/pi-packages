@@ -7,6 +7,7 @@
  * selection and records.
  */
 
+import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 import {
   type AgentDefinition,
@@ -214,7 +215,9 @@ describe("the service door", () => {
       currentCtx: {} as never,
       buildSnapshot: vi.fn((inheritContext: boolean) => ({
         ...STUB_SNAPSHOT,
-        parentContext: inheritContext ? "parent conversation" : undefined,
+        ...defined({
+          parentContext: inheritContext ? "parent conversation" : undefined,
+        }),
       })),
       getSessionInfo: vi.fn(() => ({
         parentSessionFile: "/sessions/parent.jsonl",
@@ -284,8 +287,7 @@ describe("both doors resolve alike", () => {
         run_in_background: false,
       },
       registryWith("worker", {}),
-      {
-        parentModel: undefined,
+      defined({
         modelRegistry: {
           find: (provider: string, id: string) =>
             provider === haiku.provider && id === haiku.id ? haiku : undefined,
@@ -293,7 +295,7 @@ describe("both doors resolve alike", () => {
           getAvailable: () => [haiku],
         },
         ladders,
-      },
+      }),
       { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     if ("error" in tool) throw new Error(tool.error);
@@ -346,10 +348,13 @@ describe("both doors resolve alike", () => {
       "do it",
       expect.objectContaining({
         description: "d",
-        model: tool.execution.model,
+        modelSelection: tool.execution.modelSelection,
         turnPolicy: tool.execution.turnPolicy,
         inheritContext: false,
-        thinkingLevel: tool.execution.thinking,
+        // The request asked for `low`, but Haiku does not reason, so the
+        // resolution carries a decision rather than a level — the same call
+        // shape both doors produce.
+        thinkingDecision: tool.execution.thinkingDecision,
         background: { kind: "explicit", isBackground: false },
       }),
     );

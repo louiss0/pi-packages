@@ -2,6 +2,15 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import { BoundedLines } from "#src/ui/bounded-lines";
 
+// `render` emits one row per line, but the index signature cannot promise a
+// first row exists; take it as defined so a zero-row render fails the assertion
+// rather than quietly measuring the empty string.
+function firstRow(rows: string[]): string {
+  const [row] = rows;
+  if (row === undefined) throw new Error("expected at least one row");
+  return row;
+}
+
 describe("BoundedLines", () => {
   describe("row count", () => {
     it("emits exactly one row per line at every width", () => {
@@ -22,7 +31,7 @@ describe("BoundedLines", () => {
     it("clips a line far longer than the width to that width", () => {
       const rows = new BoundedLines(["x".repeat(526)]).render(80);
 
-      expect(visibleWidth(rows[0])).toBeLessThanOrEqual(80);
+      expect(visibleWidth(firstRow(rows))).toBeLessThanOrEqual(80);
     });
 
     it("clips by display columns, not code units", () => {
@@ -30,7 +39,7 @@ describe("BoundedLines", () => {
       // code-unit cap of 80 would admit 80 of them and overrun the row.
       const rows = new BoundedLines(["急".repeat(100)]).render(80);
 
-      expect(visibleWidth(rows[0])).toBeLessThanOrEqual(80);
+      expect(visibleWidth(firstRow(rows))).toBeLessThanOrEqual(80);
     });
 
     it("leaves a line narrower than the width untouched", () => {

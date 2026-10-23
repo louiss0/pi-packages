@@ -1,3 +1,5 @@
+import { merge, type Patch } from "#src/optional";
+
 import { describe, expect, it } from "vitest";
 import {
   type AgentReport,
@@ -6,26 +8,25 @@ import {
   renderStatsParts,
 } from "#src/tools/get-result-report";
 
-function makeReport(overrides: Partial<AgentReport> = {}): AgentReport {
-  return {
-    id: "agent-1",
-    displayName: "General",
-    status: "completed",
-    toolUses: 3,
-    tokens: "",
-    contextPercent: null,
-    compactionCount: 0,
-    duration: "12.3s",
-    description: "Investigate the bug",
-    result: "All done.",
-    error: undefined,
-    stoppedWhileQueued: false,
-    conversation: undefined,
-    transcriptPath: undefined,
-    resumeRefusal: undefined,
-    model: undefined,
-    ...overrides,
-  };
+function makeReport(overrides: Patch<AgentReport> = {}): AgentReport {
+  return merge(
+    {
+      id: "agent-1",
+      displayName: "General",
+      status: "completed",
+      toolUses: 3,
+      tokens: "",
+      contextPercent: null,
+      compactionCount: 0,
+      duration: "12.3s",
+      description: "Investigate the bug",
+      result: "All done.",
+      stoppedWhileQueued: false,
+      resumeRefusal: undefined,
+      model: undefined,
+    },
+    overrides,
+  );
 }
 
 describe("renderStatsParts", () => {

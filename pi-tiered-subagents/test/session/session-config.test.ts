@@ -1,5 +1,6 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type {
@@ -67,7 +68,7 @@ const mockIO = {
 
 /** The Explore agent config used across the model/thinking resolution tests. */
 function exploreConfig(
-  overrides: Partial<AgentDefinition> = {},
+  overrides: Patch<AgentDefinition> = {},
 ): AgentDefinition {
   return {
     id: "explore",
@@ -79,7 +80,7 @@ function exploreConfig(
     runInBackground: true,
     enabled: true,
     origin: "shipped",
-    ...overrides,
+    ...defined(overrides),
   };
 }
 

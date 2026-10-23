@@ -53,7 +53,10 @@ describe("resolveInvocation", () => {
   });
 
   it("names no model when neither the request nor the definition does", () => {
-    const resolved = resolveInvocation({ ...DEFINITION, model: undefined }, {});
+    // The definition with no model key at all, rather than one whose key holds
+    // undefined: "no model was named" is the absence, not a value of nothing.
+    const { model: _named, ...unnamed } = DEFINITION;
+    const resolved = resolveInvocation(unnamed, {});
     expect(resolved.model).toBeUndefined();
     expect(resolved.modelFromParams).toBe(false);
   });

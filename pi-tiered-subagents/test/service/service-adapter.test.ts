@@ -107,16 +107,18 @@ describe("toSubagentRecord", () => {
 
   it("reports the transcript path when the agent has one", () => {
     const record = createTestSubagent();
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl"),
+    record.attachSession(
+      toSubagentSession(
+        createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl"),
+      ),
     );
     expect(toSubagentRecord(record).outputFile).toBe("/sessions/child.jsonl");
   });
 
   it("strips live objects and collaborators", () => {
     const record = createTestSubagent({ toolCallId: "tc-1" });
-    record.subagentSession = toSubagentSession(
-      createSubagentSessionStub(createMockSession()),
+    record.attachSession(
+      toSubagentSession(createSubagentSessionStub(createMockSession())),
     );
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("subagentSession");
@@ -289,6 +291,9 @@ const LADDERS: RoutingLadders = {
  * Override `currentCtx` to simulate no active session.
  */
 function makeRuntimeStub(
+  // `Partial<>` rather than `Patch<>`: a caller passes `{ currentCtx: undefined }`
+  // to simulate no active session, and the spread must preserve that `undefined`
+  // rather than collapse it back to the base value.
   override: Partial<ServiceRuntimeLike> = {},
 ): ServiceRuntimeLike {
   return {
@@ -376,8 +381,8 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
     const svc = createService([recordA, recordB]);
     const list = svc.listAgents();
     expect(list).toHaveLength(2);
-    expect(list[0].id).toBe("b-2");
-    expect(list[1].id).toBe("a-1");
+    expect(list[0]!.id).toBe("b-2");
+    expect(list[1]!.id).toBe("a-1");
     // Verify serialization
     expect(list[0]).not.toHaveProperty("session");
     expect(list[1]).not.toHaveProperty("abortController");
@@ -398,10 +403,10 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
 
     const [first, second] = createService([resumable, released]).listAgents();
 
-    expect(first.id).toBe("r-1");
+    expect(first!.id).toBe("r-1");
     expect(first).not.toHaveProperty("resumeRefusal");
-    expect(second.id).toBe("x-1");
-    expect(second.resumeRefusal).toBe("session-released");
+    expect(second!.id).toBe("x-1");
+    expect(second!.resumeRefusal).toBe("session-released");
   });
 });
 
@@ -494,12 +499,11 @@ describe("SubagentsServiceAdapter — spawn", () => {
 
       svc.spawn("Explore", "task");
 
-      expect(mgr.spawn).toHaveBeenCalledWith(
-        expect.anything(),
-        "Explore",
-        "task",
-        expect.objectContaining({ thinkingLevel: undefined }),
-      );
+      // No key at all rather than a key holding undefined: "the caller named no
+      // level" is what the manager should read, and a present-and-undefined
+      // key would say a level was supplied and was nothing.
+      const options = mgr.spawn.mock.calls[0]![3];
+      expect(options).not.toHaveProperty("thinkingLevel");
     });
   });
 
@@ -751,8 +755,10 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
     it("delegates to session.steer and returns true when session is ready", async () => {
       const mockSteer = vi.fn(async () => {});
       const record = createTestSubagent({ id: "a-1", status: "running" });
-      record.subagentSession = toSubagentSession(
-        createSubagentSessionStub(createMockSession({ steer: mockSteer })),
+      record.attachSession(
+        toSubagentSession(
+          createSubagentSessionStub(createMockSession({ steer: mockSteer })),
+        ),
       );
       const mgr = createManagerStub();
       mgr.getRecord.mockReturnValue(record);

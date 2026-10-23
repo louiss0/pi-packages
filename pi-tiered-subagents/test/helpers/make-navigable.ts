@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import type { NavigableSubagent } from "#src/ui/session-navigation";
 
 /**
@@ -6,7 +7,7 @@ import type { NavigableSubagent } from "#src/ui/session-navigation";
  * Defaults to a completed agent with a ready session; override any field.
  */
 export function makeNavigable(
-  overrides: Partial<NavigableSubagent> = {},
+  overrides: Patch<NavigableSubagent> = {},
 ): NavigableSubagent {
   return {
     id: "agent-1",
@@ -25,6 +26,6 @@ export function makeNavigable(
     isSessionReady: () => true,
     subscribeToUpdates: vi.fn(() => () => {}),
     getToolDefinition: vi.fn(() => undefined),
-    ...overrides,
+    ...defined(overrides),
   };
 }

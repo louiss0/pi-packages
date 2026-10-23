@@ -7,6 +7,7 @@ import {
   type Mock,
   vi,
 } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
@@ -72,14 +73,18 @@ function defaultRegistry(): AgentRegistry {
 /** Registry with a single custom agent, keyed by its canonical identifier. */
 function registryWith(
   name: string,
-  overrides: Partial<AgentDefinition>,
+  overrides: Patch<AgentDefinition>,
 ): AgentRegistry {
   return new AgentRegistry(() => ({
     global: {
       definitions: [
         {
           id: name,
-          patch: overrides,
+          // `Patch<AgentDefinition>` carries `T | undefined` per field; the
+          // registry wants `AgentDefinitionPatch` whose fields are `T | null`.
+          // `defined()` drops undefined entries; the surviving strings are a
+          // subset of the registry's `string | null`.
+          patch: defined(overrides),
           path: `${name}.md`,
         },
       ],
@@ -92,7 +97,7 @@ function registryWith(
 /** Test helper: construct an SubagentManager with injected stubs. */
 function createManager(overrides?: {
   createSubagentSession?: SessionFactory;
-  observer?: Partial<SubagentManagerObserver>;
+  observer?: Patch<SubagentManagerObserver>;
   getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
   getRetentionPolicy?: () => {
@@ -105,7 +110,7 @@ function createManager(overrides?: {
   const createSubagentSession: SessionFactory =
     overrides?.createSubagentSession ?? defaultFactory();
   const observer: SubagentManagerObserver | undefined = overrides?.observer
-    ? {
+    ? defined({
         onSubagentRunStarted:
           overrides.observer.onSubagentRunStarted ?? (() => {}),
         onSubagentRunFinished:
@@ -114,23 +119,25 @@ function createManager(overrides?: {
           overrides.observer.onSubagentCompacted ?? (() => {}),
         onSubagentCreated: overrides.observer.onSubagentCreated ?? (() => {}),
         onSubagentWorkspaceNotice: overrides.observer.onSubagentWorkspaceNotice,
-      }
+      })
     : undefined;
   const limiter = new ConcurrencyLimiter(
     overrides?.getMaxConcurrent ?? (() => DEFAULT_MAX_CONCURRENT),
   );
-  const mgr = new SubagentManager({
-    createSubagentSession,
-    observer,
-    limiter,
-    baseCwd: overrides?.baseCwd ?? "/repo",
-    getRunConfig: overrides?.getRunConfig,
-    getRetentionPolicy: overrides?.getRetentionPolicy,
-    registry: overrides?.registry ?? defaultRegistry(),
-    // A gate of its own, so one test's children never hold the slot another
-    // test's children wait for.
-    workspaceGates: new WorkspaceGateRegistry(),
-  });
+  const mgr = new SubagentManager(
+    defined({
+      createSubagentSession,
+      observer,
+      limiter,
+      baseCwd: overrides?.baseCwd ?? "/repo",
+      getRunConfig: overrides?.getRunConfig,
+      getRetentionPolicy: overrides?.getRetentionPolicy,
+      registry: overrides?.registry ?? defaultRegistry(),
+      // A gate of its own, so one test's children never hold the slot another
+      // test's children wait for.
+      workspaceGates: new WorkspaceGateRegistry(),
+    }),
+  );
   return { manager: mgr, createSubagentSession, limiter };
 }
 
@@ -172,12 +179,14 @@ function spawnBgWithToolCall(
 }
 
 /** Arrange a manager at limit 1 with two bg agents over a blocking factory: first runs, second queues. */
-function arrangeQueuedPair(observer?: Partial<SubagentManagerObserver>) {
+function arrangeQueuedPair(observer?: Patch<SubagentManagerObserver>) {
   const factory = createBlockingFactory();
   const { manager: mgr } = createManager({
     createSubagentSession: factory,
     getMaxConcurrent: () => 1,
-    observer,
+    // `createManager`'s bag is `?: Patch<SubagentManagerObserver>` — drop the
+    // key when no observer is supplied rather than passing `undefined`.
+    ...defined({ observer }),
   });
   const running = spawnBg(mgr, "a");
   const queued = spawnBg(mgr, "b");
@@ -783,7 +792,7 @@ describe("SubagentManager", () => {
        * turn loop stays open until releaseHolder() takes the only slot.
        */
       async function arrangeResumeAtCapacity(
-        observer?: Partial<SubagentManagerObserver>,
+        observer?: Patch<SubagentManagerObserver>,
       ) {
         const holderLoop = Promise.withResolvers<TurnLoopResult>();
         const stubs: Array<ReturnType<typeof createSubagentSessionStub>> = [];
@@ -794,20 +803,27 @@ describe("SubagentManager", () => {
           stubs.push(stub);
           return toSubagentSession(stub);
         });
-        ({ manager } = createManager({
-          createSubagentSession: factory,
-          getMaxConcurrent: () => 1,
-          observer,
-          // Read-only children, so these tests exercise the concurrency limit
-          // alone: a child that may change files also waits for the
-          // workspace's exclusive slot, which is a rule of its own.
-          registry: registryWith("worker", {
-            tools: { kind: "explicit", names: ["read", "grep", "find", "ls"] },
+        ({ manager } = createManager(
+          defined({
+            createSubagentSession: factory,
+            getMaxConcurrent: () => 1,
+            observer,
+            // Read-only children, so these tests exercise the concurrency limit
+            // alone: a child that may change files also waits for the
+            // workspace's exclusive slot, which is a rule of its own.
+            registry: registryWith("worker", {
+              tools: {
+                kind: "explicit",
+                names: ["read", "grep", "find", "ls"],
+              },
+            }),
           }),
-        }));
+        ));
         const x = spawnBg(manager, "x");
         await manager.getRecord(x)!.promise;
-        const xStub = stubs[0];
+        // The factory has been called once by now; the `!` is a checked read
+        // rather than an unsafe one — `noUncheckedIndexedAccess` can't see it.
+        const xStub = stubs[0]!;
         xStub.runTurnLoop.mockResolvedValue(
           turnLoopResult({ responseText: "resumed" }),
         );
@@ -1431,10 +1447,12 @@ describe("SubagentManager", () => {
           createMockSession(),
           outputFile,
         );
-        ({ manager } = createManager({
-          createSubagentSession: factory,
-          getRetentionPolicy,
-        }));
+        ({ manager } = createManager(
+          defined({
+            createSubagentSession: factory,
+            getRetentionPolicy,
+          }),
+        ));
         const id = spawnBg(manager, "test", "investigate the bug");
         await manager.getRecord(id)!.promise;
         return id;
@@ -1534,6 +1552,11 @@ describe("SubagentManager", () => {
 
       it("sets record.subagentSession with session and outputFile after session creation", async () => {
         const session = createMockSession();
+        // A marker message lets the assertion check the inner AgentSession is
+        // the same instance we created: `record.subagentSession` is private,
+        // but the session's messages reach the record through `record.messages`.
+        const SESSION_MARKER = { role: "user", content: "session-identity" };
+        session.messages.push(SESSION_MARKER);
         const { factory } = createSessionFactory(session, "/tmp/session.jsonl");
         ({ manager } = createManager({ createSubagentSession: factory }));
 
@@ -1541,9 +1564,11 @@ describe("SubagentManager", () => {
         await manager.getRecord(id)!.promise;
 
         const record = manager.getRecord(id)!;
-        expect(record.subagentSession).toBeDefined();
-        expect(record.subagentSession!.session).toBe(session);
-        expect(record.subagentSession!.outputFile).toBe("/tmp/session.jsonl");
+        // The public seam for "session attached".
+        expect(record.isSessionReady()).toBe(true);
+        // Inner session identity, by way of messages the session carries.
+        expect(record.messages).toContainEqual(SESSION_MARKER);
+        expect(record.outputFile).toBe("/tmp/session.jsonl");
       });
 
       it("record.subagentSession is undefined before the session is created", () => {
@@ -1553,7 +1578,8 @@ describe("SubagentManager", () => {
 
         const id = spawnBg(manager);
         const record = manager.getRecord(id)!;
-        expect(record.subagentSession).toBeUndefined();
+        // `isSessionReady()` is the public seam for "session attached".
+        expect(record.isSessionReady()).toBe(false);
         manager.abort(id);
       });
     });
@@ -1772,11 +1798,11 @@ describe("SubagentManager", () => {
 
         await vi.waitFor(() => expect(factory).toHaveBeenCalled());
 
-        const params = vi.mocked(factory).mock.calls[0][0];
-        expect(params.parentSession?.parentSessionFile).toBe(
+        const params = vi.mocked(factory).mock.calls[0]?.[0];
+        expect(params?.parentSession?.parentSessionFile).toBe(
           "/sessions/parent.jsonl",
         );
-        expect(params.parentSession?.parentSessionId).toBe(
+        expect(params?.parentSession?.parentSessionId).toBe(
           "parent-session-123",
         );
       });

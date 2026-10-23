@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import { defaultDefinition } from "#src/agents/definition";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
@@ -71,12 +72,12 @@ export function createSubagentSessionIO() {
  * createSubagentSession tests). Pass a partial definition to override fields.
  */
 export function createAgentLookup(
-  definitionOverrides?: Partial<AgentDefinition>,
+  definitionOverrides?: Patch<AgentDefinition>,
 ) {
-  const definition: AgentDefinition = {
+  const definition: AgentDefinition = defined({
     ...DEFAULT_AGENT_DEFINITION,
-    ...definitionOverrides,
-  };
+    ...defined({ ...definitionOverrides }),
+  });
   return {
     select: vi.fn((_type: string) => ({ ok: true as const, definition })),
     find: vi.fn((_type: string) => definition),

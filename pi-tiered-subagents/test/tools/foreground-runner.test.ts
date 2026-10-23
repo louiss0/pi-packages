@@ -3,6 +3,7 @@ import {
   type ForegroundParams,
   runForeground,
 } from "#src/tools/foreground-runner";
+import { defined, type Patch } from "#src/optional";
 import type { Subagent } from "#src/types";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { makeModel } from "#test/helpers/make-model";
@@ -14,9 +15,7 @@ import {
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { textOf } from "#test/helpers/text-of";
 
-function makeParams(
-  overrides: Partial<ForegroundParams> = {},
-): ForegroundParams {
+function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
   return {
     config: createResolvedSpawnConfig({ description: "fg task" }),
     snapshot: STUB_SNAPSHOT,
@@ -24,7 +23,7 @@ function makeParams(
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "session-1",
     },
-    ...overrides,
+    ...defined(overrides),
   };
 }
 

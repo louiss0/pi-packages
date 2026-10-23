@@ -10,7 +10,6 @@ const detailBase = {
   description: "map the retry path",
   subagentType: "Explore",
   modelName: "anthropic/claude-haiku-5-5",
-  tags: undefined,
 };
 
 describe("startProgressStream", () => {

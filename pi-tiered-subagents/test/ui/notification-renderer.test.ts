@@ -1,3 +1,5 @@
+import { defined, type Patch } from "#src/optional";
+
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
@@ -23,7 +25,7 @@ function stubTheme() {
 }
 
 function makeDetails(
-  overrides: Partial<NotificationDetails> = {},
+  overrides: Patch<NotificationDetails> = {},
 ): NotificationDetails {
   return {
     id: "agent-1",
@@ -34,7 +36,7 @@ function makeDetails(
     totalTokens: 1000,
     durationMs: 5000,
     resultPreview: "All done.",
-    ...overrides,
+    ...defined(overrides),
   };
 }
 
@@ -106,12 +108,14 @@ describe("buildStatsParts", () => {
 
   it("omits the turn part when the run has no turn budget yet", () => {
     expect(
-      buildStatsParts({
-        turnBudget: undefined,
-        toolUses: 3,
-        totalTokens: 1000,
-        durationMs: 5000,
-      }),
+      buildStatsParts(
+        defined({
+          turnBudget: undefined,
+          toolUses: 3,
+          totalTokens: 1000,
+          durationMs: 5000,
+        }),
+      ),
     ).toEqual(["3 tool uses", "1.0k token", "5.0s"]);
   });
 
@@ -155,32 +159,38 @@ describe("buildStatsParts", () => {
 
   it("returns an empty array when all fields are zero", () => {
     expect(
-      buildStatsParts({
-        turnBudget: undefined,
-        toolUses: 0,
-        totalTokens: 0,
-        durationMs: 0,
-      }),
+      buildStatsParts(
+        defined({
+          turnBudget: undefined,
+          toolUses: 0,
+          totalTokens: 0,
+          durationMs: 0,
+        }),
+      ),
     ).toEqual([]);
   });
 
   it("pluralizes tool use for exactly one", () => {
-    const parts = buildStatsParts({
-      turnBudget: undefined,
-      toolUses: 1,
-      totalTokens: 0,
-      durationMs: 0,
-    });
+    const parts = buildStatsParts(
+      defined({
+        turnBudget: undefined,
+        toolUses: 1,
+        totalTokens: 0,
+        durationMs: 0,
+      }),
+    );
     expect(parts).toEqual(["1 tool use"]);
   });
 
   it("pluralizes tool uses for more than one", () => {
-    const parts = buildStatsParts({
-      turnBudget: undefined,
-      toolUses: 2,
-      totalTokens: 0,
-      durationMs: 0,
-    });
+    const parts = buildStatsParts(
+      defined({
+        turnBudget: undefined,
+        toolUses: 2,
+        totalTokens: 0,
+        durationMs: 0,
+      }),
+    );
     expect(parts).toEqual(["2 tool uses"]);
   });
 });
@@ -227,7 +237,7 @@ describe("createNotificationRenderer", () => {
   it("returns undefined when message has no details", () => {
     const renderer = createNotificationRenderer();
     const result = renderer(
-      { details: undefined },
+      defined({ details: undefined }),
       { expanded: false },
       stubTheme(),
     );
@@ -307,12 +317,12 @@ describe("createNotificationRenderer", () => {
 });
 
 describe("createUpdateRenderer", () => {
-  function makeUpdate(overrides: Partial<UpdateDetails> = {}): UpdateDetails {
+  function makeUpdate(overrides: Patch<UpdateDetails> = {}): UpdateDetails {
     return {
       id: "agent-1",
       description: "Test agent",
       message: "The bug is in the retry wrapper.",
-      ...overrides,
+      ...defined(overrides),
     };
   }
 
@@ -326,7 +336,11 @@ describe("createUpdateRenderer", () => {
   it("returns undefined when message has no details", () => {
     const renderer = createUpdateRenderer();
     expect(
-      renderer({ details: undefined }, { expanded: false }, stubTheme()),
+      renderer(
+        defined({ details: undefined }),
+        { expanded: false },
+        stubTheme(),
+      ),
     ).toBeUndefined();
   });
 
@@ -375,20 +389,24 @@ describe("createUpdateRenderer", () => {
 
 describe("createWorkspaceNoticeRenderer", () => {
   function makeNotice(
-    overrides: Partial<WorkspaceNoticeDetails> = {},
+    overrides: Patch<WorkspaceNoticeDetails> = {},
   ): WorkspaceNoticeDetails {
     return {
       id: "agent-1",
       description: "Test agent",
       notice: "Changes saved to branch `pi-agent-1`.",
-      ...overrides,
+      ...defined(overrides),
     };
   }
 
   it("returns undefined when the message has no details", () => {
     const renderer = createWorkspaceNoticeRenderer();
     expect(
-      renderer({ details: undefined }, { expanded: false }, stubTheme()),
+      renderer(
+        defined({ details: undefined }),
+        { expanded: false },
+        stubTheme(),
+      ),
     ).toBeUndefined();
   });
 

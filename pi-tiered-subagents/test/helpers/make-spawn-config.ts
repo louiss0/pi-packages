@@ -1,3 +1,4 @@
+import { defined } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import { defaultDefinition } from "#src/agents/definition";
 import type { TurnPolicy } from "#src/lifecycle/turn-limits";
@@ -25,7 +26,7 @@ export interface ResolvedSpawnConfigOptions {
  *
  * Derives the mirrored regions the hand-built fixtures duplicate:
  * `displayName`/`description`/`subagentType`/`model` → `presentation.detailBase`.
- * Flat options sidestep the `Partial<ResolvedSpawnConfig>` deep-merge trap.
+ * Flat options sidestep the `Patch<ResolvedSpawnConfig>` deep-merge trap.
  */
 export function createResolvedSpawnConfig(
   options: ResolvedSpawnConfigOptions = {},
@@ -49,7 +50,6 @@ export function createResolvedSpawnConfig(
     execution: {
       prompt: options.prompt ?? "do the task",
       description,
-      model: undefined,
       modelSelection: {
         model: undefined,
         source: "inherited",
@@ -62,19 +62,17 @@ export function createResolvedSpawnConfig(
         reason: "no model was resolved, so there is no reasoning level to set",
       },
       turnPolicy: options.turnPolicy ?? UNLIMITED_TURNS,
-      thinking: undefined,
       inheritContext: false,
       runInBackground,
     },
     presentation: {
       agentTags: [],
-      detailBase: {
+      detailBase: defined({
         displayName,
         description,
         subagentType,
         modelName,
-        tags: undefined,
-      },
+      }),
     },
   };
 }

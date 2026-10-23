@@ -1,3 +1,4 @@
+import { defined, type Patch } from "#src/optional";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import { Subagent, type SubagentExecution } from "#src/lifecycle/subagent";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
@@ -19,7 +20,7 @@ import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
  * and never call run(). The factory resolves to a default session stub.
  */
 export function makeStubExecution(
-  overrides: Partial<SubagentExecution> = {},
+  overrides: Patch<SubagentExecution> = {},
 ): SubagentExecution {
   return {
     createSubagentSession: async (
@@ -32,11 +33,21 @@ export function makeStubExecution(
     // Unlimited unless a fixture is about the budget: a ceiling nobody asked
     // for would stop turns the test expects to happen.
     turnPolicy: UNLIMITED_TURNS,
-    ...overrides,
+    // Spread after the defaults so a `Patch` key explicitly set to `undefined`
+    // is dropped rather than overwriting the default — the `defined()` filter
+    // mirrors what the seam's `Object.hasOwn` consumers expect.
+    ...defined(overrides),
   };
 }
 
-export interface TestSubagentOptions {
+/**
+ * Seeds `createTestSubagent` understands.
+ *
+ * Every field is an override rather than a fact about the run, so each accepts
+ * an explicit `undefined`: for a seed, "no value" and "leave it unset" are the
+ * same instruction, which is what `Patch` says.
+ */
+export type TestSubagentOptions = Patch<{
   id?: string;
   type?: SubagentType;
   description?: string;
@@ -86,7 +97,7 @@ export interface TestSubagentOptions {
    * `sessionReady` is set — a record with no session has no transcript.
    */
   outputFile?: string;
-}
+}>;
 
 export function createTestSubagent(
   overrides: TestSubagentOptions = {},
@@ -107,19 +118,21 @@ export function createTestSubagent(
   // default honors an explicit `undefined` (e.g. `completedAt: undefined` for a
   // running fixture), as the spread this replaced did.
   const startedAt = seeded(overrides, "startedAt", 1000);
-  const state = new SubagentState({
-    // What spans runs
-    lastProgressAt: overrides.lastProgressAt ?? startedAt,
-    toolUses: overrides.toolUses ?? 3,
-    lifetimeUsage: overrides.lifetimeUsage ?? {
-      input: 500,
-      output: 500,
-      cacheWrite: 0,
-    },
-    compactionCount: overrides.compactionCount,
-    activeTools: overrides.activeTools,
-    responseText: overrides.responseText,
-  });
+  const state = new SubagentState(
+    defined({
+      // What spans runs
+      lastProgressAt: overrides.lastProgressAt ?? startedAt,
+      toolUses: overrides.toolUses ?? 3,
+      lifetimeUsage: overrides.lifetimeUsage ?? {
+        input: 500,
+        output: 500,
+        cacheWrite: 0,
+      },
+      compactionCount: overrides.compactionCount,
+      activeTools: overrides.activeTools,
+      responseText: overrides.responseText,
+    }),
+  );
   const agent = new Subagent({
     id: id ?? "agent-1",
     type: type ?? "general-purpose",
@@ -132,25 +145,25 @@ export function createTestSubagent(
       }),
     state,
     // The initial run's outcome
-    outcome: {
+    outcome: defined({
       status: seeded(overrides, "status", "completed"),
       result: seeded(overrides, "result", "All done."),
-      error: overrides.error,
-      stoppedWhileQueued: overrides.stoppedWhileQueued,
       startedAt,
       completedAt: seeded(overrides, "completedAt", 2000),
+      error: overrides.error,
+      stoppedWhileQueued: overrides.stoppedWhileQueued,
       pendingQuestion: overrides.pendingQuestion,
       workspaceNotice: overrides.workspaceNotice,
       turnBudget: overrides.turnBudget,
       runUpdates,
       consumedAt: overrides.consumedAt,
-    },
+    }),
   });
   // Assigned rather than passed to the constructor: run() is what sets this in
   // production, and a passive fixture never runs.
   if (sessionReady) {
-    agent.subagentSession = toSubagentSession(
-      createSubagentSessionStub(undefined, outputFile),
+    agent.attachSession(
+      toSubagentSession(createSubagentSessionStub(undefined, outputFile)),
     );
   }
   return agent;

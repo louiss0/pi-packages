@@ -3,6 +3,7 @@ import type {
   ParentPromptOptions,
   ParentSnapshot,
 } from "#src/lifecycle/parent-snapshot";
+import { defined, type Patch } from "#src/optional";
 import { createSubagentRuntime, SubagentRuntime } from "#src/runtime";
 import type { SessionContext } from "#src/types";
 import { makeModel } from "#test/helpers/make-model";
@@ -22,9 +23,15 @@ vi.mock("#src/lifecycle/parent-snapshot", () => ({
   buildParentSnapshot: mockBuildParentSnapshot,
 }));
 
-function makeSessionCtx(overrides?: Partial<SessionContext>): SessionContext {
+function makeSessionCtx(overrides: Patch<SessionContext> = {}): SessionContext {
+  // Filter the override spread through `defined`: a Patch entry is
+  // `T[K] | undefined`, and SessionContext.cwd/getSystemPrompt/sessionManager
+  // are not `| undefined` under exactOptionalPropertyTypes, so a raw
+  // `...overrides` would widen every field and break assignment.
   return {
     cwd: "/test/cwd",
+    // Required-but-undefined rather than optional: SessionContext.model has no
+    // `?`, so a fixture with no model still has to say so.
     model: undefined,
     modelRegistry: { find: () => undefined, getAll: () => [] },
     getSystemPrompt: () => "test prompt",
@@ -33,7 +40,7 @@ function makeSessionCtx(overrides?: Partial<SessionContext>): SessionContext {
       getSessionId: () => "test-session-id",
       getBranch: () => [],
     },
-    ...overrides,
+    ...defined(overrides),
   };
 }
 

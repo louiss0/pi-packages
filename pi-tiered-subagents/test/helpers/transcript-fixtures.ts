@@ -1,5 +1,6 @@
 import type { TUI, TuiMode } from "@earendil-works/pi-tui";
 import { vi } from "vitest";
+import { defined, type Patch } from "#src/optional";
 import type { SessionMessage } from "#src/types";
 import type { TranscriptSource } from "#src/ui/session-navigation";
 
@@ -26,7 +27,7 @@ export function mockTui(
  * source seam rather than a live record.
  */
 export function fakeSource(
-  overrides: Partial<TranscriptSource> = {},
+  overrides: Patch<TranscriptSource> = {},
 ): TranscriptSource {
   return {
     getMessages: () =>
@@ -35,6 +36,6 @@ export function fakeSource(
     streaming: () => undefined,
     getToolDefinition: () => undefined,
     sessionModel: () => ({ model: undefined, thinkingLevel: undefined }),
-    ...overrides,
+    ...defined(overrides),
   };
 }
