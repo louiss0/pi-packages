@@ -29,8 +29,10 @@ export function buildDetails(
     error?: string | undefined;
     id?: string | undefined;
     lifetimeUsage: LifetimeUsage;
-    /** The model the agent runs; unknown for an inherited model until its session exists. */
+    /** Live model object, when a session has materialized one. */
     model?: ModelIdentity | undefined;
+    /** Durable prepared identity, available while the child is queued. */
+    modelIdentity?: ModelIdentity | undefined;
     turnBudget?: TurnBudget | undefined;
   },
   overrides?: Partial<AgentDetails>,
@@ -42,7 +44,8 @@ export function buildDetails(
     durationMs: (record.completedAt ?? Date.now()) - record.startedAt,
     status: record.status as AgentDetails["status"],
     ...defined({
-      modelName: modelLabel(record.model) ?? base.modelName,
+      modelName:
+        modelLabel(record.modelIdentity ?? record.model) ?? base.modelName,
       agentId: record.id,
       error: record.error,
       turnBudget: record.turnBudget,

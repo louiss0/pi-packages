@@ -151,7 +151,7 @@ export class Subagents {
       owner: launch.owner,
       childShaping: launch.childShaping,
       ...defined({
-        model: execution.model,
+        modelIdentity: execution.modelIdentity,
         thinkingLevel: execution.thinking,
         signal,
       }),
@@ -181,7 +181,7 @@ export class Subagents {
       owner: launch.owner,
       childShaping: launch.childShaping,
       ...defined({
-        model: execution.model,
+        modelIdentity: execution.modelIdentity,
         thinkingLevel: execution.thinking,
         signal: options.signal,
         observer: options.observer,

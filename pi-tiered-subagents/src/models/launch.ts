@@ -14,6 +14,7 @@
 
 import type { Model } from "@earendil-works/pi-ai";
 import type { SubagentThinkingLevel } from "#src/config/thinking-level";
+import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelRegistry } from "#src/models/registry";
 import { routingContext, type RoutingLadders } from "#src/models/router";
 import { defined } from "#src/optional";
@@ -46,8 +47,8 @@ export interface LaunchModelRequest {
 
 /** The resolved model and level. */
 export interface ResolvedLaunchModel {
-  /** The model the child runs on. */
-  readonly model?: Model<any>;
+  /** The exact model the child runs on, captured as owned data. */
+  readonly modelIdentity?: ExactModelIdentity;
   /** How the model was chosen, and why. */
   readonly modelSelection: ModelSelection;
   /** The level the child reasons at, when it reasons at all. */
@@ -88,11 +89,19 @@ export function resolveLaunchModel(
   );
   if (!selection.ok) return { ok: false, error: selection.error };
 
+  // Thinking capabilities are read now, while preparation owns the registry
+  // view. Only the resulting decision survives into the queued launch.
+  const selectedModel = selection.selection.identity
+    ? context.registry?.find(
+        selection.selection.identity.provider,
+        selection.selection.identity.id,
+      )
+    : undefined;
   const thinkingDecision = resolveThinking(
     defined({
       // The parent's model was kept when nothing below it was available.
       parentModelKept: selection.selection.source === "inherited",
-      model: selection.selection.model,
+      model: selectedModel,
       requested: request.requestedThinking,
       defined: request.definitionThinking,
       parentLevel: context.parentThinkingLevel,
@@ -104,7 +113,7 @@ export function resolveLaunchModel(
     resolved: defined({
       modelSelection: selection.selection,
       thinkingDecision,
-      model: selection.selection.model,
+      modelIdentity: selection.selection.identity,
       thinking: thinkingDecision.level,
     }),
   };

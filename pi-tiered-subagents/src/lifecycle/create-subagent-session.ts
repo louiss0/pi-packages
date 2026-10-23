@@ -38,6 +38,7 @@ import {
 import { builtinExtensionsFor } from "#src/session/builtin-extensions";
 import type { EnvInfo } from "#src/session/env";
 import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
+import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelRegistry } from "#src/models/registry";
 import { defined } from "#src/optional";
 import {
@@ -198,7 +199,10 @@ export interface CreateSubagentSessionParams {
   cwd?: string;
   /** Parent session identity (file path + session ID). */
   parentSession?: ParentSessionInfo;
+  /** Legacy direct SDK model for internal callers. */
   model?: Model<any>;
+  /** Exact prepared model choice, materialized through the snapshot bridge. */
+  modelIdentity?: ExactModelIdentity;
   thinkingLevel?: ThinkingLevel;
   /**
    * Records a question the child declares with `ask_parent`. Supplied for every
@@ -282,6 +286,7 @@ export async function createSubagentSession(
     defined({
       cwd: params.cwd,
       model: params.model,
+      modelIdentity: params.modelIdentity,
       thinkingLevel: params.thinkingLevel,
     }),
     env,

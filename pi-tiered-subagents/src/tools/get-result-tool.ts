@@ -183,7 +183,7 @@ export class GetResultTool {
       // "resumable" and "model unknown" by omission, which is exactly the
       // fail-open each field is documented to close.
       resumeRefusal: record.resumeRefusal,
-      model: modelLabel(record.model),
+      model: modelLabel(record.modelIdentity),
     };
   }
 
@@ -213,7 +213,7 @@ export class GetResultTool {
       preview: buildPreview(outcome.result),
       error: outcome.error,
       turnBudget: outcome.turnBudget,
-      modelName: modelLabel(record.model),
+      modelName: modelLabel(record.modelIdentity),
     });
   }
 

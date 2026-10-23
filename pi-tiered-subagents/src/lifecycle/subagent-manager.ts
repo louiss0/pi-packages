@@ -9,7 +9,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { Model } from "@earendil-works/pi-ai";
+import type { ExactModelIdentity } from "#src/models/identity";
 import {
   type BackgroundRequest,
   resolveBackgroundMode,
@@ -265,7 +265,8 @@ export interface AgentSpawnConfig {
    * queued child keeps the update policy it was asked under.
    */
   childShaping?: ChildShapingSettings;
-  model?: Model<any>;
+  /** Exact model choice captured by preparation; materialized at child creation. */
+  modelIdentity?: ExactModelIdentity;
   /**
    * The run's turn ceiling, resolved once by the door that prepared the launch.
    *
@@ -672,7 +673,7 @@ export class SubagentManager {
         toolNames,
         ...defined({
           getRunConfig: this.getRunConfig,
-          model: options.model,
+          modelIdentity: options.modelIdentity,
           thinkingLevel: options.thinkingLevel,
           modelSelection: options.modelSelection,
           thinkingDecision: options.thinkingDecision,

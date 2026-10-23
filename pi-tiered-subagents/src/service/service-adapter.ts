@@ -167,8 +167,8 @@ export function toSubagentRecord(record: Subagent): SubagentRecord {
 
   // The model the child ran on, and the reasoning level it ran at: the facts a
   // consumer needs to know what it actually got.
-  if (record.model) {
-    out.model = { provider: record.model.provider, id: record.model.id };
+  if (record.modelIdentity) {
+    out.model = { ...record.modelIdentity };
   }
   if (record.thinkingLevel) {
     out.thinking = { level: record.thinkingLevel };

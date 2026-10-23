@@ -17,7 +17,11 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import { type AvailableModels, resolveExactModel } from "#src/models/identity";
+import {
+  type AvailableModels,
+  type ExactModelIdentity,
+  resolveExactModel,
+} from "#src/models/identity";
 import { type RoutingContext, routeModel } from "#src/models/router";
 
 /** What the launch asked for, and what the definition asked for. */
@@ -35,8 +39,8 @@ export type ModelSource = "request" | "definition" | "routed" | "inherited";
 
 /** The resolved model, and the facts about how it was chosen. */
 export interface ModelSelection {
-  /** The model the child runs on. */
-  readonly model: Model<any> | undefined;
+  /** The exact model the child runs on, captured as owned data. */
+  readonly identity?: ExactModelIdentity;
   /** Where the choice came from. */
   readonly source: ModelSource;
   /** The provider that serves the model, when there is one. */
@@ -76,7 +80,7 @@ export function selectModel(
     return {
       ok: true,
       selection: {
-        model: outcome.model,
+        ...identityOf(outcome.model),
         source: "inherited",
         reason: outcome.reason,
       },
@@ -85,7 +89,7 @@ export function selectModel(
   return {
     ok: true,
     selection: {
-      model: outcome.model,
+      identity: { provider: outcome.provider, id: outcome.modelId },
       source: "routed",
       provider: outcome.provider,
       modelId: outcome.modelId,
@@ -110,7 +114,7 @@ function explicit(
   return {
     ok: true,
     selection: {
-      model: resolved,
+      identity: { provider: resolved.provider, id: resolved.id },
       source,
       provider: resolved.provider,
       modelId: resolved.id,
@@ -120,4 +124,11 @@ function explicit(
           : `the agent definition named ${resolved.provider}/${resolved.id}`,
     },
   };
+}
+
+/** Copy an SDK model's durable identity, or add no field for no model. */
+function identityOf(model: Model<any> | undefined): {
+  readonly identity?: ExactModelIdentity;
+} {
+  return model ? { identity: { provider: model.provider, id: model.id } } : {};
 }

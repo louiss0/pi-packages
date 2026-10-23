@@ -248,7 +248,7 @@ export class AgentWidget implements SubagentManagerObserver {
       completedAt: record.completedAt,
       error: record.error,
       turnBudget: record.turnBudget,
-      model: record.model,
+      model: record.modelIdentity,
       contextPercent: record.getContextPercent(),
     });
   }

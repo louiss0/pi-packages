@@ -587,7 +587,10 @@ describe("SubagentsServiceAdapter — spawn", () => {
       "Explore",
       "check TODOs",
       expect.objectContaining({
-        model: resolvedModel,
+        modelIdentity: {
+          provider: resolvedModel.provider,
+          id: resolvedModel.id,
+        },
         turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
       }),
     );

@@ -149,7 +149,10 @@ describe("resolveSpawnConfig — model resolution", () => {
       defaultSettings,
     );
     if ("error" in result) return;
-    expect(result.execution.model).toBe(parentModel);
+    expect(result.execution.modelIdentity).toEqual({
+      provider: parentModel.provider,
+      id: parentModel.id,
+    });
   });
 
   it("returns error when user-specified model cannot be resolved", () => {

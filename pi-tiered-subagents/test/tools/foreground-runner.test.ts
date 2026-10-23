@@ -7,7 +7,6 @@ import type { Patch } from "#src/optional";
 import type { Subagent } from "#src/types";
 import type { PreparedSubagentsLaunch } from "#src/service/subagents";
 import { createToolDeps } from "#test/helpers/make-deps";
-import { makeModel } from "#test/helpers/make-model";
 import { createResolvedSpawnConfig } from "#test/helpers/make-spawn-config";
 import {
   createTestSubagent,
@@ -380,7 +379,7 @@ describe("runForeground", () => {
       status: "running",
       completedAt: undefined,
       execution: makeStubExecution({
-        model: makeModel({ provider: "openai", id: "gpt-5" }),
+        modelIdentity: { provider: "openai", id: "gpt-5" },
       }),
     });
     const params = () =>

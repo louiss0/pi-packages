@@ -23,6 +23,7 @@ export type StreamedRecord = Pick<
   Subagent,
   | "toolUses"
   | "model"
+  | "modelIdentity"
   | "lifetimeUsage"
   | "turnBudget"
   | "activeTools"
@@ -64,7 +65,9 @@ export function startProgressStream(params: ProgressStreamParams): () => void {
       ),
       spinnerFrame: spinnerFrame % SPINNER.length,
       ...defined({
-        modelName: modelLabel(record?.model) ?? detailBase.modelName,
+        modelName:
+          modelLabel(record?.modelIdentity ?? record?.model) ??
+          detailBase.modelName,
         turnBudget: record?.turnBudget,
       }),
     };

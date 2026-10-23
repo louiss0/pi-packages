@@ -26,7 +26,6 @@ import type { RunConfig } from "#src/runtime";
 import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type { CompactionInfo, SubagentType } from "#src/types";
 import { gatedScheduler } from "#test/helpers/gated-scheduler";
-import { makeModel } from "#test/helpers/make-model";
 import {
   createTestSubagent,
   makeStubExecution,
@@ -874,7 +873,7 @@ describe("Subagent", () => {
       it("reports the model the child is running, over the spawn override", () => {
         const { record } = withLiveSession(
           makeStubExecution({
-            model: makeModel({ provider: "openai", id: "gpt-6" }),
+            modelIdentity: { provider: "openai", id: "gpt-6" },
           }),
         );
         expect(record.model).toBe(sonnet);
@@ -910,15 +909,18 @@ describe("Subagent", () => {
     });
 
     describe("before a session exists", () => {
-      it("reports the spawn override", () => {
-        const opus = makeModel({ provider: "anthropic", id: "claude-opus-5" });
+      it("keeps only the prepared identity until a live session exists", () => {
         const record = makeSubagent({
           execution: makeStubExecution({
-            model: opus,
+            modelIdentity: { provider: "anthropic", id: "claude-opus-5" },
             thinkingLevel: "medium",
           }),
         });
-        expect(record.model).toBe(opus);
+        expect(record.model).toBeUndefined();
+        expect(record.modelIdentity).toEqual({
+          provider: "anthropic",
+          id: "claude-opus-5",
+        });
         expect(record.thinkingLevel).toBe("medium");
       });
 

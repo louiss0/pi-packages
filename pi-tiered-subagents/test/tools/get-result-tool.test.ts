@@ -13,7 +13,6 @@ import {
 import type { Subagent } from "#src/types";
 import type { Theme } from "#src/ui/display";
 import { gatedScheduler } from "#test/helpers/gated-scheduler";
-import { makeModel } from "#test/helpers/make-model";
 import {
   createTestSubagent,
   makeStubExecution,
@@ -366,7 +365,7 @@ describe("GetResultTool", () => {
     it("names the model the agent ran in the report and the TUI details", async () => {
       const record = createTestSubagent({
         execution: makeStubExecution({
-          model: makeModel({ provider: "openai", id: "gpt-5" }),
+          modelIdentity: { provider: "openai", id: "gpt-5" },
         }),
       });
       const result = await execute(

@@ -116,8 +116,10 @@ export interface AssemblerContext {
 export interface AssemblerOptions {
   /** Override working directory (e.g. for worktree isolation). */
   cwd?: string;
-  /** Explicit model override — wins over agentConfig.model and parent model. */
+  /** Legacy direct model override for internal callers. */
   model?: Model<any>;
+  /** Exact prepared model choice, materialized through the session bridge. */
+  modelIdentity?: ExactModelIdentity;
   /** Explicit thinking level — wins over agentConfig.thinking. */
   thinkingLevel?: ThinkingLevel;
 }
@@ -212,12 +214,11 @@ function assembleWithDefinition(
   // the request — never re-selected from the current session. The provider
   // that selects a prompt-inheritance strategy comes from whichever identity
   // won, so that decision needs no live object.
+  const selectedIdentity = options.modelIdentity ?? ctx.parentModelIdentity;
   const model =
     options.model ??
-    (ctx.parentModelIdentity
-      ? materializeParentModel(ctx, ctx.parentModelIdentity)
-      : undefined);
-  const provider = options.model?.provider ?? ctx.parentModelIdentity?.provider;
+    (selectedIdentity ? materializeModel(ctx, selectedIdentity) : undefined);
+  const provider = options.model?.provider ?? selectedIdentity?.provider;
 
   // Build system prompt from the resolved definition. The strategy is keyed
   // on the child's own provider, so a per-spawn model override moves the child
@@ -260,14 +261,14 @@ function assembleWithDefinition(
  * explicit failure (ARCHITECTURE-SPEC story 42): execution must not silently
  * substitute another model for the one the launch was asked under.
  */
-function materializeParentModel(
+function materializeModel(
   ctx: AssemblerContext,
   identity: ExactModelIdentity,
 ): Model<any> {
   const found = ctx.modelRegistry.find(identity.provider, identity.id);
   if (!found) {
     throw new Error(
-      `The launch was asked under the parent's model ` +
+      `The launch was asked to use ` +
         `${identity.provider}/${identity.id}, which the session no longer ` +
         `reports. Refusing to start the child on a different model.`,
     );

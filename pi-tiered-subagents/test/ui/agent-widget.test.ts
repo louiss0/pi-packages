@@ -10,7 +10,6 @@ import {
   assembleWidgetState,
   type UICtx,
 } from "#src/ui/agent-widget";
-import { makeModel } from "#test/helpers/make-model";
 import {
   createTestSubagent,
   makeStubExecution,
@@ -317,7 +316,7 @@ describe("AgentWidget — projection reads activity off Subagent records", () =>
       startedAt: Date.now() - 100,
       isBackground: true,
       execution: makeStubExecution({
-        model: makeModel({ provider: "anthropic", id: "claude-sonnet-5" }),
+        modelIdentity: { provider: "anthropic", id: "claude-sonnet-5" },
       }),
     });
     const manager = {

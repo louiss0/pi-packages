@@ -17,6 +17,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { AgentDefinition } from "#src/agents/definition";
 import { resolveInvocation } from "#src/agents/invocation";
 import { type SubagentThinkingLevel } from "#src/config/thinking-level";
+import type { ExactModelIdentity } from "#src/models/identity";
 import { type ModelSelection } from "#src/models/selection";
 import { resolveLaunchModel } from "#src/models/launch";
 import type { ModelRegistry } from "#src/models/registry";
@@ -61,8 +62,8 @@ export interface SpawnIdentity {
 export interface SpawnExecution {
   prompt: string;
   description: string;
-  /** The resolved model, when the launch has one. */
-  model?: Model<any>;
+  /** The resolved model identity, copied into the accepted launch. */
+  modelIdentity?: ExactModelIdentity;
   /** How the model was chosen, and why. */
   modelSelection: ModelSelection;
   /** The reasoning level, and what was decided about it. */
@@ -192,11 +193,12 @@ export function resolveSpawn(
     },
   );
   if (!launch.ok) return { error: launch.error };
-  const { model, modelSelection, thinking, thinkingDecision } = launch.resolved;
+  const { modelIdentity, modelSelection, thinking, thinkingDecision } =
+    launch.resolved;
   const inheritContext = resolvedInvocation.inheritContext;
   const runInBackground = resolvedInvocation.runInBackground;
 
-  const modelName = modelLabel(model);
+  const modelName = modelLabel(modelIdentity);
 
   // The turn ceiling, decided once: the request's, then the definition's, then
   // the operator's default, captured here so a later default change reaches
@@ -243,7 +245,7 @@ export function resolveSpawn(
       turnPolicy,
       inheritContext,
       runInBackground,
-      ...defined({ model, thinking }),
+      ...defined({ modelIdentity, thinking }),
     },
     presentation: {
       agentTags,
@@ -282,7 +284,7 @@ function buildThinkingNote(decision: ThinkingDecision): string[] {
  */
 function buildModelNote(selection: ModelSelection): string[] {
   if (selection.source === "request") return [];
-  const model = selection.model;
+  const model = selection.identity;
   const named = model ? `${model.provider}/${model.id}` : "the parent's model";
   return [`Note: the child runs on ${named} — ${selection.reason}.`];
 }

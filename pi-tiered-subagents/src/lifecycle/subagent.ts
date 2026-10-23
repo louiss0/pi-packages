@@ -37,6 +37,7 @@ import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
+import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelSelection } from "#src/models/selection";
 import { defined } from "#src/optional";
 import type { ThinkingDecision } from "#src/thinking/resolve";
@@ -128,7 +129,8 @@ export interface SubagentExecution {
   getRunConfig?: () => RunConfig;
   /** Resolves the registered workspace provider (if any) at run-start. */
   getWorkspaceProvider?: () => WorkspaceProvider | undefined;
-  model?: Model<any>;
+  /** Exact model choice captured by preparation; materialized at child creation. */
+  modelIdentity?: ExactModelIdentity;
   /** The definition selected by preparation; execution must not reload it. */
   definition?: AgentDefinition;
   /**
@@ -397,13 +399,19 @@ export class Subagent {
 
   /**
    * The model this agent runs: the live session's (so a mid-run switch shows),
-   * then the one captured at releaseSession(), then the spawn override.
-   * Undefined for an inherited model until the session exists.
+   * then the one captured at releaseSession(). Before session creation the
+   * accepted launch owns only an identity, not a live SDK model object.
    */
   get model(): Model<any> | undefined {
-    return (
-      this.subagentSession?.model ?? this._releasedModel ?? this.execution.model
-    );
+    return this.subagentSession?.model ?? this._releasedModel;
+  }
+
+  /** Durable model identity, available before the SDK session materializes it. */
+  get modelIdentity(): ExactModelIdentity | undefined {
+    const model = this.model;
+    return model
+      ? { provider: model.provider, id: model.id }
+      : this.execution.modelIdentity;
   }
 
   /** The thinking level this agent runs at, resolved in the same order as `model`. */
@@ -599,7 +607,7 @@ export class Subagent {
           },
           cwd,
           parentSession: this.execution.parentSession,
-          model: this.execution.model,
+          modelIdentity: this.execution.modelIdentity,
           thinkingLevel: this.execution.thinkingLevel,
           // A run whose config suppresses announcements has nothing to announce
           // through, so the child gets no channel at all rather than a dead one.

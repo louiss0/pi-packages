@@ -208,6 +208,9 @@ describe("selectModel", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.selection.source).toBe("inherited");
-    expect(result.selection.model).toBe(LUNA);
+    expect(result.selection.identity).toEqual({
+      provider: LUNA.provider,
+      id: LUNA.id,
+    });
   });
 });

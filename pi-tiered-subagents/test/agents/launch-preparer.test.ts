@@ -7,6 +7,7 @@ import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelInfo, TurnSettings } from "#src/agents/resolver";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
+import { makeReasoningModel } from "#test/helpers/make-model";
 
 const modelInfo: ModelInfo = {
   ladders: { profiles: new Map(), strategies: new Map() },
@@ -101,6 +102,52 @@ describe("LaunchPreparer", () => {
         request({ thinking: "turbo" }),
       ),
     ).toMatchObject({ kind: "rejected", reason: "invalid-thinking" });
+  });
+
+  it("captures model identity and reasoning as owned launch values", () => {
+    const parentModel = makeReasoningModel({
+      provider: "anthropic",
+      id: "claude-sonnet-5",
+    });
+    const registry = {
+      find: () => parentModel,
+      getAll: () => [parentModel],
+      getAvailable: () => [parentModel],
+    };
+    const outcome = makePreparer(registryWithWorker(), {
+      modelInfo: () => ({
+        parentModel,
+        modelRegistry: registry,
+        ladders: { profiles: new Map(), strategies: new Map() },
+        parentThinkingLevel: "high",
+      }),
+    }).prepare(
+      request({ model: "anthropic/claude-sonnet-5", thinking: "off" }),
+    );
+
+    expect(outcome.kind).toBe("prepared");
+    if (outcome.kind === "prepared") {
+      expect(outcome.value.config.execution.modelIdentity).toEqual({
+        provider: "anthropic",
+        id: "claude-sonnet-5",
+      });
+      expect(outcome.value.config.execution).not.toHaveProperty("model");
+      expect(outcome.value.config.execution.thinkingDecision).toMatchObject({
+        applicable: true,
+        clamped: true,
+      });
+
+      // Mutating the SDK object after preparation cannot alter either fact.
+      Object.assign(parentModel, { id: "replacement", reasoning: false });
+      expect(outcome.value.config.execution.modelIdentity).toEqual({
+        provider: "anthropic",
+        id: "claude-sonnet-5",
+      });
+      expect(outcome.value.config.execution.thinkingDecision).toMatchObject({
+        applicable: true,
+        clamped: true,
+      });
+    }
   });
 
   it("captures the operator turn defaults into the prepared decision", () => {

@@ -51,7 +51,6 @@ export function createResolvedSpawnConfig(
       prompt: options.prompt ?? "do the task",
       description,
       modelSelection: {
-        model: undefined,
         source: "inherited",
         reason: "the parent has no model to step down from",
       },
