@@ -14,6 +14,7 @@ import {
 } from "#src/service/service-adapter";
 import { type SessionContext, Subagent } from "#src/types";
 import { makeModel } from "#test/helpers/make-model";
+import { TEST_OWNER } from "#test/helpers/owner";
 import {
   createTestSubagent,
   makeStubExecution,
@@ -161,6 +162,7 @@ describe("toSubagentRecord", () => {
       type: "Explore",
       description: "Check stale TODOs",
       isBackground: true,
+      ownerGeneration: TEST_OWNER.generation,
       execution: makeStubExecution(),
       state,
     });
@@ -316,7 +318,10 @@ function makeRuntimeStub(
  */
 function createManagerStub() {
   return {
-    spawn: vi.fn<SubagentManagerLike["spawn"]>(() => "spawned-id"),
+    spawn: vi.fn<SubagentManagerLike["spawn"]>(() => ({
+      kind: "accepted",
+      value: "spawned-id",
+    })),
     getRecord: vi.fn<SubagentManagerLike["getRecord"]>(),
     listAgents: vi.fn<SubagentManagerLike["listAgents"]>(() => []),
     abort: vi.fn<SubagentManagerLike["abort"]>(() => true),
@@ -329,6 +334,7 @@ function createManagerStub() {
       kind: "resumed",
       record: createTestSubagent(),
     })),
+    currentOwner: vi.fn<SubagentManagerLike["currentOwner"]>(() => TEST_OWNER),
   };
 }
 

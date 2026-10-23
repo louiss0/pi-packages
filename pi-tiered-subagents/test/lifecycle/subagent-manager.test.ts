@@ -12,6 +12,7 @@ import { AgentRegistry } from "#src/agents/registry";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
+import type { LaunchOutcome } from "#src/lifecycle/session-owner";
 import {
   resolveRetentionWindow,
   SubagentManager,
@@ -44,6 +45,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_CTX, STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { TEST_OWNER } from "#test/helpers/owner";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 import type { TurnPolicy } from "#src/lifecycle/turn-limits";
@@ -138,7 +140,37 @@ function createManager(overrides?: {
       workspaceGates: new WorkspaceGateRegistry(),
     }),
   );
+  // Every fixture here stands in for work an active session asked for. The
+  // manager refuses launches without a current owner, so issuing one here is
+  // what lets the ordinary spawn tests exercise the ordinary path. Tests about
+  // ownership begin their own session on top of this.
+  mgr.beginOwner(TEST_OWNER.sessionId);
   return { manager: mgr, createSubagentSession, limiter };
+}
+
+/**
+ * The id of a launch the manager accepted.
+ *
+ * The manager reports a refusal as a value rather than throwing, because a
+ * launch it cannot accept is an expected answer. A test that is not about a
+ * refusal states the fact it cares about by asking for the id.
+ */
+function acceptedId(outcome: LaunchOutcome<string>): string {
+  if (outcome.kind === "rejected") {
+    throw new Error(`Expected an accepted launch, got: ${outcome.reason}`);
+  }
+  return outcome.value;
+}
+
+/** The record of a foreground launch the manager accepted. */
+async function acceptedRecord(
+  outcome: Promise<LaunchOutcome<Subagent>>,
+): Promise<Subagent> {
+  const settled = await outcome;
+  if (settled.kind === "rejected") {
+    throw new Error(`Expected an accepted launch, got: ${settled.reason}`);
+  }
+  return settled.value;
 }
 
 /** Spawn a background agent using STUB_SNAPSHOT. */
@@ -148,19 +180,25 @@ function spawnBg(
   desc = prompt,
   turnPolicy: TurnPolicy = UNLIMITED_TURNS,
 ) {
-  return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
-    description: desc,
-    turnPolicy,
-    background: { kind: "explicit", isBackground: true },
-  });
+  return acceptedId(
+    mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
+      description: desc,
+      turnPolicy,
+      background: { kind: "explicit", isBackground: true },
+      owner: TEST_OWNER,
+    }),
+  );
 }
 
 /** Spawn a foreground agent using STUB_SNAPSHOT. */
 function spawnFg(mgr: SubagentManager, prompt = "test", desc = prompt) {
-  return mgr.spawnAndWait(STUB_SNAPSHOT, "worker", prompt, {
-    description: desc,
-    turnPolicy: UNLIMITED_TURNS,
-  });
+  return acceptedRecord(
+    mgr.spawnAndWait(STUB_SNAPSHOT, "worker", prompt, {
+      description: desc,
+      turnPolicy: UNLIMITED_TURNS,
+      owner: TEST_OWNER,
+    }),
+  );
 }
 
 /** Spawn a background agent carrying a parentSession.toolCallId (notification path). */
@@ -170,12 +208,15 @@ function spawnBgWithToolCall(
   prompt = "test",
   desc = prompt,
 ) {
-  return mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
-    description: desc,
-    turnPolicy: UNLIMITED_TURNS,
-    background: { kind: "explicit", isBackground: true },
-    parentSession: { toolCallId },
-  });
+  return acceptedId(
+    mgr.spawn(STUB_SNAPSHOT, "worker", prompt, {
+      description: desc,
+      turnPolicy: UNLIMITED_TURNS,
+      background: { kind: "explicit", isBackground: true },
+      parentSession: { toolCallId },
+      owner: TEST_OWNER,
+    }),
+  );
 }
 
 /** Arrange a manager at limit 1 with two bg agents over a blocking factory: first runs, second queues. */
@@ -245,11 +286,14 @@ describe("SubagentManager", () => {
       it("stores the canonical type for case-variant input", () => {
         ({ manager } = createManager());
 
-        const id = manager.spawn(STUB_SNAPSHOT, "explore", "test", {
-          description: "d",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "explicit", isBackground: true },
-        });
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "explore", "test", {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
+          }),
+        );
 
         expect(manager.getRecord(id)!.type).toBe("explore");
       });
@@ -257,41 +301,46 @@ describe("SubagentManager", () => {
       it("rejects an unknown type rather than running another role", () => {
         ({ manager } = createManager());
 
-        expect(() =>
+        expect(
           manager.spawn(STUB_SNAPSHOT, "no-such-agent", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
           }),
-        ).toThrow('Unknown agent type "no-such-agent"');
+        ).toEqual({ kind: "rejected", reason: "unknown-agent" });
       });
 
-      it("throws for a known-but-disabled type", () => {
+      it("refuses a known-but-disabled type", () => {
         ({ manager } = createManager({
           registry: registryWith("planner", { enabled: false }),
         }));
 
-        expect(() =>
+        expect(
           manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
           }),
-        ).toThrow('Agent "planner" is disabled');
+        ).toEqual({ kind: "rejected", reason: "disabled-agent" });
       });
 
-      it("reports the canonical casing in the disabled-agent error for case-insensitive input", () => {
+      it("reports the canonical casing for a case-insensitive disabled type", () => {
         ({ manager } = createManager({
           registry: registryWith("planner", { enabled: false }),
         }));
 
-        expect(() =>
+        // The reason is a value; the sentence naming the canonical identifier
+        // belongs to the door, which reads the registry's error text.
+        expect(
           manager.spawn(STUB_SNAPSHOT, "PLANNER", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
           }),
-        ).toThrow('Agent "planner" is disabled');
+        ).toEqual({ kind: "rejected", reason: "disabled-agent" });
       });
 
       it("does not create a record for a rejected spawn", () => {
@@ -299,13 +348,14 @@ describe("SubagentManager", () => {
           registry: registryWith("planner", { enabled: false }),
         }));
 
-        expect(() =>
+        expect(
           manager.spawn(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
             background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
           }),
-        ).toThrow();
+        ).toEqual({ kind: "rejected", reason: "disabled-agent" });
 
         expect(manager.listAgents()).toEqual([]);
       });
@@ -329,11 +379,14 @@ describe("SubagentManager", () => {
           registry: registryWith("Explore", { runInBackground }),
           observer: { onSubagentCreated: onCreated },
         }));
-        return manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
-          description: "d",
-          turnPolicy: UNLIMITED_TURNS,
-          background,
-        });
+        return acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+            background,
+            owner: TEST_OWNER,
+          }),
+        );
       }
 
       it("defers to frontmatter declaring background when the request is a default", () => {
@@ -381,11 +434,14 @@ describe("SubagentManager", () => {
         }));
         spawnBg(manager, "occupies-the-only-slot");
 
-        const id = manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
-          description: "d",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "default", isBackground: false },
-        });
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "Explore", "test", {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "default", isBackground: false },
+            owner: TEST_OWNER,
+          }),
+        );
 
         expect(manager.getRecord(id)!.status).toBe("queued");
       });
@@ -403,14 +459,12 @@ describe("SubagentManager", () => {
       it("stores the canonical type for case-variant input", async () => {
         ({ manager } = createManager());
 
-        const record = await manager.spawnAndWait(
-          STUB_SNAPSHOT,
-          "explore",
-          "test",
-          {
+        const record = await acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "explore", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
-          },
+            owner: TEST_OWNER,
+          }),
         );
 
         expect(record.type).toBe("explore");
@@ -421,12 +475,15 @@ describe("SubagentManager", () => {
           registry: registryWith("planner", { enabled: false }),
         }));
 
+        // A launch the manager cannot accept is a value, not an exception: a
+        // door words it for its own caller rather than parsing a stack.
         await expect(
           manager.spawnAndWait(STUB_SNAPSHOT, "planner", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
+            owner: TEST_OWNER,
           }),
-        ).rejects.toThrow('Agent "planner" is disabled');
+        ).resolves.toEqual({ kind: "rejected", reason: "disabled-agent" });
       });
     });
 
@@ -436,14 +493,12 @@ describe("SubagentManager", () => {
           registry: registryWith("Explore", { runInBackground: true }),
         }));
 
-        const record = await manager.spawnAndWait(
-          STUB_SNAPSHOT,
-          "Explore",
-          "test",
-          {
+        const record = await acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "Explore", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
-          },
+            owner: TEST_OWNER,
+          }),
         );
 
         expect(record.isBackground).toBe(false);
@@ -456,14 +511,12 @@ describe("SubagentManager", () => {
           observer: { onSubagentCreated: onCreated },
         }));
 
-        const record = await manager.spawnAndWait(
-          STUB_SNAPSHOT,
-          "Explore",
-          "test",
-          {
+        const record = await acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "Explore", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
-          },
+            owner: TEST_OWNER,
+          }),
         );
 
         // The caller holds the result promise, so the frontmatter must not route
@@ -480,15 +533,13 @@ describe("SubagentManager", () => {
         const controller = new AbortController();
         controller.abort();
 
-        const record = await manager.spawnAndWait(
-          STUB_SNAPSHOT,
-          "worker",
-          "test",
-          {
+        const record = await acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
             description: "d",
             turnPolicy: UNLIMITED_TURNS,
             signal: controller.signal,
-          },
+            owner: TEST_OWNER,
+          }),
         );
 
         expect(record.status).toBe("stopped");
@@ -509,10 +560,13 @@ describe("SubagentManager", () => {
           ),
         }));
 
-        const pending = manager.spawnAndWait(STUB_SNAPSHOT, "Explore", "test", {
-          description: "d",
-          turnPolicy: UNLIMITED_TURNS,
-        });
+        const pending = acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "Explore", "test", {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+            owner: TEST_OWNER,
+          }),
+        );
 
         expect(manager.listAgents()[0]?.claimed).toBe(true);
 
@@ -545,10 +599,13 @@ describe("SubagentManager", () => {
           expect(manager.getRecord(holder)!.status).toBe("running"),
         );
 
-        const pending = manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
-          description: "d",
-          turnPolicy: UNLIMITED_TURNS,
-        });
+        const pending = acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
+            description: "d",
+            turnPolicy: UNLIMITED_TURNS,
+            owner: TEST_OWNER,
+          }),
+        );
 
         // Queued, not running: the await has no slot of its own.
         const queued = manager
@@ -1008,11 +1065,14 @@ describe("SubagentManager", () => {
           observer: { onSubagentCreated: onCreated },
         }));
 
-        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
-          description: "test agent",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "explicit", isBackground: true },
-        });
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "worker", "test", {
+            description: "test agent",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
+          }),
+        );
 
         expect(onCreated).toHaveBeenCalledOnce();
         expect(onCreated).toHaveBeenCalledWith(manager.getRecord(id));
@@ -1029,6 +1089,7 @@ describe("SubagentManager", () => {
         await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
           description: "foreground agent",
           turnPolicy: UNLIMITED_TURNS,
+          owner: TEST_OWNER,
         });
 
         expect(onCreated).not.toHaveBeenCalled();
@@ -1062,11 +1123,14 @@ describe("SubagentManager", () => {
           },
         }));
 
-        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
-          description: "bg agent",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "explicit", isBackground: true },
-        });
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "worker", "test", {
+            description: "bg agent",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
+          }),
+        );
         await manager.getRecord(id)!.promise;
 
         expect(callOrder).toEqual(["created", "started"]);
@@ -1088,16 +1152,19 @@ describe("SubagentManager", () => {
       it("forwards onSessionCreated from spawn options observer to Agent", async () => {
         const received: { agent: Subagent | undefined } = { agent: undefined };
 
-        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
-          description: "test",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "explicit", isBackground: true },
-          observer: {
-            onSessionCreated: (agent) => {
-              received.agent = agent;
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "worker", "test", {
+            description: "test",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            observer: {
+              onSessionCreated: (agent) => {
+                received.agent = agent;
+              },
             },
-          },
-        });
+            owner: TEST_OWNER,
+          }),
+        );
         await manager.getRecord(id)!.promise;
 
         expect(received.agent).toBe(manager.getRecord(id));
@@ -1107,15 +1174,18 @@ describe("SubagentManager", () => {
       it("forwards onSessionCreated for foreground agents", async () => {
         const received: { agent: Subagent | undefined } = { agent: undefined };
 
-        await manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
-          description: "fg",
-          turnPolicy: UNLIMITED_TURNS,
-          observer: {
-            onSessionCreated: (agent) => {
-              received.agent = agent;
+        await acceptedRecord(
+          manager.spawnAndWait(STUB_SNAPSHOT, "worker", "test", {
+            description: "fg",
+            turnPolicy: UNLIMITED_TURNS,
+            observer: {
+              onSessionCreated: (agent) => {
+                received.agent = agent;
+              },
             },
-          },
-        });
+            owner: TEST_OWNER,
+          }),
+        );
 
         expect(received.agent).toBeDefined();
         expect(received.agent!.type).toBe("worker");
@@ -1142,11 +1212,14 @@ describe("SubagentManager", () => {
       it("toolCallId is undefined when absent", () => {
         ({ manager } = createManager());
 
-        const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
-          description: "bg",
-          turnPolicy: UNLIMITED_TURNS,
-          background: { kind: "explicit", isBackground: true },
-        });
+        const id = acceptedId(
+          manager.spawn(STUB_SNAPSHOT, "worker", "test", {
+            description: "bg",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
+          }),
+        );
         const record = manager.getRecord(id)!;
 
         expect(record.toolCallId).toBeUndefined();
@@ -1794,6 +1867,7 @@ describe("SubagentManager", () => {
             parentSessionFile: "/sessions/parent.jsonl",
             parentSessionId: "parent-session-123",
           },
+          owner: TEST_OWNER,
         });
 
         await vi.waitFor(() => expect(factory).toHaveBeenCalled());
@@ -1967,11 +2041,14 @@ describe("SubagentManager", () => {
         })),
       });
 
-      const id = manager.spawn(STUB_SNAPSHOT, "worker", "test", {
-        description: "held agent",
-        turnPolicy: UNLIMITED_TURNS,
-        background: { kind: "explicit", isBackground: true },
-      });
+      const id = acceptedId(
+        manager.spawn(STUB_SNAPSHOT, "worker", "test", {
+          description: "held agent",
+          turnPolicy: UNLIMITED_TURNS,
+          background: { kind: "explicit", isBackground: true },
+          owner: TEST_OWNER,
+        }),
+      );
       const record = manager.getRecord(id)!;
       await record.promise;
       await record.releaseSession();

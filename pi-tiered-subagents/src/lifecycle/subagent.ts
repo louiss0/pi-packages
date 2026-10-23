@@ -189,6 +189,15 @@ export interface SubagentInit {
   description: string;
   /** The mode SubagentManager resolved for this spawn: the initial run's, and whether it queues. */
   isBackground: boolean;
+  /**
+   * The generation of the session that asked for this child.
+   *
+   * Recorded rather than derived, because the session that accepted the
+   * request is the only thing that may continue it: a later session holding
+   * this id must not resume it, and the manager needs to know which of its
+   * records to cancel when that session ends.
+   */
+  ownerGeneration: number;
 
   /** Execution machinery — always supplied; construct-complete, no test fallbacks. */
   execution: SubagentExecution;
@@ -205,6 +214,11 @@ export class Subagent {
   readonly id: string;
   readonly type: SubagentType;
   readonly description: string;
+  /**
+   * The generation of the accepting session, kept as a plain number: the
+   * manager compares it against its own counter and nothing else reads it.
+   */
+  readonly ownerGeneration: number;
 
   // Lifecycle status and metrics — owned by a private value object; getters and
   // mutation methods below delegate to it one line.
@@ -500,6 +514,7 @@ export class Subagent {
     this.id = init.id;
     this.type = init.type;
     this.description = init.description;
+    this.ownerGeneration = init.ownerGeneration;
     this.currentRun = new SubagentRun(
       "initial",
       init.isBackground,

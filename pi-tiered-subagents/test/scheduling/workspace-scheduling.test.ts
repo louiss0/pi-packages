@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import { SubagentManager } from "#src/lifecycle/subagent-manager";
+import type { LaunchOutcome } from "#src/lifecycle/session-owner";
+import type { Subagent } from "#src/types";
 import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
@@ -18,6 +20,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { TEST_OWNER } from "#test/helpers/owner";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
@@ -75,6 +78,9 @@ function createManager(
     registry: registryWithTools(tools),
     workspaceGates: options.registry ?? registryFor(),
   });
+  // Scheduling tests stand in for work an active session asked for; without an
+  // owner every launch here would be refused before the slot logic ran.
+  manager.beginOwner(TEST_OWNER.sessionId);
   return { manager, factory };
 }
 
@@ -91,11 +97,37 @@ function registryFor(): WorkspaceGateRegistry {
 
 /** Spawn a background child of the given type. */
 function spawnBg(manager: SubagentManager, type: string, prompt: string) {
-  return manager.spawn(WRITING_SNAPSHOT, type, prompt, {
+  const outcome = manager.spawn(WRITING_SNAPSHOT, type, prompt, {
     description: prompt,
     turnPolicy: UNLIMITED_TURNS,
     background: { kind: "explicit", isBackground: true },
+    owner: TEST_OWNER,
   });
+  // These tests are about the workspace slot, not about acceptance; a refusal
+  // would be a fixture mistake, so it fails loudly rather than being asserted.
+  if (outcome.kind === "rejected") {
+    throw new Error(`Expected an accepted launch, got: ${outcome.reason}`);
+  }
+  return outcome.value;
+}
+
+/** The record of a foreground launch the manager accepted. */
+async function acceptedRecord(
+  outcome: Promise<LaunchOutcome<Subagent>>,
+): Promise<Subagent> {
+  const settled = await outcome;
+  if (settled.kind === "rejected") {
+    throw new Error(`Expected an accepted launch, got: ${settled.reason}`);
+  }
+  return settled.value;
+}
+
+/** The id of a launch the manager accepted; tests unwrap the verdict. */
+function acceptedId(outcome: LaunchOutcome<string>): string {
+  if (outcome.kind === "rejected") {
+    throw new Error(`Expected an accepted launch, got: ${outcome.reason}`);
+  }
+  return outcome.value;
 }
 
 describe("children that may change files", () => {
@@ -194,10 +226,13 @@ describe("children that may change files", () => {
     ]);
 
     spawnBg(manager, "writer", "holder");
-    const pending = manager.spawnAndWait(WRITING_SNAPSHOT, "writer", "now", {
-      description: "foreground",
-      turnPolicy: UNLIMITED_TURNS,
-    });
+    const pending = acceptedRecord(
+      manager.spawnAndWait(WRITING_SNAPSHOT, "writer", "now", {
+        description: "foreground",
+        turnPolicy: UNLIMITED_TURNS,
+        owner: TEST_OWNER,
+      }),
+    );
 
     await vi.waitFor(() => expect(started).toEqual(["holder"]));
 
@@ -227,12 +262,15 @@ describe("children that may change files", () => {
     await vi.waitFor(() => expect(started).toEqual(["holder"]));
 
     // The second child waits for the slot; its parent's signal fires.
-    const id2 = manager.spawn(WRITING_SNAPSHOT, "writer", "cancelled", {
-      description: "cancelled",
-      turnPolicy: UNLIMITED_TURNS,
-      background: { kind: "explicit", isBackground: true },
-      signal: controller.signal,
-    });
+    const id2 = acceptedId(
+      manager.spawn(WRITING_SNAPSHOT, "writer", "cancelled", {
+        description: "cancelled",
+        turnPolicy: UNLIMITED_TURNS,
+        background: { kind: "explicit", isBackground: true },
+        signal: controller.signal,
+        owner: TEST_OWNER,
+      }),
+    );
     controller.abort();
 
     await manager.getRecord(id2)!.promise;
@@ -415,18 +453,28 @@ describe("children that may change files", () => {
     const gates = new WorkspaceGateRegistry();
     const first = make();
     const second = make();
+    // Two parents, one workspace, and two separate managers — so each has to
+    // issue its own ownership token for its children to be accepted.
+    first.beginOwner(TEST_OWNER.sessionId);
+    second.beginOwner(TEST_OWNER.sessionId);
     const snapshot = { ...WRITING_SNAPSHOT, cwd };
 
-    const id1 = first.spawn(snapshot, "writer", "one", {
-      description: "one",
-      turnPolicy: UNLIMITED_TURNS,
-      background: { kind: "explicit", isBackground: true },
-    });
-    const id2 = second.spawn(snapshot, "writer", "two", {
-      description: "two",
-      turnPolicy: UNLIMITED_TURNS,
-      background: { kind: "explicit", isBackground: true },
-    });
+    const id1 = acceptedId(
+      first.spawn(snapshot, "writer", "one", {
+        description: "one",
+        turnPolicy: UNLIMITED_TURNS,
+        background: { kind: "explicit", isBackground: true },
+        owner: TEST_OWNER,
+      }),
+    );
+    const id2 = acceptedId(
+      second.spawn(snapshot, "writer", "two", {
+        description: "two",
+        turnPolicy: UNLIMITED_TURNS,
+        background: { kind: "explicit", isBackground: true },
+        owner: TEST_OWNER,
+      }),
+    );
 
     await vi.waitFor(() => expect(started).toEqual(["first parent"]));
 

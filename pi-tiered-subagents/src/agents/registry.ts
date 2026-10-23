@@ -32,7 +32,13 @@ import { normalizeAgentId } from "#src/agents/definition";
  */
 export type AgentSelection =
   | { readonly ok: true; readonly definition: AgentDefinition }
-  | { readonly ok: false; readonly error: string };
+  | {
+      readonly ok: false;
+      /** Which kind of failure it is, for a caller that must branch. */
+      readonly reason: "unknown-agent" | "disabled-agent";
+      /** The sentence an operator reads. Never parsed — branch on `reason`. */
+      readonly error: string;
+    };
 
 /**
  * The registry slice the runtime reads.
@@ -108,6 +114,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
       const available = this.enabledIds();
       return {
         ok: false,
+        reason: "unknown-agent",
         error:
           `Unknown agent type "${normalized}".` +
           (available.length > 0
@@ -118,6 +125,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
     if (!definition.enabled) {
       return {
         ok: false,
+        reason: "disabled-agent",
         error: `Agent "${normalized}" is disabled.`,
       };
     }

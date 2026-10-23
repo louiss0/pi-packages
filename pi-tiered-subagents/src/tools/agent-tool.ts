@@ -9,6 +9,7 @@ import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
 import type {
   AgentSpawnConfig,
   ResumeCallOptions,
@@ -53,19 +54,25 @@ export interface AgentToolManager {
     type: string,
     prompt: string,
     opts: AgentSpawnConfig,
-  ) => string;
+  ) => LaunchOutcome<string>;
   spawnAndWait: (
     snapshot: ParentSnapshot,
     type: string,
     prompt: string,
     opts: Omit<AgentSpawnConfig, "background">,
-  ) => Promise<Subagent>;
+  ) => Promise<LaunchOutcome<Subagent>>;
   startResume: (
     id: string,
     prompt: string,
     options: ResumeCallOptions,
   ) => ResumeStart;
   getRecord: (id: string) => Subagent | undefined;
+  /**
+   * The session token every launch must carry. Undefined when no session is
+   * active or one is ending, which is what the door turns into a refusal
+   * before it asks for any work.
+   */
+  currentOwner: () => SessionOwner | undefined;
 }
 
 /** Narrow runtime interface — the Agent tool's slice of SubagentRuntime. */
@@ -119,6 +126,15 @@ export class AgentTool {
     if ("error" in config) return textResult(config.error);
 
     // ---- Boundary extraction (after config so inheritContext is resolved) ----
+    // The session token is read before anything is captured or resolved, so
+    // that a launch belonging to a session which has since ended is refused
+    // here rather than accepted by a session that never asked for it.
+    const owner = this.manager.currentOwner();
+    if (!owner) {
+      return textResult(
+        "No active session — cannot launch agents outside a session.",
+      );
+    }
     const snapshot = this.runtime.buildSnapshot(
       config.execution.inheritContext,
     );
@@ -155,13 +171,14 @@ export class AgentTool {
         snapshot,
         parentSession,
         settings: this.settings,
+        owner,
       });
     }
 
     // ---- Foreground execution — stream progress via onUpdate ----
     return runForeground(
       this.manager,
-      { config, snapshot, parentSession },
+      { config, snapshot, parentSession, owner },
       signal,
       onUpdate,
     );
@@ -388,6 +405,11 @@ function resumeRefusalMessage(
   switch (refusal) {
     case "unknown-agent":
       return `Agent not found: "${id}". Records are cleared at session start/switch, so it may be from a previous session.`;
+    case "stale-session":
+      return (
+        `Agent "${id}" belongs to a session that is no longer active. Its work was cancelled when that ` +
+        "session was replaced, so it cannot be resumed from this one."
+      );
     case "still-running":
       return (
         `Agent "${id}" is still running; wait for it to finish before resuming. ` +

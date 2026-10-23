@@ -1,5 +1,6 @@
 import { defined } from "#src/optional";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
 import { renderSpawnNotes, textResult } from "#src/tools/helpers";
 import type {
@@ -16,8 +17,9 @@ export interface BackgroundManagerDeps {
     type: string,
     prompt: string,
     opts: AgentSpawnConfig,
-  ): string;
+  ): LaunchOutcome<string>;
   getRecord(id: string): Subagent | undefined;
+  currentOwner(): SessionOwner | undefined;
 }
 
 /** All values the background spawner needs beyond the resolved config. */
@@ -26,6 +28,8 @@ export interface BackgroundParams {
   snapshot: ParentSnapshot;
   parentSession: ParentSessionInfo;
   settings: { readonly maxConcurrent: number };
+  /** The token proving which session asked for this launch. */
+  owner: SessionOwner;
 }
 
 /** What a background launch reports: one shape for every door that returns before the run ends. */
@@ -55,7 +59,7 @@ export function spawnBackground(
 
   let id: string;
   try {
-    id = manager.spawn(
+    const outcome = manager.spawn(
       params.snapshot,
       identity.subagentType,
       execution.prompt,
@@ -71,8 +75,17 @@ export function spawnBackground(
         background: { kind: "explicit", isBackground: true } as const,
         model: execution.model,
         thinkingLevel: execution.thinking,
+        owner: params.owner,
       }),
     );
+    // A refusal is an expected answer, not a crash: the session this launch
+    // belonged to is gone, so it is reported in the door's own words.
+    if (outcome.kind === "rejected") {
+      return textResult(
+        launchRefusedMessage(outcome.reason, identity.displayName),
+      );
+    }
+    id = outcome.value;
   } catch (err) {
     return textResult(err instanceof Error ? err.message : String(err));
   }
@@ -93,6 +106,33 @@ export function spawnBackground(
         : undefined,
     }),
   );
+}
+
+/**
+ * The operator-facing sentence for a launch refused before a child was created.
+ *
+ * Exhausts the four reasons: a launch can be refused for the agent type, the
+ * session, or both. Adding a new reason fails to compile here rather than
+ * falling through to an unhelpful answer.
+ */
+function launchRefusedMessage(
+  reason:
+    | "no-active-session"
+    | "session-ended"
+    | "unknown-agent"
+    | "disabled-agent",
+  displayName: string,
+): string {
+  switch (reason) {
+    case "no-active-session":
+      return "No active session — cannot launch agents outside a session.";
+    case "session-ended":
+      return "Session ended before the launch was accepted.";
+    case "unknown-agent":
+      return `Unknown agent type "${displayName}".`;
+    case "disabled-agent":
+      return `Agent "${displayName}" is disabled.`;
+  }
 }
 
 /**

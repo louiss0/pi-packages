@@ -723,11 +723,10 @@ describe("AgentTool — background execution", () => {
 describe("AgentTool — foreground execution", () => {
   it("returns completion message with stats", async () => {
     const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi
-      .fn()
-      .mockResolvedValue(
-        createTestSubagent({ result: "Task complete.", toolUses: 5 }),
-      );
+    deps.manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({ result: "Task complete.", toolUses: 5 }),
+    });
     const result = await execute(deps, {
       prompt: "do task",
       description: "fg task",
@@ -741,11 +740,10 @@ describe("AgentTool — foreground execution", () => {
 
   it("returns error message when agent fails", async () => {
     const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi
-      .fn()
-      .mockResolvedValue(
-        createTestSubagent({ status: "error", error: "Out of context" }),
-      );
+    deps.manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({ status: "error", error: "Out of context" }),
+    });
     const result = await execute(deps, {
       prompt: "do task",
       description: "fg task",
@@ -772,9 +770,10 @@ describe("AgentTool — foreground execution", () => {
 
   it("names the agent ID in the foreground result text", async () => {
     const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi
-      .fn()
-      .mockResolvedValue(createTestSubagent({ result: "Task complete." }));
+    deps.manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({ result: "Task complete." }),
+    });
     const result = await execute(deps, {
       prompt: "do task",
       description: "fg task",

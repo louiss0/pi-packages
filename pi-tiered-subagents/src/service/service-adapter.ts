@@ -8,11 +8,11 @@
 import { defined } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import { defaultDefinition } from "#src/agents/definition";
+import type { BackgroundRequest } from "#src/agents/invocation";
 import {
   parseThinkingLevel,
   thinkingLevelError,
 } from "#src/config/thinking-level";
-import type { BackgroundRequest } from "#src/agents/invocation";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type {
   AgentSpawnConfig,
@@ -23,6 +23,7 @@ import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import type { RoutingLadders } from "#src/models/router";
 import { resolveSpawn, type TurnSettings } from "#src/agents/resolver";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
+import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
 import type {
   ResumeOptions,
   ResumeResult,
@@ -32,14 +33,14 @@ import type {
 } from "#src/service/service";
 import type { SessionContext, Subagent, ThinkingLevel } from "#src/types";
 
-/** Narrow interface for the SubagentManager — avoids coupling to the concrete class. */
+/** Narrow manager interface — avoids coupling to the concrete class. */
 export interface SubagentManagerLike {
   spawn(
     snapshot: ParentSnapshot,
     type: string,
     prompt: string,
     options: AgentSpawnConfig,
-  ): string;
+  ): LaunchOutcome<string>;
   getRecord(id: string): Subagent | undefined;
   listAgents(): Subagent[];
   abort(id: string): boolean;
@@ -51,6 +52,13 @@ export interface SubagentManagerLike {
     prompt: string,
     options: ResumeCallOptions,
   ): Promise<ResumeOutcome>;
+  /**
+   * The token a launch under the current session must carry, or undefined when
+   * no session is active or one is in the process of ending. The doors stamp
+   * this onto every launch, so a session that has been replaced is refused at
+   * acceptance rather than accepted into the wrong parent.
+   */
+  currentOwner(): SessionOwner | undefined;
 }
 
 /**
@@ -101,6 +109,17 @@ export class SubagentsServiceAdapter implements SubagentsService {
         "No active session — cannot spawn agents outside a session.",
       );
     }
+    // Read from the manager rather than from this runtime, because the manager
+    // is the only thing that can say whether the session this launch belongs
+    // to is still the one accepting work. A request stamped with a stale token
+    // is refused at acceptance, not accepted into the session that replaced the
+    // one that asked for it.
+    const owner = this.manager.currentOwner();
+    if (!owner) {
+      throw new Error(
+        "No active session — cannot spawn agents outside a session.",
+      );
+    }
 
     // The one resolver answers both doors: the caller's own answers, then the
     // definition's, then the automatic routing.
@@ -140,7 +159,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
       options?.foreground === undefined
         ? { kind: "default", isBackground: true }
         : { kind: "explicit", isBackground: !options.foreground };
-    return this.manager.spawn(
+    const outcome: LaunchOutcome<string> = this.manager.spawn(
       snapshot,
       type,
       prompt,
@@ -156,8 +175,13 @@ export class SubagentsServiceAdapter implements SubagentsService {
         background,
         model: execution.model,
         thinkingLevel: execution.thinking,
+        owner,
       }),
     );
+    if (outcome.kind === "rejected") {
+      throw new Error(`Launch refused: ${outcome.reason}`);
+    }
+    return outcome.value;
   }
 
   getRecord(id: string): SubagentRecord | undefined {

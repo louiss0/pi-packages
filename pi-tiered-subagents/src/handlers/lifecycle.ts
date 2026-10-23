@@ -12,6 +12,12 @@ export interface LifecycleManager {
   clearCompleted(): Promise<void>;
   abortAll(): void;
   dispose(): Promise<void>;
+  /** Take ownership for a session, ending whatever session held it before. */
+  beginOwner(sessionId: string): void;
+  /** Note that the session may be replaced, without cancelling anything yet. */
+  beginOwnerEnd(): void;
+  /** End the session for good; no later session will restore it. */
+  endOwner(): void;
 }
 
 /** Narrow runtime interface — only the methods lifecycle handlers call. */
@@ -35,29 +41,60 @@ export class SessionLifecycleHandler {
     private readonly manager: LifecycleManager,
     private readonly disposeNotifications: () => void,
     private readonly unpublishService: () => void,
+    /**
+     * The current session's identity, for handing the manager ownership of it.
+     *
+     * Read from the session context rather than taken from the event: the
+     * context is the thing whose replacement cancels children's work, so the
+     * ownership token must name the session that actually exists.
+     */
+    private readonly sessionIdOf: (ctx: unknown) => string,
   ) {}
 
+  /**
+   * A session began, so this one owns the work accepted from now on.
+   *
+   * `beginOwner` is what confirms a switch: reaching here after a
+   * `session_before_switch` means the replacement took effect, and the previous
+   * session's children are cancelled. Reaching here with the same session id
+   * means the switch was abandoned, and that session's children keep running.
+   */
   handleSessionStart(_event: unknown, ctx: unknown): Promise<void> {
-    this.runtime.setSessionContext(ctx as SessionContext);
+    const context = ctx as SessionContext;
+    this.runtime.setSessionContext(context);
+    this.manager.beginOwner(this.sessionIdOf(context));
     return this.manager.clearCompleted();
   }
 
+  /**
+   * A replacement may be about to happen.
+   *
+   * Deliberately does not cancel anything. Pi emits this before it knows
+   * whether the switch will happen — a handler can veto it, and the operator
+   * can back out — so cancelling here would stop live children for a
+   * navigation that never occurred. It only closes the door to new launches;
+   * `handleSessionStart` decides what actually happened.
+   */
   handleSessionBeforeSwitch(): Promise<void> {
+    this.manager.beginOwnerEnd();
     return this.manager.clearCompleted();
   }
 
   // Cleanup order matters:
   // 1. Unpublish service — prevent new cross-extension calls
   // 2. Clear session context — no more session state
-  // 3. Dispose notifications — silence nudges *before* the aborts that would
+  // 3. End session ownership — the session's children are cancelled, and a
+  //    later session gets a fresh generation rather than inheriting this one's
+  // 4. Dispose notifications — silence nudges *before* the aborts that would
   //    raise them: no parent run is active at shutdown, so a terminal
   //    transition delivers its nudge synchronously and Pi cannot recall it
-  // 4. Abort all agents — stop running and queued work
-  // 5. Dispose manager — final cleanup, awaited so each child's extensions get
+  // 5. Abort all agents — stop running and queued work
+  // 6. Dispose manager — final cleanup, awaited so each child's extensions get
   //    their `session_shutdown` before Pi tears the parent down (#709)
   handleSessionShutdown(): Promise<void> {
     this.unpublishService();
     this.runtime.clearSessionContext();
+    this.manager.endOwner();
     this.disposeNotifications();
     this.manager.abortAll();
     return this.manager.dispose();

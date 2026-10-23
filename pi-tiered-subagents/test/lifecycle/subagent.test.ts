@@ -132,6 +132,8 @@ interface MakeSubagentOptions {
   description?: string;
   execution?: SubagentExecution;
   isBackground?: boolean;
+  /** The accepting session's generation, for ownership-shaped fixtures. */
+  ownerGeneration?: number;
   /**
    * A caller-owned SubagentState, for tests that mutate it after construction to
    * observe the record delegating live. Wins over the flat state overrides.
@@ -159,6 +161,7 @@ function makeSubagent(overrides: MakeSubagentOptions = {}): Subagent {
       type: type ?? "general-purpose",
       description: description ?? "test",
       isBackground: isBackground ?? true,
+      ownerGeneration: overrides.ownerGeneration ?? 1,
       execution: execution ?? makeStubExecution(),
       state,
       outcome: defined({ status, result, startedAt, completedAt }),

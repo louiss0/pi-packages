@@ -32,7 +32,11 @@ function makeRegistry(opts: {
       const definition = definitions.find((d) => d.id === id);
       return definition
         ? { ok: true as const, definition }
-        : { ok: false as const, error: `Unknown agent type "${id}".` };
+        : {
+            ok: false as const,
+            reason: "unknown-agent" as const,
+            error: `Unknown agent type "${id}".`,
+          };
     },
     find: (id: string) => definitions.find((d) => d.id === id),
     list: () => definitions,

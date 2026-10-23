@@ -40,6 +40,9 @@ describe("SessionLifecycleHandler", () => {
       clearCompleted: mockClearCompleted,
       abortAll: mockAbortAll,
       dispose: mockDispose,
+      beginOwner: vi.fn(),
+      beginOwnerEnd: vi.fn(),
+      endOwner: vi.fn(),
     };
 
     handler = new SessionLifecycleHandler(
@@ -47,6 +50,7 @@ describe("SessionLifecycleHandler", () => {
       manager,
       mockDisposeNotifications,
       mockUnpublishService,
+      (ctx) => (ctx as { id?: string }).id ?? "session-1",
     );
   });
 

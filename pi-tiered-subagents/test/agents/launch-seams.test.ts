@@ -202,7 +202,7 @@ describe("the service door", () => {
   /** The adapter's collaborators, with a registry the adapter can read. */
   function makeAdapter(definition?: AgentDefinition) {
     const manager = {
-      spawn: vi.fn().mockReturnValue("agent-1"),
+      spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
       getRecord: vi.fn(),
       listAgents: vi.fn(() => []),
       abort: vi.fn(),
@@ -210,6 +210,7 @@ describe("the service door", () => {
       hasRunning: vi.fn(() => false),
       registerWorkspaceProvider: vi.fn(),
       resume: vi.fn(),
+      currentOwner: vi.fn(() => ({ generation: 1, sessionId: "session-1" })),
     };
     const runtime = {
       currentCtx: {} as never,
@@ -301,7 +302,7 @@ describe("both doors resolve alike", () => {
     if ("error" in tool) throw new Error(tool.error);
 
     const manager = {
-      spawn: vi.fn().mockReturnValue("agent-1"),
+      spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
       getRecord: vi.fn(),
       listAgents: vi.fn(() => []),
       abort: vi.fn(),
@@ -309,6 +310,7 @@ describe("both doors resolve alike", () => {
       hasRunning: vi.fn(() => false),
       registerWorkspaceProvider: vi.fn(),
       resume: vi.fn(),
+      currentOwner: vi.fn(() => ({ generation: 1, sessionId: "session-1" })),
     };
     const runtime = {
       currentCtx: {

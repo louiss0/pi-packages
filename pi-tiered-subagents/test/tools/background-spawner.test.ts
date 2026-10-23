@@ -14,6 +14,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { TEST_OWNER } from "#test/helpers/owner";
 import { textOf } from "#test/helpers/text-of";
 
 function makeConfig(
@@ -38,6 +39,7 @@ function makeParams(overrides: Patch<BackgroundParams> = {}): BackgroundParams {
       toolCallId: "tc-1",
     },
     settings: { maxConcurrent: 4 },
+    owner: TEST_OWNER,
     ...defined(overrides),
   };
 }
@@ -157,7 +159,7 @@ describe("spawnBackground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawn: vi.fn().mockReturnValue("bg-2"),
+        spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "bg-2" }),
         getRecord: vi
           .fn()
           .mockReturnValue(createTestSubagent({ status: "queued" })),
@@ -187,7 +189,7 @@ describe("spawnBackground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawn: vi.fn().mockReturnValue("bg-3"),
+        spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "bg-3" }),
         getRecord: vi.fn().mockReturnValue(record),
       },
     });
@@ -227,7 +229,7 @@ describe("spawnBackground", () => {
       const deps = createToolDeps({
         manager: {
           ...createToolDeps().manager,
-          spawn: vi.fn().mockReturnValue("bg-3"),
+          spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "bg-3" }),
           getRecord: vi.fn().mockReturnValue(record),
         },
       });
@@ -262,7 +264,7 @@ describe("spawnBackground", () => {
       const deps = createToolDeps({
         manager: {
           ...createToolDeps().manager,
-          spawn: vi.fn().mockReturnValue("bg-2"),
+          spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "bg-2" }),
           getRecord: vi
             .fn()
             .mockReturnValue(createTestSubagent({ status: "queued" })),

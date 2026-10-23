@@ -1,6 +1,7 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { defined } from "#src/optional";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { LaunchOutcome, SessionOwner } from "#src/lifecycle/session-owner";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
 import {
   renderOutcomeAddenda,
@@ -27,7 +28,7 @@ export interface ForegroundManagerDeps {
     type: string,
     prompt: string,
     opts: Omit<AgentSpawnConfig, "background">,
-  ): Promise<Subagent>;
+  ): Promise<LaunchOutcome<Subagent>>;
 }
 
 /** All values the foreground runner needs beyond the resolved config. */
@@ -35,6 +36,36 @@ export interface ForegroundParams {
   config: ResolvedSpawnConfig;
   snapshot: ParentSnapshot;
   parentSession: ParentSessionInfo;
+  /** The token proving which session asked for this launch. */
+  owner: SessionOwner;
+}
+
+/**
+ * The operator-facing sentence for a launch refused before a child was created.
+ *
+ * Exhaustive over the four reasons, so one added later fails to compile here
+ * rather than falling through to an answer that says nothing. Mirrors the
+ * background door's wording: the two differ in how they deliver a result, not
+ * in what they can refuse.
+ */
+function launchRefusedMessage(
+  reason:
+    | "no-active-session"
+    | "session-ended"
+    | "unknown-agent"
+    | "disabled-agent",
+  displayName: string,
+): string {
+  switch (reason) {
+    case "no-active-session":
+      return "No active session — cannot launch agents outside a session.";
+    case "session-ended":
+      return "Session ended before the launch was accepted.";
+    case "unknown-agent":
+      return `Unknown agent type "${displayName}".`;
+    case "disabled-agent":
+      return `Agent "${displayName}" is disabled.`;
+  }
 }
 
 /**
@@ -57,7 +88,7 @@ export async function runForeground(
 
   let record: Subagent;
   try {
-    record = await manager.spawnAndWait(
+    const outcome = await manager.spawnAndWait(
       params.snapshot,
       identity.subagentType,
       execution.prompt,
@@ -76,8 +107,17 @@ export async function runForeground(
         },
         model: execution.model,
         thinkingLevel: execution.thinking,
+        owner: params.owner,
       }),
     );
+    // Refused before a child existed: the session this launch belonged to is
+    // gone. Reported in the door's words, and the stream stops either way.
+    if (outcome.kind === "rejected") {
+      return textResult(
+        launchRefusedMessage(outcome.reason, identity.displayName),
+      );
+    }
+    record = outcome.value;
   } catch (err) {
     return textResult(err instanceof Error ? err.message : String(err));
   } finally {

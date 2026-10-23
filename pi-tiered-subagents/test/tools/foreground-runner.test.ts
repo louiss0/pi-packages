@@ -13,6 +13,7 @@ import {
   makeStubExecution,
 } from "#test/helpers/make-subagent";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { TEST_OWNER } from "#test/helpers/owner";
 import { textOf } from "#test/helpers/text-of";
 
 function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
@@ -23,6 +24,7 @@ function makeParams(overrides: Patch<ForegroundParams> = {}): ForegroundParams {
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "session-1",
     },
+    owner: TEST_OWNER,
     ...defined(overrides),
   };
 }
@@ -51,14 +53,15 @@ describe("runForeground", () => {
 
   it("surfaces a declared question as answerable, naming the resume call", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         id: "agent-5",
         result: "Mapped them.",
         pendingQuestion: "Which config?",
         sessionReady: true,
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -81,7 +84,9 @@ describe("runForeground", () => {
       sessionReady: true,
     });
     await released.releaseSession();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(released);
+    manager.spawnAndWait = vi
+      .fn()
+      .mockResolvedValue({ kind: "accepted", value: released });
 
     const result = await runForeground(
       manager,
@@ -110,11 +115,12 @@ describe("runForeground", () => {
 
   it("names where a teardown saved the work of an agent that completed", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         workspaceNotice: "\n\n---\nChanges saved to branch `pi-agent-5`.",
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -128,11 +134,12 @@ describe("runForeground", () => {
 
   it("reports the updates the agent sent while the parent was blocked", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         runUpdates: ["The bug is in the retry wrapper."],
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -149,13 +156,14 @@ describe("runForeground", () => {
 
   it("reports the updates of an agent whose run then failed", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         status: "error",
         error: "turn loop exploded",
         runUpdates: ["The premise is wrong."],
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -169,13 +177,14 @@ describe("runForeground", () => {
 
   it("names where a teardown saved the work of an agent that failed", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         status: "error",
         error: "turn loop exploded",
         workspaceNotice: "\n\n---\nChanges saved to branch `pi-agent-5`.",
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -193,14 +202,15 @@ describe("runForeground", () => {
   // both name it; this carrier did not (#889).
   it("names the transcript of an agent that failed", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         status: "error",
         error: "429 rate limit exceeded",
         sessionReady: true,
         outputFile: "/sessions/child.jsonl",
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -217,12 +227,13 @@ describe("runForeground", () => {
 
   it("omits the transcript line for a failed agent that persisted none", async () => {
     const { manager } = createToolDeps();
-    manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestSubagent({
+    manager.spawnAndWait = vi.fn().mockResolvedValue({
+      kind: "accepted",
+      value: createTestSubagent({
         status: "error",
         error: "429 rate limit exceeded",
       }),
-    );
+    });
 
     const result = await runForeground(
       manager,
@@ -239,7 +250,9 @@ describe("runForeground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawnAndWait: vi.fn().mockResolvedValue(record),
+        spawnAndWait: vi
+          .fn()
+          .mockResolvedValue({ kind: "accepted", value: record }),
       },
     });
     await runForeground(deps.manager, makeParams(), undefined, undefined);
@@ -251,7 +264,9 @@ describe("runForeground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawnAndWait: vi.fn().mockResolvedValue(record),
+        spawnAndWait: vi
+          .fn()
+          .mockResolvedValue({ kind: "accepted", value: record }),
       },
     });
     await runForeground(deps.manager, makeParams(), undefined, undefined);
@@ -262,12 +277,13 @@ describe("runForeground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawnAndWait: vi.fn().mockResolvedValue(
-          createTestSubagent({
+        spawnAndWait: vi.fn().mockResolvedValue({
+          kind: "accepted",
+          value: createTestSubagent({
             status: "error",
             error: "Context window exceeded",
           }),
-        ),
+        }),
       },
     });
     const result = await runForeground(
@@ -320,7 +336,11 @@ describe("runForeground", () => {
     const deps = createToolDeps({
       manager: {
         ...createToolDeps().manager,
-        spawnAndWait: vi.fn().mockReturnValue(promise),
+        spawnAndWait: vi
+          .fn()
+          .mockReturnValue(
+            promise.then((r) => ({ kind: "accepted" as const, value: r })),
+          ),
       },
     });
     const onUpdate = vi.fn();
@@ -366,7 +386,10 @@ describe("runForeground", () => {
           },
         ) => {
           options.observer?.onSessionCreated?.(running);
-          return promise;
+          return promise.then((record) => ({
+            kind: "accepted" as const,
+            value: record,
+          }));
         },
       );
       const deps = createToolDeps({
@@ -396,7 +419,9 @@ describe("runForeground", () => {
       const deps = createToolDeps({
         manager: {
           ...createToolDeps().manager,
-          spawnAndWait: vi.fn().mockResolvedValue(running),
+          spawnAndWait: vi
+            .fn()
+            .mockResolvedValue({ kind: "accepted", value: running }),
         },
       });
       const result = await runForeground(
@@ -426,7 +451,10 @@ describe("runForeground", () => {
         },
       ) => {
         options.observer?.onSessionCreated?.(running);
-        return promise;
+        return promise.then((record) => ({
+          kind: "accepted" as const,
+          value: record,
+        }));
       },
     );
     const deps = createToolDeps({
@@ -492,7 +520,10 @@ describe("runForeground", () => {
           },
         ) => {
           if (record) options.observer?.onSessionCreated?.(record);
-          return promise;
+          return promise.then((record) => ({
+            kind: "accepted" as const,
+            value: record,
+          }));
         },
       );
       const deps = createToolDeps({
@@ -507,7 +538,10 @@ describe("runForeground", () => {
       let updatesAtSpawn: number | undefined;
       spawnAndWait.mockImplementationOnce(() => {
         updatesAtSpawn = onUpdate.mock.calls.length;
-        return Promise.resolve(createTestSubagent());
+        return Promise.resolve({
+          kind: "accepted",
+          value: createTestSubagent(),
+        });
       });
 
       await runForeground(manager, makeParams(), undefined, onUpdate);
@@ -615,12 +649,13 @@ describe("runForeground", () => {
       const deps = createToolDeps({
         manager: {
           ...createToolDeps().manager,
-          spawnAndWait: vi.fn().mockResolvedValue(
-            createTestSubagent({
+          spawnAndWait: vi.fn().mockResolvedValue({
+            kind: "accepted",
+            value: createTestSubagent({
               status: "error",
               error: "Context window exceeded",
             }),
-          ),
+          }),
         },
       });
       const result = await runForeground(

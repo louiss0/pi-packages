@@ -13,6 +13,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+import { TEST_OWNER } from "#test/helpers/owner";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /**
@@ -53,6 +54,11 @@ export type TestSubagentOptions = Patch<{
   description?: string;
   /** Defaults to true so a fixture survives the widget's background-only filter. */
   isBackground?: boolean;
+  /**
+   * The accepting session's generation, for a fixture standing in for work a
+   * different session asked for.
+   */
+  ownerGeneration?: number;
   execution?: SubagentExecution;
   /** Shorthand to set execution.parentSession.toolCallId. Ignored when execution is supplied. */
   toolCallId?: string;
@@ -138,6 +144,9 @@ export function createTestSubagent(
     type: type ?? "general-purpose",
     description: description ?? "Test task",
     isBackground: isBackground ?? true,
+    // Every fixture stands in for work the current session asked for; a test
+    // about ownership names its own generation instead.
+    ownerGeneration: overrides.ownerGeneration ?? TEST_OWNER.generation,
     execution:
       execution ??
       makeStubExecution({

@@ -3,6 +3,7 @@ import type { BackgroundManagerDeps } from "#src/tools/background-spawner";
 import type { ForegroundManagerDeps } from "#src/tools/foreground-runner";
 import { createToolDeps } from "./make-deps";
 import { STUB_SNAPSHOT } from "./stub-ctx";
+import { TEST_OWNER } from "./owner";
 import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
@@ -15,19 +16,22 @@ describe("createToolDeps", () => {
           description: "test",
           turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
+          owner: TEST_OWNER,
         }),
-      ).toBe("agent-1");
+      ).toEqual({ kind: "accepted", value: "agent-1" });
     });
 
     it("spawnAndWait resolves to a completed record", async () => {
       const { manager } = createToolDeps();
-      const record = await manager.spawnAndWait(
+      const outcome = await manager.spawnAndWait(
         STUB_SNAPSHOT,
         "general-purpose",
         "prompt",
-        { description: "test", turnPolicy: UNLIMITED_TURNS },
+        { description: "test", turnPolicy: UNLIMITED_TURNS, owner: TEST_OWNER },
       );
-      expect(record.status).toBe("completed");
+      expect(outcome.kind).toBe("accepted");
+      if (outcome.kind !== "accepted") throw new Error("unreachable");
+      expect(outcome.value.status).toBe("completed");
     });
 
     it("startResume starts a resume on a completed record", () => {
@@ -78,6 +82,7 @@ describe("createToolDeps", () => {
         description: "test",
         turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
+        owner: TEST_OWNER,
       });
       expect(customSpawn).toHaveBeenCalledOnce();
     });

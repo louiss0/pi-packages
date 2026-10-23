@@ -14,6 +14,7 @@ import {
 import { makeModel } from "./make-model";
 import { createTestSubagent, type TestSubagentOptions } from "./make-subagent";
 import { STUB_SNAPSHOT } from "./stub-ctx";
+import { TEST_OWNER } from "./owner";
 
 /** Minimal registry with the shipped specialists and no files. */
 const defaultRegistry = new AgentRegistry(() => ({
@@ -71,12 +72,15 @@ export function createToolDeps(
 
   return {
     manager: {
-      spawn: vi.fn().mockReturnValue("agent-1"),
-      spawnAndWait: vi.fn().mockResolvedValue(createTestSubagent()),
+      spawn: vi.fn().mockReturnValue({ kind: "accepted", value: "agent-1" }),
+      spawnAndWait: vi
+        .fn()
+        .mockResolvedValue({ kind: "accepted", value: createTestSubagent() }),
       startResume: vi
         .fn()
         .mockReturnValue({ kind: "started", record: createTestSubagent() }),
       getRecord: vi.fn().mockReturnValue(createTestSubagent()),
+      currentOwner: vi.fn().mockReturnValue(TEST_OWNER),
     },
     runtime,
     settings: {

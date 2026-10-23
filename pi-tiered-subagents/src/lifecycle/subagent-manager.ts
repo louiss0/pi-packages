@@ -24,6 +24,11 @@ import type { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import {
+  type LaunchOutcome,
+  ownerCanAccept,
+  type SessionOwner,
+} from "#src/lifecycle/session-owner";
+import {
   type ResumeRefusal,
   type ResumeRunOptions,
   type RunScheduler,
@@ -67,10 +72,14 @@ export interface SpawnTypeResolver {
 /**
  * Why a resume was refused, across every front door.
  *
- * Widens the record's own vocabulary by the one refusal that is not a fact
- * about a record: an id no record answers to.
+ * `unknown-agent` and `stale-session` are the manager's own: no such record,
+ * or a record belonging to a session that is no longer current. The rest are
+ * facts about the record itself, owned by {@link ResumeRefusal}.
  */
-export type ResumeRefusalReason = ResumeRefusal | "unknown-agent";
+export type ResumeRefusalReason =
+  | ResumeRefusal
+  | "unknown-agent"
+  | "stale-session";
 
 /**
  * What a resume attempt produced: the record whose run was restarted, or the
@@ -270,10 +279,20 @@ export interface AgentSpawnConfig {
   >;
   /**
    * Whether this door has committed to a background mode or is offering a
-   * default the agent's frontmatter may override. Required so a new front door
+   * default its agent's frontmatter may override. Required so a new front door
    * cannot silently inherit another's policy.
    */
   background: BackgroundRequest;
+  /**
+   * The session this launch was asked for under, captured with the request.
+   *
+   * Required, and checked at the moment of acceptance: a request prepared for
+   * a session that has since been replaced is refused rather than attached to
+   * the session that replaced it. That result would be delivered to a parent
+   * that never asked for it, so there is no version of "accept it anyway" that
+   * is correct.
+   */
+  owner: SessionOwner;
   /** Parent abort signal - when aborted, the subagent is also stopped. */
   signal?: AbortSignal;
   /** Per-subagent lifecycle observer — replaces onSessionCreated callback. */
@@ -314,9 +333,101 @@ export class SubagentManager {
   private readonly workspacePlans = new Map<string, WorkspacePlan>();
   private _workspaceProvider: WorkspaceProvider | undefined;
 
+  /**
+   * The session allowed to accept work right now, and the one whose end is
+   * being considered.
+   *
+   * `ownerEnding` is the half that makes a tentative switch safe. Pi emits
+   * `session_before_switch` before it knows whether the switch will happen —
+   * a handler can veto it, and the operator can back out — so cancelling there
+   * would destroy live children for a navigation that never occurred. Instead
+   * the flag only closes the door to *new* launches, and `beginOwner` decides
+   * what actually happened.
+   */
+  private owner: SessionOwner | undefined = undefined;
+  private ownerEnding = false;
+  private generationCounter = 0;
+
   /** The registered workspace provider, or undefined when none is registered. */
   get workspaceProvider(): WorkspaceProvider | undefined {
     return this._workspaceProvider;
+  }
+
+  // ── Session ownership ─────────────────────────────────────────────────────
+
+  /**
+   * The token a launch under the current session must carry.
+   *
+   * Undefined when no session is active, and undefined again while one is
+   * ending — which is what turns "the session I asked under has gone" into a
+   * refusal at acceptance rather than a child attached to the wrong parent.
+   */
+  currentOwner(): SessionOwner | undefined {
+    return this.ownerEnding ? undefined : this.owner;
+  }
+
+  /**
+   * Take ownership for `sessionId`, ending whatever session held it before.
+   *
+   * Called from `session_start`. Reaching here is what confirms a switch
+   * happened: the previous owner — if there was one, and if it was not this
+   * same session id — is gone for real, so its children are cancelled now.
+   * A `session_start` that names the session already in hand is the abandoned
+   * switch, and its owner is simply restored with its children untouched.
+   */
+  beginOwner(sessionId: string): void {
+    if (this.owner && this.owner.sessionId !== sessionId) {
+      this.cancelOwned(this.owner.generation);
+    }
+    // Every session gets a fresh generation even when the id repeats: a token
+    // from an earlier session must never compare equal to a later one.
+    this.owner = {
+      generation: ++this.generationCounter,
+      sessionId,
+    };
+    this.ownerEnding = false;
+  }
+
+  /**
+   * Note that the current session may be about to be replaced, without
+   * cancelling anything yet.
+   *
+   * No new launch is accepted from here on, so nothing joins a session that is
+   * leaving. Children already running continue, because the switch may still
+   * be vetoed or abandoned — see `beginOwner` for the case where it was not.
+   */
+  beginOwnerEnd(): void {
+    if (this.owner) this.ownerEnding = true;
+  }
+
+  /**
+   * End the current session for good, cancelling the work it owned.
+   *
+   * The shutdown path, where there is no later session to restore.
+   */
+  endOwner(): void {
+    if (this.owner) this.cancelOwned(this.owner.generation);
+    this.owner = undefined;
+    this.ownerEnding = false;
+  }
+
+  /**
+   * Cancel every child accepted under `generation`, whatever state it is in.
+   *
+   * Settled records are left alone: cancellation stops work, it does not delete
+   * it, and a result already produced stays retrievable.
+   */
+  private cancelOwned(generation: number): void {
+    for (const agent of this.agents.values()) {
+      if (agent.ownerGeneration === generation && agent.isActive()) {
+        agent.abort();
+      }
+    }
+  }
+
+  /** Whether a launch carrying `owner` may still be accepted. */
+  private accepts(owner: SessionOwner): boolean {
+    return ownerCanAccept(owner, this.currentOwner());
   }
 
   constructor(options: SubagentManagerOptions) {
@@ -396,23 +507,21 @@ export class SubagentManager {
   }
 
   /**
-   * Spawn an agent and return its ID immediately (for background use).
+   * Spawn an agent and hand back its ID immediately (for background use).
    * If the concurrency limit is reached, the agent is queued.
    *
-   * Throws when the named agent type is disabled.
+   * Accepts or refuses; it does not throw for a request the current session
+   * cannot honour. Only a genuine defect throws.
    */
   spawn(
     snapshot: ParentSnapshot,
     type: SubagentType,
     prompt: string,
     options: AgentSpawnConfig,
-  ): string {
-    return this.create(
-      snapshot,
-      this.resolveSpawn(type, options.background),
-      prompt,
-      options,
-    );
+  ): LaunchOutcome<string> {
+    const resolved = this.resolveSpawn(type, options.background);
+    if (resolved.kind === "rejected") return resolved;
+    return this.create(snapshot, resolved.value, prompt, options);
   }
 
   /**
@@ -424,55 +533,66 @@ export class SubagentManager {
    * The caller holds the result, which is a delivery commitment: the agent must
    * not be announced, whatever its frontmatter declares.
    *
-   * Rejects when the named agent type is disabled.
+   * Accepts or refuses, like {@link spawn}, and on acceptance claims the outcome
+   * before awaiting it so nothing announces what is already being delivered.
    */
   async spawnAndWait(
     snapshot: ParentSnapshot,
     type: SubagentType,
     prompt: string,
     options: Omit<AgentSpawnConfig, "background">,
-  ): Promise<Subagent> {
+  ): Promise<LaunchOutcome<Subagent>> {
     const foreground: BackgroundRequest = {
       kind: "explicit",
       isBackground: false,
     };
-    const id = this.create(
-      snapshot,
-      this.resolveSpawn(type, foreground),
-      prompt,
-      {
-        ...options,
-        background: foreground,
-      },
-    );
-    const record = this.agents.get(id)!;
-    // The caller holds the result, so this call is the carrier: claim the outcome
-    // before awaiting it, so nothing announces what is already being delivered.
+    const resolved = this.resolveSpawn(type, foreground);
+    if (resolved.kind === "rejected") return resolved;
+    const started = this.create(snapshot, resolved.value, prompt, {
+      ...options,
+      background: foreground,
+    });
+    if (started.kind === "rejected") return started;
+    const record = this.agents.get(started.value);
+    // `create` registered the record under the id it returned, so the lookup
+    // cannot miss; the assertion states that rather than defending against it.
+    if (!record) {
+      throw new Error(`Subagent record vanished immediately: ${started.value}`);
+    }
     record.claim();
     await record.promise;
-    return record;
+    return { kind: "accepted", value: record };
   }
 
   /**
    * Stamp the invariants every front door shares: a canonical agent type, a
-   * rejection for a disabled one, and the effective background mode.
+   * verdict for a rejected one, and the effective background mode.
+   *
+   * The verdict is computed here, before any record exists, so a refused
+   * launch leaves nothing behind: no id, no workspace plan, no entry in the
+   * map a caller could poll.
    */
   private resolveSpawn(
     type: string,
     background: BackgroundRequest,
-  ): ResolvedSpawn {
+  ): LaunchOutcome<ResolvedSpawn> {
     // Refresh first: a definition file added since the last spawn is a fact
     // that arrives after the extension loads.
     this.reloadDefinitions?.();
     const selection = this.registry.select(type);
     if (!selection.ok) {
-      throw new Error(selection.error);
+      // The registry distinguishes an unknown type from a disabled one, so the
+      // reason travels as a value rather than being recovered from the prose.
+      return { kind: "rejected", reason: selection.reason };
     }
     const definition = selection.definition;
     return {
-      type: definition.id,
-      isBackground: resolveBackgroundMode(definition, background),
-      tools: definition.tools,
+      kind: "accepted",
+      value: {
+        type: definition.id,
+        isBackground: resolveBackgroundMode(definition, background),
+        tools: definition.tools,
+      },
     };
   }
 
@@ -482,7 +602,13 @@ export class SubagentManager {
     resolved: ResolvedSpawn,
     prompt: string,
     options: AgentSpawnConfig,
-  ): string {
+  ): LaunchOutcome<string> {
+    // The last check before anything exists. A launch whose session has ended
+    // is refused here, so it leaves no id, no workspace plan, and no record for
+    // a caller to poll — the outcome of work nobody asked for any more.
+    if (!this.accepts(options.owner)) {
+      return { kind: "rejected", reason: "session-ended" };
+    }
     const { type, isBackground } = resolved;
     const id = randomUUID().slice(0, 17);
     // The tools this child will have, resolved once, here: the definition's
@@ -513,6 +639,7 @@ export class SubagentManager {
       type,
       description: options.description,
       isBackground,
+      ownerGeneration: options.owner.generation,
       execution: {
         createSubagentSession: this.createSubagentSession,
         snapshot,
@@ -547,7 +674,7 @@ export class SubagentManager {
     record.scheduleVia((thunk) =>
       this.admitBackground(() => this.admit(plan, thunk)),
     );
-    return id;
+    return { kind: "accepted", value: id };
   }
 
   /**
@@ -625,6 +752,12 @@ export class SubagentManager {
   ): ResumeStart {
     const agent = this.agents.get(id);
     if (!agent) return { kind: "refused", reason: "unknown-agent" };
+    // Before the record's own state: a child belongs to the session that asked
+    // for it, and continuing it from a session that did not would hand its
+    // outcome to a parent that never knew the child existed.
+    if (agent.ownerGeneration !== this.generationCounter) {
+      return { kind: "refused", reason: "stale-session" };
+    }
     const refusal = agent.resumeRefusal;
     if (refusal) return { kind: "refused", reason: refusal };
     // Each resume's caller decides who carries its outcome: the resume's run is

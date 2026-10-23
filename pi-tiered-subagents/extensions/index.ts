@@ -351,6 +351,17 @@ export default function (pi: ExtensionAPI) {
     manager,
     () => notifications.dispose(),
     unpublishSubagentsService,
+    // The manager is told which session owns the work it accepts, so that a
+    // replacement can cancel it. Read from the session context, falling back
+    // to the file: a session with no id yet is still a distinct session.
+    (ctx) =>
+      (
+        ctx as { sessionManager?: { getSessionId?(): string } }
+      ).sessionManager?.getSessionId?.() ||
+      (
+        ctx as { sessionManager?: { getSessionFile?(): string } }
+      ).sessionManager?.getSessionFile?.() ||
+      "",
   );
 
   // Live widget: constructed after the manager (it polls listAgents()) and
