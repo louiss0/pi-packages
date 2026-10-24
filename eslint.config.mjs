@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import { uiBoundaryRule } from './pi-tiered-subagents/scripts/ui-boundary-rule.mjs';
 
 export default [
   ...nx.configs['flat/base'],
@@ -83,16 +84,16 @@ export default [
   },
   {
     files: ['pi-tiered-subagents/src/ui/**/*.ts'],
+    plugins: {
+      'pi-tiered-subagents': { rules: { 'ui-boundary': uiBoundaryRule } },
+    },
     rules: {
+      'pi-tiered-subagents/ui-boundary': 'error',
       'no-restricted-imports': ['error', {
         paths: [{
           name: '@earendil-works/pi-coding-agent',
           importNames: ['ExtensionAPI'],
           message: 'Only the runtime extension root owns host registrations.',
-        }],
-        patterns: [{
-          group: ['#src/agents/*', '#src/lifecycle/*', '#src/observation/*', '#src/service/*', '#src/tools/*', '#src/presentation/*', '@code-fixer-23/pi-tiered-subagents', '@code-fixer-23/pi-tiered-subagents/*'],
-          message: 'The UI module consumes owned views/actions, not execution implementation.',
         }],
       }],
     },
