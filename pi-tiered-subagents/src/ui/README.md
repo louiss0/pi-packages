@@ -24,6 +24,11 @@ The UI module must not import execution implementation or `ExtensionAPI`.
 Conversely, modules outside `src/ui/` must not import `pi-tui`. ESLint and
 `test/presentation-boundary.test.ts` enforce these dependency rules.
 
+`test/ui-registration.test.ts` loads the actual runtime source entry with Pi's
+public SDK loader and exercises the registered commands and renderers without
+a second enabled extension or model request. Existing composition-root tests
+cover widget activation and teardown.
+
 Presentation behavior is characterized in `test/ui/` and renderer suites in
 `test/tools/`; projection behavior is covered in the widget/transcript adapter
 tests. Those tests use UI-owned views/actions rather than constructing a runtime

@@ -171,7 +171,7 @@ The arrows describe responsibilities and information flow, not a requirement to 
 ### Extracted terminal presentation
 
 92. As a maintainer, I want all terminal presentation in a separate module inside the pi-tiered-subagents project, so that execution modules contain no TUI implementation.
-93. As a user, I want the runtime to load and register that library, so that extraction does not require enabling a second independent extension.
+93. As a user, I want the runtime to load and register the internal UI module, so that extraction does not require enabling a second independent extension.
 94. As a maintainer, I want the runtime to adapt to UI-owned contracts, so that the UI module never imports execution implementation.
 95. As a developer, I want UI-owned narrow view/action contracts, so that presentation can be tested without a live manager or SDK child.
 96. As a user, I want the widget, transcript viewer, and settings views preserved, so that architecture improvement does not remove useful workflows.

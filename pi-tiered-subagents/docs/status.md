@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 106 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
+| Tests | `test/` — 107 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,314 passed, one skipped |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,321 passed, one skipped |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -477,7 +477,8 @@ ARCHITECTURE-SPEC's own.
 | Async programmatic launch, explicit run, shared resume | 60–66 | Done — `launch()` (accepts into background) and `run()` (prepares and settles with a claimed by-value record); the inherited synchronous `spawn()` and `foreground` option removed (stories 60–66, 76). |
 | Cancellation, delivery, and lifetime | 77–91 | Partial — see *Session ownership*. Sessions refuse launches for ended sessions, hold live children through a tentative switch, cancel on a confirmed switch, and refuse resumes a later session did not ask for. The narrower delivery and lifetime story (the observation and notification halves) is not yet touched. |
 | Terminal presentation isolated in an internal UI module | 92 | Done under the maintainer's clarified requirement: `src/ui/` remains inside this project, not a separate workspace/npm package. It now owns tool-call/result rendering as well as widgets, transcript/settings views, notifications, and presentation helpers. Runtime adapters supply structural views/readers; no execution module imports `pi-tui`. |
-| Presentation contracts and independence | 93–100 | The root wires the internal module without a second enabled extension. UI no longer imports runtime implementations; focused widget/transcript adapters bridge owned views and live readers. Model-facing text, delivery claims/timing, and persistence remain in the runtime. Further headless/lifetime verification belongs to the remaining architecture work. |
+| Runtime-owned UI loading and registration | 93 | Done. The runtime entry alone loads the internal UI module and registers its message/tool renderers and settings/transcript commands. `test/ui-registration.test.ts` loads the real source entry with Pi's public loader, exercises those registrations through its runner, and requires no second extension or model request. Existing composition-root widget tests cover activation and teardown. |
+| Presentation contracts and independence | 94–100 | The root wires the internal module without a second enabled extension. UI no longer imports runtime implementations; focused widget/transcript adapters bridge owned views and live readers. Model-facing text, delivery claims/timing, and persistence remain in the runtime. Further headless/lifetime verification belongs to the remaining architecture work. |
 | Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
 | Independent ownership and migration cleanup | — | Not started. |
 
@@ -509,6 +510,32 @@ projects. The runtime suite passed 106 files (2,314 passed, one skipped). Its
 existing typecheck wrapper still reports and excludes the 12 diagnostics in the
 third-party settings package; no new exclusions were added. Standards and spec
 reviews were completed, with their findings addressed and rechecked.
+
+### Runtime-owned UI registration (story 93)
+
+The wiring shipped with story 92; story 93 adds a real offline SDK contract
+check rather than rewriting already-working registration. Loading only
+`extensions/index.ts` through Pi's public source loader produces working
+completion, update, workspace-notice, tool-call/result, settings, and transcript
+registrations. The commands are invoked using Pi's own command contexts;
+recorded UI transport methods observe the menus without mocking this project's
+UI module or factory. The widget's session activation and teardown are already
+pinned by the composition-root suite.
+
+The loader fixture isolates both the SDK discovery directories and the
+extension's own cwd/agent-directory settings lookup. It makes no model request,
+disables model-catalog network refresh, awaits shutdown, checks runner-reported
+errors, invalidates the runtime, and removes its temporary files. A deliberate
+omission of completion-renderer registration failed the new suite; restoring
+it returned all seven cases to green. This proves registration sensitivity,
+not that a pre-existing product defect was repaired.
+
+After story 93, daemon-disabled
+`pnpm nx run-many -t test typecheck lint check metadata` passed across all eight
+projects. The runtime suite passed 107 files (2,321 passed, one skipped).
+Standards review found no documented breaches (one optional test-boilerplate
+cleanup suggestion); spec review found no actionable issues. No production
+registration code needed to change in this increment.
 
 ## Session ownership
 
