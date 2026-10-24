@@ -7,8 +7,6 @@ const ui = path.join(project, "src", "ui");
 const optional = path.join(project, "src", "optional.ts");
 const packageName = "@code-fixer-23/pi-tiered-subagents";
 
-
-
 export const uiBoundaryRule = {
   meta: {
     type: "problem",

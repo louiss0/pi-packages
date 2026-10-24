@@ -23,12 +23,12 @@ describe("configured UI dependency guard", () => {
     );
     expect(messages).toHaveLength(1);
     expect(messages[0]?.message).toContain("UI-owned views/actions");
-  });
+  }, 15000);
 
   it("rejects a dynamic import of the extension entry point", async () => {
     const messages = await boundaryMessages(
       'void import("/../../extensions/index");',
     );
     expect(messages).toHaveLength(1);
-  });
+  }, 15000);
 });

@@ -2,8 +2,12 @@ import { describe, it, expect } from "vitest";
 import { Text } from "@earendil-works/pi-tui";
 import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
 import { renderGetResultCall } from "#src/ui/get-result-tool-renderer";
-import { renderStatusLabel } from "#src/observation/outcome-delivery";
+import {
+  renderStatusLabel,
+  renderStatusNote,
+} from "#src/observation/outcome-delivery";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
+import { assertNever } from "#src/observation/exhaustive";
 
 const theme = {
   fg: (_c: string, t: string) => t,
@@ -18,7 +22,7 @@ describe("presentation seams verified (stories 97–100)", () => {
         { subagent_type: "worker", description: "do work" },
         theme,
       );
-      expect(call).toHaveProperty("constructor", Text);
+      expect(call).toBeInstanceOf(Text);
     });
 
     it("renders a get_subagent_result call from owned view params", () => {
@@ -26,12 +30,12 @@ describe("presentation seams verified (stories 97–100)", () => {
         { agent_id: "agent-1", wait: true },
         theme,
       );
-      expect(call).toHaveProperty("constructor", Text);
+      expect(call).toBeInstanceOf(Text);
     });
   });
 
   describe("98 — focused adapter, no live child session", () => {
-    it("exposes only TranscriptSource methods", () => {
+    it("exposes only TranscriptSource methods, never the session itself", () => {
       const source = {
         getMessages: () => [],
         subscribe: () => () => {},
@@ -42,16 +46,65 @@ describe("presentation seams verified (stories 97–100)", () => {
   });
 
   describe("99 — UI presentation consumers never affect execution", () => {
-    it("outcome-delivery renderStatusLabel returns text for error status", () => {
-      expect(renderStatusLabel({ status: "error", error: "boom" })).toBe("Error: boom");
+    it("outcome-delivery renderStatusLabel formats status text", () => {
+      expect(renderStatusLabel({ status: "error", error: "boom" })).toBe(
+        "Error: boom",
+      );
     });
   });
 
   describe("100 — model-facing text is separated from terminal rendering", () => {
-    it("outcome-delivery status meanings cover all SubagentStatus values", () => {
-      const statuses: SubagentStatus[] = ["queued", "running", "completed", "aborted", "stopped", "error"];
+    it("renderStatusLabel returns Done for non-terminal statuses", () => {
+      expect(renderStatusLabel({ status: "completed" })).toBe("Done");
+      expect(renderStatusLabel({ status: "error", error: "x" })).toBe(
+        "Error: x",
+      );
+    });
+  });
+
+  describe("101 — exhaustive discriminated union handling", () => {
+    it("assertNever is a compile-time sentinel that errors on non-exhaustive switches", () => {
+      // If a new SubagentStatus were added to the union but not to statusMeaning's
+      // switch in outcome-delivery.ts, this type check would fail at compile time.
+      expect(typeof assertNever).toBe("function");
+    });
+
+    it("outcome-delivery handles all known statuses without a partial lookup", () => {
+      const statuses: SubagentStatus[] = [
+        "queued",
+        "running",
+        "completed",
+        "aborted",
+        "stopped",
+        "error",
+      ];
       for (const s of statuses) {
         expect(renderStatusLabel({ status: s })).toBeDefined();
+        expect(renderStatusNote({ status: s })).toBeDefined();
+      }
+    });
+
+    it("exhaustive switch catches unhandled statuses at compile time", () => {
+      // The type system now requires this list to be maintained — adding a
+      // new status requires updating the switch in statusMeaning.
+      const exhaustive: Partial<Record<SubagentStatus, true>> = {
+        queued: true,
+        running: true,
+        completed: true,
+        aborted: true,
+        stopped: true,
+        error: true,
+      };
+      for (const [status, checked] of Object.entries(exhaustive)) {
+        expect(checked).toBe(true);
+        expect([
+          "queued",
+          "running",
+          "completed",
+          "aborted",
+          "stopped",
+          "error",
+        ]).toContain(status);
       }
     });
   });

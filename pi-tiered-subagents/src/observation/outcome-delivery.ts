@@ -29,6 +29,7 @@
 
 import type { ResumeRefusal } from "#src/lifecycle/subagent";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
+import { assertNever } from "./exhaustive";
 import {
   type TurnBudget,
   wrappedUpAtTurnLimit,
@@ -50,30 +51,6 @@ interface StatusMeaning {
   /** Why, without terminal punctuation, e.g. "after turn-budget warning". */
   detail: string;
 }
-
-const STATUS_MEANINGS: Record<SubagentStatus, StatusMeaning> = {
-  aborted: {
-    label: "Aborted",
-    detail: "turn limit reached, output may be incomplete",
-  },
-  completed: {
-    label: "Completed",
-    detail: "finished on its own",
-  },
-  queued: {
-    label: "Queued",
-    detail: "waiting for a slot",
-  },
-  running: {
-    label: "Running",
-    detail: "agent is actively running",
-  },
-  stopped: { label: "Stopped", detail: "user request" },
-  error: {
-    label: "Error",
-    detail: "agent exited with error",
-  },
-};
 
 /** A run that finished on its own after the harness warned it about its turn limit. */
 const WRAPPED_UP: StatusMeaning = {
@@ -99,9 +76,26 @@ export interface StatusOutcome {
 }
 
 function statusMeaning(outcome: StatusOutcome): StatusMeaning | undefined {
-  return wrappedUpAtTurnLimit(outcome)
-    ? WRAPPED_UP
-    : STATUS_MEANINGS[outcome.status];
+  switch (outcome.status) {
+    case "aborted":
+      return {
+        label: "Aborted",
+        detail: "turn limit reached, output may be incomplete",
+      };
+    case "stopped":
+      return { label: "Stopped", detail: "user request" };
+    case "completed":
+      if (wrappedUpAtTurnLimit(outcome)) {
+        return WRAPPED_UP;
+      }
+      return undefined;
+    case "running":
+    case "queued":
+    case "error":
+      return undefined;
+    default:
+      return assertNever(outcome.status);
+  }
 }
 
 /**
@@ -291,18 +285,26 @@ export function renderRunUpdates(
  * agreeing with them (#889).
  */
 export function renderOutcomeBody(outcome: OutcomeBody): string {
-  if (outcome.status === "running")
-    return "Agent is still running. Use wait: true or check back later.";
-  // Only a pull can see this status: every other carrier renders a settled run.
-  if (outcome.status === "queued")
-    return (
-      "Agent is queued and has not started; it is waiting for a concurrency slot (maxConcurrent). " +
-      "Use wait: true or check back later."
-    );
-  if (outcome.status === "error") return `Error: ${outcome.error}`;
-  if (outcome.stoppedWhileQueued)
-    return "Agent was stopped while queued and never started. No work was performed.";
-  const trimmed = outcome.result?.trim();
+  switch (outcome.status) {
+    case "running":
+      return "Agent is still running. Use wait: true or check back later.";
+    case "queued":
+      return (
+        "Agent is queued and has not started; it is waiting for a concurrency slot (maxConcurrent). " +
+        "Use wait: true or check back later."
+      );
+    case "error":
+      return `Error: ${outcome.error}`;
+    case "completed":
+    case "aborted":
+    case "stopped": {
+      if (outcome.stoppedWhileQueued)
+        return "Agent was stopped while queued and never started. No work was performed.";
+      const trimmed = outcome.result?.trim();
 
-  return trimmed || "No output.";
+      return trimmed || "No output.";
+    }
+    default:
+      return assertNever(outcome.status);
+  }
 }
