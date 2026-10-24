@@ -51,14 +51,28 @@ interface StatusMeaning {
   detail: string;
 }
 
-const STATUS_MEANINGS: Partial<Record<SubagentStatus, StatusMeaning>> = {
+const STATUS_MEANINGS: Record<SubagentStatus, StatusMeaning> = {
   aborted: {
     label: "Aborted",
     detail: "turn limit reached, output may be incomplete",
   },
-  // "user request" rather than "stopped by user": the detail must stand on its
-  // own after the label, which both presentations already supply.
+  completed: {
+    label: "Completed",
+    detail: "finished on its own",
+  },
+  queued: {
+    label: "Queued",
+    detail: "waiting for a slot",
+  },
+  running: {
+    label: "Running",
+    detail: "agent is actively running",
+  },
   stopped: { label: "Stopped", detail: "user request" },
+  error: {
+    label: "Error",
+    detail: "agent exited with error",
+  },
 };
 
 /** A run that finished on its own after the harness warned it about its turn limit. */
