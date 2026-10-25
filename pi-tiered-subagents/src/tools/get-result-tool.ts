@@ -16,6 +16,11 @@ import {
   formatAgentReport,
 } from "#src/tools/get-result-report";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
+import {
+  type GetResultToolOutput,
+  getResultOutputSchema,
+  withStructured,
+} from "#src/tools/structured-output";
 import type { Subagent } from "#src/types";
 import {
   describeActivity,
@@ -69,18 +74,60 @@ export class GetResultTool {
     validateTimeout(params.timeout);
     const record = this.manager.getRecord(params.agent_id);
     if (!record) {
-      return textResult<GetResultDetails>(
-        `Agent not found: "${params.agent_id}". Records are cleared at session start/switch, so it may be from a previous session.`,
+      return withStructured(
+        textResult<GetResultDetails>(
+          `Agent not found: "${params.agent_id}". Records are cleared at session start/switch, so it may be from a previous session.`,
+        ),
+        { found: false, agentId: params.agent_id },
       );
     }
 
     const collected = await this.collectOutcome(record, params, signal);
 
     const verbose = params.verbose === true;
-    return textResult<GetResultDetails>(
-      formatAgentReport(this.buildReport(record, verbose, collected)),
-      this.buildGetResultDetails(record, collected.run, verbose),
+    return withStructured(
+      textResult<GetResultDetails>(
+        formatAgentReport(this.buildReport(record, verbose, collected)),
+        this.buildGetResultDetails(record, collected.run, verbose),
+      ),
+      this.buildStructuredOutput(record, collected, verbose),
     );
+  }
+
+  /**
+   * The report's machine-readable twin: the same facts the text renders, as
+   * values a programmatic caller reads instead of parsing the report's lines.
+   */
+  private buildStructuredOutput(
+    record: Subagent,
+    collected: CollectedOutcome,
+    verbose: boolean,
+  ): GetResultToolOutput {
+    const outcome = collected.run;
+    return {
+      found: true,
+      agentId: record.id,
+      status: outcome.status,
+      displayName: getDisplayName(record.type, this.registry),
+      description: record.description,
+      toolUses: record.toolUses,
+      compactionCount: record.compactionCount,
+      durationMs: (outcome.completedAt ?? Date.now()) - outcome.startedAt,
+      resumable: record.resumeRefusal === undefined,
+      ...defined({
+        model: modelLabel(record.modelIdentity),
+        result: outcome.result,
+        error: outcome.error,
+        contextPercent: record.getContextPercent() ?? undefined,
+        resumeRefusal: record.resumeRefusal,
+        pendingQuestion: outcome.pendingQuestion,
+        stoppedWhileQueued: outcome.stoppedWhileQueued || undefined,
+        resumedWhileWaiting: outcome.replaced || undefined,
+        waitExpiredAfter: collected.waitExpiredAfter,
+        transcriptPath: record.outputFile,
+        conversation: verbose ? record.getConversation() : undefined,
+      }),
+    };
   }
 
   /**
@@ -114,10 +161,11 @@ export class GetResultTool {
     // this call's claim. The call holds that run, so it reports and consumes
     // that run's outcome; the resumed run's own delivery is untouched.
     if (params.wait === true) {
-      // Waiting commits this call to delivering the outcome, so claim it before
-      // the agent can settle and be announced by the nudge instead. The claim
-      // lands on the current run, which is the run the wait then holds.
-      const claim = record.claim();
+      // Capture and claim the observed run as one synchronous operation. The
+      // record may point at a resumed run by the time this await continues, but
+      // this carrier's claim stays with the run it began observing.
+      const observedRun = record.latestRun;
+      const claim = observedRun.claim();
       const bound =
         params.timeout === undefined
           ? undefined
@@ -246,6 +294,7 @@ export class GetResultTool {
           }),
         ),
       }),
+      outputSchema: getResultOutputSchema,
       renderCall: renderGetResultCall,
       renderResult: renderGetResultResult,
 

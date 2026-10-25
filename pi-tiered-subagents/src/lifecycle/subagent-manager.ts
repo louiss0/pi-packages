@@ -362,6 +362,13 @@ export class SubagentManager {
   private owner: SessionOwner | undefined = undefined;
   private ownerEnding = false;
   private generationCounter = 0;
+  /** The in-flight teardown of an ended owner, if any. */
+  private ownerCleanup: Promise<void> | undefined;
+  /** Owner transitions are serialized in lifecycle call order. */
+  private ownerTransition: Promise<void> = Promise.resolve();
+  private pendingOwnerTransitions = 0;
+  /** The manager-wide teardown, shared by repeated lifecycle delivery. */
+  private disposePromise: Promise<void> | undefined;
 
   /** The registered workspace provider, or undefined when none is registered. */
   get workspaceProvider(): WorkspaceProvider | undefined {
@@ -390,10 +397,32 @@ export class SubagentManager {
    * A `session_start` that names the session already in hand is the abandoned
    * switch, and its owner is simply restored with its children untouched.
    */
-  beginOwner(sessionId: string): void {
-    if (this.owner && this.owner.sessionId !== sessionId) {
-      this.cancelOwned(this.owner.generation);
+  beginOwner(sessionId: string): Promise<void> {
+    const previous = this.owner;
+    const abandoned = previous?.sessionId === sessionId;
+
+    // A first start (and an abandoned switch) has no cleanup to wait for, so
+    // retain the historical synchronous acceptance. Once a transition is
+    // pending, however, every request joins the call-order chain.
+    if (this.pendingOwnerTransitions === 0 && (abandoned || !previous)) {
+      this.installOwner(sessionId);
+      return Promise.resolve();
     }
+
+    if (previous && !abandoned) {
+      // Invalidate synchronously. No launch can enter the old owner, or sneak
+      // into the replacement while its children are being torn down.
+      this.owner = undefined;
+      this.ownerEnding = true;
+    }
+
+    return this.enqueueOwnerTransition(async () => {
+      if (previous && !abandoned) await this.endOwned(previous.generation);
+      this.installOwner(sessionId);
+    });
+  }
+
+  private installOwner(sessionId: string): void {
     // Every session gets a fresh generation even when the id repeats: a token
     // from an earlier session must never compare equal to a later one.
     this.owner = {
@@ -420,24 +449,68 @@ export class SubagentManager {
    *
    * The shutdown path, where there is no later session to restore.
    */
-  endOwner(): void {
-    if (this.owner) this.cancelOwned(this.owner.generation);
-    this.owner = undefined;
-    this.ownerEnding = false;
+  endOwner(): Promise<void> {
+    const owner = this.owner;
+
+    // Closing the owner is synchronous, before any queued cleanup. Thus stale
+    // launch tokens are refused even if callers do not await this callback.
+    if (owner) {
+      this.owner = undefined;
+      this.ownerEnding = false;
+    }
+
+    // Even with no visible owner, wait behind an earlier begin/end request;
+    // otherwise a later lifecycle event could be observed as complete first.
+    return this.enqueueOwnerTransition(() => {
+      // If a replacement was already queued, it is the owner at this point;
+      // this end request still follows it in lifecycle call order and must end
+      // that replacement rather than becoming a no-op.
+      const target = owner ?? this.owner;
+      if (!target) return;
+      this.owner = undefined;
+      this.ownerEnding = false;
+      return this.endOwned(target.generation);
+    });
+  }
+
+  private enqueueOwnerTransition(
+    transition: () => void | Promise<void>,
+  ): Promise<void> {
+    this.pendingOwnerTransitions++;
+    const queued = this.ownerTransition.then(transition);
+    this.ownerTransition = queued.finally(() => {
+      this.pendingOwnerTransitions--;
+    });
+    return queued;
   }
 
   /**
-   * Cancel every child accepted under `generation`, whatever state it is in.
+   * Cancel and then fully tear down each child of one ended owner.
    *
-   * Settled records are left alone: cancellation stops work, it does not delete
-   * it, and a result already produced stays retrievable.
+   * Shutdown requests are issued to every sibling before any teardown is
+   * awaited. `allSettled` is deliberate: one throwing/rejecting child must not
+   * abandon the rest, and each child's own session shutdown has its enforced
+   * timeout before it reaches SDK disposal.
    */
-  private cancelOwned(generation: number): void {
-    for (const agent of this.agents.values()) {
-      if (agent.ownerGeneration === generation && agent.isActive()) {
-        agent.abort();
-      }
+  private endOwned(generation: number): Promise<void> {
+    if (this.ownerCleanup) return this.ownerCleanup;
+
+    const records = [...this.agents.values()].filter(
+      (agent) => agent.ownerGeneration === generation,
+    );
+    for (const agent of records) {
+      if (agent.status === "queued") agent.stopQueued();
+      else if (agent.isActive()) agent.abort();
     }
+
+    const cleanup = Promise.allSettled(
+      records.map((agent) => agent.disposeSession()),
+    ).then(() => undefined);
+    this.ownerCleanup = cleanup;
+    void cleanup.then(() => {
+      if (this.ownerCleanup === cleanup) this.ownerCleanup = undefined;
+    });
+    return cleanup;
   }
 
   /** Whether a launch carrying `owner` may still be accepted. */
@@ -783,7 +856,11 @@ export class SubagentManager {
     // Before the record's own state: a child belongs to the session that asked
     // for it, and continuing it from a session that did not would hand its
     // outcome to a parent that never knew the child existed.
-    if (agent.ownerGeneration !== this.generationCounter) {
+    // Compare against the live owner, not the generation counter: `beginOwner`
+    // clears the owner synchronously before it awaits the old owner's teardown
+    // and installs the replacement, so only the owner says "no current session"
+    // during that window.
+    if (agent.ownerGeneration !== this.owner?.generation) {
       return { kind: "refused", reason: "stale-session" };
     }
     const refusal = agent.resumeRefusal;
@@ -941,14 +1018,26 @@ export class SubagentManager {
    * can reach a dying record; `allSettled` keeps one failing child from
    * abandoning its siblings.
    */
-  async dispose(): Promise<void> {
+  dispose(): Promise<void> {
+    if (!this.disposePromise) this.disposePromise = this.disposeOnce();
+    return this.disposePromise;
+  }
+
+  private async disposeOnce(): Promise<void> {
     clearInterval(this.sweepInterval);
-    // Drop pending thunks
+    // Drop pending thunks.
     this.limiter.clear();
+    const teardownInProgress = this.ownerCleanup;
     const teardowns = [...this.agents.values()].map((record) =>
       record.disposeSession(),
     );
     this.agents.clear();
-    await Promise.allSettled(teardowns);
+    this.workspacePlans.clear();
+    this.owner = undefined;
+    this.ownerEnding = false;
+    await Promise.allSettled([
+      ...teardowns,
+      ...(teardownInProgress ? [teardownInProgress] : []),
+    ]);
   }
 }

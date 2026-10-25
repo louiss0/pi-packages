@@ -71,11 +71,11 @@ function makeWidget(
     completedAt?: number;
   }>,
 ) {
-  const manager = {
+  const source = {
     listAgents: () => agents.map((a) => makeWidgetAgent(a)),
   };
   const registry = makeDefinitionLookup();
-  const widget = new AgentWidget(manager, registry);
+  const widget = new AgentWidget(source, registry);
   const setWidget = vi.fn<UICtx["setWidget"]>();
   const setStatus = vi.fn<UICtx["setStatus"]>();
   widget.setUICtx({ setStatus, setWidget });

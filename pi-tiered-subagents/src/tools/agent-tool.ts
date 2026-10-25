@@ -30,6 +30,11 @@ import {
   textResult,
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
+import {
+  type SubagentToolOutput,
+  subagentOutputSchema,
+  withStructured,
+} from "#src/tools/structured-output";
 import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
 import type { SpawnPresentation } from "#src/tools/spawn-config";
 import type { Subagent } from "#src/types";
@@ -115,7 +120,12 @@ export class AgentTool {
       toolCallId,
       signal,
     );
-    if (prepared.kind === "rejected") return textResult(prepared.message);
+    if (prepared.kind === "rejected") {
+      return withStructured(textResult(prepared.message), {
+        outcome: "rejected",
+        reason: prepared.reason,
+      });
+    }
     const launch = prepared.value;
     const { config } = launch;
 
@@ -177,7 +187,14 @@ export class AgentTool {
       claimOutcome: true,
     });
     if (start.kind === "refused") {
-      return textResult(resumeRefusalMessage(start.reason, id));
+      return withStructured(
+        textResult(resumeRefusalMessage(start.reason, id)),
+        {
+          outcome: "rejected",
+          reason: start.reason,
+          agentId: id,
+        },
+      );
     }
     const record = start.record;
     const stopStream = startProgressStream({
@@ -192,11 +209,24 @@ export class AgentTool {
     }
     // Resume-return delivery edge: the resumed outcome is returned directly.
     record.markConsumed();
-    return textResult(
-      `Agent ID: ${record.id}${renderStatusNote(record)}\n\n` +
-        renderOutcomeBody(record) +
-        renderOutcomeAddenda(record),
-      buildDetails(detailBase, record),
+    const output: SubagentToolOutput = {
+      outcome: "completed",
+      agentId: record.id,
+      agentType: record.type,
+      background: false,
+      resumed: true,
+      status: record.status,
+      toolUses: record.toolUses,
+      ...defined({ result: record.result, error: record.error }),
+    };
+    return withStructured(
+      textResult(
+        `Agent ID: ${record.id}${renderStatusNote(record)}\n\n` +
+          renderOutcomeBody(record) +
+          renderOutcomeAddenda(record),
+        buildDetails(detailBase, record),
+      ),
+      output,
     );
   }
 
@@ -213,23 +243,42 @@ export class AgentTool {
   ) {
     const start = this.manager.startResume(id, prompt, { background: true });
     if (start.kind === "refused") {
-      return textResult(resumeRefusalMessage(start.reason, id));
+      return withStructured(
+        textResult(resumeRefusalMessage(start.reason, id)),
+        {
+          outcome: "rejected",
+          reason: start.reason,
+          agentId: id,
+        },
+      );
     }
     const queued = start.record.status === "queued";
-    return renderBackgroundLaunch(
-      defined({
-        headline: queued
-          ? "Agent resume queued in background."
-          : "Agent resumed in background.",
-        id: start.record.id,
-        displayName: detailBase.displayName,
-        description: detailBase.description,
-        detailBase,
-        outputFile: start.record.outputFile,
-        queuePosition: queued
-          ? { maxConcurrent: this.settings.maxConcurrent }
-          : undefined,
-      }),
+    const output: SubagentToolOutput = {
+      outcome: "accepted",
+      agentId: start.record.id,
+      agentType: detailBase.subagentType,
+      background: true,
+      resumed: true,
+      queued,
+      ...defined({ outputFile: start.record.outputFile }),
+    };
+    return withStructured(
+      renderBackgroundLaunch(
+        defined({
+          headline: queued
+            ? "Agent resume queued in background."
+            : "Agent resumed in background.",
+          id: start.record.id,
+          displayName: detailBase.displayName,
+          description: detailBase.description,
+          detailBase,
+          outputFile: start.record.outputFile,
+          queuePosition: queued
+            ? { maxConcurrent: this.settings.maxConcurrent }
+            : undefined,
+        }),
+      ),
+      output,
     );
   }
 
@@ -316,6 +365,7 @@ ${guidelines}
           }),
         ),
       }),
+      outputSchema: subagentOutputSchema,
 
       ...createAgentToolRenderer((type) => getDisplayName(type, registry)),
 

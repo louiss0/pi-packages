@@ -37,7 +37,7 @@ export function supportedLevels(model?: Model<any>): readonly ThinkingLevel[] {
       "xhigh",
       "max",
     ] as ThinkingLevel[]
-  ).filter((l) => withOff.includes(l as any));
+  ).filter((l) => withOff.includes(l));
 }
 
 /** Clamp to SDK-supported levels (Pi-compatible). */
@@ -61,8 +61,8 @@ export function modelIdentity(
 ): { provider: string; id: string } | undefined {
   if (!model) return undefined;
   return {
-    provider: (model as any).provider || "unknown",
-    id: (model as any).id || "",
+    provider: model.provider || "unknown",
+    id: model.id || "",
   };
 }
 

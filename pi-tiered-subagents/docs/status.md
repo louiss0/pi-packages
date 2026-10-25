@@ -14,9 +14,9 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 107 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
+| Tests | `test/` — 123 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,321 passed, one skipped |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,424 passed, one skipped |
 
 The runtime is a **faithful derivative** of upstream today: the lifecycle,
 configuration, prompt assembly, observation, and UI behaviour are upstream's,
@@ -315,6 +315,37 @@ fields. For those, "the getter returned nothing" and "the field is not there" ar
 the same fact, and making the type say otherwise would be inventing a
 distinction the runtime does not make.
 
+### Modern APIs and verification seams
+
+External definition files now cross one total validation seam. Malformed YAML,
+non-mapping frontmatter, and invalid recognized values diagnose the file or
+field without aborting unrelated definitions or silently treating invalid input
+as absence. Authoritative tool and service launches use the asynchronous,
+signal-aware definition loader; the synchronous registry loader remains a
+legacy listing/internal compatibility path and has not been expanded into the
+new launch architecture.
+
+Explicit resource management was adopted only after a real Pi-loader probe.
+The installed jiti pipeline, TypeScript configuration, and Vitest transform all
+load and dispose `using` / `await using` scopes correctly. `promptForAnswer`
+uses that syntax for its genuinely lexical subscriptions and listeners;
+session-lifetime teardown remains explicit and awaited. `ESNext.Disposable` is
+a type library only — the supported Node runtime supplies the symbols.
+
+The three model-facing tools declare TypeBox `outputSchema`s and return matching
+`structuredContent`; terminal `content` and UI `details` remain separate. Real
+offline SDK coverage loads the extension, inspects active registered tools,
+executes accepted and expected-rejected results, and exercises codemode without
+credentials or network access. The SDK adapter reads public model fields rather
+than concrete implementation details.
+
+`ChildSession` is now a package-owned contract, with a controllable test adapter
+that can pause creation, settle, fail, steer, cancel, and dispose deterministically.
+High-value launch, run, resume, cancellation, claiming, and turn-budget tests
+cross the public `Subagents` interface. UI tests consume owned views/actions,
+and architecture tests enforce dependency direction instead of concrete class
+shape. Verification runs through the package's Nx targets.
+
 ### The typecheck script
 
 `scripts/typecheck.mjs` runs `tsc` and then reads what it says. `tsc`
@@ -475,7 +506,7 @@ ARCHITECTURE-SPEC's own.
 | Model, reasoning, and capability decisions captured as owned values | 38–50 | Done — parent/child models are owned `{provider,id}` identities; reasoning is resolved through the SDK adapter (`src/agents/sdk-adapter.ts`) that localizes SDK availability/reasoning details (story 41) with tested contracts (`adapter` interface, `SupportedLevels`, `Clamp`, `CanReason`, `Identity`). Active tools and registered parent tool names are copied with the request; scheduling and child creation use the same allowlist. Child creation fails explicitly if unavailable (story 42). Remaining: formal SDK adapter test surface (story 41 complete — covered by `test/agents/sdk-adapter.test.ts`). |
 | Child-shaping settings captured; operational settings live | 56, 57 | Done — see *One preparation authority*. Mid-run updates, the exclusion list, and prompt inheritance are captured and copied at preparation; concurrency, retention, and interrupt policy stay live. |
 | Async programmatic launch, explicit run, shared resume | 60–66 | Done — `launch()` (accepts into background) and `run()` (prepares and settles with a claimed by-value record); the inherited synchronous `spawn()` and `foreground` option removed (stories 60–66, 76). |
-| Cancellation, delivery, and lifetime | 77–91 | Partial — see *Session ownership*. Sessions refuse launches for ended sessions, hold live children through a tentative switch, cancel on a confirmed switch, and refuse resumes a later session did not ask for. The narrower delivery and lifetime story (the observation and notification halves) is not yet touched. |
+| Cancellation, delivery, and lifetime | 77–91 | Done — see *Session ownership*. Launch/run/wait signals retain distinct ownership; confirmed replacement closes acceptance, suppresses delivery, cancels, awaits bounded and idempotent child cleanup, then installs the next owner. Fast foreground completion cannot outrun its claim; waits retain the run they began observing; stopped records remain persisted/queryable; old-session nudges are suppressed without changing the notification protocol. |
 | Terminal presentation isolated in an internal UI module | 92 | Done under the maintainer's clarified requirement: `src/ui/` remains inside this project, not a separate workspace/npm package. It now owns tool-call/result rendering as well as widgets, transcript/settings views, notifications, and presentation helpers. Runtime adapters supply structural views/readers; no execution module imports `pi-tui`. |
 | Runtime-owned UI loading and registration | 93 | Done. The runtime entry alone loads the internal UI module and registers its message/tool renderers and settings/transcript commands. `test/ui-registration.test.ts` loads the real source entry with Pi's public loader, exercises those registrations through its runner, and requires no second extension or model request. Existing composition-root widget tests cover activation and teardown. |
 | Presentation contracts and independence | 94 | Done — UI dependency guard (`pi-tiered-subagents/ui-boundary` ESLint rule + `test/ui-dependency-rule.test.ts`) enforces that `src/ui/` imports only owned contracts (`#src/ui/*`, `src/optional`) and rejects any target outside presentation (execution modules, `extensions/`, SDK runtime APIs). Existing architecture checks (`presentation-boundary.test.ts`) cover dependency direction, and the new rule catches relative/alias/absolute/dynamic imports with TypeScript path resolution. The narrow UI-owned view/action contracts (`view-types.ts`: `ModelIdentity`, `AgentDefinitionView`, `AgentDefinitionLookup`, `TurnBudget`, `WidgetAgent`, `WidgetSource`, `AgentStatus`) are testable independently without a live manager or SDK child. No separate workspace package or independent extension needed. |
@@ -484,7 +515,7 @@ ARCHITECTURE-SPEC's own.
 | Transcript reading behind focused adapter | 98 | Done — `transcript-adapter.ts` exposes `TranscriptSource` (`getMessages`, `subscribe`, `getToolDefinition`), never a live child session. |
 | UI consumers do not affect execution | 99 | Done — presentation modules only consume UI-owned contracts (`display.ts`, `view-types.ts`); they call narrow settings actions and never influence execution decisions. |
 | Model-facing text / terminal rendering separate | 100 | Done — `outcome-delivery.ts` provides pure model-facing text formatting; `src/ui/` handles terminal rendering. No execution dependency on UI module. |
-| Further TypeScript and API modernization | 101–117 | Partial — see the table above. Discriminated unions, `as const satisfies` tables, `readonly` owned values, and the strict optional flags are in place; lexical resource management (109), typed tool outputs (110), and the `Subagents`-seam test surface (112–113) are not. |
+| Further TypeScript and API modernization | 101–117 | Done — discriminated unions, literal-preserving tables, copied readonly values, strict indexed/optional semantics, total external-data validation, asynchronous launch I/O, ownership-correct cancellation, loader-verified lexical disposal, typed structured tool outputs, public SDK adapters, `Subagents`-seam tests, a controllable `ChildSession`, real offline SDK checks, owned UI contracts, behavioral architecture checks, and Nx-target verification are in place. |
 | Independent ownership and migration cleanup | — | Not started. |
 
 ## Terminal presentation module
@@ -566,14 +597,23 @@ The switch handshake is three calls, because "switching" is not one moment:
 - `beginOwner` on a different id is the switch taking effect; only then are
   the previous session's children cancelled.
 
-`endOwner` is shutdown: refuse, then cancel. Resume is refused with
-`stale-session` for a child a later session did not ask for, even when the id
-is known and the child is otherwise resumable.
+Confirmed owner transitions are serialized in lifecycle call order while
+acceptance closes synchronously. Cleanup suppresses old notification delivery,
+cancels owned runs, awaits every child disposal with sibling fault isolation,
+and only then exposes the replacement owner. Repeated or concurrent cleanup
+shares one promise. Child shutdown has an enforced time bound; SDK disposal
+still runs when a shutdown handler hangs, rejects, or throws.
 
-14 characterization tests pin this behaviour. They were checked against
-deliberate mutations: reusing a generation fails four of them; cancelling
-eagerly in `session_before_switch` — the bug story 84 warns about — fails
-two.
+`endOwner` is shutdown: refuse, then cancel and await disposal. Resume is
+refused with `stale-session` for a child a later session did not ask for, even
+when the id is known and the child is otherwise resumable. Foreground delivery
+claims are established before execution can settle, and result waits retain the
+specific run they began observing across a concurrent resume. Stopped outcomes
+remain persisted/queryable while old-session nudges stay suppressed.
+
+Characterization and integration tests pin abandoned switches, overlapping
+owner transitions, cleanup ordering/idempotence, bounded shutdown, notification
+suppression/persistence, fast completion claims, and resume/wait races.
 
 The new `src/lifecycle/session-owner.ts` is the only file the manager,
 the lifecycle handlers, and the two doors all import from, so a future

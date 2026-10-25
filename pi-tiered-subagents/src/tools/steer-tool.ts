@@ -1,6 +1,10 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
+import {
+  steerOutputSchema,
+  withStructured,
+} from "#src/tools/structured-output";
 import type { SteerOutcome, Subagent } from "#src/types";
 
 // ---- Deps interfaces ----
@@ -30,8 +34,11 @@ export class SteerTool {
   ) {
     const record = this.manager.getRecord(params.agent_id);
     if (!record) {
-      return textResult(
-        `Agent not found: "${params.agent_id}". Records are cleared at session start/switch, so it may be from a previous session.`,
+      return withStructured(
+        textResult(
+          `Agent not found: "${params.agent_id}". Records are cleared at session start/switch, so it may be from a previous session.`,
+        ),
+        { agentId: params.agent_id, outcome: "not-found" },
       );
     }
 
@@ -39,30 +46,48 @@ export class SteerTool {
     try {
       outcome = await record.steer(params.message);
     } catch (err) {
-      return textResult(
-        `Failed to steer agent: ${err instanceof Error ? err.message : String(err)}`,
+      const message = err instanceof Error ? err.message : String(err);
+      // A steer that throws is a defect, not an answer about the agent: flag
+      // it as an error so neither the model nor a programmatic caller mistakes
+      // it for a steer outcome.
+      return withStructured(
+        { ...textResult(`Failed to steer agent: ${message}`), isError: true },
+        { agentId: params.agent_id, outcome: "failed" },
       );
     }
 
     switch (outcome.kind) {
       case "rejected":
-        return textResult(
-          `Agent "${params.agent_id}" is not running (status: ${outcome.status}). Cannot steer a non-running agent.`,
+        return withStructured(
+          textResult(
+            `Agent "${params.agent_id}" is not running (status: ${outcome.status}). Cannot steer a non-running agent.`,
+          ),
+          {
+            agentId: params.agent_id,
+            outcome: "rejected",
+            status: outcome.status,
+          },
         );
       case "buffered":
         this.events.emit("subagents:steered", {
           id: record.id,
           message: params.message,
         });
-        return textResult(
-          `Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`,
+        return withStructured(
+          textResult(
+            `Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`,
+          ),
+          { agentId: record.id, outcome: "queued" },
         );
       case "delivered":
         this.events.emit("subagents:steered", {
           id: record.id,
           message: params.message,
         });
-        return this.renderDelivered(record);
+        return withStructured(this.renderDelivered(record), {
+          agentId: record.id,
+          outcome: "delivered",
+        });
     }
   }
 
@@ -105,6 +130,7 @@ export class SteerTool {
             "The steering message to send. This will appear as a user message in the agent's conversation.",
         }),
       }),
+      outputSchema: steerOutputSchema,
       execute: (
         toolCallId: string,
         params: { agent_id: string; message: string },

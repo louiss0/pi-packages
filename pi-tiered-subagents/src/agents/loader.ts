@@ -26,6 +26,12 @@
  * duplicate, and a duplicate is reported rather than resolved by filesystem
  * order — the operator has to delete one of them.
  *
+ * The frontmatter is untrusted bytes, so it is validated here, once, at the
+ * seam: a recognized key holding an invalid value is reported and dropped
+ * rather than reinterpreted as absence, and a frontmatter block that is not
+ * readable YAML makes its file unusable — reported, never thrown out of the
+ * loader (ARCHITECTURE-SPEC story 106).
+ *
  * Both scopes are read unconditionally. Whether a project's files may be used
  * is Pi's decision, made for its own resources; this package adds no second
  * trust gate of its own (ARCHITECTURE-SPEC story 36).
@@ -272,9 +278,16 @@ export function collectDefinitions(
       continue;
     }
 
+    const parsed = parseDefinitionFile(file);
+    if (!parsed.ok) {
+      errors.push(parsed.error);
+      continue;
+    }
+    errors.push(...parsed.problems);
+
     const definition: LoadedDefinition = {
       id,
-      patch: parseDefinitionContent(file.content),
+      patch: parsed.patch,
       path: file.path,
     };
     definitions.push(definition);
@@ -284,64 +297,161 @@ export function collectDefinitions(
   return { definitions, errors };
 }
 
+/** One file's parse outcome: the patch and its diagnostics, or the reason the file is unusable. */
+type ParsedDefinitionFile =
+  | {
+      readonly ok: true;
+      readonly patch: AgentDefinitionPatch;
+      readonly problems: readonly string[];
+    }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * Read one file into a patch without letting its bytes escape the seam.
+ *
+ * A frontmatter block that is not readable YAML makes the file unusable —
+ * reported, like a duplicate, rather than resolved into a definition the
+ * operator did not write. A recognized key holding an invalid value is a
+ * diagnostic on an otherwise usable file: the value is dropped, never
+ * reinterpreted as absence.
+ */
+function parseDefinitionFile(file: DefinitionFile): ParsedDefinitionFile {
+  const problems: string[] = [];
+  let patch: AgentDefinitionPatch;
+  try {
+    patch = parseDefinitionContent(file.content, (problem) =>
+      problems.push(problem),
+    );
+  } catch (err) {
+    debugLog("parse agent definition", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: `Could not parse the agent definition at ${file.path}: ${reason}.`,
+    };
+  }
+  return {
+    ok: true,
+    patch,
+    problems: problems.map(
+      (problem) => `The agent definition at ${file.path}: ${problem}.`,
+    ),
+  };
+}
+
+/** Reports a field-level problem found while validating one file's frontmatter. */
+type FieldReporter = (problem: string) => void;
+
 /**
  * Read one definition file's frontmatter and body into a patch.
  *
  * Pure: the file's content in, the patch out. A frontmatter value the
- * definition does not recognize is ignored rather than failing the file.
+ * definition does not recognize is ignored rather than failing the file; a
+ * value it recognizes but cannot use is reported through `report` and dropped
+ * — absence stays the file's own choice, not the loader's reinterpretation.
+ *
+ * Throws when the frontmatter block is not readable YAML; the collector turns
+ * that into a diagnostic, so the throw never leaves the seam.
  */
-export function parseDefinitionContent(content: string): AgentDefinitionPatch {
-  const { frontmatter: fm, body } = parseFrontmatter(content);
+export function parseDefinitionContent(
+  content: string,
+  report?: FieldReporter,
+): AgentDefinitionPatch {
+  const { frontmatter: rawFrontmatter, body } = parseFrontmatter(content);
+  // The SDK types the frontmatter as a record, but the bytes decide: a scalar
+  // or a sequence is a frontmatter the file did not write, so it is diagnosed
+  // and ignored rather than read key by key as if it were a mapping.
+  const fm: Record<string, unknown> =
+    typeof rawFrontmatter === "object" &&
+    rawFrontmatter !== null &&
+    !Array.isArray(rawFrontmatter)
+      ? rawFrontmatter
+      : {};
+  if (fm !== rawFrontmatter) {
+    report?.("the frontmatter is not a mapping; its keys are ignored");
+  }
 
   return {
     ...defined({
-      displayName: stringField(fm.display_name),
-      description: stringField(fm.description),
+      displayName: stringField("display_name", fm.display_name, report),
+      description: stringField("description", fm.description, report),
       // The body is the standing instructions. An empty body inherits the
       // instructions of the layer below, so a configuration-only override stays
       // concise.
       instructions: body.trim() === "" ? undefined : body.trim(),
-      tools: toolSelection(fm.tools),
-      model: stringField(fm.model),
-      thinking: thinkingField(fm.thinking),
-      maxTurns: numberField(fm.max_turns),
-      inheritContext: booleanField(fm.inherit_context),
-      runInBackground: booleanField(fm.run_in_background),
-      enabled: booleanField(fm.enabled),
+      tools: toolSelection(fm.tools, report),
+      model: stringField("model", fm.model, report),
+      thinking: thinkingField(fm.thinking, report),
+      maxTurns: numberField("max_turns", fm.max_turns, report),
+      inheritContext: booleanField(
+        "inherit_context",
+        fm.inherit_context,
+        report,
+      ),
+      runInBackground: booleanField(
+        "run_in_background",
+        fm.run_in_background,
+        report,
+      ),
+      enabled: booleanField("enabled", fm.enabled, report),
     }),
   };
 }
 
 /**
  * A string field: absent stays absent, an explicit null clears, anything else
- * is trimmed.
+ * is trimmed. A value of another type is reported rather than dropped
+ * silently.
  */
-function stringField(value: unknown): string | null | undefined {
+function stringField(
+  key: string,
+  value: unknown,
+  report?: FieldReporter,
+): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== "string") {
+    report?.(`the "${key}" value must be a string; the value is ignored`);
+    return undefined;
+  }
   return value.trim();
 }
 
 /**
  * A number field: absent stays absent, an explicit null clears, and a
- * non-negative number is taken as written.
+ * non-negative number is taken as written. Anything else is reported.
  */
-function numberField(value: unknown): number | null | undefined {
+function numberField(
+  key: string,
+  value: unknown,
+  report?: FieldReporter,
+): number | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
-  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-  return value < 0 ? undefined : value;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    report?.(
+      `the "${key}" value must be a non-negative number; the value is ignored`,
+    );
+    return undefined;
+  }
+  return value;
 }
 
 /**
  * A boolean field: absent stays absent, an explicit null clears, and only
- * `true` and `false` are read as booleans.
+ * `true` and `false` are read as booleans. Anything else is reported.
  */
-function booleanField(value: unknown): boolean | null | undefined {
+function booleanField(
+  key: string,
+  value: unknown,
+  report?: FieldReporter,
+): boolean | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
-  if (typeof value !== "boolean") return undefined;
+  if (typeof value !== "boolean") {
+    report?.(`the "${key}" value must be true or false; the value is ignored`);
+    return undefined;
+  }
   return value;
 }
 
@@ -352,12 +462,15 @@ function booleanField(value: unknown): boolean | null | undefined {
  * does not know down to `off`, which would silently disable reasoning for an
  * agent whose author asked for more of it.
  */
-function thinkingField(value: unknown): AgentDefinitionPatch["thinking"] {
+function thinkingField(
+  value: unknown,
+  report?: FieldReporter,
+): AgentDefinitionPatch["thinking"] {
   if (value === undefined) return undefined;
   if (value === null) return null;
   const level = parseThinkingLevel(value);
   if (level === undefined) {
-    debugLog("agent frontmatter thinking", thinkingLevelError(value));
+    report?.(thinkingLevelError(value));
     return undefined;
   }
   return level;
@@ -369,7 +482,10 @@ function thinkingField(value: unknown): AgentDefinitionPatch["thinking"] {
  * `inherit` selects the parent's tools; a list names the tools; an empty list
  * (or upstream's `none`) means no tools at all.
  */
-function toolSelection(value: unknown): ToolSelection | null | undefined {
+function toolSelection(
+  value: unknown,
+  report?: FieldReporter,
+): ToolSelection | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
 
@@ -384,8 +500,19 @@ function toolSelection(value: unknown): ToolSelection | null | undefined {
   }
 
   if (Array.isArray(value)) {
+    // Only strings name a tool; coercing another type would reinterpret a
+    // value the file did not write, so it is reported and dropped.
+    const invalid = value.filter((entry) => typeof entry !== "string");
+    if (invalid.length > 0) {
+      report?.(
+        `the "tools" list holds ${invalid.length} ${
+          invalid.length === 1 ? "entry that is" : "entries that are"
+        } not a tool name; ${invalid.length === 1 ? "it is" : "they are"} ignored`,
+      );
+    }
     const names = value
-      .map((entry) => String(entry).trim())
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0);
     if (names.length === 0) return { kind: "explicit", names: [] };
     if (names.length === 1 && names[0]?.toLowerCase() === INHERIT_TOOLS) {
@@ -394,6 +521,9 @@ function toolSelection(value: unknown): ToolSelection | null | undefined {
     return { kind: "explicit", names };
   }
 
+  report?.(
+    `the "tools" value must be a comma-separated list or a YAML list; the value is ignored`,
+  );
   return undefined;
 }
 

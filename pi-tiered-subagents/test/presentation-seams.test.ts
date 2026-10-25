@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Text } from "@earendil-works/pi-tui";
 import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
 import { renderGetResultCall } from "#src/ui/get-result-tool-renderer";
 import {
@@ -22,7 +21,7 @@ describe("presentation seams verified (stories 97–100)", () => {
         { subagent_type: "worker", description: "do work" },
         theme,
       );
-      expect(call).toBeInstanceOf(Text);
+      expect(call.render(80).join("\n")).toContain("worker");
     });
 
     it("renders a get_subagent_result call from owned view params", () => {
@@ -30,7 +29,7 @@ describe("presentation seams verified (stories 97–100)", () => {
         { agent_id: "agent-1", wait: true },
         theme,
       );
-      expect(call).toBeInstanceOf(Text);
+      expect(call.render(80).join("\n")).toContain("agent-1");
     });
   });
 

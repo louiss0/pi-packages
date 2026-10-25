@@ -15,6 +15,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
+  type AgentSessionEvent,
   type InlineExtension,
   type SettingsManager,
   type ToolDefinition,
@@ -28,8 +29,13 @@ import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { SUBAGENT_TOOL_NAMES } from "#src/agents/definition";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import { SubagentSession } from "#src/lifecycle/subagent-session";
+import {
+  SubagentSession,
+  type TurnLoopOptions,
+  type TurnLoopResult,
+} from "#src/lifecycle/subagent-session";
 import type { TurnPolicy } from "#src/lifecycle/turn-limits";
+import type { SessionStatsLike } from "#src/lifecycle/usage";
 import {
   AskParentTool,
   type QuestionRecorder,
@@ -50,6 +56,7 @@ import {
 import type {
   ParentSessionInfo,
   PromptInheritance,
+  SessionMessage,
   ShellExec,
   SubagentType,
   ThinkingLevel,
@@ -231,6 +238,61 @@ export interface CreateSubagentSessionParams {
 }
 
 /**
+ * The package-owned child-session contract: the execution substitution point
+ * (ARCHITECTURE-SPEC stories 6 and 113).
+ *
+ * Everything run coordination and record observation consume from a child
+ * session, and nothing more — in particular not the wrapped SDK `AgentSession`,
+ * a class with private fields that must not leak across this seam. The real
+ * adapter (`SubagentSession`, born complete from the factory below) and test
+ * doubles both satisfy this interface structurally, so a fake needs no cast
+ * into a concrete SDK class to cross the seam.
+ */
+export interface ChildSession {
+  /** Path to the persisted session JSONL, absent for a headless session. */
+  readonly outputFile: string | undefined;
+  /** The model the child is running now, when one is bound. */
+  readonly model: Model<any> | undefined;
+  /** The child's current thinking level. */
+  readonly thinkingLevel: ThinkingLevel;
+  /**
+   * Drive one run's turn loop under a fresh budget at the session's limits:
+   * the initial run, or a resume, which keeps the policy and starts a new
+   * counter. Settles with the run's answer or rejects with its failure.
+   */
+  runTurnLoop(prompt: string, opts: TurnLoopOptions): Promise<TurnLoopResult>;
+  /** Deliver a steer to the live session. */
+  steer(message: string): Promise<void>;
+  /** The session's conversation as formatted text. */
+  getConversation(): string;
+  /** The session context window utilization (0-100), or null when unavailable. */
+  getContextPercent(): number | null;
+  /** Subscribe to session events; returns the unsubscribe. */
+  subscribe(fn: (event: AgentSessionEvent) => void): () => void;
+  /** Session token statistics. */
+  getSessionStats(): SessionStatsLike;
+  /** The session's message history. */
+  readonly messages: readonly unknown[];
+  /** The message history, typed for Pi's session-rendering machinery. */
+  readonly agentMessages: readonly SessionMessage[];
+  /** Resolve a registered tool definition by name. */
+  getToolDefinition(name: string): ToolDefinition | undefined;
+  /**
+   * Tear the child down: session shutdown, disposal, registry release.
+   * Idempotent — concurrent callers await the same teardown.
+   */
+  dispose(): Promise<void>;
+}
+
+/**
+ * The seam the execution manager substitutes in tests: one call per child,
+ * producing a session that satisfies the package-owned contract.
+ */
+export type CreateChildSession = (
+  params: CreateSubagentSessionParams,
+) => Promise<ChildSession>;
+
+/**
  * The core's own child-facing tools, built for whichever callbacks this run
  * supplied. An agent's `tools:` list is its complete capability allowlist, so
  * these are appended to it rather than drawn from it: they are protocol the
@@ -395,4 +457,19 @@ export async function createSubagentSession(
   deps.lifecycle.bound(defined({ sessionId, parentSessionId }));
 
   return subagentSession;
+}
+
+/**
+ * The production assembly factory, bound to its deps and read through the
+ * package-owned ChildSession contract.
+ *
+ * The return assignment doubles as the conformance proof: `SubagentSession`
+ * is a class with private fields, so this compiles only while its public
+ * surface structurally satisfies `ChildSession` — the real adapter and test
+ * doubles cross one and the same seam (ARCHITECTURE-SPEC story 113).
+ */
+export function createChildSessionWith(
+  deps: SubagentSessionDeps,
+): CreateChildSession {
+  return (params) => createSubagentSession(params, deps);
 }

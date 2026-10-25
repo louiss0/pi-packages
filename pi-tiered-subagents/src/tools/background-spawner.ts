@@ -8,6 +8,10 @@ import type {
   ResolvedSpawnConfig,
   SpawnPresentation,
 } from "#src/tools/spawn-config";
+import {
+  type SubagentToolOutput,
+  withStructured,
+} from "#src/tools/structured-output";
 import type { AgentDetails } from "#src/ui/display";
 
 /** Narrow manager interface for the background spawner. */
@@ -55,32 +59,55 @@ export function spawnBackground(
     // snapshot, session identity, and resolved execution fields to acceptance.
     // Delivery remains background-specific here.
     // A refusal is an expected answer, not a crash: the session this launch
-    // belonged to is gone, so it is reported in the door's own words.
+    // belonged to is gone, so it is reported in the door's own words — as a
+    // structured value, so a caller reads the reason instead of parsing it.
     if (outcome.kind === "rejected") {
-      return textResult(
-        launchRefusedMessage(outcome.reason, identity.displayName),
+      return withStructured(
+        textResult(launchRefusedMessage(outcome.reason, identity.displayName)),
+        {
+          outcome: "rejected",
+          reason: outcome.reason,
+          agentType: identity.subagentType,
+        },
       );
     }
     id = outcome.value;
   } catch (err) {
-    return textResult(err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    // A spawn that throws is a defect in this runtime, not an answer about the
+    // child: flagged as an error so it is not mistaken for a launch outcome.
+    return withStructured(
+      { ...textResult(message), isError: true },
+      { outcome: "failed", error: message, agentType: identity.subagentType },
+    );
   }
 
   const record = manager.getRecord(id);
   const isQueued = record?.status === "queued";
-  return renderBackgroundLaunch(
-    defined({
-      headline: `Agent ${isQueued ? "queued" : "started"} in background.`,
-      id,
-      displayName: identity.displayName,
-      description: execution.description,
-      detailBase: presentation.detailBase,
-      notes,
-      outputFile: record?.outputFile,
-      queuePosition: isQueued
-        ? { maxConcurrent: params.settings.maxConcurrent }
-        : undefined,
-    }),
+  const output: SubagentToolOutput = {
+    outcome: "accepted",
+    agentId: id,
+    agentType: identity.subagentType,
+    background: true,
+    queued: isQueued,
+    ...defined({ outputFile: record?.outputFile }),
+  };
+  return withStructured(
+    renderBackgroundLaunch(
+      defined({
+        headline: `Agent ${isQueued ? "queued" : "started"} in background.`,
+        id,
+        displayName: identity.displayName,
+        description: execution.description,
+        detailBase: presentation.detailBase,
+        notes,
+        outputFile: record?.outputFile,
+        queuePosition: isQueued
+          ? { maxConcurrent: params.settings.maxConcurrent }
+          : undefined,
+      }),
+    ),
+    output,
   );
 }
 

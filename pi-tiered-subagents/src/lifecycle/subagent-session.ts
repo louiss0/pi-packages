@@ -70,7 +70,12 @@ export interface SubagentSessionMeta {
  * One child AgentSession plus its turn-driving and teardown — born complete.
  */
 export class SubagentSession {
-  private disposed = false;
+  /**
+   * The single teardown operation for this child. Retaining the promise (rather
+   * than only a boolean) means a concurrent caller waits for the first caller's
+   * shutdown handlers and SDK disposal instead of reporting completion early.
+   */
+  private disposePromise: Promise<void> | undefined;
 
   /**
    * Set as the session's first run starts, settled or not: only that run
@@ -167,18 +172,21 @@ export class SubagentSession {
   ): Promise<string> {
     if (opts.signal?.aborted) return "";
     const session = this._session;
-    const unsubTurns = this.enforceTurnBudget(tracker, opts.onTurnBudget);
+    // Lexically owned temporary subscriptions: each `using` releases its
+    // listener at scope exit, in reverse declaration order, on success and on
+    // throw — the bracketed-resources case ARCHITECTURE-SPEC §12 reserves
+    // `using` for, after the loader/runtime verification of story 109. The
+    // names are underscore-prefixed because the bindings exist only to be
+    // disposed; noUnusedLocals flags an unreferenced `using` otherwise.
+    using _turns = asDisposable(
+      this.enforceTurnBudget(tracker, opts.onTurnBudget),
+    );
     const collector = collectResponseText(session);
-    const cleanupAbort = forwardAbortSignal(session, opts.signal);
+    using _text = asDisposable(collector.unsubscribe);
+    using _abort = asDisposable(forwardAbortSignal(session, opts.signal));
 
-    try {
-      await session.prompt(prompt);
-      failIfProviderErrored(this.turnFailure.getFailure());
-    } finally {
-      unsubTurns();
-      collector.unsubscribe();
-      cleanupAbort();
-    }
+    await session.prompt(prompt);
+    failIfProviderErrored(this.turnFailure.getFailure());
 
     return collector.getText().trim() || getLastAssistantText(session);
   }
@@ -283,17 +291,27 @@ export class SubagentSession {
    * unregisters the child from the permission system, so a shutdown handler
    * still resolves against a live registration.
    *
-   * Idempotent: the guard is set before the first await, so concurrent callers
-   * (a retention sweep racing a manager teardown) emit and dispose exactly once.
+   * Idempotent: the teardown promise is retained before a caller can yield, so
+   * concurrent callers (a retention sweep racing a manager teardown) await the
+   * same emission and disposal exactly once.
    */
-  async dispose(): Promise<void> {
-    if (this.disposed) return;
-    this.disposed = true;
+  dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
+    this.disposePromise = this.disposeOnce();
+    return this.disposePromise;
+  }
+
+  private async disposeOnce(): Promise<void> {
     this.turnFailure.unsubscribe();
     await emitChildSessionShutdown(this._session);
 
-    this._session.dispose?.();
-    this.meta.lifecycle.disposed({ sessionId: this.meta.sessionId });
+    try {
+      this._session.dispose?.();
+    } finally {
+      // Registry release must happen even when an SDK disposer throws: callers
+      // must not retain a dead child merely because its SDK resource was faulty.
+      this.meta.lifecycle.disposed({ sessionId: this.meta.sessionId });
+    }
   }
 }
 
@@ -413,6 +431,16 @@ function getLastAssistantText(session: AgentSession): string {
     .map((msg) => extractText(msg.content).trim())
     .filter((text) => text !== "");
   return texts.at(-1) ?? "";
+}
+
+/**
+ * Adapt an unsubscribe function to a lexical `Disposable`, so a bracketed
+ * operation can hold it with `using` instead of a hand-rolled try/finally.
+ * For temporary subscriptions only: session-lifetime teardown stays with the
+ * explicit awaited disposeOnce above (ARCHITECTURE-SPEC §12, story 109).
+ */
+function asDisposable(unsubscribe: () => void): Disposable {
+  return { [Symbol.dispose]: unsubscribe };
 }
 
 /**

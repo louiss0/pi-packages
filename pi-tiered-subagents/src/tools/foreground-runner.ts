@@ -19,6 +19,10 @@ import {
 } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
+import {
+  type SubagentToolOutput,
+  withStructured,
+} from "#src/tools/structured-output";
 import type { Subagent } from "#src/types";
 import { type AgentDetails, formatMs } from "#src/ui/display";
 
@@ -93,13 +97,24 @@ export async function runForeground(
     // Refused before a child existed: the session this launch belonged to is
     // gone. Reported in the door's words, and the stream stops either way.
     if (outcome.kind === "rejected") {
-      return textResult(
-        launchRefusedMessage(outcome.reason, identity.displayName),
+      return withStructured(
+        textResult(launchRefusedMessage(outcome.reason, identity.displayName)),
+        {
+          outcome: "rejected",
+          reason: outcome.reason,
+          agentType: identity.subagentType,
+        },
       );
     }
     record = outcome.value;
   } catch (err) {
-    return textResult(err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    // A wait that throws is a defect in this runtime, not the child's answer:
+    // flagged as an error so it is not mistaken for a run outcome.
+    return withStructured(
+      { ...textResult(message), isError: true },
+      { outcome: "failed", error: message, agentType: identity.subagentType },
+    );
   } finally {
     stopStream();
   }
@@ -127,22 +142,51 @@ export async function runForeground(
     const transcriptLine = record.outputFile
       ? `\nFull transcript available at: ${record.outputFile}`
       : "";
-    return textResult(
-      `${noteText}Agent failed: ${record.error}\nAgent ID: ${record.id}${transcriptLine}` +
-        renderRunUpdates(record.runUpdates) +
-        renderWorkspaceNotice(record.workspaceNotice),
-      details,
+    // An accepted child whose execution failed: a settled run outcome, not a
+    // defect — the error stays a structured value, the result is not isError.
+    const failureOutput: SubagentToolOutput = {
+      outcome: "completed",
+      agentId: record.id,
+      agentType: identity.subagentType,
+      background: false,
+      status: record.status,
+      ...defined({
+        error: record.error,
+        outputFile: record.outputFile,
+      }),
+    };
+    return withStructured(
+      textResult(
+        `${noteText}Agent failed: ${record.error}\nAgent ID: ${record.id}${transcriptLine}` +
+          renderRunUpdates(record.runUpdates) +
+          renderWorkspaceNotice(record.workspaceNotice),
+        details,
+      ),
+      failureOutput,
     );
   }
 
   const durationMs = (record.completedAt ?? Date.now()) - record.startedAt;
   const statsParts = [`${record.toolUses} tool uses`];
   if (tokenText) statsParts.push(tokenText);
-  return textResult(
-    `${noteText}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${renderStatusNote(record)}.\n` +
-      `Agent ID: ${record.id}\n\n` +
-      renderOutcomeBody(record) +
-      renderOutcomeAddenda(record),
-    details,
+  const output: SubagentToolOutput = {
+    outcome: "completed",
+    agentId: record.id,
+    agentType: identity.subagentType,
+    background: false,
+    status: record.status,
+    toolUses: record.toolUses,
+    durationMs,
+    ...defined({ result: record.result, outputFile: record.outputFile }),
+  };
+  return withStructured(
+    textResult(
+      `${noteText}Agent completed in ${formatMs(durationMs)} (${statsParts.join(", ")})${renderStatusNote(record)}.\n` +
+        `Agent ID: ${record.id}\n\n` +
+        renderOutcomeBody(record) +
+        renderOutcomeAddenda(record),
+      details,
+    ),
+    output,
   );
 }

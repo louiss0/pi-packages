@@ -13,11 +13,11 @@ export interface LifecycleManager {
   abortAll(): void;
   dispose(): Promise<void>;
   /** Take ownership for a session, ending whatever session held it before. */
-  beginOwner(sessionId: string): void;
+  beginOwner(sessionId: string): void | Promise<void>;
   /** Note that the session may be replaced, without cancelling anything yet. */
   beginOwnerEnd(): void;
   /** End the session for good; no later session will restore it. */
-  endOwner(): void;
+  endOwner(): void | Promise<void>;
 }
 
 /** Narrow runtime interface — only the methods lifecycle handlers call. */
@@ -36,6 +36,9 @@ export interface LifecycleRuntime {
  * - `unpublishService` — unpublishes the SubagentsService symbol on shutdown
  */
 export class SessionLifecycleHandler {
+  /** Shared by repeated lifecycle delivery so cleanup is one awaited operation. */
+  private shutdownPromise: Promise<void> | undefined;
+
   constructor(
     private readonly runtime: LifecycleRuntime,
     private readonly manager: LifecycleManager,
@@ -59,11 +62,13 @@ export class SessionLifecycleHandler {
    * session's children are cancelled. Reaching here with the same session id
    * means the switch was abandoned, and that session's children keep running.
    */
-  handleSessionStart(_event: unknown, ctx: unknown): Promise<void> {
+  async handleSessionStart(_event: unknown, ctx: unknown): Promise<void> {
     const context = ctx as SessionContext;
     this.runtime.setSessionContext(context);
-    this.manager.beginOwner(this.sessionIdOf(context));
-    return this.manager.clearCompleted();
+    // A confirmed replacement does not expose its new owner until the old
+    // owner's children have completed their bounded shutdown and SDK disposal.
+    await this.manager.beginOwner(this.sessionIdOf(context));
+    await this.manager.clearCompleted();
   }
 
   /**
@@ -92,11 +97,20 @@ export class SessionLifecycleHandler {
   // 6. Dispose manager — final cleanup, awaited so each child's extensions get
   //    their `session_shutdown` before Pi tears the parent down (#709)
   handleSessionShutdown(): Promise<void> {
+    if (!this.shutdownPromise) this.shutdownPromise = this.shutdownOnce();
+    return this.shutdownPromise;
+  }
+
+  private async shutdownOnce(): Promise<void> {
     this.unpublishService();
     this.runtime.clearSessionContext();
-    this.manager.endOwner();
+    // Starting the owner end closes acceptance and cancellation synchronously.
+    // Do not await it yet: notification delivery must be suppressed before the
+    // terminal transitions caused by cancellation can publish a nudge.
+    const ownerEnd = this.manager.endOwner();
     this.disposeNotifications();
     this.manager.abortAll();
-    return this.manager.dispose();
+    await ownerEnd;
+    await this.manager.dispose();
   }
 }

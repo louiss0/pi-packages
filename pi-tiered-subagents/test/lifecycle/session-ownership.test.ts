@@ -14,7 +14,7 @@
  *    (ARCHITECTURE-SPEC 73/82).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import { SubagentManager } from "#src/lifecycle/subagent-manager";
@@ -199,6 +199,64 @@ describe("a switch that may not happen", () => {
 
     gate.release();
     await record.promise;
+  });
+});
+
+describe("serialized owner transitions", () => {
+  it("installs overlapping replacements in call order and closes acceptance while queued", async () => {
+    const cleanup = Promise.withResolvers<void>();
+    const child = createSubagentSessionStub();
+    child.dispose.mockReturnValue(cleanup.promise);
+    const manager = new SubagentManager({
+      createSubagentSession: async () =>
+        toSubagentSession(child) as SubagentSession,
+      limiter: new ConcurrencyLimiter(() => 4),
+      baseCwd: "/repo",
+      registry,
+      workspaceGates: new WorkspaceGateRegistry(),
+    });
+    manager.beginOwner("session-a");
+    const owner = manager.currentOwner()!;
+    manager.spawn(STUB_SNAPSHOT, "explore", "held", { ...BASE_CONFIG, owner });
+    await vi.waitFor(() => expect(manager.listAgents()).toHaveLength(1));
+
+    manager.beginOwnerEnd();
+    const first = manager.beginOwner("session-b");
+    const second = manager.beginOwner("session-c");
+
+    expect(manager.currentOwner()).toBeUndefined();
+    expect(spawn(manager, owner)).toEqual({
+      kind: "rejected",
+      reason: "session-ended",
+    });
+    cleanup.resolve();
+    await Promise.all([first, second]);
+    expect(manager.currentOwner()?.sessionId).toBe("session-c");
+  });
+
+  it("serializes an end behind an overlapping replacement", async () => {
+    const cleanup = Promise.withResolvers<void>();
+    const child = createSubagentSessionStub();
+    child.dispose.mockReturnValue(cleanup.promise);
+    const manager = new SubagentManager({
+      createSubagentSession: async () =>
+        toSubagentSession(child) as SubagentSession,
+      limiter: new ConcurrencyLimiter(() => 4),
+      baseCwd: "/repo",
+      registry,
+      workspaceGates: new WorkspaceGateRegistry(),
+    });
+    manager.beginOwner("session-a");
+    const owner = manager.currentOwner()!;
+    manager.spawn(STUB_SNAPSHOT, "explore", "held", { ...BASE_CONFIG, owner });
+    await vi.waitFor(() => expect(manager.listAgents()).toHaveLength(1));
+
+    const replacement = manager.beginOwner("session-b");
+    const ending = manager.endOwner();
+    expect(manager.currentOwner()).toBeUndefined();
+    cleanup.resolve();
+    await Promise.all([replacement, ending]);
+    expect(manager.currentOwner()).toBeUndefined();
   });
 });
 

@@ -54,6 +54,8 @@ export interface RunOutcome {
   /** A resume replaced this run after it settled. */
   readonly replaced: boolean;
   isActive(): boolean;
+  /** Claim this exact run's delivery, rather than whichever run is current later. */
+  claim(): CarrierClaim;
   markConsumed(at?: number): void;
 }
 

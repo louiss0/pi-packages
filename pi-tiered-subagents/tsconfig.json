@@ -2,7 +2,7 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2024",
-    "lib": ["ES2024"],
+    "lib": ["ES2024", "ESNext.Disposable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "types": ["node", "vitest/globals"],
