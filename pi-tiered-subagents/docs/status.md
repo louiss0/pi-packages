@@ -12,15 +12,17 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | --- | --- |
 | Source material | [`@gotgenes/pi-subagents`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 (MIT, © Chris Lasher), itself a friendly fork of [`@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents) |
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
-| Runtime code | `src/` — the inherited runtime plus the new `src/agents/` domain |
+| Runtime code | `src/` — the locally maintained implementation, including the agent, preparation, lifecycle, and UI domains |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
 | Tests | `test/` — 123 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
 | Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,424 passed, one skipped |
 
-The runtime is a **faithful derivative** of upstream today: the lifecycle,
-configuration, prompt assembly, observation, and UI behaviour are upstream's,
-characterized by upstream's own suite.
+The runtime is a **locally maintained, credited derivative** of upstream. The
+recovered characterization suite preserves the inherited behavior that the
+specifications retain; locally owned architecture, lifecycle, presentation,
+and modernization decisions now govern intentional changes. Upstream
+snapshots are provenance, not the current design.
 
 ## The inherited runtime, explained
 
@@ -131,8 +133,8 @@ evaluated. A family with no naming structure is refused — the eight shipped
 strategies are the structures this package can read.
 
 The profiles live in the runtime's settings file, which the settings module
-owns: it merges the global and project layers per family, reads the project
-layer only when the project is trusted, and round-trips the profiles so a
+owns: it merges the global and project layers per family without an
+extension-owned trust check, and round-trips the profiles so a
 `/subagents:settings` edit does not erase them. The model domain reads the
 data and validates it; it never touches a file of its own.
 
@@ -212,8 +214,8 @@ A save writes the project's own layer. The operator's data — the families, the
 excluded packages, the inheritance rules — stays in the operator's file, where
 a later change to it still reaches the project; a value the project's file
 does not declare is not written at all, so the operator's value stays in
-force. The project's file is only read when Pi has granted the project trust,
-and an unread project's file is left alone rather than written empty.
+force. Pi owns project trust and extension loading; this package adds no
+second trust check when reading either layer.
 
 The store is also an extension, offering a `/extension-settings` menu. This
 package publishes its settings to that menu when it loads; the shared
@@ -359,6 +361,30 @@ the build; one naming a file under `node_modules` is reported and counted, so a
 dependency that grows new ones is visible here rather than silently absorbed.
 `tsconfig.json` keeps `skipLibCheck` and does not name the dependency — the split
 lives in the script, where it can be read.
+
+## Independent ownership and provenance
+
+This workspace is the only maintained implementation. Development and
+verification do not read the migration checkout. The identified temporary
+`%TEMP%/gotgenes-pi-subagents` clone was rechecked at removal time: its origin
+and expected v25.0.1 HEAD matched the specification, and it had no modified,
+untracked, or stashed work. Only that local directory was removed; its remote,
+unrelated checkouts, sibling packages, and this package were untouched.
+
+The README still credits `@gotgenes/pi-subagents` v25.0.1 and Chris Lasher,
+its `@tintinweb/pi-subagents` lineage, and the preserved MIT notice. The local
+[architecture specification](ARCHITECTURE-SPEC.md), [glossary](../GLOSSARY.md),
+and [ADRs](adr/) govern current behavior; copied architecture and decision
+snapshots remain provenance. Intentional behavior changes, SDK compatibility
+adaptations, and reproduced fixes are documented separately. See
+[adr/0012](adr/0012-own-the-implementation-locally.md).
+
+After removal, daemon-disabled
+`pnpm nx run-many -t test typecheck lint check metadata --skipNxCache` passed
+for all eight workspace projects. The runtime again passed 123 files (2,424
+tests, one skipped); lint retained one pre-existing warning in
+`pi-bash-tooljack-nu` and no errors. Attribution and both licence files remain
+present, and the identified clone path is absent.
 
 ## Inherited behaviour, now characterized
 
@@ -516,7 +542,7 @@ ARCHITECTURE-SPEC's own.
 | UI consumers do not affect execution | 99 | Done — presentation modules only consume UI-owned contracts (`display.ts`, `view-types.ts`); they call narrow settings actions and never influence execution decisions. |
 | Model-facing text / terminal rendering separate | 100 | Done — `outcome-delivery.ts` provides pure model-facing text formatting; `src/ui/` handles terminal rendering. No execution dependency on UI module. |
 | Further TypeScript and API modernization | 101–117 | Done — discriminated unions, literal-preserving tables, copied readonly values, strict indexed/optional semantics, total external-data validation, asynchronous launch I/O, ownership-correct cancellation, loader-verified lexical disposal, typed structured tool outputs, public SDK adapters, `Subagents`-seam tests, a controllable `ChildSession`, real offline SDK checks, owned UI contracts, behavioral architecture checks, and Nx-target verification are in place. |
-| Independent ownership and migration cleanup | — | Not started. |
+| Independent ownership and migration cleanup | 118–125 | Done — this workspace is the sole maintained implementation; the exact verified temporary clone was removed without touching its remote or any unrelated checkout. Attribution and MIT notices remain, local architecture/glossary/ADRs are authoritative, and intentional changes remain distinct from compatibility adaptations and reproduced fixes. See [adr/0012](adr/0012-own-the-implementation-locally.md). |
 
 ## Terminal presentation module
 
@@ -615,9 +641,8 @@ Characterization and integration tests pin abandoned switches, overlapping
 owner transitions, cleanup ordering/idempotence, bounded shutdown, notification
 suppression/persistence, fast completion claims, and resume/wait races.
 
-The new `src/lifecycle/session-owner.ts` is the only file the manager,
-the lifecycle handlers, and the two doors all import from, so a future
-`Subagents` module can take this seam over without rippling through them.
+`src/lifecycle/session-owner.ts` is the shared ownership vocabulary used by
+the manager, lifecycle handlers, and caller-facing `Subagents` seam.
 
 ## One preparation authority
 
@@ -630,9 +655,10 @@ distinct rejections, never a substitute role, so a programmatic typo
 can no longer become a synthetic shipped definition.
 
 `src/service/subagents.ts` is the session-scoped seam both doors use:
-capture the owner, prepare, capture the parent snapshot and session
-identity, then accept into the manager. The tool adapter and the
-service adapter translate their own vocabulary into one request and
+capture the owner, parent snapshot, session identity, and launch-shaping
+settings before asynchronous preparation, then accept the prepared plan into
+the manager. The tool adapter and the service adapter translate their own
+vocabulary into one request and
 consume the same prepared value; neither reads the registry, settings,
 or model facts on its own.
 

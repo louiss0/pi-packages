@@ -2,7 +2,7 @@
 
 Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with the [normative TypeScript/API and tooling appendix](https://github.com/louiss0/pi-packages/issues/9#issuecomment-6351577862). This document contains the complete specification in one place; publication is split only to respect GitHub's issue-body size limit.
 
-> **Approved design; implementation pending.** Synthesized from the completed maintainer interview, including the final approval of targeted TypeScript/API modernization. This is a follow-up to [issue #8](https://github.com/louiss0/pi-packages/issues/8), not a claim that the proposed architecture is already implemented.
+> **Approved and implemented design.** Synthesized from the completed maintainer interview, including the final approval of targeted TypeScript/API modernization. This is a follow-up to [issue #8](https://github.com/louiss0/pi-packages/issues/8). This document states the requirements and decisions; [status.md](status.md) records the independently verified implementation evidence.
 >
 > **Maintainer clarification (story 92):** terminal presentation is a separate module **inside `pi-tiered-subagents`**, not a separate workspace/npm package. This supersedes the originally published package-extraction requirement; no second package or extension is required.
 >

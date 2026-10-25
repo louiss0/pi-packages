@@ -92,10 +92,48 @@ at all, which is *not applicable* rather than wrong.
 
 ## Parent snapshot
 
-The parent's state captured when a request is made: the model, the model
-registry, the active tool names, the working directory, the prompt, and the
-conversation when the child is to inherit it. A queued child runs with the
-snapshot, not with the parent as it is when the child's slot opens.
+The parent's owned state captured when a request is made: model identity and
+capabilities, reasoning effort, active and registered tool names, working
+directory, session identity, portable prompt inputs, and the conversation when
+the child is to inherit it. Launch-shaping settings are captured with it. A
+queued child uses these copied values, not the parent as it is when the child's
+slot opens; no live model registry or SDK session is part of the snapshot.
+
+## Definition catalog
+
+The immutable, layered set of definitions used by one launch preparation. Each
+request loads a fresh catalog, so concurrent requests cannot change each
+other's selection. Selecting an identifier produces an available definition or
+an unknown, disabled, or invalid outcome; an invalid identifier never falls
+back to a shipped definition.
+
+## Prepared launch
+
+The complete execution decision produced by preparation: the selected
+definition, exact capabilities, captured parent inputs, model and reasoning
+decisions, final turn policy, and child-shaping settings. Acceptance transfers
+this plan to the session runtime. Later file or setting edits affect future
+requests, not an accepted plan.
+
+## Launch acceptance
+
+The point at which a valid request becomes an identified, manager-owned child
+record. Acceptance is not execution success: admission, SDK session creation,
+and settling happen later. Expected preparation or ownership failures are
+rejections and create no accepted child.
+
+## Session owner
+
+The generation-scoped identity of the parent session that owns accepted
+children. A replacement closes acceptance for the old owner before cancelling
+and cleaning up its children. Reusing a session id does not reuse its
+generation, so stale requests cannot attach to a successor.
+
+## Child session
+
+The package-owned execution contract behind one child. It exposes the behavior
+the lifecycle needs without exposing a concrete SDK session across public or
+test seams.
 
 ## Workspace impact
 

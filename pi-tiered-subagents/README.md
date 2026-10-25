@@ -3,15 +3,13 @@
 A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-coding-agent):
 scoped specialists, layered agent definitions, and inspectable model selection.
 
-> **Status: inherited runtime, specified work pending.** The package now typechecks,
-> and passes 2,321 tests (one skipped) against Pi 1.3.0. It is loaded
-> from TypeScript source, with no build step, so Pi compiles the extension itself.
-> The five scoped specialists, the layered agent definitions, the inherited tool
-> selection, the rejection of unknown agents, the family-aware model selection,
-> the reasoning level that follows it, the capability-based workspace
-> scheduling, the shared settings backend, and the narrowed inherited identity
-> are **done**. See [docs/status.md](docs/status.md) for the verified state and
-> what is still owed.
+> **Status: locally maintained implementation.** The package typechecks and
+> passes 2,424 tests (one skipped) against Pi 1.3.0. It is loaded from
+> TypeScript source, with no build step, so Pi compiles the extension itself.
+> The approved architecture and modernization work is implemented, including
+> authoritative launch preparation, explicit session ownership and cleanup,
+> extracted presentation, typed tool outputs, and offline SDK verification.
+> See [docs/status.md](docs/status.md) for the verified state.
 
 ## Install
 
@@ -155,8 +153,8 @@ conversation.
 Operator and project definitions are Markdown files with frontmatter, whose
 body is the agent's standing instructions. They are discovered in the global
 agent directory (`~/.pi/agent/agents/*.md`) and in a project
-(`.pi/agents/*.md`); a project's files are read only when Pi has granted the
-project trust.
+(`.pi/agents/*.md`). Pi owns project trust and extension loading; this runtime
+adds no second trust gate to definition or settings reads.
 
 ```markdown
 ---
@@ -219,9 +217,9 @@ architecture decisions or configuration instructions for this derivative:
 
 Relative source/test links in those snapshots refer to the original project
 layout. Their original context is the upstream project linked above. Where the
-approved specification differs, treat the difference as an intentional
-requirement to implement and test, not evidence that the inherited runtime
-already behaves that way.
+approved specification differs, the difference is intentional; consult the
+current source and [runtime status](docs/status.md), not the snapshots, for
+this implementation's behavior.
 
 The `inherit` tool-selection convention was informed by
 [Nico Bailon's pi-subagents](https://github.com/nicobailon/pi-subagents).

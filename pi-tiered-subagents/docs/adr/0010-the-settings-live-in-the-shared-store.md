@@ -38,9 +38,11 @@ operational settings then merge per setting, the project's over the
 operator's, and the family profiles merge per family, so a project replaces
 one family and leaves the operator's others alone.
 
-**What about the project's trust?** The project's file is only read when Pi
-has granted the project trust. The trust decision is a session fact, so the
-settings are read again when the session starts.
+**What about the project's trust?** Pi owns project trust and extension
+loading. This package originally added a second check of its own;
+ARCHITECTURE-SPEC stories 36–37 superseded that clause. While this extension
+runs, it reads the configured project layer like the global one and performs
+no trust input, revalidation, or rejection branch of its own.
 
 The store is also an *extension*: it offers a `/extension-settings` menu, and
 an extension publishes its settings to that menu by emitting an event at load
@@ -64,6 +66,9 @@ import was verified under Pi's loader before this decision was taken.
   the operator's file, so the adapter reads the project's file without that
   fallback. The operational settings merge per setting; the family profiles
   merge per family.
+- **The extension adds no trust policy.** Pi's own loading and resource
+  behavior remain untouched; this package does not duplicate or revalidate
+  them when reading either settings layer.
 - **A save writes the project's own layer.** The operator's data — the
   families, the excluded packages, the inheritance rules — is not copied into
   the project's file, where it would outlive a later change to the operator's
