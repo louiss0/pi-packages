@@ -22,9 +22,9 @@ implementation history and verification evidence, not release approval.
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the locally maintained implementation, including the agent, preparation, lifecycle, and UI domains |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 132 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
+| Tests | `test/` — 133 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,464 passed, one skipped |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,466 passed, one skipped |
 | Release checks | `pnpm nx run pi-tiered-subagents:release-check` and `mcp-check` — packed install, public types, Pi loader, declared Node floor, live stdio MCP |
 
 Latest verification on the current tree, daemon plugins disabled and uncached:

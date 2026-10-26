@@ -18,14 +18,11 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { basename, resolve } from "node:path";
 import process from "node:process";
 
 const packageRoot = resolve(import.meta.dirname, "..");
-const configs =
-  process.argv.slice(2).length > 0
-    ? process.argv.slice(2)
-    : ["tsconfig.json", "tsconfig.spec.json"];
 
 /** A `tsc` diagnostic header: a path, a position, a code, and a message. */
 const HEADER = /^\S.*\(\d+,\d+\): error TS\d+:/;
@@ -63,6 +60,35 @@ function groupDiagnostics(lines) {
   return groups;
 }
 
+/**
+ * The baseline is a tripwire, not a mute button. This package's own sources
+ * must be clean, and the third-party diagnostics must be exactly the ones
+ * recorded here. A dependency that fixes them, or grows a new one, changes the
+ * set and turns this target red until someone looks.
+ *
+ * Regenerate deliberately with `node scripts/typecheck.mjs --write-baseline`.
+ */
+const BASELINE_PATH = resolve(
+  import.meta.dirname,
+  "third-party-diagnostics.json",
+);
+
+/** A stable identity for one third-party diagnostic: package, file, and code. */
+function thirdPartyKey(group) {
+  const header = group[0];
+  const code = /error (TS\d+)/.exec(header)?.[1] ?? "TS?";
+  const file = basename(header.replace(/\(\d+,\d+\):.*$/, ""));
+  return `${packageNameOf(header)} ${file} ${code}`;
+}
+
+function readBaseline() {
+  try {
+    return JSON.parse(readFileSync(BASELINE_PATH, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
 /** The `name@version` a diagnostic's path points into, pnpm store layout included. */
 function packageNameOf(header) {
   // pnpm lays a package out as `node_modules/.pnpm/<name>@<version>/node_modules/<name>/…`;
@@ -72,6 +98,14 @@ function packageNameOf(header) {
   return segments.slice(last + 1, last + 3).join("/");
 }
 
+const args = process.argv.slice(2);
+const writeBaseline = args.includes("--write-baseline");
+const configs =
+  args.filter((argument) => !argument.startsWith("--")).length > 0
+    ? args.filter((argument) => !argument.startsWith("--"))
+    : ["tsconfig.json", "tsconfig.spec.json"];
+const baseline = writeBaseline ? {} : readBaseline();
+const recorded = {};
 let failed = false;
 
 for (const config of configs) {
@@ -116,9 +150,39 @@ for (const config of configs) {
   if (theirs.length > 0) {
     const packages = new Set(theirs.map((group) => packageNameOf(group[0])));
     console.warn(
-      `typecheck: ${config} — ignoring ${theirs.length} error(s) in ${[...packages].join(", ")} (third-party sources in our program)`,
+      `typecheck: ${config} — ${theirs.length} error(s) in ${[...packages].join(", ")} (third-party sources compiled into our program)`,
     );
+    const observed = {};
+    for (const group of theirs) {
+      const key = thirdPartyKey(group);
+      observed[key] = (observed[key] ?? 0) + 1;
+    }
+    recorded[config] = observed;
+    const expectedHere = baseline[config] ?? {};
+    if (writeBaseline) continue;
+    for (const [key, count] of Object.entries(observed)) {
+      const expected = expectedHere[key] ?? 0;
+      if (count > expected) {
+        failed = true;
+        console.error(
+          `typecheck: ${config} — unrecorded third-party diagnostic (${count}× ${key}). Fix it, or record it with --write-baseline.`,
+        );
+      }
+    }
+    for (const [key, count] of Object.entries(expectedHere)) {
+      if (count > (observed[key] ?? 0)) {
+        console.warn(
+          `typecheck: ${config} — recorded third-party diagnostic is gone (${key}); prune third-party-diagnostics.json`,
+        );
+      }
+    }
   }
+}
+
+if (writeBaseline) {
+  writeFileSync(BASELINE_PATH, `${JSON.stringify(recorded, null, 2)}\n`);
+  console.log(`typecheck: wrote ${BASELINE_PATH}`);
+  process.exit(0);
 }
 
 process.exit(failed ? 1 : 0);

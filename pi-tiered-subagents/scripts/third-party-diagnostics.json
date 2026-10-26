@@ -1,0 +1,16 @@
+{
+  "tsconfig.json": {
+    "@juanibiapina/pi-extension-settings ordered-multi-select.ts TS18048": 3,
+    "@juanibiapina/pi-extension-settings ordered-multi-select.ts TS2322": 4,
+    "@juanibiapina/pi-extension-settings settings-list.ts TS2322": 1,
+    "@juanibiapina/pi-extension-settings settings-list.ts TS2345": 1,
+    "@juanibiapina/pi-extension-settings extension.ts TS2379": 3
+  },
+  "tsconfig.spec.json": {
+    "@juanibiapina/pi-extension-settings ordered-multi-select.ts TS18048": 3,
+    "@juanibiapina/pi-extension-settings ordered-multi-select.ts TS2322": 4,
+    "@juanibiapina/pi-extension-settings settings-list.ts TS2322": 1,
+    "@juanibiapina/pi-extension-settings settings-list.ts TS2345": 1,
+    "@juanibiapina/pi-extension-settings extension.ts TS2379": 3
+  }
+}

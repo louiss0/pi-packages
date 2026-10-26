@@ -461,29 +461,74 @@ runtime, MCP client) and the `git`-spawning environment test could time out.
 the suite is reproducible instead of load-dependent. Three consecutive full runs
 passed afterwards.
 
+## Tenth slice: closing the documented limitations
+
+Each limitation the earlier slices recorded was either closed or explicitly
+reclassified as a design decision, so nothing stays in the "unverified" bucket
+by inertia.
+
+**Parent service identity tested against a real parent.** The earlier
+regression used a published sentinel. `test/runtime-loader/parent-service-identity.test.ts`
+now starts a real Pi session whose loader loads this package's source
+extension, captures the service that session actually published, builds a child
+through the production assembly factory with this package in the child's own
+load path, and asserts the same service object survives the child's loading,
+its work (nothing of it appears in the parent's records), and its disposal. The
+test was checked for red-capability: disabling the child-discovery guard makes
+it fail, and restoring the guard makes it pass.
+
+**MCP coverage moved into the package suite.** `mcp-check` still exists as its
+own Nx target, and `test/runtime-loader/mcp-resource-check.test.ts` now runs it
+in a child process from the suite, failing if that process fails or its success
+line is missing. The reason for the process boundary is a fact about Pi's
+loader, not an exemption from `nx test`.
+
+**The typecheck exclusion became a tripwire.** `scripts/typecheck.mjs` no
+longer just ignores diagnostics whose files live in `node_modules`. It
+partitions them per configuration, records exactly which ones are expected in
+`scripts/third-party-diagnostics.json`, fails when a dependency produces an
+unrecorded one, and warns when a recorded one disappears. Regeneration is
+deliberate (`--write-baseline`), so a dependency change cannot silently absorb
+new errors or silently fix the old ones.
+
+**Reclassified as design decisions, not gaps:**
+
+- *Offline model responses.* Substituting the external response is the safety
+  rule this plan opened with: no credentials or network requests in
+  compatibility checks. SDK dispatch, extension binding, tool pipelines, and
+  veto sequencing still run for real.
+- *Bounded child shutdown.* Waiting indefinitely for a factory or provider that
+  never returns would let one extension block Pi's exit. Cleanup is guaranteed
+  when the resource arrives — proven for late children and late workspaces —
+  rather than by hanging the parent.
+
 ## Evidence summary
 
 | Check | Result |
 | --- | --- |
-| Package tests (uncached) | 132 files, 2,464 passed, 1 skipped |
+| Package tests (uncached) | 133 files, 2,466 passed, 1 skipped |
 | Package typecheck, lint, formatting check, metadata | passed |
 | Packed install + public types + Pi loader (Node 24) | passed |
 | Packed install on declared floor (Node 22.19.0) | passed |
 | Resource-only MCP against a live stdio server | passed |
 | Other seven workspace projects | passed |
 
-## Known limitations
+## Standing constraints
 
-- External model responses are substituted in the offline fixtures; no live
-  provider call is part of any check.
-- The child regression that proves parent service identity uses a published
-  sentinel rather than a second real parent runtime; legitimate source-loaded
-  parent publication is verified separately.
-- Child shutdown stays bounded rather than waiting indefinitely for a factory
-  or workspace provider that never returns; a resource that arrives later is
-  cleaned up when it does.
-- MCP positive coverage runs as a process-level check (`mcp-check`) because
-  Pi's built-in MCP extension loads its client through its own module graph,
-  which Vitest's transform pipeline does not reproduce.
-- The typecheck wrapper still excludes 12 known diagnostics from the
-  third-party settings package.
+These are deliberate boundaries of the stabilization plan rather than gaps to be
+closed later.
+
+- **No live provider calls.** The external model response is substituted; every
+  other SDK layer runs for real. Adding a live call would require credentials
+  and network access the plan explicitly excludes.
+- **Bounded child shutdown.** Cleanup completes when a late factory or workspace
+  result arrives; the parent is never hung waiting for a collaborator that does
+  not return.
+- **MCP runs as a real process.** Pi's built-in MCP extension loads its client
+  through its own module graph, which Vitest cannot reproduce. The suite spawns
+  the check, and the `mcp-check` target runs it directly.
+- **Third-party diagnostics are pinned, not ignored.** The typecheck target
+  fails on any diagnostic the baseline does not record.
+- **One service per package identity.** Publication is guarded against child and
+  stale owners; it is not a registry for several concurrent parents in one
+  process.

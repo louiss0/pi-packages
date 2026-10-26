@@ -4,7 +4,7 @@ A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-co
 scoped specialists, layered agent definitions, and inspectable model selection.
 
 > **Status: stabilization complete; release approval is a separate decision.**
-> The package passes 2,464 tests (one skipped) against Pi 1.3.0, plus packed
+> The package passes 2,466 tests (one skipped) against Pi 1.3.0, plus packed
 > install, declared Node floor, and live stdio MCP checks. It is loaded from
 > TypeScript source, with no build step, so Pi compiles the extension itself.
 > The implementation includes authoritative launch preparation, explicit session
