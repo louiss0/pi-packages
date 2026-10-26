@@ -146,6 +146,7 @@ describe("subagent structured output", () => {
   async function execute(
     deps: ReturnType<typeof createToolDeps>,
     params: Record<string, unknown>,
+    signal = new AbortController().signal,
   ) {
     const tool = new AgentTool(
       deps.manager,
@@ -156,13 +157,7 @@ describe("subagent structured output", () => {
     );
     return {
       def: tool.toToolDefinition(),
-      result: await tool.execute(
-        "tc-1",
-        params,
-        new AbortController().signal,
-        vi.fn(),
-        makeCtx(),
-      ),
+      result: await tool.execute("tc-1", params, signal, vi.fn(), makeCtx()),
     };
   }
 
@@ -281,7 +276,36 @@ describe("subagent structured output", () => {
       reason: "unknown-agent",
     });
     expect(output.agentId).toBeUndefined();
-    expect(isErrorOf(result)).toBeUndefined();
+    expect(isErrorOf(result)).toBe(true);
+  });
+
+  it("rejects cancellation after preparation before acceptance", async () => {
+    const deps = createToolDeps();
+    const controller = new AbortController();
+    const prepared = await deps.subagents.prepareLaunch({
+      type: "worker",
+      prompt: "do task",
+    });
+    if (prepared.kind !== "prepared") throw new Error("expected preparation");
+    deps.subagents.prepareLaunch = vi.fn(async () => {
+      controller.abort();
+      return prepared;
+    });
+
+    const { def, result } = await execute(
+      deps,
+      {
+        prompt: "do task",
+        description: "task",
+        subagent_type: "worker",
+        run_in_background: true,
+      },
+      controller.signal,
+    );
+    const output = checkedOutput(def, result);
+    expect(output).toMatchObject({ outcome: "rejected", reason: "cancelled" });
+    expect(isErrorOf(result)).toBe(true);
+    expect(deps.manager.spawn).not.toHaveBeenCalled();
   });
 
   it("a refused resume reports its structured reason and the agent id", async () => {
@@ -300,7 +324,7 @@ describe("subagent structured output", () => {
       agentId: "agent-1",
     });
     expect(textOf(result)).toContain('Agent "agent-1" has no active session');
-    expect(isErrorOf(result)).toBeUndefined();
+    expect(isErrorOf(result)).toBe(true);
   });
 
   it("a foreground resume reports the resumed run's outcome", async () => {

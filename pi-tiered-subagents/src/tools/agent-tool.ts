@@ -121,10 +121,22 @@ export class AgentTool {
       signal,
     );
     if (prepared.kind === "rejected") {
-      return withStructured(textResult(prepared.message), {
-        outcome: "rejected",
-        reason: prepared.reason,
-      });
+      return withStructured(
+        { ...textResult(prepared.message), isError: true },
+        {
+          outcome: "rejected",
+          reason: prepared.reason,
+        },
+      );
+    }
+    // Preparation can yield to definition I/O. Match the programmatic door's
+    // acceptance boundary: cancellation that arrives after preparation but
+    // before manager acceptance must reject without creating a child.
+    if (signal?.aborted) {
+      return withStructured(
+        { ...textResult("Launch cancelled before acceptance."), isError: true },
+        { outcome: "rejected", reason: "cancelled" },
+      );
     }
     const launch = prepared.value;
     const { config } = launch;
@@ -188,7 +200,10 @@ export class AgentTool {
     });
     if (start.kind === "refused") {
       return withStructured(
-        textResult(resumeRefusalMessage(start.reason, id)),
+        {
+          ...textResult(resumeRefusalMessage(start.reason, id)),
+          isError: true,
+        },
         {
           outcome: "rejected",
           reason: start.reason,
@@ -244,7 +259,10 @@ export class AgentTool {
     const start = this.manager.startResume(id, prompt, { background: true });
     if (start.kind === "refused") {
       return withStructured(
-        textResult(resumeRefusalMessage(start.reason, id)),
+        {
+          ...textResult(resumeRefusalMessage(start.reason, id)),
+          isError: true,
+        },
         {
           outcome: "rejected",
           reason: start.reason,

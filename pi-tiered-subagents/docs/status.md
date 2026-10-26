@@ -3,8 +3,16 @@
 What is in this package today, what is inherited, what was changed on purpose,
 and what is still owed to the approved specification.
 
-The authoritative requirements are [SPEC.md](SPEC.md). This file records
-**verified** state, not plans.
+The authoritative requirements are [SPEC.md](SPEC.md), as superseded where
+specified by [ARCHITECTURE-SPEC.md](ARCHITECTURE-SPEC.md). This file records
+implementation history and verification evidence, not release approval.
+
+> **Stabilization actions are complete and verified; release approval is still a
+> separate human decision.** The follow-up review's findings were reproduced,
+> fixed, and re-checked at the approved boundaries, including packed-install,
+> declared-runtime-floor, and real-MCP verification. See
+> [stabilization.md](stabilization.md) for the evidence table and the remaining
+> known limitations.
 
 ## Baseline
 
@@ -14,9 +22,16 @@ The authoritative requirements are [SPEC.md](SPEC.md). This file records
 | Pi runtime | `@earendil-works/pi-coding-agent` 1.3.0, `@earendil-works/pi-tui` 1.3.0 |
 | Runtime code | `src/` — the locally maintained implementation, including the agent, preparation, lifecycle, and UI domains |
 | Extension entry | `extensions/index.ts` — the composition root that Pi loads |
-| Tests | `test/` — 123 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
+| Tests | `test/` — 132 test files, including recovered upstream v25.0.1 characterization and local contract coverage |
 | Typecheck | `pnpm nx run pi-tiered-subagents:typecheck` — clean, under `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` |
-| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,424 passed, one skipped |
+| Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,464 passed, one skipped |
+| Release checks | `pnpm nx run pi-tiered-subagents:release-check` and `mcp-check` — packed install, public types, Pi loader, declared Node floor, live stdio MCP |
+
+Latest verification on the current tree, daemon plugins disabled and uncached:
+`pnpm nx run-many -t test typecheck lint check metadata` passed for all eight
+workspace projects; `release-check` passed on Node 24.18.0 and on the declared
+floor Node 22.19.0; `mcp-check` passed against a live stdio MCP server. See
+[stabilization.md](stabilization.md) for the per-slice evidence.
 
 The runtime is a **locally maintained, credited derivative** of upstream. The
 recovered characterization suite preserves the inherited behavior that the
@@ -73,18 +88,17 @@ body is either inherited (empty) or replaced (non-empty).
 
 ### Trust is Pi's, not this package's
 
-The extension used to ask Pi whether the project was trusted, and a project it
-had not blessed contributed nothing — definitions, the project settings layer,
-and the profiles inside it. That was this package's second trust gate, and it
-was both redundant and wrong: the operator decides which projects Pi loads
-extensions into, so a project that got this extension loaded has already been
-blessed, and an untrusted project cannot get the extension loaded in the first
-place.
+The extension formerly applied its own project-trust check to definitions,
+project settings, and family profiles. The approved architecture specification
+removed that check, its inputs, and its rejection path; Pi owns its trust and
+extension-loading policy rather than this package duplicating it.
 
-The check, its inputs, and its rejection path are gone. The project layer is
-read on its own terms, exactly as the global layer is. Nothing about the
-project's configuration becomes reachable that Pi had not already decided was
-reachable.
+The project layer is now read normally, like the global layer. Loading this
+extension does not prove that Pi separately approved every project configuration
+file it reads: a globally installed extension can run independently of project
+extension resources. The absence of an extension-owned trust gate is an
+intentional policy decision, not a claim that all direct configuration reads are
+protected by an equivalent host gate.
 
 ## The model selection
 
@@ -614,14 +628,17 @@ door (`src/tools/`) and the service door (`src/service/`) — stamp the same
 token shape on every launch, and translate the rejection into their own
 message.
 
-The switch handshake is three calls, because "switching" is not one moment:
+A tentative SDK switch is not an owner transition. Pi 1.3.0 can veto
+`session_before_switch` and return without emitting either `session_shutdown`
+or a restorative `session_start`. That tentative hook therefore leaves the
+owner, acceptance, and retained records unchanged.
 
-- `beginOwnerEnd` stops accepting new launches and leaves running children
-  alone — Pi may still abandon the switch.
-- `beginOwner` on the same id restores the session; the existing children
-  keep running.
-- `beginOwner` on a different id is the switch taking effect; only then are
-  the previous session's children cancelled.
+A confirmed SDK replacement emits `session_shutdown`; that handler closes
+acceptance and performs the existing owned cleanup. The replacement extension's
+`session_start` establishes its owner. The manager still exposes explicit owner
+transition operations, but manually reopening an owner is not evidence of the
+SDK's cancelled-switch sequence. See [stabilization.md](stabilization.md) for
+the boundary regression and its verification scope.
 
 Confirmed owner transitions are serialized in lifecycle call order while
 acceptance closes synchronously. Cleanup suppresses old notification delivery,

@@ -9,7 +9,8 @@
  * work into the manager.
  */
 
-import type { AgentDefinition } from "#src/agents/definition";
+import { type AgentDefinition, normalizeAgentId } from "#src/agents/definition";
+import type { Model } from "@earendil-works/pi-ai";
 import type { LoadedScopes } from "#src/agents/loader";
 import { buildCatalog } from "#src/agents/registry";
 import type {
@@ -24,6 +25,8 @@ import {
 } from "#src/config/thinking-level";
 import { defined } from "#src/optional";
 import type { PromptInheritance, SubagentType } from "#src/types";
+import type { ModelRegistry } from "#src/models/registry";
+import type { RoutingLadders } from "#src/models/router";
 
 /** Caller-specific names translated into one preparation request. */
 export interface LaunchRequest {
@@ -131,14 +134,48 @@ export class LaunchPreparer {
   ): Promise<LaunchPreparationOutcome> {
     // Capture the invocation-time facts first. These reads must reflect the
     // request, not the moment the definition files finished loading.
-    const modelInfo = this.deps.modelInfo();
+    const modelInfo = copyModelInfo(this.deps.modelInfo());
     const turnSettings = { ...this.deps.turnSettings() };
     const childShapingCapture = this.deps.childShaping();
 
     if (signal?.aborted) return cancelledRejection();
 
-    const scopes = await this.deps.loadScopes(signal);
+    let scopes: LoadedScopes;
+    try {
+      scopes = await this.deps.loadScopes(signal);
+    } catch (error) {
+      // The filesystem adapter rejects on abort rather than returning a
+      // partial catalog. Caller cancellation is an expected public outcome;
+      // other loader failures remain implementation errors, not cancellation.
+      if (signal?.aborted) return cancelledRejection();
+      throw error;
+    }
     if (signal?.aborted) return cancelledRejection();
+
+    const scopeErrors = [
+      scopes.global.scopeError,
+      scopes.project.scopeError,
+    ].filter((problem) => problem !== undefined);
+    if (scopeErrors.length > 0) {
+      return {
+        kind: "rejected",
+        reason: "configuration",
+        message: scopeErrors.join("; "),
+      };
+    }
+
+    const id = normalizeAgentId(request.type);
+    const problems = [
+      ...(scopes.global.invalidDefinitions?.[id] ?? []),
+      ...(scopes.project.invalidDefinitions?.[id] ?? []),
+    ];
+    if (problems.length > 0) {
+      return {
+        kind: "rejected",
+        reason: "configuration",
+        message: `Invalid agent "${id}": ${problems.join("; ")}`,
+      };
+    }
 
     const registry = buildCatalog(scopes);
     const selection = registry.select(request.type);
@@ -204,6 +241,66 @@ function cancelledRejection(): LaunchPreparationOutcome {
 }
 
 /** Copy nested child-shaping values: a prepared launch cannot track settings edits. */
+/** Copy mutable SDK/routing inputs so resolution cannot observe later session edits. */
+function copyModelInfo(info: ModelInfo): ModelInfo {
+  const models = new Map<string, Model<any>>();
+  const copyModel = (model: Model<any>): Model<any> => {
+    const key = `${model.provider}/${model.id}`;
+    const existing = models.get(key);
+    if (existing) return existing;
+    const copy = { ...model } as Model<any>;
+    models.set(key, copy);
+    return copy;
+  };
+
+  const all = info.modelRegistry?.getAll?.().map(copyModel) ?? [];
+  const available = info.modelRegistry?.getAvailable?.().map(copyModel);
+  const modelRegistry: ModelRegistry | undefined = info.modelRegistry
+    ? {
+        find: (provider, id) => models.get(`${provider}/${id}`),
+        getAll: () => [...all],
+        ...(available ? { getAvailable: () => [...available] } : {}),
+      }
+    : undefined;
+
+  return {
+    ...defined({
+      parentModel: info.parentModel ? copyModel(info.parentModel) : undefined,
+      modelRegistry,
+      parentThinkingLevel: info.parentThinkingLevel,
+    }),
+    ladders: copyRoutingLadders(info.ladders),
+  };
+}
+
+function copyRoutingLadders(ladders: RoutingLadders): RoutingLadders {
+  return {
+    profiles: new Map(
+      [...ladders.profiles].map(([family, profile]) => [
+        family,
+        {
+          ...profile,
+          versions: profile.versions.map((version) => ({
+            ...version,
+            tiers: version.tiers.map((tier) => ({
+              ...tier,
+              models: tier.models.map((model) => ({ ...model })),
+              ...(tier.fallbacks
+                ? {
+                    fallbacks: tier.fallbacks.map((fallback) => ({
+                      ...fallback,
+                    })),
+                  }
+                : {}),
+            })),
+          })),
+        },
+      ]),
+    ),
+    strategies: new Map(ladders.strategies),
+  };
+}
+
 function copyChildShaping(
   captured: ChildShapingSettings,
 ): ChildShapingSettings {

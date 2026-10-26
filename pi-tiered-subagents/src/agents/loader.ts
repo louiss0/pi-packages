@@ -75,6 +75,10 @@ export interface DefinitionFile {
 
 /** The definitions one scope holds, and what went wrong while reading them. */
 export interface LoadedScope {
+  /** Scope contents are unknown, so no lower-layer fallback is safe. */
+  readonly scopeError?: string;
+  /** Identifier-specific failures that must not fall back to a lower layer. */
+  readonly invalidDefinitions?: Readonly<Record<string, readonly string[]>>;
   /** The definitions, in file-name order. */
   readonly definitions: readonly LoadedDefinition[];
   /** Human-readable problems: a duplicate identifier, an unreadable file. */
@@ -154,12 +158,14 @@ export function loadDefinitionScope(dir: string): LoadedScope {
       .filter((file) => file.endsWith(".md"))
       .sort();
   } catch (err) {
+    if (isMissingPathError(err)) return { definitions: [], errors: [] };
     debugLog("readdirSync agents dir", err);
-    return { definitions: [], errors: [] };
+    return failedScope(dir);
   }
 
   const files: DefinitionFile[] = [];
   const errors: string[] = [];
+  const unreadable: Record<string, string[]> = {};
 
   for (const name of names) {
     const path = join(dir, name);
@@ -167,12 +173,18 @@ export function loadDefinitionScope(dir: string): LoadedScope {
       files.push({ name, content: readFileSync(path, "utf-8"), path });
     } catch (err) {
       debugLog("readFileSync agent file", err);
-      errors.push(`Could not read the agent definition at ${path}.`);
+      const problem = `Could not read the agent definition at ${path}.`;
+      errors.push(problem);
+      unreadable[normalizeAgentId(basename(name, ".md"))] = [problem];
     }
   }
 
   const scope = collectDefinitions(files);
   return {
+    ...scope,
+    ...(Object.keys(unreadable).length > 0
+      ? { invalidDefinitions: { ...scope.invalidDefinitions, ...unreadable } }
+      : {}),
     definitions: scope.definitions,
     errors: [...errors, ...scope.errors],
   };
@@ -181,9 +193,9 @@ export function loadDefinitionScope(dir: string): LoadedScope {
 /**
  * Asynchronously read every definition file in one directory.
  *
- * A missing directory remains an empty scope. Other directory failures retain
- * the inherited behavior of producing no definitions, while unreadable files
- * are reported individually. Cancellation is different: it propagates so the
+ * A missing directory remains an empty scope. Other directory failures are
+ * scope-wide configuration failures, while unreadable files are reported
+ * individually. Cancellation is different: it propagates so the
  * launch boundary can return the expected `cancelled` rejection.
  */
 export async function loadDefinitionScopeAsync(
@@ -199,11 +211,12 @@ export async function loadDefinitionScopeAsync(
     if (signal?.aborted) throw err;
     if (isMissingPathError(err)) return { definitions: [], errors: [] };
     debugLog("readdir agents dir", err);
-    return { definitions: [], errors: [] };
+    return failedScope(dir);
   }
 
   const files: DefinitionFile[] = [];
   const errors: string[] = [];
+  const unreadable: Record<string, string[]> = {};
   for (const name of names) {
     throwIfAborted(signal);
     const path = join(dir, name);
@@ -216,16 +229,27 @@ export async function loadDefinitionScopeAsync(
     } catch (err) {
       if (signal?.aborted) throw err;
       debugLog("readFile agent file", err);
-      errors.push(`Could not read the agent definition at ${path}.`);
+      const problem = `Could not read the agent definition at ${path}.`;
+      errors.push(problem);
+      unreadable[normalizeAgentId(basename(name, ".md"))] = [problem];
     }
   }
 
   throwIfAborted(signal);
   const scope = collectDefinitions(files);
   return {
+    ...scope,
+    ...(Object.keys(unreadable).length > 0
+      ? { invalidDefinitions: { ...scope.invalidDefinitions, ...unreadable } }
+      : {}),
     definitions: scope.definitions,
     errors: [...errors, ...scope.errors],
   };
+}
+
+function failedScope(dir: string): LoadedScope {
+  const scopeError = `Could not read the agent definitions directory at ${dir}.`;
+  return { definitions: [], errors: [scopeError], scopeError };
 }
 
 /** Stop before starting another filesystem operation after caller cancellation. */
@@ -260,17 +284,20 @@ export function collectDefinitions(
   const errors: string[] = [];
   const byId = new Map<string, LoadedDefinition>();
   const duplicated = new Set<string>();
+  const invalidDefinitions: Record<string, string[]> = {};
 
   for (const file of files) {
     const id = normalizeAgentId(basename(file.name, ".md"));
 
     const existing = byId.get(id);
+    if (duplicated.has(id)) continue;
     if (existing) {
       if (!duplicated.has(id)) {
-        errors.push(
+        const problem =
           `Two agent definitions normalize to the identifier "${id}": ` +
-            `${existing.path} and ${file.path}. Rename one of them; neither is used.`,
-        );
+          `${existing.path} and ${file.path}. Rename one of them; neither is used.`;
+        errors.push(problem);
+        invalidDefinitions[id] = [problem];
         duplicated.add(id);
         definitions.splice(definitions.indexOf(existing), 1);
         byId.delete(id);
@@ -280,10 +307,20 @@ export function collectDefinitions(
 
     const parsed = parseDefinitionFile(file);
     if (!parsed.ok) {
+      invalidDefinitions[id] = [
+        ...(invalidDefinitions[id] ?? []),
+        parsed.error,
+      ];
       errors.push(parsed.error);
       continue;
     }
     errors.push(...parsed.problems);
+    if (parsed.problems.length > 0) {
+      invalidDefinitions[id] = [
+        ...(invalidDefinitions[id] ?? []),
+        ...parsed.problems,
+      ];
+    }
 
     const definition: LoadedDefinition = {
       id,
@@ -294,7 +331,11 @@ export function collectDefinitions(
     byId.set(id, definition);
   }
 
-  return { definitions, errors };
+  return {
+    definitions,
+    errors,
+    ...(Object.keys(invalidDefinitions).length ? { invalidDefinitions } : {}),
+  };
 }
 
 /** One file's parse outcome: the patch and its diagnostics, or the reason the file is unusable. */

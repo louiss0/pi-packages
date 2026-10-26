@@ -317,7 +317,15 @@ export function getSubagentsService(): SubagentsService | undefined {
     | undefined;
 }
 
-/** Remove the SubagentsService from globalThis (call on shutdown/reload). */
-export function unpublishSubagentsService(): void {
+/**
+ * Remove the published service from globalThis.
+ *
+ * When an owner is supplied, cleanup is conditional: a stale child/reloaded
+ * instance cannot remove a newer service that now owns the symbol. The
+ * no-argument form remains for compatibility with existing consumers.
+ */
+export function unpublishSubagentsService(owner?: SubagentsService): void {
+  const current = getSubagentsService();
+  if (owner !== undefined && current !== owner) return;
   delete (globalThis as Record<symbol, unknown>)[SERVICE_KEY];
 }

@@ -3,13 +3,15 @@
 A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-coding-agent):
 scoped specialists, layered agent definitions, and inspectable model selection.
 
-> **Status: locally maintained implementation.** The package typechecks and
-> passes 2,424 tests (one skipped) against Pi 1.3.0. It is loaded from
+> **Status: stabilization complete; release approval is a separate decision.**
+> The package passes 2,464 tests (one skipped) against Pi 1.3.0, plus packed
+> install, declared Node floor, and live stdio MCP checks. It is loaded from
 > TypeScript source, with no build step, so Pi compiles the extension itself.
-> The approved architecture and modernization work is implemented, including
-> authoritative launch preparation, explicit session ownership and cleanup,
-> extracted presentation, typed tool outputs, and offline SDK verification.
-> See [docs/status.md](docs/status.md) for the verified state.
+> The implementation includes authoritative launch preparation, explicit session
+> ownership and cleanup, extracted presentation, typed tool outputs, and offline
+> SDK checks; the reviewed SDK and lifecycle gaps were reproduced, fixed, and
+> re-verified. See [docs/stabilization.md](docs/stabilization.md) for the evidence
+> and known limitations, and [docs/status.md](docs/status.md) for history.
 
 ## Install
 

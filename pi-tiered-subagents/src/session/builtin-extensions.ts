@@ -44,7 +44,7 @@ export function builtinExtensionsFor(
 }
 
 /** MCP's resource tools, which MCP registers alongside the server tools. */
-const MCP_RESOURCE_TOOLS: ReadonlySet<string> = new Set([
+export const MCP_RESOURCE_TOOLS: ReadonlySet<string> = new Set([
   "list_mcp_resources",
   "list_mcp_resource_templates",
   "read_mcp_resource",

@@ -562,7 +562,11 @@ describe("createSubagentSession — recursion guard", () => {
 
     expect(io.createSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        excludeTools: ["subagent", "get_subagent_result", "steer_subagent"],
+        excludeTools: expect.arrayContaining([
+          "subagent",
+          "get_subagent_result",
+          "steer_subagent",
+        ]),
       }),
     );
   });

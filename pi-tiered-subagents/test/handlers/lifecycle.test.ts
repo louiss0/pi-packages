@@ -97,26 +97,11 @@ describe("SessionLifecycleHandler", () => {
   });
 
   describe("handleSessionBeforeSwitch", () => {
-    it("clears completed agents", async () => {
+    it("does not mutate ownership or retained children before SDK confirmation", async () => {
       await handler.handleSessionBeforeSwitch();
 
-      expect(manager.clearCompleted).toHaveBeenCalled();
-    });
-
-    it("resolves only after the cleared children have shut down", async () => {
-      const cleared = Promise.withResolvers<void>();
-      mockClearCompleted.mockReturnValue(cleared.promise);
-
-      let settled = false;
-      const pending = handler.handleSessionBeforeSwitch().then(() => {
-        settled = true;
-      });
-      await Promise.resolve();
-      expect(settled).toBe(false);
-
-      cleared.resolve();
-      await pending;
-      expect(settled).toBe(true);
+      expect(manager.beginOwnerEnd).not.toHaveBeenCalled();
+      expect(manager.clearCompleted).not.toHaveBeenCalled();
     });
   });
 

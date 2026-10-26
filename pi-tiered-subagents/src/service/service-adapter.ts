@@ -16,6 +16,7 @@ import type {
   ResumeCallOptions,
   ResumeOutcome,
 } from "#src/lifecycle/subagent-manager";
+import type { RunOutcome } from "#src/lifecycle/subagent-run";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import type { Subagents, SubagentsManager } from "#src/service/subagents";
 import type {
@@ -80,6 +81,8 @@ export class SubagentsServiceAdapter implements SubagentsService {
       };
     }
 
+    if (options?.signal?.aborted) return cancelledBeforeAcceptance();
+
     // A service launch is committed to background delivery: the ID-returning
     // operation hands off, exactly as the inherited synchronous spawn did.
     const outcome = this.subagents.spawn(prepared.value, {
@@ -127,7 +130,9 @@ export class SubagentsServiceAdapter implements SubagentsService {
       };
     }
 
-    const outcome = await this.subagents.spawnAndWait(
+    if (options?.signal?.aborted) return cancelledBeforeAcceptance();
+
+    const outcome = await this.subagents.spawnAndWaitWithOutcome(
       prepared.value,
       defined({
         signal: options?.signal,
@@ -136,7 +141,10 @@ export class SubagentsServiceAdapter implements SubagentsService {
     if (outcome.kind === "rejected") {
       return refused(outcome.reason);
     }
-    return { kind: "settled", record: toSubagentRecord(outcome.value) };
+    return {
+      kind: "settled",
+      record: toSubagentRecord(outcome.value.record, outcome.value.run),
+    };
   }
 
   getRecord(id: string): SubagentRecord | undefined {
@@ -145,7 +153,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
   }
 
   listAgents(): SubagentRecord[] {
-    return this.manager.listAgents().map(toSubagentRecord);
+    return this.manager.listAgents().map((record) => toSubagentRecord(record));
   }
 
   abort(id: string): boolean {
@@ -220,15 +228,18 @@ function refused(reason: LaunchRejected["reason"]): LaunchRejected {
  * bookkeeping stay out; see
  * `docs/decisions/0005-subagent-record-admission-policy.md`.
  */
-export function toSubagentRecord(record: Subagent): SubagentRecord {
+export function toSubagentRecord(
+  record: Subagent,
+  associatedRun: RunOutcome = record.latestRun,
+): SubagentRecord {
   const out: SubagentRecord = {
     id: record.id,
     type: record.type,
     description: record.description,
-    status: record.status,
-    isBackground: record.isBackground,
+    status: associatedRun.status,
+    isBackground: associatedRun.inBackground,
     toolUses: record.toolUses,
-    startedAt: record.startedAt,
+    startedAt: associatedRun.startedAt,
     // Copy: the agent accumulates into its own object on every message_end, so
     // an aliased snapshot would drift, and a consumer could write into the
     // agent's totals.
@@ -236,16 +247,21 @@ export function toSubagentRecord(record: Subagent): SubagentRecord {
     compactionCount: record.compactionCount,
   };
 
-  if (record.result !== undefined) out.result = record.result;
-  if (record.pendingQuestion !== undefined)
-    out.pendingQuestion = record.pendingQuestion;
-  if (record.error !== undefined) out.error = record.error;
-  if (record.completedAt !== undefined) out.completedAt = record.completedAt;
+  if (associatedRun.result !== undefined) out.result = associatedRun.result;
+  if (associatedRun.pendingQuestion !== undefined)
+    out.pendingQuestion = associatedRun.pendingQuestion;
+  if (associatedRun.error !== undefined) out.error = associatedRun.error;
+  if (associatedRun.completedAt !== undefined)
+    out.completedAt = associatedRun.completedAt;
   // Copy, like lifetimeUsage: the snapshot is by value.
-  if (record.turnBudget !== undefined)
-    out.turnBudget = { ...record.turnBudget };
+  if (associatedRun.turnBudget !== undefined)
+    out.turnBudget = { ...associatedRun.turnBudget };
   if (record.outputFile !== undefined) out.outputFile = record.outputFile;
-  if (record.resumeRefusal !== undefined)
+  // A run-associated snapshot describes the run this caller waited for. Its
+  // resume eligibility is intentionally read from the live record only when no
+  // older run was supplied; a later resume must not make a settled foreground
+  // result claim that its own run is still active.
+  if (associatedRun === record.latestRun && record.resumeRefusal !== undefined)
     out.resumeRefusal = record.resumeRefusal;
 
   // The model the child ran on, and the reasoning level it ran at: the facts a
@@ -276,4 +292,13 @@ export function toSubagentRecord(record: Subagent): SubagentRecord {
   }
 
   return out;
+}
+
+/** No async gap remains between this check and manager acceptance. */
+function cancelledBeforeAcceptance(): LaunchRejected {
+  return {
+    kind: "rejected",
+    reason: "cancelled",
+    message: "Launch cancelled before acceptance.",
+  };
 }

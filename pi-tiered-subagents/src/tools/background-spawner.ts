@@ -63,7 +63,12 @@ export function spawnBackground(
     // structured value, so a caller reads the reason instead of parsing it.
     if (outcome.kind === "rejected") {
       return withStructured(
-        textResult(launchRefusedMessage(outcome.reason, identity.displayName)),
+        {
+          ...textResult(
+            launchRefusedMessage(outcome.reason, identity.displayName),
+          ),
+          isError: true,
+        },
         {
           outcome: "rejected",
           reason: outcome.reason,

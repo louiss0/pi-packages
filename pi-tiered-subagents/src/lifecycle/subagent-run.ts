@@ -38,6 +38,8 @@ export interface CarrierClaim {
  * and records it.
  */
 export interface RunOutcome {
+  /** Whether this run was delivered in the background. */
+  readonly inBackground: boolean;
   readonly status: SubagentStatus;
   readonly result: string | undefined;
   readonly error: string | undefined;

@@ -98,7 +98,12 @@ export async function runForeground(
     // gone. Reported in the door's words, and the stream stops either way.
     if (outcome.kind === "rejected") {
       return withStructured(
-        textResult(launchRefusedMessage(outcome.reason, identity.displayName)),
+        {
+          ...textResult(
+            launchRefusedMessage(outcome.reason, identity.displayName),
+          ),
+          isError: true,
+        },
         {
           outcome: "rejected",
           reason: outcome.reason,

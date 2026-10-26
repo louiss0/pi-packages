@@ -40,8 +40,13 @@ import {
   AskParentTool,
   type QuestionRecorder,
 } from "#src/session/ask-parent-tool";
-import { builtinExtensionsFor } from "#src/session/builtin-extensions";
+import {
+  builtinExtensionsFor,
+  MCP_RESOURCE_TOOLS,
+} from "#src/session/builtin-extensions";
+import { duringChildExtensionLoading } from "#src/session/child-extension-scope";
 import type { EnvInfo } from "#src/session/env";
+import { concreteToolNamesError } from "#src/session/mcp-tool-patterns";
 import type { ExactModelIdentity } from "#src/models/identity";
 import type { ModelRegistry } from "#src/models/registry";
 import { defined } from "#src/optional";
@@ -357,6 +362,12 @@ export async function createSubagentSession(
   );
 
   const toolNames = cfg.toolNames;
+  // Preparation expands supported MCP patterns against the captured registry.
+  // Anything still containing SDK selection syntax is not a concrete capability
+  // list: Pi interprets '*' as a live glob and +/- entries as default modifiers.
+  // Reject rather than silently granting tools the launch did not classify.
+  const toolError = concreteToolNamesError(toolNames);
+  if (toolError) throw new Error(toolError);
 
   const agentDir = deps.io.getAgentDir();
   const sessionSettings = deps.io.createSettingsManager(
@@ -388,6 +399,10 @@ export async function createSubagentSession(
     appendSystemPromptOverride: () => [],
     extensionFactories: builtinExtensionsFor(toolNames),
   });
+  // Keep the scope on the loader's lifetime, not just its initial discovery:
+  // SDK session.reload() reuses this loader to execute inherited factories.
+  const reload = loader.reload.bind(loader);
+  loader.reload = () => duringChildExtensionLoading(reload);
   await loader.reload();
 
   // Create a persisted SessionManager so transcripts are written in Pi's
@@ -415,7 +430,15 @@ export async function createSubagentSession(
     modelRegistry,
     tools: [...toolNames, ...childTools.map((tool) => tool.name)],
     customTools: childTools,
-    excludeTools: EXCLUDED_TOOL_NAMES,
+    // Pi 1.3.0 deliberately keeps MCP tools callable when `tools` has no
+    // mcp__ entry. A child's list is a capability boundary, not a CLI loadout:
+    // explicitly exclude that namespace and unlisted resource tools. The SDK
+    // reapplies these exclusions on every registry refresh, including late tools.
+    excludeTools: [
+      ...EXCLUDED_TOOL_NAMES,
+      ...(toolNames.some((name) => name.startsWith("mcp__")) ? [] : ["mcp__*"]),
+      ...[...MCP_RESOURCE_TOOLS].filter((name) => !toolNames.includes(name)),
+    ],
     resourceLoader: loader,
     ...defined({ model: cfg.model, thinkingLevel: cfg.thinkingLevel }),
   });

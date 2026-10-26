@@ -52,10 +52,24 @@
         "command": "node tools/validate-package-metadata.mjs {projectRoot}"
       }
     },
+    "release-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/release-check.mjs",
+        "cwd": "{projectRoot}"
+      }
+    },
     "make-extension": {
       "executor": "nx:run-commands",
       "options": {
         "command": "pnpm exec tsx ./scripts/create-extension.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "mcp-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx scripts/mcp-check.mts",
         "cwd": "{projectRoot}"
       }
     }

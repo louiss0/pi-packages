@@ -63,6 +63,7 @@ import {
   SHARED_SETTING_DEFINITIONS,
 } from "#src/shared-settings";
 import { detectEnv } from "#src/session/env";
+import { isChildExtensionLoading } from "#src/session/child-extension-scope";
 import type { FamilyProfile } from "#src/models/profile";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import type { RoutingLadders } from "#src/models/router";
@@ -92,6 +93,10 @@ import {
 } from "#src/ui/index";
 
 export default function (pi: ExtensionAPI) {
+  // The SDK invokes inherited factories during child resource discovery.
+  // This explicit async-local scope distinguishes those loads from another
+  // independent parent, before allocating or publishing any runtime state.
+  if (isChildExtensionLoading()) return;
   /**
    * Publishes this package's settings to the shared settings extension, so
    * they can be edited where the other extensions' settings are edited.
@@ -394,13 +399,12 @@ export default function (pi: ExtensionAPI) {
   // Consumers: const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
   const subagents = new Subagents(manager, runtime, launchPreparer);
   const service = new SubagentsServiceAdapter(manager, subagents);
-  publishSubagentsService(service);
 
   const lifecycle = new SessionLifecycleHandler(
     runtime,
     manager,
     () => notifications.dispose(),
-    unpublishSubagentsService,
+    () => unpublishSubagentsService(service),
     // The manager is told which session owns the work it accepts, so that a
     // replacement can cancel it. Read from the session context, falling back
     // to the file: a session with no id yet is still a distinct session.
@@ -430,6 +434,7 @@ export default function (pi: ExtensionAPI) {
     settings.load();
     refreshProfiles();
     refreshDefinitions();
+    publishSubagentsService(service);
     return lifecycle.handleSessionStart(event, ctx);
   });
   pi.on("session_start", (event, ctx) =>

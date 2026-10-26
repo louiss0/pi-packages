@@ -59,8 +59,9 @@ export class SessionLifecycleHandler {
    *
    * `beginOwner` is what confirms a switch: reaching here after a
    * `session_before_switch` means the replacement took effect, and the previous
-   * session's children are cancelled. Reaching here with the same session id
-   * means the switch was abandoned, and that session's children keep running.
+   * session's children are cancelled. A same-id owner transition can preserve
+   * children when a host reports an abandoned attempt; Pi 1.3.0's actual veto
+   * path emits no `session_start`, so the before-switch hook remains a no-op.
    */
   async handleSessionStart(_event: unknown, ctx: unknown): Promise<void> {
     const context = ctx as SessionContext;
@@ -74,15 +75,15 @@ export class SessionLifecycleHandler {
   /**
    * A replacement may be about to happen.
    *
-   * Deliberately does not cancel anything. Pi emits this before it knows
-   * whether the switch will happen — a handler can veto it, and the operator
-   * can back out — so cancelling here would stop live children for a
-   * navigation that never occurred. It only closes the door to new launches;
-   * `handleSessionStart` decides what actually happened.
+   * Pi 1.3.0 returns immediately when any `session_before_switch` handler
+   * vetoes and emits neither `session_shutdown` nor `session_start`. There is
+   * no post-veto callback in the SDK with which to restore ownership, so this
+   * hook must not mutate the owner or remove retained results. A confirmed
+   * replacement runs `session_shutdown`, while the following `session_start`
+   * performs the normal new-owner cleanup.
    */
   handleSessionBeforeSwitch(): Promise<void> {
-    this.manager.beginOwnerEnd();
-    return this.manager.clearCompleted();
+    return Promise.resolve();
   }
 
   // Cleanup order matters:

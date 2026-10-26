@@ -87,10 +87,12 @@ export class AgentRegistry implements AgentDefinitionLookup {
   currentScopes(): LoadedScopes {
     return {
       global: {
+        ...this.scopes.global,
         definitions: [...this.scopes.global.definitions],
         errors: [...this.scopes.global.errors],
       },
       project: {
+        ...this.scopes.project,
         definitions: [...this.scopes.project.definitions],
         errors: [...this.scopes.project.errors],
       },

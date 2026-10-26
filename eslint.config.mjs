@@ -20,7 +20,14 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
+          allow: [
+            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
+            // Package-private source aliases: a package that ships TypeScript
+            // source reaches its own modules through these instead of long
+            // relative chains. They never leave the declaring package.
+            '^#src/',
+            '^#test/',
+          ],
           depConstraints: [
             {
               sourceTag: 'project:package',

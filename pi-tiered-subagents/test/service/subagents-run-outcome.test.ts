@@ -186,6 +186,41 @@ describe("outcome claims", () => {
       await h.dispose();
     }
   });
+
+  it("returns the run it awaited when completion immediately starts a resume", async () => {
+    let resumed!: Promise<void>;
+    const h = await createSubagentsHarness({
+      observer: {
+        onSubagentCreated: () => {},
+        onSubagentRunStarted: () => {},
+        onSubagentRunFinished: (record, kind) => {
+          if (kind === "initial")
+            resumed = record.resume("follow-up", { background: true });
+        },
+        onSubagentCompacted: () => {},
+      },
+    });
+    try {
+      const running = h.service.run("worker", "initial task");
+      const child = await h.children.childBorn(0);
+      (await child.runStarted(0)).settle("initial answer");
+
+      const outcome = await running;
+      if (outcome.kind !== "settled")
+        throw new Error(`expected a settled run, got ${outcome.message}`);
+
+      // `run()` waited for the initial run. A completion observer may start a
+      // resume before that wait's continuation runs, but it must not make the
+      // foreground caller report the newer run instead.
+      expect(outcome.record.status).toBe("completed");
+      expect(outcome.record.result).toBe("initial answer");
+
+      (await child.runStarted(1)).settle("follow-up answer");
+      await resumed;
+    } finally {
+      await h.dispose();
+    }
+  });
 });
 
 describe("steer", () => {

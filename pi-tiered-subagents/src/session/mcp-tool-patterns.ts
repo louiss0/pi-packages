@@ -1,14 +1,22 @@
 /**
  * mcp-tool-patterns.ts — expand `mcp__…*` entries of an agent's tool allowlist.
  *
- * Pi's tool allowlist matches names exactly, and an MCP server's tool names
- * exist only once the server connects, so naming every tool of a large server
- * by hand is the only way the allowlist alone could admit it. An agent may
- * instead write a pattern such as `mcp__github__*`, which is expanded against
+ * An MCP server's tool names exist only once the server connects. Rather than
+ * passing Pi a live glob that could admit capabilities added after acceptance,
+ * an agent may write a pattern such as `mcp__github__*`, expanded against
  * the tool names the parent session has registered when the child is created.
  * Pi derives an MCP tool's name from its server and tool alone, so the child's
  * own MCP extension registers the same names.
  */
+
+/** Reject SDK selection syntax left after request-time MCP pattern expansion. */
+export function concreteToolNamesError(
+  toolNames: readonly string[],
+): string | undefined {
+  return toolNames.some((name) => name.includes("*") || /^[+-]/.test(name))
+    ? "Child capabilities require concrete tool names; unresolved patterns and +/- tool modifiers are not supported."
+    : undefined;
+}
 
 /** An agent's allowlist with its MCP patterns expanded. */
 export interface ExpandedTools {

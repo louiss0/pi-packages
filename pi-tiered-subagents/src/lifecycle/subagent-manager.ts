@@ -37,7 +37,7 @@ import {
   Subagent,
   type SubagentLifecycleObserver,
 } from "#src/lifecycle/subagent";
-import type { RunKind } from "#src/lifecycle/subagent-run";
+import type { RunKind, RunOutcome } from "#src/lifecycle/subagent-run";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceGate, WorkspaceGateRegistry } from "#src/scheduling/gate";
@@ -107,6 +107,12 @@ export type ResumeStart =
 
 /** Per-call knobs for a resume; both doors pass their own. */
 export type ResumeCallOptions = ResumeRunOptions;
+
+/** The exact run a foreground wait observed, even if a resume replaces it. */
+export interface ForegroundRunOutcome {
+  readonly record: Subagent;
+  readonly run: RunOutcome;
+}
 
 /** A spawn's resolved identity and mode — the invariants every front door shares. */
 interface ResolvedSpawn {
@@ -634,6 +640,24 @@ export class SubagentManager {
     prompt: string,
     options: Omit<AgentSpawnConfig, "background">,
   ): Promise<LaunchOutcome<Subagent>> {
+    const outcome = await this.spawnAndWaitWithOutcome(
+      snapshot,
+      type,
+      prompt,
+      options,
+    );
+    return outcome.kind === "rejected"
+      ? outcome
+      : { kind: "accepted", value: outcome.value.record };
+  }
+
+  /** Await a foreground run while retaining the exact run it began on. */
+  async spawnAndWaitWithOutcome(
+    snapshot: ParentSnapshot,
+    type: SubagentType,
+    prompt: string,
+    options: Omit<AgentSpawnConfig, "background">,
+  ): Promise<LaunchOutcome<ForegroundRunOutcome>> {
     const foreground: BackgroundRequest = {
       kind: "explicit",
       isBackground: false,
@@ -652,8 +676,9 @@ export class SubagentManager {
       throw new Error(`Subagent record vanished immediately: ${started.value}`);
     }
     record.claim();
+    const run = record.latestRun;
     await record.promise;
-    return { kind: "accepted", value: record };
+    return { kind: "accepted", value: { record, run } };
   }
 
   /**

@@ -417,6 +417,27 @@ describe("the service door", () => {
     );
   });
 
+  it.each([
+    "*",
+    "+codemode",
+    "-write",
+  ])("rejects unsafe tool selection %s before accepting a launch", async (selection) => {
+    const { adapter, manager } = makeAdapter({
+      ...defaultDefinition("worker", "shipped"),
+      tools: { kind: "explicit", names: [selection] },
+    });
+
+    const result = await adapter.launch("worker", "do it");
+
+    expect(result).toMatchObject({
+      kind: "rejected",
+      reason: "configuration",
+      message: expect.stringContaining("concrete tool names"),
+    });
+    expect(manager.spawn).not.toHaveBeenCalled();
+    expect(manager.spawnAndWait).not.toHaveBeenCalled();
+  });
+
   it("rejects an unknown programmatic type before creating a manager record", async () => {
     const { adapter, manager } = makeAdapter();
 

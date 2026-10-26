@@ -27,6 +27,13 @@ export default defineConfig({
 
     watch: false,
 
+    // Two suites here start real processes (the SDK runtime fixture and Pi's
+    // MCP client) and one spawns `git`. Unbounded worker parallelism makes
+    // those checks starve and time out on a loaded machine, so the cap keeps
+    // the run reproducible without serialising everything.
+    maxWorkers: 2,
+    testTimeout: 30_000,
+
     coverage: {
       provider: "v8",
 

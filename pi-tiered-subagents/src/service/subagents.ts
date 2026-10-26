@@ -16,7 +16,10 @@ import type {
 } from "#src/agents/launch-preparer";
 import { resolveChildToolNames } from "#src/agents/definition";
 import type { BackgroundRequest } from "#src/agents/invocation";
-import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
+import type {
+  AgentSpawnConfig,
+  ForegroundRunOutcome,
+} from "#src/lifecycle/subagent-manager";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type {
   Subagent,
@@ -29,7 +32,10 @@ import {
 } from "#src/lifecycle/session-owner";
 import { debugNote } from "#src/debug";
 import { defined } from "#src/optional";
-import { expandMcpToolPatterns } from "#src/session/mcp-tool-patterns";
+import {
+  concreteToolNamesError,
+  expandMcpToolPatterns,
+} from "#src/session/mcp-tool-patterns";
 import type { ParentSessionInfo } from "#src/types";
 
 /**
@@ -65,6 +71,12 @@ export interface SubagentsManager {
     prompt: string,
     options: Omit<AgentSpawnConfig, "background">,
   ): Promise<LaunchOutcome<Subagent>>;
+  spawnAndWaitWithOutcome?: (
+    snapshot: ParentSnapshot,
+    type: string,
+    prompt: string,
+    options: Omit<AgentSpawnConfig, "background">,
+  ) => Promise<LaunchOutcome<ForegroundRunOutcome>>;
   getRecord(id: string): Subagent | undefined;
 }
 
@@ -162,6 +174,10 @@ export class Subagents {
       declaredTools,
       snapshot.registeredToolNames,
     );
+    const toolError = concreteToolNamesError(toolNames);
+    if (toolError) {
+      return { kind: "rejected", reason: "configuration", message: toolError };
+    }
     for (const pattern of unmatchedPatterns) {
       debugNote(
         `agent ${config.identity.subagentType}: tools pattern ${pattern} matched no tool the parent had when the request was made`,
@@ -254,6 +270,54 @@ export class Subagents {
       execution.prompt,
       managerOptions,
     );
+  }
+
+  /** Await a foreground run while preserving the run associated with the wait. */
+  spawnAndWaitWithOutcome(
+    launch: PreparedSubagentsLaunch,
+    options: ForegroundLaunchOptions = {},
+  ): Promise<LaunchOutcome<ForegroundRunOutcome>> {
+    const { identity, execution } = launch.config;
+    const managerOptions: Omit<AgentSpawnConfig, "background"> = {
+      description: execution.description,
+      definition: identity.definition,
+      modelSelection: execution.modelSelection,
+      thinkingDecision: execution.thinkingDecision,
+      turnPolicy: execution.turnPolicy,
+      inheritContext: execution.inheritContext,
+      parentSession: launch.parentSession,
+      owner: launch.owner,
+      childShaping: launch.childShaping,
+      toolNames: launch.toolNames,
+      ...defined({
+        modelIdentity: execution.modelIdentity,
+        thinkingLevel: execution.thinking,
+        signal: options.signal,
+        observer: options.observer,
+      }),
+    };
+    if (this.manager.spawnAndWaitWithOutcome)
+      return this.manager.spawnAndWaitWithOutcome(
+        launch.snapshot,
+        identity.rawType,
+        execution.prompt,
+        managerOptions,
+      );
+    return this.manager
+      .spawnAndWait(
+        launch.snapshot,
+        identity.rawType,
+        execution.prompt,
+        managerOptions,
+      )
+      .then((outcome) =>
+        outcome.kind === "rejected"
+          ? outcome
+          : {
+              kind: "accepted" as const,
+              value: { record: outcome.value, run: outcome.value.latestRun },
+            },
+      );
   }
 
   /** Read the current by-reference record only for presentation adapters. */

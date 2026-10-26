@@ -142,6 +142,55 @@ describe("LaunchPreparer", () => {
     }
   });
 
+  it("copies routing model inputs before definition loading can mutate them", async () => {
+    const parentModel = makeReasoningModel({
+      provider: "anthropic",
+      id: "claude-sonnet-5",
+    });
+    const registry = {
+      find: (provider: string, id: string) =>
+        provider === "anthropic" && id === "claude-sonnet-5"
+          ? parentModel
+          : undefined,
+      getAll: () => [parentModel],
+      getAvailable: () => [parentModel],
+    };
+    const preparer = new LaunchPreparer({
+      loadScopes: async () => {
+        // This is the asynchronous gap a queued request crosses. A live SDK
+        // model object must not rewrite the routing decision after capture.
+        Object.assign(parentModel, { id: "replacement" });
+        return workerScopes();
+      },
+      modelInfo: () => ({
+        parentModel,
+        modelRegistry: registry,
+        ladders: { profiles: new Map(), strategies: new Map() },
+      }),
+      turnSettings: () => ({
+        defaultMaxTurns: undefined,
+        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
+      }),
+      childShaping: () => ({
+        midRunUpdates: true,
+        excludedExtensionPackages: [],
+        promptInheritance: {},
+      }),
+    });
+
+    const outcome = await preparer.prepare(
+      request({ model: "anthropic/claude-sonnet-5" }),
+    );
+
+    expect(outcome).toMatchObject({ kind: "prepared" });
+    if (outcome.kind === "prepared") {
+      expect(outcome.value.config.execution.modelIdentity).toEqual({
+        provider: "anthropic",
+        id: "claude-sonnet-5",
+      });
+    }
+  });
+
   it("captures the operator turn defaults before the definition load yields", async () => {
     let turnSettings: TurnSettings = {
       defaultMaxTurns: 8,

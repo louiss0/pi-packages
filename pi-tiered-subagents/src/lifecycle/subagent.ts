@@ -336,6 +336,15 @@ export class Subagent {
   }
 
   private _promise?: Promise<void>;
+  /** A queued run's early-settlement lever, paired with the exact run it owns. */
+  private queuedCancellation:
+    | {
+        readonly run: SubagentRun;
+        readonly resolve: () => void;
+        readonly detach: () => void;
+      }
+    | undefined;
+
   /** Handle on the agent's current run — the initial run, or the live resume that replaced it. */
   get promise(): Promise<void> | undefined {
     return this._promise;
@@ -560,6 +569,8 @@ export class Subagent {
    * "not configured" guards. The returned promise always resolves (errors are
    * captured internally).
    */
+  private sessionDisposalRequested = false;
+
   async run(): Promise<void> {
     const run = this.currentRun;
     this.startRun(run, this.execution.signal);
@@ -588,6 +599,15 @@ export class Subagent {
         this.fail(run, err);
         return;
       }
+    }
+
+    // Shutdown may finish while a provider is still preparing. The arriving
+    // workspace still belongs to this record, but must never reach a child.
+    if (this.sessionDisposalRequested) {
+      this.disposeHeldWorkspace();
+      // The run is stopped, not left reading "running" on a disposed record.
+      this.endBeforeStart(run);
+      return;
     }
 
     // A captured decision wins over the live read: a queued child keeps the
@@ -622,6 +642,11 @@ export class Subagent {
           toolNames: this.execution.toolNames,
         }),
       );
+      if (this.sessionDisposalRequested) {
+        await disposeQuietly(session, "late child session dispose");
+        this.endBeforeStart(run);
+        return;
+      }
       this.attachSession(session);
     } catch (err) {
       // The factory disposed its own session on a post-creation failure.
@@ -720,7 +745,68 @@ export class Subagent {
    * slot finally frees.
    */
   scheduleVia(schedule: RunScheduler): void {
-    this._promise = schedule(() => this.guardedRun());
+    const run = this.currentRun;
+    this._promise = this.scheduleQueued(
+      run,
+      schedule,
+      () => this.guardedRun(),
+      this.execution.signal,
+    );
+  }
+
+  /**
+   * Keep the scheduler's slot ownership separate from a queued run's promise:
+   * stopping one run settles its own waiter immediately, while the scheduler
+   * task remains queued and cannot release another run's capacity.
+   */
+  private scheduleQueued(
+    run: SubagentRun,
+    schedule: RunScheduler,
+    task: () => Promise<void>,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const cancelled = Promise.withResolvers<void>();
+    const stop = (): void => {
+      // A stale signal from an older run must not stop or settle a newer one.
+      if (this.currentRun !== run || run.status !== "queued") return;
+      this.stopQueued();
+    };
+    const detach = (): void => {
+      signal?.removeEventListener("abort", stop);
+    };
+    this.queuedCancellation = { run, resolve: cancelled.resolve, detach };
+    // An already-fired signal is not this path's business: the run's own start
+    // reads it and hands the turn loop a fired lever, which the existing
+    // settled-before-it-started behaviour depends on.
+    if (!signal?.aborted)
+      signal?.addEventListener("abort", stop, { once: true });
+
+    const scheduled = schedule(() => {
+      this.clearQueuedCancellation(run);
+      return task();
+    });
+    // Ending this queued run does not settle the scheduler's task or release
+    // another child's slot. Its stopped thunk is skipped when admitted.
+    return Promise.race([scheduled, cancelled.promise]).finally(() => {
+      this.clearQueuedCancellation(run);
+    });
+  }
+
+  /** Clear only the cancellation handle belonging to this exact queued run. */
+  private clearQueuedCancellation(run: SubagentRun): void {
+    const pending = this.queuedCancellation;
+    if (!pending || pending.run !== run) return;
+    this.queuedCancellation = undefined;
+    pending.detach();
+  }
+
+  /** Settle only the cancellation waiter belonging to this exact queued run. */
+  private resolveQueuedCancellation(run: SubagentRun): void {
+    const pending = this.queuedCancellation;
+    if (!pending || pending.run !== run) return;
+    this.queuedCancellation = undefined;
+    pending.detach();
+    pending.resolve();
   }
 
   /**
@@ -793,10 +879,14 @@ export class Subagent {
     const run = this.beginResume(options);
     // Checked on the run, not the record: a run stopped while it waited leaves
     // the record resumable, and a later resume may already have replaced it.
-    this._promise = schedule(() =>
-      run.isActive()
-        ? this.startResumedRun(run, subagentSession, prompt, options.signal)
-        : Promise.resolve(),
+    this._promise = this.scheduleQueued(
+      run,
+      schedule,
+      () =>
+        run.isActive()
+          ? this.startResumedRun(run, subagentSession, prompt, options.signal)
+          : Promise.resolve(),
+      options.signal,
     );
     return this._promise;
   }
@@ -891,10 +981,12 @@ export class Subagent {
    * when the slot finally frees no-ops on its guard — one notification.
    */
   stopQueued(): void {
-    this.currentRun.stopQueued();
+    const run = this.currentRun;
+    run.stopQueued();
+    this.resolveQueuedCancellation(run);
     // The queued run is the agent's initial run or a resume waiting for its slot,
     // and it ends on that run's own path.
-    this.execution.observer?.onRunFinished?.(this, this.currentRun.kind);
+    this.execution.observer?.onRunFinished?.(this, run.kind);
   }
 
   /**
@@ -968,6 +1060,7 @@ export class Subagent {
    * swallowed so the caller's remaining cleanup still runs.
    */
   async disposeSession(): Promise<void> {
+    this.sessionDisposalRequested = true;
     this.disposeHeldWorkspace();
     await disposeQuietly(this.subagentSession, "child session dispose");
   }

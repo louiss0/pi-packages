@@ -76,6 +76,29 @@ describe("SubagentsService accessors", () => {
     ).toBeUndefined();
   });
 
+  it("ordinary publication still replaces the active service", () => {
+    const parent = {} as SubagentsService;
+    const replacement = {} as SubagentsService;
+
+    publishSubagentsService(parent);
+    publishSubagentsService(replacement);
+
+    expect(getSubagentsService()).toBe(replacement);
+  });
+
+  it("does not let a stale owner unpublish a newer owner", () => {
+    const oldOwner = {} as SubagentsService;
+    const newOwner = {} as SubagentsService;
+
+    publishSubagentsService(oldOwner);
+    unpublishSubagentsService(oldOwner);
+    publishSubagentsService(newOwner);
+    unpublishSubagentsService(oldOwner);
+
+    expect(getSubagentsService()).toBe(newOwner);
+    unpublishSubagentsService(newOwner);
+  });
+
   it("publishes under this package's own identity, not the upstream one", () => {
     const upstreamKey = Symbol.for("@gotgenes/pi-subagents:service");
     expect(SERVICE_KEY).not.toBe(upstreamKey);
