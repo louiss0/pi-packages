@@ -11,8 +11,10 @@ definition — runs on exactly that model, or the launch fails.
 
 > **Partially superseded by [ADR 0014](0014-role-aware-model-routing.md):**
 > automatic routing is now role-aware rather than uniformly one tier down.
-> Exact explicit resolution, data-only profiles, whole-family replacement,
-> approved cross-version links, and retain/error outcomes remain in force.
+> Exact explicit resolution, data-only profiles, and whole-family replacement
+> remain in force. [ADR 0015](0015-version-local-routing-and-retained-effort.md)
+> subsequently removes cross-version links and replaces unknown-family errors
+> with parent retention.
 > The family examples below are historical; GLM replaces Kimi in supported data.
 
 ## Context

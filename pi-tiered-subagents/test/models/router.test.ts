@@ -130,54 +130,6 @@ describe("validateProfile", () => {
     expect(problems[0]?.problem).toContain("is not in the tier");
   });
 
-  it("rejects a fallback the profile does not have", () => {
-    const problems = validateProfile(
-      {
-        family: "gpt",
-        group: "size",
-        versions: [
-          {
-            version: "6.1",
-            tiers: [
-              {
-                tier: "sol",
-                size: "L",
-                models: [model("openai", "gpt-6.1-sol")],
-                fallbacks: [{ version: "9.9", tier: "luna" }],
-              },
-            ],
-          },
-        ],
-      },
-      strategy,
-    );
-    expect(problems[0]?.problem).toContain('fallback version "9.9"');
-  });
-
-  it("rejects a fallback tier the version does not have", () => {
-    const problems = validateProfile(
-      {
-        family: "gpt",
-        group: "size",
-        versions: [
-          {
-            version: "6.1",
-            tiers: [
-              {
-                tier: "sol",
-                size: "L",
-                models: [model("openai", "gpt-6.1-sol")],
-                fallbacks: [{ version: "6.1", tier: "nope" }],
-              },
-            ],
-          },
-        ],
-      },
-      strategy,
-    );
-    expect(problems[0]?.problem).toContain('fallback tier "nope"');
-  });
-
   it("rejects a family with no naming structure", () => {
     const problems = validateProfile(
       {
@@ -242,7 +194,6 @@ describe("routeModel", () => {
   });
 
   it.each([
-    ["openai", "gpt-6.1-sol", "worker", "gpt-6-luna", "M"],
     ["openai", "gpt-6-astra", "worker", "gpt-6-luna", "M"],
     ["openai", "gpt-6-sol", "reviewer", "gpt-6-sol", "L"],
     ["openai", "gpt-5.6-luna", "debug", "gpt-5.6-terra", "M"],
@@ -250,7 +201,6 @@ describe("routeModel", () => {
     ["openai", "gpt-5.4", "researcher", "gpt-5.4-mini", "S"],
     ["openai", "gpt-5.4-nano", "worker", "gpt-5.4-mini", "S"],
     ["qwen-token-plan", "qwen3.7-max", "worker", "qwen3.7-plus", "M"],
-    ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
     ["minimax", "MiniMax-M3.1", "debug", "MiniMax-M3.1-flash", "worker"],
     ["minimax", "MiniMax-M3.1-flash", "reviewer", "MiniMax-M3.1", "planner"],
     ["xiaomi", "mimo-v2.6-pro", "worker", "mimo-v2.6-flash", "worker"],
@@ -340,18 +290,36 @@ describe("routeModel", () => {
     expect(outcome.modelId).toBe("gpt-5.6-luna");
   });
 
-  it("crosses into an approved version when its own has nothing to offer", () => {
+  it("never crosses versions even when a legacy profile contains a link", () => {
+    const parent = model("openai", "gpt-6.1-sol");
+    const otherVersion = model("openai", "gpt-6-luna");
+    const legacyLinks = { fallbacks: [{ version: "6", tier: "luna" }] };
+    const profile: FamilyProfile = {
+      family: "gpt",
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [{ tier: "sol", size: "L", models: [parent], ...legacyLinks }],
+        },
+        {
+          version: "6",
+          tiers: [{ tier: "luna", size: "M", models: [otherVersion] }],
+        },
+      ],
+    };
     const outcome = routeModel(
-      model("openai", "gpt-6.1-sol"),
-      context([model("openai", "gpt-6.1-sol"), model("openai", "gpt-6-luna")]),
+      parent,
+      context([parent, otherVersion], [profile]),
+      "worker",
     );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gpt-6-luna");
-    expect(outcome.tier).toBe("gpt 6 tier luna");
+    expect(outcome.kind).toBe("retained");
+    if (outcome.kind !== "retained") return;
+    expect(outcome.model).toBe(parent);
+    expect(outcome.reason).toContain("6.1");
   });
 
-  it("does not cross into a version the profile does not approve", () => {
+  it("never invents a route to another version", () => {
     const profile: FamilyProfile = {
       family: "gpt",
       group: "size",
@@ -415,14 +383,14 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("no profile for version 4.1");
   });
 
-  it("errors on a model it cannot place in a family", () => {
-    const outcome = routeModel(
-      model("acme", "wonder-model-9"),
-      context([model("acme", "wonder-model-9")]),
-    );
-    expect(outcome.kind).toBe("error");
-    if (outcome.kind !== "error") return;
-    expect(outcome.error).toContain("Cannot place the model");
+  it("keeps a parent it cannot place in a family", () => {
+    const parent = model("acme", "wonder-model-9");
+    const outcome = routeModel(parent, context([parent]), "worker");
+    expect(outcome.kind).toBe("retained");
+    if (outcome.kind !== "retained") return;
+    expect(outcome.model).toBe(parent);
+    expect(outcome.reason).toContain("worker targets");
+    expect(outcome.reason).toContain("unknown family");
   });
 
   it("keeps the parent's model when there is no parent", () => {
@@ -504,79 +472,17 @@ describe("routeModel", () => {
     ["minimax", "MiniMax-M2.7", "explore", "MiniMax-M3.1-flash", "worker"],
     ["qwen-token-plan", "qwen3.7-max", "researcher", "qwen3.6-flash", "S"],
     ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
-  ])("%s/%s reaches the %s target via approved links", (provider, parentId, role, expected, target) => {
+  ])("%s/%s retains rather than crossing versions for %s", (provider, parentId, role, otherVersionId, target) => {
     const parent = model(provider, parentId);
     const outcome = routeModel(
       parent,
-      context([parent, model(provider, expected)]),
+      context([parent, model(provider, otherVersionId)]),
       role,
     );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect([outcome.provider, outcome.modelId]).toEqual([provider, expected]);
+    expect(outcome.kind).toBe("retained");
+    if (outcome.kind !== "retained") return;
+    expect(outcome.model).toBe(parent);
     expect(outcome.reason).toContain(`${role} targets ${target}`);
-  });
-
-  it("keeps walking down approved links when a target model is unavailable", () => {
-    const outcome = routeModel(
-      model("openai", "gpt-6.1-sol"),
-      context([model("openai", "gpt-5.6-luna")]),
-    );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gpt-5.6-luna");
-  });
-
-  it("tries the next approved target path when the first is unrunnable", () => {
-    const parent = model("google", "gemini-3.7-flash");
-    const profile: FamilyProfile = {
-      family: "gemini",
-      group: "planner-worker",
-      versions: [
-        {
-          version: "3.7",
-          tiers: [
-            {
-              tier: "flash",
-              class: "worker",
-              models: [parent],
-              fallbacks: [
-                { version: "3.1", tier: "pro-preview" },
-                { version: "2.5", tier: "pro" },
-              ],
-            },
-          ],
-        },
-        {
-          version: "3.1",
-          tiers: [
-            {
-              tier: "pro-preview",
-              class: "planner",
-              models: [model("google", "gemini-3.1-pro-preview")],
-            },
-          ],
-        },
-        {
-          version: "2.5",
-          tiers: [
-            {
-              tier: "pro",
-              class: "planner",
-              models: [model("google", "gemini-2.5-pro")],
-            },
-          ],
-        },
-      ],
-    };
-    const outcome = routeModel(
-      parent,
-      context([model("google", "gemini-2.5-pro")], [profile]),
-      "reviewer",
-    );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gemini-2.5-pro");
   });
 
   it("degrades review downward when its planner target is unavailable", () => {
@@ -592,7 +498,27 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("reviewer targets planner");
   });
 
-  it("does not promote a worker target through a planner-only cross-version link", () => {
+  it("tries a cheaper rung in the same version when the target is unavailable", () => {
+    const parent = model("openai", "gpt-5.4-pro");
+    const outcome = routeModel(
+      parent,
+      context([
+        parent,
+        model("openai", "gpt-5.4-nano"),
+        model("openai", "gpt-5.5-pro"),
+      ]),
+      "worker",
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect([outcome.provider, outcome.modelId]).toEqual([
+      "openai",
+      "gpt-5.4-nano",
+    ]);
+    expect(outcome.reason).toContain("worker targets S");
+  });
+
+  it("does not borrow a planner from another version", () => {
     const parent = model("google", "gemini-3.7-flash");
     const outcome = routeModel(
       parent,

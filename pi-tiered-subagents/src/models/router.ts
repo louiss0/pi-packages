@@ -2,22 +2,23 @@
  * Role-aware model selection on data-only family ladders.
  *
  * Resolve the role's size/class target first, then try that rung and cheaper
- * rungs in capability order, followed by approved links. Names only locate a
+ * rungs within the parent's exact family and version. Names only locate a
  * parent; group/size/class come from profile data, never name heuristics.
- * Versions are crossed only through links on the rungs visited. Only models
- * the session can run may win; an exhausted walk retains the parent.
+ * Versions are never crossed. Only models the session can run may win; an
+ * unknown family or exhausted version ladder retains the parent.
  */
 
 import type { Model } from "@earendil-works/pi-ai";
 import type {
   FamilyProfile,
   ModelCandidate,
-  ModelSize,
-  ModelClass,
-  TierRef,
   TierProfile,
 } from "#src/models/profile";
 import { policyFor } from "#src/models/role-policy";
+import {
+  createRoutingTarget,
+  type RoutingTarget,
+} from "#src/models/routing-target";
 import {
   candidateJoins,
   type FamilyStrategy,
@@ -77,11 +78,6 @@ export type RoutingOutcome =
       readonly kind: "retained";
       readonly model: Model<any> | undefined;
       readonly reason: string;
-    }
-  | {
-      /** The parent's model cannot be placed: the family is unknown. */
-      readonly kind: "error";
-      readonly error: string;
     };
 
 /**
@@ -108,10 +104,9 @@ export function routeModel(
   const strategy = strategyFor(parent.id, context);
   if (!strategy) {
     return {
-      kind: "error",
-      error:
-        `Cannot place the model "${parent.id}" in a known family, so there is no ` +
-        "automatic routing for it. Name the model explicitly to choose one.",
+      kind: "retained",
+      model: parent,
+      reason: `${intent}: ${parent.id} belongs to an unknown family; keeping the parent model`,
     };
   }
 
@@ -136,11 +131,14 @@ export function routeModel(
     };
   }
 
-  const tier = mostSpecificTier(
+  const parentTierName = mostSpecificTier(
     parts?.tierCandidates ?? [],
     version.tiers.map((candidate) => candidate.tier),
   );
-  if (tier === undefined) {
+  const parentTier = version.tiers.find(
+    (candidate) => candidate.tier === parentTierName,
+  );
+  if (!parentTier) {
     return {
       kind: "retained",
       model: parent,
@@ -148,48 +146,28 @@ export function routeModel(
     };
   }
 
-  const parentTier = version.tiers.find((candidate) => candidate.tier === tier);
-  const target =
-    profile.group === "planner-worker"
-      ? policy.class
-      : policy.size === "equal"
-        ? parentTier?.size
-        : policy.size === "one-below"
-          ? sizeBelow(parentTier?.size)
-          : policy.size;
-  const matchesTarget = (candidate: TierProfile) =>
-    profile.group === "size"
-      ? candidate.size === target
-      : candidate.class === target;
-  const targetTier =
-    profile.group === "size" && policy.size === "equal"
-      ? parentTier
-      : version.tiers.find(matchesTarget);
-  const available = indexAvailable(context.available);
-  const runnableFrom = (start: TierRef) =>
-    walkLadder(profile, start, new Set(), (candidate, ref) => {
-      // Links may expose a higher class solely to make another role's target
-      // reachable (flash-only Gemini -> pro). That is not a cheaper fallback.
-      const label = profile.group === "size" ? candidate.size : candidate.class;
-      if (!label || !target || CAPABILITY[label] > CAPABILITY[target])
-        return undefined;
-      const selected = pickAvailable(candidate.models, available);
-      return selected ? { ...selected, tier: ref } : undefined;
-    });
-  const found = targetTier
-    ? runnableFrom({ version: version.version, tier: targetTier.tier })
-    : walkLadder(
-        profile,
-        { version: version.version, tier },
-        new Set(),
-        (candidate, ref) =>
-          matchesTarget(candidate) ? runnableFrom(ref) : undefined,
-      );
+  const routingTarget = createRoutingTarget(profile.group, policy, parentTier);
+  if (!routingTarget) {
+    return {
+      kind: "retained",
+      model: parent,
+      reason: `${intent}: the parent tier has no size label; keeping ${parent.id}`,
+    };
+  }
+  const startingTier = routingTarget.startingTier(version, parentTier);
+  const candidateTiers = startingTier
+    ? version.tiers.slice(version.tiers.indexOf(startingTier))
+    : [];
+  const found = pickRunnableTier(
+    candidateTiers,
+    routingTarget,
+    indexAvailable(context.available),
+  );
   if (!found) {
     return {
       kind: "retained",
       model: parent,
-      reason: `${agentId} targets ${target}: no runnable target or lower ${strategy.family} tier; keeping ${parent.id}`,
+      reason: `${agentId} targets ${routingTarget.label}: no runnable target or cheaper tier in ${strategy.family} ${version.version}; keeping ${parent.id}`,
     };
   }
 
@@ -198,57 +176,21 @@ export function routeModel(
     model: found.model,
     provider: found.candidate.provider,
     modelId: found.candidate.id,
-    tier: `${strategy.family} ${found.tier.version} tier ${found.tier.tier || "default"}`,
-    reason: `${agentId} targets ${target}: ${parent.id} → ${found.candidate.id} (${strategy.family} ${found.tier.version} tier ${found.tier.tier || "default"})`,
+    tier: `${strategy.family} ${version.version} tier ${found.tierName || "default"}`,
+    reason: `${agentId} targets ${routingTarget.label}: ${parent.id} → ${found.candidate.id} (${strategy.family} ${version.version} tier ${found.tierName || "default"})`,
   };
 }
 
-/** Labels order fallback capability only within their own family group. */
-const CAPABILITY = {
-  S: 0,
-  M: 1,
-  L: 2,
-  worker: 0,
-  planner: 1,
-} as const satisfies Record<ModelSize | ModelClass, number>;
-
-/** The smallest size is a floor, never an invented rung below S. */
-function sizeBelow(size: ModelSize | undefined): ModelSize | undefined {
-  return size === "L" ? "M" : size === undefined ? undefined : "S";
-}
-
-/**
- * Visit the starting rung and cheaper same-version rungs before their links.
- * The same order resolves missing targets and finds runnable models, without
- * ever comparing version numbers or inventing a cross-version relationship.
- */
-function walkLadder<T>(
-  profile: FamilyProfile,
-  from: TierRef,
-  visited: Set<string>,
-  pick: (tier: TierProfile, ref: TierRef) => T | undefined,
-): T | undefined {
-  const version = profile.versions.find(
-    (candidate) => candidate.version === from.version,
-  );
-  if (!version) return undefined;
-  const index = version.tiers.findIndex((tier) => tier.tier === from.tier);
-  if (index === -1) return undefined;
-
-  const rungs = version.tiers
-    .slice(index)
-    .filter((tier) => !visited.has(`${version.version}/${tier.tier}`));
-  for (const tier of rungs) {
-    const ref = { version: version.version, tier: tier.tier };
-    visited.add(`${ref.version}/${ref.tier}`);
-    const found = pick(tier, ref);
-    if (found !== undefined) return found;
-  }
-  for (const tier of rungs) {
-    for (const fallback of tier.fallbacks ?? []) {
-      const found = walkLadder(profile, fallback, visited, pick);
-      if (found !== undefined) return found;
-    }
+/** The first runnable target/cheaper rung within the one selected version. */
+function pickRunnableTier(
+  tiers: readonly TierProfile[],
+  target: RoutingTarget,
+  available: ReadonlyMap<string, Model<any>>,
+) {
+  for (const tier of tiers) {
+    if (!target.allowsFallback(tier)) continue;
+    const selected = pickAvailable(tier.models, available);
+    if (selected) return { ...selected, tierName: tier.tier };
   }
   return undefined;
 }

@@ -41,7 +41,7 @@ import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { createTestSubagent } from "#test/helpers/make-subagent";
-import { makeModel } from "#test/helpers/make-model";
+import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
@@ -586,6 +586,55 @@ describe("both doors resolve alike", () => {
 });
 
 describe("automatic model selection at launch", () => {
+  it.each([
+    ["acme", "wonder-model-9", false],
+    ["openai", "gpt-5.4-nano", true],
+  ])("keeps %s/%s and lowers effort by the next supported rung", (provider, id, registryHasParent) => {
+    const parent = makeReasoningModel({
+      provider,
+      id,
+      thinkingLevelMap: {
+        off: "off",
+        minimal: null,
+        low: "low",
+        medium: null,
+        high: "high",
+        xhigh: null,
+        max: "max",
+      },
+    });
+    const result = resolveSpawnConfig(
+      { subagent_type: "worker", prompt: "do it", description: "d" },
+      registryWith("worker", {}),
+      {
+        parentModel: parent,
+        parentThinkingLevel: "max",
+        modelRegistry: {
+          getAll: () => (registryHasParent ? [parent] : []),
+          getAvailable: () => (registryHasParent ? [parent] : []),
+          find: (candidateProvider, candidateId) =>
+            registryHasParent &&
+            candidateProvider === provider &&
+            candidateId === id
+              ? parent
+              : undefined,
+        },
+        ladders: {
+          profiles: new Map(SHIPPED_PROFILES.map((p) => [p.family, p])),
+          strategies: strategiesByFamily(SHIPPED_STRATEGIES),
+        },
+      },
+      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
+    );
+    expect(result).not.toHaveProperty("error");
+    if ("error" in result) return;
+    expect(result.execution.modelIdentity).toEqual({ provider, id });
+    expect(result.execution.thinkingDecision.level).toBe("high");
+    expect(result.execution.thinkingDecision.reason).toContain(
+      "the parent's model was kept",
+    );
+  });
+
   it.each([
     ["reviewer", "claude-opus-4-5"],
     ["worker", "claude-sonnet-4-5"],

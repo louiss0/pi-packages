@@ -94,16 +94,21 @@ export function resolveLaunchModel(
 
   // Thinking capabilities are read now, while preparation owns the registry
   // view. Only the resulting decision survives into the queued launch.
+  // A role may deliberately select the same model (equal size or the bottom
+  // rung). Identity, not selection source, determines retention.
+  const parentModelKept =
+    selection.selection.identity !== undefined &&
+    selection.selection.identity.provider === context.parentModel?.provider &&
+    selection.selection.identity.id === context.parentModel?.id;
   const selectedModel = selection.selection.identity
-    ? context.registry?.find(
+    ? (context.registry?.find(
         selection.selection.identity.provider,
         selection.selection.identity.id,
-      )
+      ) ?? (parentModelKept ? context.parentModel : undefined))
     : undefined;
   const thinkingDecision = resolveThinking(
     defined({
-      // The parent's model was kept when nothing below it was available.
-      parentModelKept: selection.selection.source === "inherited",
+      parentModelKept,
       model: selectedModel,
       requested: request.requestedThinking,
       defined: request.definitionThinking,

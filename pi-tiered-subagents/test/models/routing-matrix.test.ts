@@ -11,6 +11,7 @@ describe("the routing matrix in docs/model-matrix.md", () => {
   it("matches every generated region, including the role grid and all availability scenarios", async () => {
     const markdown = await readFile(DOC, "utf8");
     const regions = generateModelMatrix();
+    expect(regions.map((region) => region.name)).toEqual(["grid", "full"]);
     const documented = [
       ...markdown.matchAll(
         /<!-- model-matrix:([\w-]+):start -->\n([\s\S]*?)\n<!-- model-matrix:\1:end -->/g,
@@ -50,6 +51,17 @@ describe("the routing matrix in docs/model-matrix.md", () => {
     ]);
   });
 
+  it("shows retention when the exact version lacks the role target despite all candidates being available", () => {
+    const grid = generateModelMatrix().find((region) => region.name === "grid");
+    const worker = grid?.markdown
+      .split("\n")
+      .find((line) => line.startsWith("| `worker` |"));
+    // GPT 6.1 has no M rung; Gemini 4 and DeepSeek 4 have no worker class.
+    expect(worker).toBe(
+      "| `worker` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |",
+    );
+  });
+
   it("documents every concrete parent for every role with all three availability outcomes", () => {
     const full = generateModelMatrix().find((region) => region.name === "full");
     const rows =
@@ -74,6 +86,7 @@ describe("the routing matrix in docs/model-matrix.md", () => {
         for (const outcome of cells.slice(3)) {
           expect(outcome).toMatch(/^(\*\*retain\*\*|`[^`]+\/[^`]+`)$/);
         }
+        expect(cells[4]).toBe("**retain**");
         expect(cells[5]).toBe("**retain**");
         return `${cells[0]?.replaceAll("`", "")}\t${cells[2]?.replaceAll("`", "")}`;
       })

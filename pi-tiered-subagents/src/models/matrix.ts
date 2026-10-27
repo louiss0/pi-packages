@@ -53,9 +53,6 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
       { profiles, strategies, available },
       role,
     );
-    if (result.kind === "error") {
-      throw new Error(`Matrix row ${key(parent)} / ${role}: ${result.error}`);
-    }
     return result.kind === "retained"
       ? "**retain**"
       : code(`${result.provider}/${result.modelId}`);
@@ -82,7 +79,7 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
   const full = SHIPPED_PROFILES.map((profile) => {
     const rows = profile.versions.flatMap((version) => {
       // Remove ALL candidates in the parent's version, including its target
-      // and peers, so this scenario probes only approved cross-version paths.
+      // and peers: other versions and families must never supply a target.
       const sameVersion = new Set(
         version.tiers.flatMap((tier) => tier.models.map(key)),
       );
@@ -113,24 +110,8 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
     )}`;
   }).join("\n\n");
 
-  const links = table(
-    ["Family", "From version / rung", "To version / rung"],
-    SHIPPED_PROFILES.flatMap((profile) =>
-      profile.versions.flatMap((version) =>
-        version.tiers.flatMap((tier) =>
-          (tier.fallbacks ?? []).map((fallback) => [
-            profile.family,
-            `${version.version} / ${code(tier.tier || "(default)")}`,
-            `${fallback.version} / ${code(fallback.tier || "(default)")}`,
-          ]),
-        ),
-      ),
-    ),
-  );
-
   return [
     { name: "grid", markdown: `${grid}\n\n${gridParents}` },
     { name: "full", markdown: full },
-    { name: "links", markdown: links },
   ];
 }

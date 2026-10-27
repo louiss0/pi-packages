@@ -285,13 +285,6 @@ function copyRoutingLadders(ladders: RoutingLadders): RoutingLadders {
             tiers: version.tiers.map((tier) => ({
               ...tier,
               models: tier.models.map((model) => ({ ...model })),
-              ...(tier.fallbacks
-                ? {
-                    fallbacks: tier.fallbacks.map((fallback) => ({
-                      ...fallback,
-                    })),
-                  }
-                : {}),
             })),
           })),
         },

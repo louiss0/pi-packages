@@ -2,9 +2,9 @@
  * profiles.ts — The family profiles this package ships.
  *
  * Each profile is data: the versions a family has, the tiers of each version in
- * capability order, the concrete model ids of each tier, and the rungs a tier
- * may fall back to. Nothing here is code, so an operator can correct a
- * ladder — or replace a family wholesale — without touching the runtime.
+ * capability order, and the concrete model ids of each tier. Nothing here is
+ * code, so an operator can correct a ladder — or replace a family wholesale —
+ * without touching the runtime.
  *
  * The ladders are written against the model catalogue the installed SDK ships,
  * which is a representative registry and not a promise of vendor availability:
@@ -16,10 +16,7 @@
  * A version's default model — the one whose id names no tier of its own — is
  * the tier with the empty name.
  *
- * The fallbacks are the only way a version is ever crossed. They are written
- * on the rung that may cross, because the tiers of two versions are not
- * comparable by name: one version's cheapest line may be dearer than
- * another's.
+ * Routing stays within the parent's exact family and version.
  */
 
 import type { FamilyProfile, ModelCandidate } from "#src/models/profile";
@@ -51,9 +48,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "sol",
             size: "L",
             models: [model("openai", "gpt-6.1-sol")],
-            // The 6.1 line has one rung, so the walk crosses into 6 — an
-            // approved link, and the only one this profile declares.
-            fallbacks: [{ version: "6", tier: "luna" }],
           },
         ],
       },
@@ -64,19 +58,16 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "astra",
             size: "L",
             models: [model("openai", "gpt-6-astra")],
-            fallbacks: [{ version: "5.6", tier: "sol" }],
           },
           {
             tier: "sol",
             size: "L",
             models: [model("openai", "gpt-6-sol")],
-            fallbacks: [{ version: "5.6", tier: "sol" }],
           },
           {
             tier: "luna",
             size: "M",
             models: [model("openai", "gpt-6-luna")],
-            fallbacks: [{ version: "5.6", tier: "luna" }],
           },
         ],
       },
@@ -253,7 +244,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "flash",
             class: "worker",
             models: [model("google", "gemini-3.8-flash")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
         ],
       },
@@ -264,7 +254,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "flash",
             class: "worker",
             models: [model("google", "gemini-3.7-flash")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
         ],
       },
@@ -275,7 +264,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "flash",
             class: "worker",
             models: [model("google", "gemini-3.6-flash")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
         ],
       },
@@ -291,7 +279,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "flash-lite",
             class: "worker",
             models: [model("google", "gemini-3.5-flash-lite")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
         ],
       },
@@ -302,7 +289,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "pro-preview",
             class: "planner",
             models: [model("google", "gemini-3.1-pro-preview")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
           {
             tier: "flash-lite",
@@ -389,10 +375,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "",
             class: "planner",
             models: [model("minimax", "MiniMax-M3")],
-            fallbacks: [
-              { version: "3.1", tier: "flash" },
-              { version: "2.7", tier: "" },
-            ],
           },
         ],
       },
@@ -403,13 +385,11 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "highspeed",
             class: "planner",
             models: [model("minimax", "MiniMax-M2.7-highspeed")],
-            fallbacks: [{ version: "3.1", tier: "flash" }],
           },
           {
             tier: "",
             class: "planner",
             models: [model("minimax", "MiniMax-M2.7")],
-            fallbacks: [{ version: "3.1", tier: "flash" }],
           },
         ],
       },
@@ -426,16 +406,11 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "max",
             size: "L",
             models: [model("qwen-token-plan", "qwen3.7-max")],
-            fallbacks: [
-              { version: "3.6", tier: "plus" },
-              { version: "3.6", tier: "flash" },
-            ],
           },
           {
             tier: "plus",
             size: "M",
             models: [model("qwen-token-plan", "qwen3.7-plus")],
-            fallbacks: [{ version: "3.6", tier: "flash" }],
           },
         ],
       },
@@ -488,7 +463,6 @@ export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
             tier: "pro",
             class: "planner",
             models: [model("xiaomi", "mimo-v2.6-pro")],
-            fallbacks: [{ version: "2.5", tier: "pro" }],
           },
           {
             tier: "flash",

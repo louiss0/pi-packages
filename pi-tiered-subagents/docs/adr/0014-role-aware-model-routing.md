@@ -5,6 +5,15 @@ date: 2026-10-27
 
 # 0014 — Automatic model routing is role-aware
 
+> **Partially superseded by [ADR 0015](0015-version-local-routing-and-retained-effort.md):**
+> automatic routing now stays in the exact parent family/version, with no
+> version fallback links in schema, data, or runtime; unknown families retain
+> the parent instead of requiring an explicit model. Legacy `fallbacks` fields
+> are ignored as unknown fields. The role-aware mapping and size/class labels
+> below remain in force; cross-version examples below are historical. ADR 0015
+> also replaces the older retained-model reasoning preference with the next
+> supported non-off rung when parent effort is known.
+
 [Issue #10](https://github.com/louiss0/pi-packages/issues/10) replaces the uniform
 one-tier-down automatic model rule in [ADR 0007](0007-the-childs-model-is-one-tier-down.md).
 Review should not be guaranteed a weaker model than the work it audits, and a

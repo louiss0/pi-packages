@@ -110,7 +110,8 @@ protected by an equivalent host gate.
 | `src/models/strategy.ts` | How one family's ids are read: the version and the tier. |
 | `src/models/profile.ts` | What a profile says, and how a malformed one is refused. |
 | `src/models/profiles.ts` | The ladders this package ships. |
-| `src/models/router.ts` | Role-aware size/class targets, then the downward walk and approved cross-version links. |
+| `src/models/routing-target.ts` | `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`: label matching, starting rung, and fallback rank behind a small common interface. |
+| `src/models/router.ts` | The common downward walk within the exact parent family/version. |
 | `src/models/selection.ts` | The precedence: the request, then the definition, then the routing. |
 | `src/models/user-profiles.ts` | The operator's profiles, read from the settings layers. |
 
@@ -128,23 +129,17 @@ runtime uses:
       "group": "size",
       "versions": [
         {
-          "version": "6.1",
+          "version": "5.6",
           "tiers": [
             {
               "tier": "sol",
               "size": "L",
-              "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
-              "fallbacks": [{ "version": "6", "tier": "luna" }]
-            }
-          ]
-        },
-        {
-          "version": "6",
-          "tiers": [
+              "models": [{ "provider": "openai", "id": "gpt-5.6-sol" }]
+            },
             {
-              "tier": "luna",
+              "tier": "terra",
               "size": "M",
-              "models": [{ "provider": "openai", "id": "gpt-6-luna" }]
+              "models": [{ "provider": "openai", "id": "gpt-5.6-terra" }]
             }
           ]
         }
@@ -175,8 +170,10 @@ runtime uses:
 ```
 
 Only data is read: a value the schema does not name is ignored, never
-evaluated. A family with no naming structure is refused — the eight shipped
-strategies are the structures this package can read.
+evaluated. A replacement profile with an unsupported naming structure is
+refused — the eight shipped strategies are the structures this package can
+read. This is profile validation, not an unknown-parent-family error: an
+unknown parent family retains the parent model.
 
 The profiles live in the runtime's settings file, which the settings module
 owns: it merges the global and project layers per family without an
@@ -184,7 +181,7 @@ extension-owned trust check, and round-trips the profiles so a
 `/subagents:settings` edit does not erase them. The model domain reads the
 data and validates it; it never touches a file of its own.
 
-### Role-aware routing follow-up (issue #10)
+### Role-aware routing (issue #10), updated by ADR 0015
 
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
@@ -204,29 +201,30 @@ Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
 sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
-A size or class target starts at the top matching rung in the parent's version;
-Equal starts at the parent's own rung, not the top of its size. If that version
-has no matching target, only profile-approved cross-version links may reach it.
-From the resolved target, try concrete IDs in preference order, then cheaper
-rungs in the same version, then approved cross-version links, skipping anything
-the session cannot run. No version relationship is inferred. If nothing is
-runnable (including an absent target class), keep the parent's model and report
-why. A reviewer retaining its own rung by Equal is a designed choice, not an
-exhaustion fallback. The launch reason names the role and target as well as the
-chosen model, including retained outcomes.
+Automatic model routing stays within the parent's exact family and version.
+A size or class target starts at the top matching rung in that version; Equal
+starts at the parent's own rung, not the top of its size. Try concrete IDs in
+preference order, then eligible cheaper rungs in the same version, skipping
+anything the session cannot run. No version fallback links are supported or
+inferred. If no role target or cheaper rung is runnable, keep the parent's
+model and report why. An unknown family also retains the parent, without
+price-based or name-based guessing. A reviewer retaining its own rung by Equal
+is a designed choice, not an exhaustion fallback. The launch reason names the
+role and target as well as the chosen model, including retained outcomes.
 
 Flash-named tiers, including the separate flash-lite rung, are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the new worker rung
-below its planner flagship; M3 and M2.7 have approved links to that flash rung.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
-versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
-approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
-reviewer targets pro, and the other roles retain the parent.
+runtime name-based classification. MiniMax M3.1-flash is the worker rung
+below its planner flagship, available only to routing within version 3.1.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
+cannot reach it; flash-only Gemini versions cannot reach a different version's
+planner, and Qwen cannot reach another version's S tier. Missing targets retain
+the parent. DeepSeek has planner but no worker class: reviewer targets pro,
+and the other roles retain the parent.
 
 GLM uses a glued-version naming strategy (version adjoining the prefix,
 variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: a Kimi parent requires an explicit model.
+supported automatic-routing family: an unpinned Kimi parent is retained.
 The shipped catalogue is representative of the installed SDK, not a promise of
 vendor availability. Profiles enumerate candidates; session access decides
 which can run. Model routing changes neither exact-pin resolution nor reasoning
@@ -236,8 +234,10 @@ A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
 labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels; version/tier/model/fallback shape and
-whole-family replacement semantics stay the same. Examples are representative
+replacements by adding these labels. Version/tier/model shape and whole-family
+replacement semantics stay the same; version fallback links are removed from
+the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
+the same unknown-field rule as any other unrecognized field. Examples are representative
 profile data, not provider-access guarantees.
 
 [ADR 0014](adr/0014-role-aware-model-routing.md) supersedes only ADR 0007's
@@ -253,8 +253,40 @@ is generated through the implementation. Verification for this increment:
   there are no package-owned diagnostics.
 - The standards/spec review resolved duplicated label rules and confirmed the
   generic downward fallback also applies to review when its target is unavailable.
-  A regression verifies alternate approved target paths are tried after an
-  unrunnable first path.
+  Its alternate cross-version target-path coverage is historical and is
+  superseded by ADR 0015's exact-version boundary.
+
+### Version-local routing and retained effort (ADR 0015)
+
+[ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
+only version links, unknown-family errors, and the old retained-effort
+medium/low preference. The five-role mapping and size/class labels stay intact;
+no new families or versions are added. The verification counts immediately
+above describe the earlier issue-#10 increment, not evidence for this change.
+`SizeRoutingTarget` and `PlannerWorkerRoutingTarget` separately own label
+matching, starting rung, and fallback rank behind a small shared interface;
+the router owns the common exact-version walk. No class-internal tests are
+required.
+
+Automatic retained-model reasoning with known parent effort takes the next
+supported non-off rung: on `[low, high, max]`, `max` becomes `high`, not `low`.
+Gaps are skipped and floor effort stays. No-parent medium/low/lowest defaults,
+explicit request/definition precedence and clamping, and non-reasoning
+*not applicable* reporting remain unchanged.
+
+Verification for this follow-up:
+
+- Final full package suite: 135 files passed; 2,523 tests passed and one skipped.
+  The other six workspace test projects also passed in the workspace-wide run.
+- An isolated checkout of the staged changes passed 212 focused model, launch,
+  and reasoning tests plus typechecking, without the unrelated working-tree
+  reasoning changes.
+- Package `typecheck`, `lint`, and `metadata` targets passed. The same recorded
+  twelve third-party settings-source diagnostics per configuration remain;
+  there are no package-owned diagnostics.
+- Standards and spec re-review: no remaining findings. Regression coverage
+  includes unknown-family retention, ignored legacy links, registry-missing
+  parent capabilities, gapped effort ladders, and parents below the non-off floor.
 
 ### What the model selection does now
 
@@ -265,10 +297,10 @@ is generated through the implementation. Verification for this increment:
 | Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
 | An explicit choice works without a known family | 59 | Done. |
 | Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover the eight agreed families. |
-| Cross-version links are declared, never inferred | 62 | Done. A link names the version and the tier it may cross to. |
+| Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; old `fallbacks` is ignored as an unknown field. |
 | The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
-| An unplaceable family is an error | 66 | Done. |
+| An unknown parent family retains the parent | 66; ADR 0015 | No guessed family, price ranking, or cross-version fallback. |
 | A family with nothing to offer keeps the parent's model | 67 | Done. |
 | The choice is reported | 74 (model half) | Done. The launch note says which model was chosen and why. |
 
@@ -280,7 +312,7 @@ is known.
 | Rule | Stories | State |
 | --- | --- | --- |
 | Automatic defaults: medium, then low, then the lowest supported non-off | 68 | Done. The supported levels come from Pi's own report about the model, not from its name. |
-| The retained-parent fallback never raises the effort | 69 | Done. Medium or low are taken only when they are below the effort the parent was running at; otherwise a supported level below it; otherwise the parent's effort stands. |
+| Retained-model automatic effort takes the next supported non-off rung | 69; ADR 0015 | With known parent effort, choose the highest supported level strictly below it, skipping gaps; at the floor, effort stays. No fixed medium/low preference applies. Without parent effort, medium/low/lowest non-off remains. Explicit request/definition levels still win. |
 | The request's level wins over the definition's | 70 | Done. |
 | An unsupported level is clamped, never rejected | 71 | Done. The clamp is Pi's own, so the runtime cannot disagree with Pi about a level, and it never lands on "off" for a reasoning model. |
 | A model that does not reason is still usable | 72 | Done. |

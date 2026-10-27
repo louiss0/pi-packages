@@ -3,7 +3,7 @@
 Which specialist runs, and which model it runs on, are **two separate decisions**.
 All 5 × 8 agent/family combinations are valid, but automatic model selection is
 **role-aware**, not uniform: the agent identifier determines a target within
-the parent's family. Explicit model pins still win over automatic routing.
+the parent's exact family **and version**. Explicit model pins still win over automatic routing.
 
 Sources: [`src/agents/registry.ts`](../src/agents/registry.ts),
 [`src/agents/definition.ts`](../src/agents/definition.ts),
@@ -22,7 +22,7 @@ request ──► agent selection ──► definition (layered by name)
                   │
                   └─► model selection ──► exact request model
                                           exact definition model
-                                          automatic role-aware family ladder
+                                          automatic role-aware same-version family ladder
 ```
 
 A family is a **model grouping** (GPT, Claude, Gemini, …). A role is a **task
@@ -70,11 +70,11 @@ or definition model pin bypasses this grid.
 <!-- model-matrix:grid:start -->
 | Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `explore` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** | `xiaomi/mimo-v2.6-flash` |
-| `worker` | `openai/gpt-6-luna` | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
+| `explore` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** | `xiaomi/mimo-v2.6-flash` |
+| `worker` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
 | `reviewer` | `openai/gpt-6.1-sol` | `anthropic/claude-opus-5-5` | `google/gemini-4-argon` | `zai/glm-5.3` | `minimax/MiniMax-M3.1` | `qwen-token-plan/qwen3.7-max` | `deepseek/deepseek-v4-pro` | `xiaomi/mimo-v2.6-pro-ultraspeed` |
-| `debug` | `openai/gpt-6-luna` | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
-| `researcher` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** | `xiaomi/mimo-v2.6-flash` |
+| `debug` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
+| `researcher` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** | `xiaomi/mimo-v2.6-flash` |
 
 | Family | Representative parent (all candidates available) |
 | --- | --- |
@@ -104,9 +104,8 @@ routing policy. Availability is an explicit input:
 - **All available**: every candidate in every shipped profile is runnable.
 - **Other versions only**: every candidate in the parent's version is removed
   (including the parent, its role target, and sibling candidates); all other
-  candidates remain runnable. Only approved cross-version paths can select a
-  model. This is an availability stress case, not a promise that any link is
-  reachable for every role.
+  candidates remain runnable. Every outcome must retain the parent: automatic
+  routing never crosses a version or family boundary.
 - **None available**: no candidate is runnable, exercising parent retention.
 - **retain**: the routing outcome keeps the exact parent identity. A routed
   identity equal to the parent is printed explicitly instead; intentional
@@ -121,24 +120,24 @@ identities and retain outcomes come only from the router.
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `openai/gpt-6.1-sol` | 6.1 / sol (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `worker` | `openai/gpt-6-luna` | `openai/gpt-6-luna` | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `reviewer` | `openai/gpt-6.1-sol` | `openai/gpt-6-luna` | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `debug` | `openai/gpt-6-luna` | `openai/gpt-6-luna` | **retain** |
+| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `worker` | **retain** | **retain** | **retain** |
+| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `reviewer` | `openai/gpt-6.1-sol` | **retain** | **retain** |
+| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `debug` | **retain** | **retain** | **retain** |
 | `openai/gpt-6.1-sol` | 6.1 / sol (L) | `researcher` | **retain** | **retain** | **retain** |
 | `openai/gpt-6-astra` | 6 / astra (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `worker` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `reviewer` | `openai/gpt-6-astra` | `openai/gpt-5.6-sol` | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `debug` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
+| `openai/gpt-6-astra` | 6 / astra (L) | `worker` | `openai/gpt-6-luna` | **retain** | **retain** |
+| `openai/gpt-6-astra` | 6 / astra (L) | `reviewer` | `openai/gpt-6-astra` | **retain** | **retain** |
+| `openai/gpt-6-astra` | 6 / astra (L) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
 | `openai/gpt-6-astra` | 6 / astra (L) | `researcher` | **retain** | **retain** | **retain** |
 | `openai/gpt-6-sol` | 6 / sol (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `worker` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `reviewer` | `openai/gpt-6-sol` | `openai/gpt-5.6-sol` | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `debug` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
+| `openai/gpt-6-sol` | 6 / sol (L) | `worker` | `openai/gpt-6-luna` | **retain** | **retain** |
+| `openai/gpt-6-sol` | 6 / sol (L) | `reviewer` | `openai/gpt-6-sol` | **retain** | **retain** |
+| `openai/gpt-6-sol` | 6 / sol (L) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
 | `openai/gpt-6-sol` | 6 / sol (L) | `researcher` | **retain** | **retain** | **retain** |
 | `openai/gpt-6-luna` | 6 / luna (M) | `explore` | **retain** | **retain** | **retain** |
 | `openai/gpt-6-luna` | 6 / luna (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `reviewer` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `debug` | `openai/gpt-6-luna` | `openai/gpt-5.6-luna` | **retain** |
+| `openai/gpt-6-luna` | 6 / luna (M) | `reviewer` | `openai/gpt-6-luna` | **retain** | **retain** |
+| `openai/gpt-6-luna` | 6 / luna (M) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
 | `openai/gpt-6-luna` | 6 / luna (M) | `researcher` | **retain** | **retain** | **retain** |
 | `openai/gpt-5.6-sol` | 5.6 / sol (L) | `explore` | **retain** | **retain** | **retain** |
 | `openai/gpt-5.6-sol` | 5.6 / sol (L) | `worker` | `openai/gpt-5.6-terra` | **retain** | **retain** |
@@ -280,39 +279,39 @@ identities and retain outcomes come only from the router.
 | `google/gemini-4-argon` | 4 / argon (planner) | `reviewer` | `google/gemini-4-argon` | **retain** | **retain** |
 | `google/gemini-4-argon` | 4 / argon (planner) | `debug` | **retain** | **retain** | **retain** |
 | `google/gemini-4-argon` | 4 / argon (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `explore` | `google/gemini-3.8-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `worker` | `google/gemini-3.8-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `reviewer` | `google/gemini-2.5-pro` | `google/gemini-2.5-pro` | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `debug` | `google/gemini-3.8-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `researcher` | `google/gemini-3.8-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `explore` | `google/gemini-3.7-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `worker` | `google/gemini-3.7-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `reviewer` | `google/gemini-2.5-pro` | `google/gemini-2.5-pro` | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `debug` | `google/gemini-3.7-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `researcher` | `google/gemini-3.7-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `explore` | `google/gemini-3.6-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `worker` | `google/gemini-3.6-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `reviewer` | `google/gemini-2.5-pro` | `google/gemini-2.5-pro` | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `debug` | `google/gemini-3.6-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `researcher` | `google/gemini-3.6-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `explore` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `worker` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `reviewer` | `google/gemini-2.5-pro` | `google/gemini-2.5-pro` | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `debug` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `researcher` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `explore` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `worker` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `reviewer` | `google/gemini-2.5-pro` | `google/gemini-2.5-pro` | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `debug` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `researcher` | `google/gemini-3.5-flash` | `google/gemini-2.5-flash` | **retain** |
+| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `explore` | `google/gemini-3.8-flash` | **retain** | **retain** |
+| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `worker` | `google/gemini-3.8-flash` | **retain** | **retain** |
+| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
+| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `debug` | `google/gemini-3.8-flash` | **retain** | **retain** |
+| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `researcher` | `google/gemini-3.8-flash` | **retain** | **retain** |
+| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `explore` | `google/gemini-3.7-flash` | **retain** | **retain** |
+| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `worker` | `google/gemini-3.7-flash` | **retain** | **retain** |
+| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
+| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `debug` | `google/gemini-3.7-flash` | **retain** | **retain** |
+| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `researcher` | `google/gemini-3.7-flash` | **retain** | **retain** |
+| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `explore` | `google/gemini-3.6-flash` | **retain** | **retain** |
+| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `worker` | `google/gemini-3.6-flash` | **retain** | **retain** |
+| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
+| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `debug` | `google/gemini-3.6-flash` | **retain** | **retain** |
+| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `researcher` | `google/gemini-3.6-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `explore` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `worker` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
+| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `debug` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `researcher` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `explore` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `worker` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `reviewer` | **retain** | **retain** | **retain** |
+| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `debug` | `google/gemini-3.5-flash` | **retain** | **retain** |
+| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `researcher` | `google/gemini-3.5-flash` | **retain** | **retain** |
 | `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `explore` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `worker` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `reviewer` | `google/gemini-3.1-pro-preview` | `google/gemini-2.5-pro` | **retain** |
+| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `reviewer` | `google/gemini-3.1-pro-preview` | **retain** | **retain** |
 | `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `debug` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `researcher` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `explore` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `worker` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `reviewer` | `google/gemini-3.1-pro-preview` | `google/gemini-2.5-pro` | **retain** |
+| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `reviewer` | `google/gemini-3.1-pro-preview` | **retain** | **retain** |
 | `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `debug` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `researcher` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
 | `google/gemini-2.5-pro` | 2.5 / pro (planner) | `explore` | `google/gemini-2.5-flash` | **retain** | **retain** |
@@ -380,36 +379,36 @@ identities and retain outcomes come only from the router.
 | `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `reviewer` | `minimax/MiniMax-M3.1` | **retain** | **retain** |
 | `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `debug` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
 | `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `researcher` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `explore` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `worker` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `reviewer` | `minimax/MiniMax-M3` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `debug` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `researcher` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `explore` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `worker` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `debug` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `researcher` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `explore` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `worker` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `debug` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `researcher` | `minimax/MiniMax-M3.1-flash` | `minimax/MiniMax-M3.1-flash` | **retain** |
+| `minimax/MiniMax-M3` | 3 / (default) (planner) | `explore` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M3` | 3 / (default) (planner) | `worker` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M3` | 3 / (default) (planner) | `reviewer` | `minimax/MiniMax-M3` | **retain** | **retain** |
+| `minimax/MiniMax-M3` | 3 / (default) (planner) | `debug` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M3` | 3 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `explore` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `worker` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | **retain** | **retain** |
+| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `debug` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `researcher` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `explore` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `worker` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | **retain** | **retain** |
+| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `debug` | **retain** | **retain** | **retain** |
+| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
 
 ### qwen — size
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `explore` | `qwen-token-plan/qwen3.6-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `worker` | `qwen-token-plan/qwen3.7-plus` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `reviewer` | `qwen-token-plan/qwen3.7-max` | `qwen-token-plan/qwen3.6-plus` | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `debug` | `qwen-token-plan/qwen3.7-plus` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `researcher` | `qwen-token-plan/qwen3.6-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `explore` | `qwen-token-plan/qwen3.6-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `worker` | `qwen-token-plan/qwen3.6-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `reviewer` | `qwen-token-plan/qwen3.7-plus` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `debug` | `qwen-token-plan/qwen3.7-plus` | `qwen-token-plan/qwen3.6-flash` | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `researcher` | `qwen-token-plan/qwen3.6-flash` | `qwen-token-plan/qwen3.6-flash` | **retain** |
+| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `explore` | **retain** | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `worker` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `reviewer` | `qwen-token-plan/qwen3.7-max` | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `debug` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `researcher` | **retain** | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `explore` | **retain** | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `worker` | **retain** | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `reviewer` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `debug` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
+| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `researcher` | **retain** | **retain** | **retain** |
 | `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `explore` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
 | `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `worker` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
 | `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `reviewer` | `qwen-token-plan/qwen3.6-plus` | **retain** | **retain** |
@@ -437,17 +436,17 @@ identities and retain outcomes come only from the router.
 | --- | --- | --- | --- | --- | --- |
 | `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | `xiaomi/mimo-v2.5-pro` | **retain** |
+| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | `xiaomi/mimo-v2.5-pro` | **retain** |
+| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | `xiaomi/mimo-v2.5-pro` | **retain** |
+| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
 | `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `explore` | **retain** | **retain** | **retain** |
@@ -467,37 +466,7 @@ identities and retain outcomes come only from the router.
 | `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
 <!-- model-matrix:full:end -->
 
-## 5. The only cross-version links that exist
-
-A version is crossed **only** where a profile writes the link on the rung that
-may cross. The following is the complete generated inventory, not an implied
-ordering between versions. Role-target resolution and subsequent availability
-fallback use the router's approved paths; a skipped rung does not lend its
-links to another rung.
-
-<!-- model-matrix:links:start -->
-| Family | From version / rung | To version / rung |
-| --- | --- | --- |
-| gpt | 6.1 / `sol` | 6 / `luna` |
-| gpt | 6 / `astra` | 5.6 / `sol` |
-| gpt | 6 / `sol` | 5.6 / `sol` |
-| gpt | 6 / `luna` | 5.6 / `luna` |
-| gemini | 3.8 / `flash` | 2.5 / `pro` |
-| gemini | 3.7 / `flash` | 2.5 / `pro` |
-| gemini | 3.6 / `flash` | 2.5 / `pro` |
-| gemini | 3.5 / `flash-lite` | 2.5 / `pro` |
-| gemini | 3.1 / `pro-preview` | 2.5 / `pro` |
-| minimax | 3 / `(default)` | 3.1 / `flash` |
-| minimax | 3 / `(default)` | 2.7 / `(default)` |
-| minimax | 2.7 / `highspeed` | 3.1 / `flash` |
-| minimax | 2.7 / `(default)` | 3.1 / `flash` |
-| qwen | 3.7 / `max` | 3.6 / `plus` |
-| qwen | 3.7 / `max` | 3.6 / `flash` |
-| qwen | 3.7 / `plus` | 3.6 / `flash` |
-| mimo | 2.6 / `pro` | 2.5 / `pro` |
-<!-- model-matrix:links:end -->
-
-## 6. The rules, in order
+## 5. The rules, in order
 
 ```text
 selectAgent(id):
@@ -512,12 +481,11 @@ selectModel(request, definition, parent):
 
 route(parent, context, agentId = "worker"):
   parent has no model          → retain
-  no strategy claims the id    → error: name a model explicitly
+  no strategy claims the id    → retain parent
   profile/version/tier missing → retain parent
   resolve the role's target using the family's group and labels
   starting at that target:
     try the target rung, then cheaper same-version rungs in profile order
-    try only the profile's approved cross-version links
     choose the first candidate the session can run
   nothing runnable             → retain parent
 ```
@@ -538,7 +506,7 @@ size-family tier; a **class** (planner, worker) labels a planner/worker-family
 tier. Runtime routing reads those declarations; it does not infer class from
 price or a model-name substring. The top rung of the target size/class is the
 starting point (reviewer equality uses the parent's own rung). Versions are
-never crossed implicitly to find a target.
+never crossed to find a target, even when other versions are runnable.
 
 Consequences worth naming:
 
@@ -547,8 +515,9 @@ Consequences worth naming:
   from an S parent. Review deliberately keeps the parent's size on size
   families and may step up to a planner on planner/worker families.
 - **Fallback goes downward from the target.** An unavailable target can lead to
-  cheaper rungs in the same version, then approved cross-version links, then
-  retention. A family with no reachable target retains the parent.
+  cheaper rungs in the same version, then retention. A version with no target
+  for the role retains the parent, even when another version has that target.
+  For example, GPT 6.1 has no M rung, so its worker retains the parent.
 - **Tier matching is specific.** `flash-lite` is its own worker rung, not
   `flash`; dated Claude snapshots use the size of their matched tier.
 - **Explicit beats routing, always.** A request or definition model is resolved
@@ -557,11 +526,14 @@ Consequences worth naming:
   fails as that child's outcome; it does not become a different model.
 - **Reasoning follows the model.** The thinking level is chosen after the model
   resolves: request → definition → **one rung down from the parent's effort**
-  (medium → low → lowest supported when there is no parent effort), clamped to
-  what the model reports. A non-reasoning model is valid and reports “not
-  applicable”. This effort policy is unchanged by role-aware model routing.
+  using the next supported non-off rung; the lowest supported rung stays put.
+  Without parent effort, medium steps down to low or the lowest supported
+  non-off rung. This also applies when automatic model routing retains the
+  parent. Explicit request or definition reasoning still wins. A non-reasoning
+  model is valid and reports “not applicable”. This effort policy is unchanged
+  by role-aware model routing.
 
-## 7. What this matrix does not promise
+## 6. What this matrix does not promise
 
 - **The IDs are representative profile data, not a vendor release list.** A tier
   the session cannot run is skipped, so your effective child may differ from
@@ -569,18 +541,20 @@ Consequences worth naming:
 - **Family support does not guarantee a cheaper child.** DeepSeek has no worker
   class, so non-review roles retain the parent. Review uses its planner class.
   MiniMax does have a worker: M3.1 flash (not a Gemini 3.1 flash release).
-- **An unknown family is an error**, not a guess. A known family whose rung or
-  version is missing retains the parent. Kimi is no longer supported; GLM is.
+- **An unknown family retains the parent**, without guessing a replacement. A
+  known family whose rung or exact version is missing also retains the parent.
+  Kimi has no shipped profile; GLM does.
 - **Operators replace profiles whole.** A project `familyProfiles` entry for one
-  family replaces that family's versions, tiers, candidates, and links
-  entirely; other families are untouched. Replacement profiles must declare
+  family replaces that family's versions, tiers, and candidates entirely;
+  other families are untouched. Legacy `fallbacks` settings are ignored; the
+  schema no longer exposes that field. Replacement profiles must declare
   the group and the corresponding size/class labels. A new *naming* family
   still needs code support in `strategy.ts`.
 - **Pinning a model in an agent file bypasses this whole table** for that agent.
 
-## 8. Keeping this file honest
+## 7. Keeping this file honest
 
-The marked grid, full matrix, and cross-version-link inventory are generated by
+The marked grid and full matrix are generated by
 [`src/models/matrix.ts`](../src/models/matrix.ts). Regenerate them after changing
 profiles, strategies, or routing:
 
@@ -593,9 +567,9 @@ The async writer is [`scripts/regenerate-model-matrix.ts`](../scripts/regenerate
 it replaces only the marked regions and preserves the explanatory text.
 `test/models/routing-matrix.test.ts` recomputes **every generated region** through
 the real router and compares the entire content, including the role-aware grid,
-every concrete parent for every shipped role, both restricted availability
-scenarios, and all declared links. Hand edits anywhere in these regions fail
-the evidence test. It also verifies the five shipped definitions remain unpinned
+every concrete parent for every shipped role, and both restricted availability
+scenarios. Every other-versions-only outcome must retain the parent. Hand edits
+anywhere in these regions fail the evidence test. It also verifies the five shipped definitions remain unpinned
 and that the grid covers the eight supported families (GLM included, Kimi gone).
 
 This is documentation-drift evidence, **not the sole correctness oracle**:

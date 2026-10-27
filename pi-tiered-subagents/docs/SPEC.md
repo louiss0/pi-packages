@@ -7,6 +7,14 @@
 > one-tier-down model rule and replace Kimi with GLM. Exact explicit selection
 > and reasoning requirements are unchanged by that follow-up.
 
+> **Latest routing and retained-effort decision:**
+> [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
+> earlier cross-version links, unknown-family errors, and the retained-model
+> medium/low preference. Automatic routing is confined to the exact parent
+> family/version; unknown families retain the parent. With known parent effort,
+> automatic reasoning takes the next supported non-off rung below it, including
+> on retained models. The five-role mapping and size/class labels are unchanged.
+
 ## Problem Statement
 
 Users want to delegate work to specialists without manually choosing an appropriate child model for every task. Inheriting an expensive parent model for every child wastes resources, while hardcoded model pins ignore the user's current session and available model families. Model names, versions, capability tiers, and reasoning controls vary across providers and series; naive suffix parsing, fuzzy selection, or ranking by price cannot reliably express the intended relationships.
@@ -19,7 +27,7 @@ The repository currently contains a scaffold, copied upstream source and documen
 
 Build @code-fixer-23/pi-tiered-subagents as an independent, credited derivative that replaces the original runtime in a session. Preserve established subagent lifecycle functionality while adding five deliberately scoped specialists, layered agent-definition overrides, explicit tool inheritance, family-aware automatic model routing, supported reasoning defaults, capability-based workspace scheduling, and centralized extension settings.
 
-When no model is explicitly selected, identify the parent's family, version, and tier, map the resolved agent identifier to a size or class target, then walk downward from that target until the session can resolve an available candidate. Family strategies interpret supported naming structures; profiles provide concrete model identities, tier order, and approved version relationships. Unknown families produce a clear error rather than a guess. A recognized family with no runnable role target or downward fallback retains the parent model and uses a reasoning fallback where applicable.
+When no model is explicitly selected, identify the parent's family, version, and tier, map the resolved agent identifier to a size or class target, then walk downward from that target until the session can resolve an available candidate. Family strategies interpret supported naming structures; profiles provide concrete model identities and per-version tier order. Routing never leaves the exact parent family and version. Unknown families retain the parent rather than guessing. A recognized family with no runnable role target or downward fallback retains the parent model and uses a reasoning fallback where applicable.
 
 Explicit model choices require an exact provider/model identity and bypass automatic family routing. Reasoning selection happens after model selection. Non-reasoning models are usable: discard the thinking setting, not the launch. Expose actual resolved decisions in the existing launch/result presentation.
 
@@ -102,14 +110,14 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 59. As a user, I want explicit model choices usable without a recognized family profile, so that automatic routing support is not a prerequisite for deliberate selection.
 60. As a user, I want automatic routing based on series, version, variant, and tier relationships, so that arbitrary name fragments or prices do not determine the child model.
 61. As a user, I want profiles for Claude, GLM, GPT, MiniMax, Gemini, Qwen, MiMo, and DeepSeek, so that the major agreed series are supported.
-62. As a user, I want cross-version compatibility declared explicitly, so that an older or unrelated model is not assumed to be a valid downgrade.
+62. As a user, I want automatic routing confined to the exact parent family and version, with no version fallback links in schema, data, or runtime, so that another release is never assumed to be a valid downgrade.
 63. As a user, I want the router to start at the role target and walk downward to an available compatible candidate, so that one unavailable intermediate tier does not stop useful routing.
 64. As a user, I want concrete target model IDs ordered by preference, so that routing neither invents IDs nor depends on registry enumeration order.
 65. As a user, I want family routing to defer provider access and restrictions to session model resolution, so that it does not impose a separate same-provider policy or invent credentials.
-66. As a user, I want an unknown family to produce an automatic-routing error, so that the runtime does not guess a family from price or silently keep the parent model.
+66. As a user, I want an unknown family to retain the parent model with an explanation, so that the runtime does not guess from price or names.
 67. As a user, I want a recognized family with no runnable role target or downward fallback to retain the parent model, so that reasoning fallback can still make delegation economical.
-68. As a user, I want reasoning defaults to prefer medium, then low, then the lowest supported non-off level, so that defaults remain useful across different models.
-69. As a user, I want reasoning fallback on a retained parent model never to increase effort, so that a cost-saving fallback does not become more expensive.
+68. As a user, I want automatic reasoning to take the next supported non-off rung below known parent effort, landing on the model floor when no lower rung exists, and to prefer medium, then low, then lowest supported non-off only without parent effort.
+69. As a user, I want retained-model automatic reasoning to take the next supported non-off rung below known parent effort, staying at the floor, rather than preferring fixed medium or low.
 70. As a user, I want explicit thinking chosen in the tool call to win over the file and then automatic selection, so that per-task choices are respected.
 71. As a user, I want unsupported non-off thinking requests clamped to supported levels, so that a specialist is not rejected for a level the chosen model cannot express exactly.
 72. As a user, I want a non-reasoning model to remain usable, so that lack of reasoning support does not invalidate an otherwise valid model choice.
@@ -180,13 +188,13 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 - Explicit model selections require exact provider/model identity. Parse the provider separately while preserving the remaining model ID, which may itself contain a namespace separator. Resolve exactly or fail. Do not use fuzzy matching, provider assumptions, or cross-provider fallback.
 - Explicit selection bypasses family recognition, including for new families the router does not know. Apply thinking handling independently after the explicit model resolves.
 - Model identity, display name, series, version, variant/tier, and qualifiers are separate concepts. Do not assume the last number is always a version, all pro or fast suffixes mean the same thing, or hyphen position is uniform across series.
-- Initially provide strategy classes for GPT, Claude, Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Keep model releases, tier ladders, target preferences, and version compatibility as profile data rather than subclasses per release.
+- Initially provide strategy classes for GPT, Claude, Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Keep model releases, per-version tier ladders, and target preferences as profile data rather than subclasses per release. Version fallback links are not supported.
 - User-defined profiles follow the same schema and already-supported naming structures. They must be consumable without authoring a strategy class. Genuinely new naming structures require runtime code support. Do not accept user regexes, wildcard targets, matcher callbacks, parser functions, or executable settings.
-- Profiles explicitly enumerate concrete model IDs, their series/version and tier relationships, and permitted cross-version transitions. Do not synthesize nonexistent variants. Preserve meaningful snapshot, specialization, serving, and other qualifiers unless the applicable strategy/profile explicitly defines their relationship.
-- Resolve the role target at the same version (Equal anchors at the parent rung); allow crossing versions only through profile-declared relationships. The requested GPT example is a parent on 6.1 Sol selecting a listed Luna target from an explicitly approved compatible version. Do not generalize that example to every minor-version pair or treat unverified local catalog names as universal vendor facts.
+- Profiles explicitly enumerate concrete model IDs and their series/version and tier relationships, with no cross-version transitions. Do not synthesize nonexistent variants. Preserve meaningful snapshot, specialization, serving, and other qualifiers unless the applicable strategy/profile explicitly defines their relationship.
+- Resolve the role target within the exact parent family and version (Equal anchors at the parent rung). For example, GPT 5.6 Sol may target GPT 5.6 Terra, while GPT 6.1 Sol cannot borrow GPT 6 Luna. These are representative profile examples, not vendor-availability claims. No version fallback links exist; old `fallbacks` fields are ignored as unknown fields.
 - Walk downward from the resolved role target through permitted cheaper tiers rather than requiring the immediate rung or jumping straight to the cheapest model. Within a target tier/version, try concrete IDs in profile preference order. Continue downward if none are available.
 - Family routing is not a provider-routing policy. Use the session's model resolution, credentials, availability, and restrictions to materialize family candidates. Do not independently impose same-provider-only selection, invent credentials, or select an arbitrary provider through fuzzy matching or registry order.
-- Unknown parent families produce an automatic-routing error. There is no output-cost ranking fallback. A known family with no runnable role target or downward fallback retains the captured parent model and attempts the reasoning fallback.
+- Unknown parent families retain the captured parent model with an explanation. There is no output-cost ranking fallback. A known family with no runnable role target or eligible cheaper rung in the exact parent version also retains the captured parent model and applies automatic reasoning.
 - Validate profile data and supported naming structures explicitly. The exact settings encoding and profile schema must express the agreed semantics without becoming an executable configuration language. Malformed data must not silently create unrelated routing relationships.
 
 ### Role-aware model routing (issue #10)
@@ -209,29 +217,30 @@ Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
 sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
-A size or class target starts at the top matching rung in the parent's version;
-Equal starts at the parent's own rung, not the top of its size. If that version
-has no matching target, only profile-approved cross-version links may reach it.
-From the resolved target, try concrete IDs in preference order, then cheaper
-rungs in the same version, then approved cross-version links, skipping anything
-the session cannot run. No version relationship is inferred. If nothing is
-runnable (including an absent target class), keep the parent's model and report
-why. A reviewer retaining its own rung by Equal is a designed choice, not an
-exhaustion fallback. The launch reason names the role and target as well as the
-chosen model, including retained outcomes.
+Automatic model routing stays within the parent's exact family and version.
+A size or class target starts at the top matching rung in that version; Equal
+starts at the parent's own rung, not the top of its size. Try concrete IDs in
+preference order, then eligible cheaper rungs in the same version, skipping
+anything the session cannot run. No version fallback links are supported or
+inferred. If no role target or cheaper rung is runnable, keep the parent's
+model and report why. An unknown family also retains the parent, without
+price-based or name-based guessing. A reviewer retaining its own rung by Equal
+is a designed choice, not an exhaustion fallback. The launch reason names the
+role and target as well as the chosen model, including retained outcomes.
 
 Flash-named tiers, including the separate flash-lite rung, are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the new worker rung
-below its planner flagship; M3 and M2.7 have approved links to that flash rung.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
-versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
-approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
-reviewer targets pro, and the other roles retain the parent.
+runtime name-based classification. MiniMax M3.1-flash is the worker rung
+below its planner flagship, available only to routing within version 3.1.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
+cannot reach it; flash-only Gemini versions cannot reach a different version's
+planner, and Qwen cannot reach another version's S tier. Missing targets retain
+the parent. DeepSeek has planner but no worker class: reviewer targets pro,
+and the other roles retain the parent.
 
 GLM uses a glued-version naming strategy (version adjoining the prefix,
 variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: a Kimi parent requires an explicit model.
+supported automatic-routing family: an unpinned Kimi parent is retained.
 The shipped catalogue is representative of the installed SDK, not a promise of
 vendor availability. Profiles enumerate candidates; session access decides
 which can run. Model routing changes neither exact-pin resolution nor reasoning
@@ -241,15 +250,23 @@ A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
 labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels; version/tier/model/fallback shape and
-whole-family replacement semantics stay the same. Examples are representative
+replacements by adding these labels. Version/tier/model shape and whole-family
+replacement semantics stay the same; version fallback links are removed from
+the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
+the same unknown-field rule as any other unrecognized field. Examples are representative
 profile data, not provider-access guarantees.
+
+The routing-target policy has two implementations behind a small shared
+interface: `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`. Each owns
+label matching, starting rung, and fallback rank; the router owns the common
+exact-version walk. No new tests of class internals are required; test routing
+behavior through the existing seams. Do not expand family/version catalogues.
 
 ### Thinking selection
 
 - Resolve the child model before reasoning. Precedence is explicit tool-call thinking, then effective agent-file thinking, then automatic selection.
-- For reasoning-capable models, automatic defaults prefer medium, then low, then the lowest supported non-off level. Use Pi's reported supported levels/model metadata rather than parsing a display name or assuming uniform support across a series.
-- When retaining the parent model because no lower target exists, prefer medium or low only when lower than the parent's captured effort; otherwise choose a supported lower non-off level where possible. Never increase the parent's effort through this fallback. If no lower non-off level exists, retain its effort.
+- For reasoning-capable models with known parent effort, take the next supported non-off rung below it in the chosen model's own level array, skipping gaps and landing on the model floor when no lower rung exists. At the parent's own floor, effort stays. Use Pi's reported levels rather than names or series-wide assumptions.
+- Retained-parent automatic reasoning follows that same next-supported-rung rule: no fixed medium/low preference applies when parent effort is known. With no parent effort, prefer medium, then low, then the lowest supported non-off level.
 - Clamp unsupported explicit non-off requests using Pi-compatible ordering rather than rejecting an otherwise valid launch. Prevent clamping from silently selecting off for a reasoning-capable model. Do not use a numerical midpoint algorithm.
 - Automatic selection never disables reasoning on a reasoning-capable model. Preserve the agreed prohibition on an explicit off request for such models; permitting non-reasoning models is not the same as disabling a capable model's reasoning.
 - Non-reasoning models are valid explicit and automatic candidates. Discard/reject the inapplicable thinking setting, not the subagent launch. Represent thinking as not applicable, not as successfully applied medium/low or an arbitrary setting that enables unsupported capability.
@@ -289,9 +306,9 @@ The user explicitly confirmed two complementary seams: behaviour of the shared c
 - Exact shipped tool lists, including researcher's literal web_search entry and ordinary missing-tool behaviour without bespoke prerequisites. Do not replace this acceptance criterion with a test that only copies tool names from the parent.
 - Both launch entry points produce the same effective role defaults and explicit model/thinking precedence.
 - Explicit model resolution: exact identities, model IDs containing namespace separators, rejection of shorthand, unavailable models, no provider fallback, and explicit use of unrecognized families.
-- Family routing: fixtures for all eight supported strategies (GLM replaces Kimi); role × family outcomes and reasons; required group/size/class validation; shipped-label/link sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; same-version preference; approved cross-version routes; rejection of unapproved relationships; walking past unavailable tiers; unknown-family errors; and recognized-family exhaustion.
+- Family routing: fixtures for all eight supported strategies (GLM replaces Kimi); role × family outcomes and reasons; required group/size/class validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
 - User-added profiles using supported schema/naming structures, named-profile replacement without erasing unrelated families, project-trust enforcement, and refusal to execute user matcher/parser logic.
-- Thinking: medium preference, low fallback, lowest non-off fallback, explicit precedence, supported-level clamping, no automatic off, explicit off policy, no increase on retained-parent fallback, non-reasoning models, and truthful not-applicable reporting.
+- Thinking: next-supported-rung selection with known parent effort, including retained models and gaps; unchanged floors; medium/low/lowest non-off defaults without parent effort; explicit precedence, supported-level clamping, no automatic off, explicit off policy, no increase on retained-parent fallback, non-reasoning models, and truthful not-applicable reporting.
 - Request-time snapshots: change parent model, effort, tools, and conversation while a request waits; assert that queued work uses its captured inputs.
 - Scheduling: readers can overlap, exclusive children do not overlap in a shared workspace, classification changes after overrides, and cancellation/failure/resume do not leak or bypass the exclusive slot.
 - Lifecycle regression: background default, explicit foreground, completion/result retrieval, failures, steering, questions/updates where retained, cancellation, resume eligibility, retention, transcripts, shutdown, provider registration inheritance, and package exclusions.

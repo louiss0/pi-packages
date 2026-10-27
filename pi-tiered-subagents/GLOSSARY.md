@@ -91,25 +91,25 @@ tier with the empty name.
 ## Profile
 
 The data that describes a family's group and ladder: its versions, each version's
-tiers with their size or class labels, concrete ids, and approved cross-version
-links. A profile is
+tiers with their size or class labels and concrete ids. A profile is
 read, never executed: it holds no matcher, no pattern and no parser.
 
 ## Ladder
 
-A family's versions and tiers in capability order, with the cross-version
-links. A role selects a target size or class; the router starts at the top
-matching rung in the parent's version (the parent's own rung for Equal), then
-walks downward through cheaper rungs and approved links. Versions are never
-crossed implicitly; an exhausted or absent target retains the parent.
+A family's versions and tiers in capability order. A role selects a target
+size or class within the parent's exact family and version, starting at the
+top matching rung (the parent's own rung for Equal) and walking through
+eligible cheaper rungs. Versions are never crossed; an exhausted or absent
+target, or an unknown family, retains the parent.
 
 ## Reasoning level
 
-The effort a child reasons at. It is chosen after the model, from what the
-model supports: the request's level, then the definition's, then the default —
-**medium**, then **low**, then the lowest supported level above off. A level the
-model does not support is clamped; a model that does not reason has no level
-at all, which is *not applicable* rather than wrong.
+The effort a child reasons at, chosen after the model: the request's level,
+then the definition's, then automatic selection. With known parent effort,
+automatic selection takes the next supported non-off rung below it, staying
+at the floor; without parent effort, it prefers **medium**, then **low**, then
+the lowest supported non-off level. This includes retained models. Unsupported
+explicit levels are clamped; a non-reasoning model has no applicable level.
 
 ## Parent snapshot
 

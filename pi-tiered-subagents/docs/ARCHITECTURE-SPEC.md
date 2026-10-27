@@ -14,6 +14,14 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 > GLM. Exact pins, captured launch ownership, and reasoning policy are unchanged
 > by issue #10.
 
+> **Latest routing and retained-effort decision:**
+> [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
+> earlier cross-version links, unknown-family errors, and the retained-model
+> medium/low preference. Automatic routing is confined to the exact parent
+> family/version; unknown families retain the parent. With known parent effort,
+> automatic reasoning takes the next supported non-off rung below it, including
+> on retained models. The five-role mapping and size/class labels are unchanged.
+
 ## Problem Statement
 
 The maintainer migrated a fork-derived subagent runtime into this workspace using several models and now wants to own and evolve its architecture rather than maintain a renamed copy. The package has useful lifecycle functionality and extensive characterization coverage, but selecting an agent, preparing a launch, capturing parent inputs, and translating execution options are distributed across tool handlers, programmatic callers, the manager, and session assembly. An accepted request can therefore depend on configuration read at different times, and tests sometimes preserve concrete class structure or cast test doubles into SDK classes instead of checking meaningful behavior.
@@ -116,7 +124,7 @@ The arrows describe responsibilities and information flow, not a requirement to 
 41. As a maintainer, I want an SDK adapter to translate model availability and reasoning support, so that SDK-specific details are localized and tested.
 42. As a user, I want a selected model that can no longer run to fail explicitly, so that execution never substitutes another identity after acceptance.
 43. As a user, I want Pi-compatible reasoning clamping and truthful not-applicable reporting preserved, so that the refactor does not change the established reasoning rules.
-44. As a user, I want the retained-parent fallback never to increase reasoning effort, so that delegation does not become more expensive through fallback.
+44. As a user, I want retained-parent automatic reasoning to take the next supported non-off rung below known parent effort, staying at the floor, rather than jumping to fixed medium or low.
 45. As a caller, I want inherited active tools and registered names captured at invocation, so that later parent changes cannot widen accepted work.
 46. As a caller, I want MCP wildcard patterns expanded against those captured registered names, so that a prepared plan contains exact capability names rather than deferred patterns.
 47. As a user, I want scheduling and child creation to use the same exact capability allowlist, so that workspace classification cannot disagree with permitted tools.
@@ -301,9 +309,9 @@ flowchart LR
 ### 5. Models, reasoning, tools, and prompt assembly
 
 - The model-catalog adapter captures exact identities, available candidates, and SDK-reported reasoning capabilities into owned values. Use public model-resolution and reasoning-support APIs. Credentials, mutable registries, and concrete SDK model/session objects remain inside integration implementation.
-- Preserve exact explicit choice and family-ladder selection, unknown-family rejection, known-family exhaustion behavior, and declaration-driven cross-version links. Do not rebuild routing as part of this refactor.
+- Preserve exact explicit choice and family-ladder selection, updated by ADR 0015: automatic routing stays in the exact parent family/version; unknown families and exhausted or absent same-version targets retain the parent. No version fallback links exist in schema, data, or runtime; old `fallbacks` fields are ignored as unknown fields.
 - Preserve Pi-compatible thinking-level clamping. Translate SDK behavior into owned capability data or a narrow compatibility adapter, with differential/contract verification against public SDK helpers. Do not silently replace clamping with a new independent ranking algorithm to satisfy an import rule.
-- Preserve the default medium/low/lowest-supported-non-off order, non-reasoning not-applicable state, explicit-off policy for reasoning models, and no-increase rule for retained-parent fallback.
+- With known parent effort, automatic reasoning takes the next supported non-off rung below it in the chosen model's own level array, skipping gaps and landing on the model floor when no lower rung exists. Retained models use the same rule, with no fixed medium/low preference; at the parent's floor effort stays. Without parent effort, preserve medium/low/lowest-supported-non-off order. Explicit request/definition reasoning wins with Pi-compatible clamping; non-reasoning not-applicable state and explicit-off policy remain unchanged.
 - Materialize the exact accepted identity in the SDK adapter. Later provider or availability failure is an execution failure, not permission to select another model. Do not let SDK implicit default/fallback behavior silently undo this invariant.
 - Resolve inheritance and expand MCP patterns against the registered names captured at invocation. The prepared launch contains exact capability names, with management tools excluded. The same list drives workspace classification and SDK allowlisting.
 - Exact allowed names do not freeze implementation binaries, guarantee third-party tool availability, or constitute a sandbox. Preserve ordinary missing-tool behavior; do not add a special web prerequisite or silently widen capabilities to compensate.
@@ -334,29 +342,30 @@ Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
 sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
-A size or class target starts at the top matching rung in the parent's version;
-Equal starts at the parent's own rung, not the top of its size. If that version
-has no matching target, only profile-approved cross-version links may reach it.
-From the resolved target, try concrete IDs in preference order, then cheaper
-rungs in the same version, then approved cross-version links, skipping anything
-the session cannot run. No version relationship is inferred. If nothing is
-runnable (including an absent target class), keep the parent's model and report
-why. A reviewer retaining its own rung by Equal is a designed choice, not an
-exhaustion fallback. The launch reason names the role and target as well as the
-chosen model, including retained outcomes.
+Automatic model routing stays within the parent's exact family and version.
+A size or class target starts at the top matching rung in that version; Equal
+starts at the parent's own rung, not the top of its size. Try concrete IDs in
+preference order, then eligible cheaper rungs in the same version, skipping
+anything the session cannot run. No version fallback links are supported or
+inferred. If no role target or cheaper rung is runnable, keep the parent's
+model and report why. An unknown family also retains the parent, without
+price-based or name-based guessing. A reviewer retaining its own rung by Equal
+is a designed choice, not an exhaustion fallback. The launch reason names the
+role and target as well as the chosen model, including retained outcomes.
 
 Flash-named tiers, including the separate flash-lite rung, are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the new worker rung
-below its planner flagship; M3 and M2.7 have approved links to that flash rung.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
-versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
-approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
-reviewer targets pro, and the other roles retain the parent.
+runtime name-based classification. MiniMax M3.1-flash is the worker rung
+below its planner flagship, available only to routing within version 3.1.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
+cannot reach it; flash-only Gemini versions cannot reach a different version's
+planner, and Qwen cannot reach another version's S tier. Missing targets retain
+the parent. DeepSeek has planner but no worker class: reviewer targets pro,
+and the other roles retain the parent.
 
 GLM uses a glued-version naming strategy (version adjoining the prefix,
 variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: a Kimi parent requires an explicit model.
+supported automatic-routing family: an unpinned Kimi parent is retained.
 The shipped catalogue is representative of the installed SDK, not a promise of
 vendor availability. Profiles enumerate candidates; session access decides
 which can run. Model routing changes neither exact-pin resolution nor reasoning
@@ -366,9 +375,22 @@ A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
 labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels; version/tier/model/fallback shape and
-whole-family replacement semantics stay the same. Examples are representative
+replacements by adding these labels. Version/tier/model shape and whole-family
+replacement semantics stay the same; version fallback links are removed from
+the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
+the same unknown-field rule as any other unrecognized field. Examples are representative
 profile data, not provider-access guarantees.
+
+### Routing-target ownership
+
+`SizeRoutingTarget` and `PlannerWorkerRoutingTarget` are separate TypeScript
+classes behind a small shared routing-target interface. Each owns its group's
+label matching, starting rung, and fallback rank. The router owns the common
+walk over the exact parent version and session availability; it does not
+reimplement group-specific matching or cross versions. Keep behavioral coverage
+at the routing/resolution seams; no new class-internal tests are required.
+This changes neither the five-role mapping nor the shipped family/version
+catalogue, and adds no launch authority.
 
 ### 6. Turn policy and captured versus live settings
 
@@ -703,7 +725,7 @@ flowchart TB
 6. **Definition validity:** retain four-way layering, normalized identifiers, exact tool replacement, body inheritance/replacement, and valid unrelated agents; reject invalid recognized fields and duplicate requested identifiers without a shipped/default fallback. Diagnose scope-wide read failure honestly.
 7. **No extension trust policy:** project layers are read without extension-owned trust inputs or branching. Remove tests requiring the extension to grant/revalidate trust; do not mock SDK trust as always true to hide a retained extension gate. Keep ordinary SDK behavior untouched.
 8. **Exact tools and real installation:** capture inheritance and wildcard expansion, exclude management names, and use one exact capability allowlist for admission and construction. Include genuine child-tool activation/registration checks where SDK behavior matters, not only copied requested names.
-9. **Model/reasoning continuity:** preserve the eight-family strategies, exact explicit identities, ladder walk, exhaustion/unknown-family distinctions, Pi-compatible clamping, non-reasoning applicability, and no-increase retained-parent fallback. Change availability after acceptance and verify failure rather than rerouting.
+9. **Model/reasoning continuity:** preserve the eight-family strategies, exact explicit identities, exact-version ladder walk, exhaustion and unknown-family retention reasons, ignored legacy `fallbacks`, Pi-compatible clamping, non-reasoning applicability, and next-supported-rung retained-parent reasoning (including gaps and floors). Change availability after acceptance and verify failure rather than rerouting.
 10. **Turn policy:** request/definition/operator precedence, below-minimum normalization, explicit unlimited against a finite definition/default, captured wrap-up behavior, and later setting changes cannot restore a fallback. Assert the actual session-enforced budget, not just mocked manager arguments.
 11. **Live controls:** increasing/decreasing concurrency changes subsequent admissions; interrupt policy is read at interrupt; retention uses current windows. Captured exclusions, prompt policy, and update-tool availability do not change for accepted work.
 12. **Uniform admission:** launch, run, initial execution, and resume all consume the same capacity. Prove foreground/public bypass is gone. Preserve writer serialization, reader overlap, conservative unknown/shell classification, and release on failure/cancellation.

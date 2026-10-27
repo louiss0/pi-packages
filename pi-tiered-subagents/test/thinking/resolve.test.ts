@@ -141,7 +141,48 @@ describe("resolveThinking — the automatic level", () => {
 });
 
 describe("resolveThinking — the parent's model was kept", () => {
-  it("prefers medium when it is below the parent's effort", () => {
+  it("uses the next supported rung instead of jumping to a preferred default", () => {
+    const decision = resolveThinking({
+      model: modelWithLevels({
+        off: "off",
+        minimal: null,
+        low: "low",
+        medium: null,
+        high: "high",
+        xhigh: null,
+        max: "max",
+      }),
+      parentLevel: "max",
+      parentModelKept: true,
+    });
+    expect(decision.level).toBe("high");
+    expect(decision.source).toBe("parent");
+    expect(decision.reason).toContain("one supported rung");
+  });
+
+  it.each([
+    "off",
+    "minimal",
+  ] as const)("uses the supported non-off floor when the parent is at %s below it", (parentLevel) => {
+    const decision = resolveThinking({
+      model: modelWithLevels({
+        off: "off",
+        minimal: null,
+        low: "low",
+        medium: null,
+        high: "high",
+        xhigh: null,
+        max: null,
+      }),
+      parentLevel,
+      parentModelKept: true,
+    });
+    expect(decision.level).toBe("low");
+    expect(decision.source).toBe("parent");
+    expect(decision.reason).toContain("lowest supported non-off level");
+  });
+
+  it("takes medium when it is the next supported rung below high", () => {
     const decision = resolveThinking({
       model: makeReasoningModel(),
       parentLevel: "high",

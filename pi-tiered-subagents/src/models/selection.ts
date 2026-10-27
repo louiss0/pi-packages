@@ -77,7 +77,6 @@ export function selectModel(
   }
 
   const outcome = routeModel(request.parentModel, routing, request.agentId);
-  if (outcome.kind === "error") return { ok: false, error: outcome.error };
   if (outcome.kind === "retained") {
     return {
       ok: true,

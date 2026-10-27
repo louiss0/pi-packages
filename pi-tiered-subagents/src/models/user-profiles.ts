@@ -172,18 +172,6 @@ export function parseProfile(
           ? { class: modelClass }
           : {}),
         models,
-        ...(Array.isArray(tier.fallbacks)
-          ? {
-              fallbacks: tier.fallbacks.flatMap((fallback) => {
-                if (!fallback || typeof fallback !== "object") return [];
-                const ref = fallback as Record<string, unknown>;
-                return typeof ref.version === "string" &&
-                  typeof ref.tier === "string"
-                  ? [{ version: ref.version, tier: ref.tier }]
-                  : [];
-              }),
-            }
-          : {}),
       });
     }
     parsedVersions.push({ version: version.version, tiers });
@@ -204,5 +192,4 @@ interface MutableTier {
   size?: ModelSize;
   class?: ModelClass;
   models: { provider: string; id: string }[];
-  fallbacks?: { version: string; tier: string }[];
 }

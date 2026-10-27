@@ -3,10 +3,9 @@
  * rejected.
  *
  * A profile is data: the versions a family has, the tiers of each version in
- * capability order, the concrete model ids of each tier, and the versions a
- * family may cross into. It holds no code, no matchers and no parsers, so an
- * operator can correct it — or add a family of their own — without a
- * strategy class.
+ * capability order, and the concrete model ids of each tier. It holds no
+ * code, no matchers and no parsers, so an operator can correct it — or add a
+ * family of their own — without a strategy class.
  *
  * The rules a profile must satisfy are checked when it is read, not when it is
  * used: a malformed profile is reported, rather than quietly creating a
@@ -27,12 +26,6 @@ export interface ModelCandidate {
   readonly id: string;
 }
 
-/** A tier of a family's ladder: a version and a tier within it. */
-export interface TierRef {
-  readonly version: string;
-  readonly tier: string;
-}
-
 /**
  * One rung of a version's ladder.
  *
@@ -48,16 +41,6 @@ export interface TierProfile {
   readonly class?: ModelClass;
   /** The concrete models of this tier, most preferred first. */
   readonly models: readonly ModelCandidate[];
-  /**
-   * The rungs this one may fall back to, most preferred first.
-   *
-   * A version is only ever crossed when the profile says so: the router walks
-   * the parent's own version first, and crosses only into a rung named here.
-   * The link is explicit because the tiers of two versions are not
-   * comparable by name — one version's cheapest line may be dearer than
-   * another's.
-   */
-  readonly fallbacks?: readonly TierRef[];
 }
 
 /** One version of a family. */
@@ -226,27 +209,6 @@ export function validateProfile(
           problems.push({
             where: tierWhere,
             problem: `"${model.id}" is not in the tier "${tier.tier}" (it names ${describeCandidates(parsed.tierCandidates)})`,
-          });
-        }
-      }
-
-      for (const fallback of tier.fallbacks ?? []) {
-        const target = profile.versions.find(
-          (candidate) => candidate.version === fallback.version,
-        );
-        if (!target) {
-          problems.push({
-            where: tierWhere,
-            problem: `the fallback version "${fallback.version}" is not in the profile`,
-          });
-          continue;
-        }
-        if (
-          !target.tiers.some((candidate) => candidate.tier === fallback.tier)
-        ) {
-          problems.push({
-            where: tierWhere,
-            problem: `the fallback tier "${fallback.tier}" is not in version ${fallback.version}`,
           });
         }
       }

@@ -114,29 +114,30 @@ Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
 sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
-A size or class target starts at the top matching rung in the parent's version;
-Equal starts at the parent's own rung, not the top of its size. If that version
-has no matching target, only profile-approved cross-version links may reach it.
-From the resolved target, try concrete IDs in preference order, then cheaper
-rungs in the same version, then approved cross-version links, skipping anything
-the session cannot run. No version relationship is inferred. If nothing is
-runnable (including an absent target class), keep the parent's model and report
-why. A reviewer retaining its own rung by Equal is a designed choice, not an
-exhaustion fallback. The launch reason names the role and target as well as the
-chosen model, including retained outcomes.
+Automatic model routing stays within the parent's exact family and version.
+A size or class target starts at the top matching rung in that version; Equal
+starts at the parent's own rung, not the top of its size. Try concrete IDs in
+preference order, then eligible cheaper rungs in the same version, skipping
+anything the session cannot run. No version fallback links are supported or
+inferred. If no role target or cheaper rung is runnable, keep the parent's
+model and report why. An unknown family also retains the parent, without
+price-based or name-based guessing. A reviewer retaining its own rung by Equal
+is a designed choice, not an exhaustion fallback. The launch reason names the
+role and target as well as the chosen model, including retained outcomes.
 
 Flash-named tiers, including the separate flash-lite rung, are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the new worker rung
-below its planner flagship; M3 and M2.7 have approved links to that flash rung.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
-versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
-approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
-reviewer targets pro, and the other roles retain the parent.
+runtime name-based classification. MiniMax M3.1-flash is the worker rung
+below its planner flagship, available only to routing within version 3.1.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
+cannot reach it; flash-only Gemini versions cannot reach a different version's
+planner, and Qwen cannot reach another version's S tier. Missing targets retain
+the parent. DeepSeek has planner but no worker class: reviewer targets pro,
+and the other roles retain the parent.
 
 GLM uses a glued-version naming strategy (version adjoining the prefix,
 variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: a Kimi parent requires an explicit model.
+supported automatic-routing family: an unpinned Kimi parent is retained.
 The shipped catalogue is representative of the installed SDK, not a promise of
 vendor availability. Profiles enumerate candidates; session access decides
 which can run. Model routing changes neither exact-pin resolution nor reasoning
@@ -152,23 +153,17 @@ settings file, under `familyProfiles`:
       "group": "size",
       "versions": [
         {
-          "version": "6.1",
+          "version": "5.6",
           "tiers": [
             {
               "tier": "sol",
               "size": "L",
-              "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
-              "fallbacks": [{ "version": "6", "tier": "luna" }]
-            }
-          ]
-        },
-        {
-          "version": "6",
-          "tiers": [
+              "models": [{ "provider": "openai", "id": "gpt-5.6-sol" }]
+            },
             {
-              "tier": "luna",
+              "tier": "terra",
               "size": "M",
-              "models": [{ "provider": "openai", "id": "gpt-6-luna" }]
+              "models": [{ "provider": "openai", "id": "gpt-5.6-terra" }]
             }
           ]
         }
@@ -202,26 +197,36 @@ A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
 labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels; version/tier/model/fallback shape and
-whole-family replacement semantics stay the same. Examples are representative
+replacements by adding these labels. Version/tier/model shape and whole-family
+replacement semantics stay the same; version fallback links are removed from
+the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
+the same unknown-field rule as any other unrecognized field. Examples are representative
 profile data, not provider-access guarantees.
 
 Only data is read: a value the schema does not name is ignored, never
-evaluated. A family this package cannot read the names of is refused.
+evaluated. A replacement profile with an unsupported naming structure is
+refused; an unknown parent family instead retains the parent model.
 
 ## Reasoning
 
 A child's reasoning level is chosen after its model, from what the model
 actually supports:
 
-- a level the request names, then the level the definition names, then the
-  default: **medium**, then **low**, then the lowest supported level above off;
-- a level the model does not support is clamped the way Pi clamps it — never
-  rejected, and never silently down to "off" on a model that reasons;
-- a model that does not reason is still usable: the level does not apply, and
-  the launch says so;
-- when the child keeps the parent's model, its effort never rises above the
-  effort the parent was running at.
+When parent effort is known, automatic reasoning takes the next supported
+non-off rung below it in the chosen model's level array (the highest supported
+level strictly below the parent). Gaps are skipped; at the floor, effort stays.
+This includes retained models: on `[low, high, max]`, `max` becomes `high`,
+not `low`. There is no fixed medium/low preference with known parent effort.
+With no parent effort, the default remains medium, then low, then the lowest
+supported non-off level. Request reasoning, then definition reasoning, still
+wins, with Pi-compatible clamping; non-reasoning models report *not applicable*.
+
+Unsupported explicit levels are clamped, never silently to off on a reasoning
+model. The prohibition on explicit off for a reasoning model is unchanged.
+
+[ADR 0015](docs/adr/0015-version-local-routing-and-retained-effort.md) records
+the version boundary, unknown-family retention, and retained-model effort.
+The five-role mapping from ADR 0014 is unchanged.
 
 The launch note reports what was decided, so a caller that asked for one thing
 and got another can see it.

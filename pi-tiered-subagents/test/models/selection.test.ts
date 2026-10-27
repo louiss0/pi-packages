@@ -157,17 +157,18 @@ describe("selectModel", () => {
     expect(result.selection.modelId).toBe("gpt-6-luna");
   });
 
-  it("routes automatically when neither names a model", () => {
+  it("routes within the parent's version when neither names a model", () => {
+    const parent = model("openai", "gpt-6-sol");
     const result = selectModel(
-      { parentModel: SOL },
-      registry([SOL, LUNA]),
-      routing([SOL, LUNA]),
+      { parentModel: parent },
+      registry([parent, LUNA]),
+      routing([parent, LUNA]),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.selection.source).toBe("routed");
     expect(result.selection.modelId).toBe("gpt-6-luna");
-    expect(result.selection.reason).toContain("gpt-6.1-sol");
+    expect(result.selection.reason).toContain("gpt-6-sol");
   });
 
   it("reports a model it cannot resolve rather than falling back", () => {
@@ -202,16 +203,21 @@ describe("selectModel", () => {
     expect(result.selection.modelId).toBe("wonder-1");
   });
 
-  it("reports a parent model it cannot place in a family", () => {
+  it("inherits a parent model it cannot place in a family", () => {
     const other = model("acme", "wonder-1");
     const result = selectModel(
       { parentModel: other },
       registry([other]),
       routing([other]),
     );
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error).toContain("Cannot place the model");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.selection.source).toBe("inherited");
+    expect(result.selection.identity).toEqual({
+      provider: "acme",
+      id: "wonder-1",
+    });
+    expect(result.selection.reason).toContain("unknown family");
   });
 
   it("keeps the parent's model when the ladder has nothing to offer", () => {

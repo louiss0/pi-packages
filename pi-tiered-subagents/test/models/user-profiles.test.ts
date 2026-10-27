@@ -18,7 +18,6 @@ const GPT_PROFILE = {
           tier: "sol",
           size: "L",
           models: [{ provider: "openai", id: "gpt-6.1-sol" }],
-          fallbacks: [{ version: "6", tier: "luna" }],
         },
       ],
     },
@@ -92,9 +91,41 @@ describe("parseProfile", () => {
     expect(parsed.profile.versions[0]?.tiers[0]?.models[0]?.id).toBe(
       "gpt-6.1-sol",
     );
-    expect(parsed.profile.versions[0]?.tiers[0]?.fallbacks).toEqual([
-      { version: "6", tier: "luna" },
-    ]);
+  });
+
+  it("ignores obsolete fallback entries without rejecting the profile", () => {
+    for (const fallbacks of [
+      [{ version: "6", tier: "luna" }],
+      [{ version: "missing", tier: "missing" }, null, 42],
+      "obsolete",
+    ]) {
+      const parsed = parseProfile("gpt", {
+        group: "size",
+        versions: [
+          {
+            version: "6.1",
+            tiers: [
+              {
+                tier: "sol",
+                size: "L",
+                models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+                fallbacks,
+              },
+            ],
+          },
+        ],
+      });
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) continue;
+      expect(parsed.profile.versions[0]?.tiers[0]).toEqual({
+        tier: "sol",
+        size: "L",
+        models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+      });
+      expect(validateProfile(parsed.profile, strategies.get("gpt"))).toEqual(
+        [],
+      );
+    }
   });
 
   it("ignores a field the schema does not name", () => {
@@ -273,6 +304,27 @@ describe("mergeProfiles", () => {
 });
 
 describe("profile label validation", () => {
+  it("ignores obsolete fallback references in runtime profile data", () => {
+    const profile = {
+      family: "gpt",
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              size: "L",
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+              fallbacks: [{ version: "missing", tier: "missing" }],
+            },
+          ],
+        },
+      ],
+    } as const;
+    expect(validateProfile(profile, strategies.get("gpt"))).toEqual([]);
+  });
+
   it("reports missing or invalid group and group-appropriate labels", () => {
     const profile = {
       family: "gpt",
@@ -315,7 +367,7 @@ describe("profile label validation", () => {
 });
 
 describe("shipped profile data", () => {
-  it("labels every rung and resolves every approved fallback", () => {
+  it("labels every rung without cross-version links", () => {
     expect(SHIPPED_PROFILES.map((profile) => profile.family).sort()).toEqual([
       "claude",
       "deepseek",
@@ -331,6 +383,11 @@ describe("shipped profile data", () => {
         validateProfile(profile, strategies.get(profile.family)),
         profile.family,
       ).toEqual([]);
+      for (const version of profile.versions) {
+        for (const tier of version.tiers) {
+          expect(tier).not.toHaveProperty("fallbacks");
+        }
+      }
     }
   });
 });

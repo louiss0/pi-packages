@@ -13,10 +13,10 @@
  *
  * - A model that does not reason is not a failure. The level is discarded and
  *   reported as *not applicable*; the launch goes ahead.
- * - When the parent's model is kept, the child's effort never rises. The
- *   fallback prefers medium or low only when they are *below* the effort the
- *   parent was running at; otherwise it takes a supported level below it, and
- *   failing that it keeps the parent's own effort.
+ * - When the parent's model is kept and parent effort is known, take the next
+ *   supported non-off rung below it, or the model's floor if none is lower.
+ *   Effort already at the floor stands; a parent below the supported floor is
+ *   brought to that floor and the limitation is reported.
  *
  * The supported levels come from Pi's own report about the model, and an
  * unsupported request is clamped the way Pi clamps it — never by a numerical
@@ -231,9 +231,8 @@ function automaticLevel(
 /**
  * The level for a child that keeps the parent's model.
  *
- * The effort never rises: the preferred levels are taken only when they are
- * below the parent's own, then any supported level below it, and failing both
- * the parent's effort stands.
+ * The next supported non-off rung below the parent's effort is used. Gaps are
+ * skipped; where no lower rung exists the model's non-off floor is used.
  */
 function retainedParent(
   parentLevel: SubagentThinkingLevel | undefined,
@@ -255,36 +254,28 @@ function retainedParent(
   }
 
   const parentEffort = EFFORT.indexOf(parentLevel);
-  for (const candidate of ["medium", "low"] as const) {
-    if (!nonOff.includes(candidate)) continue;
-    if (EFFORT.indexOf(candidate) < parentEffort) {
-      return {
-        level: candidate,
-        applicable: true,
-        source: "parent",
-        clamped: false,
-        reason: `the parent's model was kept, and ${candidate} is below the effort the parent was running at (${parentLevel})`,
-      };
-    }
-  }
-
-  const below = nonOff.filter((level) => EFFORT.indexOf(level) < parentEffort);
-  const lowest = below[0];
-  if (lowest) {
+  const nextLower = nonOff
+    .filter((level) => EFFORT.indexOf(level) < parentEffort)
+    .at(-1);
+  if (nextLower) {
     return {
-      level: lowest,
+      level: nextLower,
       applicable: true,
       source: "parent",
       clamped: false,
-      reason: `the parent's model was kept, and ${lowest} is the lowest level it supports below the effort the parent was running at (${parentLevel})`,
+      reason: `the parent's model was kept, and ${nextLower} is one supported rung below the effort the parent was running at (${parentLevel})`,
     };
   }
 
+  const floor = nonOff[0];
   return {
-    level: parentLevel,
+    ...(floor ? { level: floor } : {}),
     applicable: true,
     source: "parent",
     clamped: false,
-    reason: `the parent's model was kept, and it supports no level below the effort the parent was running at (${parentLevel}), so that effort stands`,
+    reason:
+      floor === parentLevel
+        ? `the parent's model was kept, and it supports no level below the effort the parent was running at (${parentLevel}), so that effort stands`
+        : `the parent's model was kept; its lowest supported non-off level is ${floor}, so the parent's ${parentLevel} effort cannot be lowered on this model`,
   };
 }

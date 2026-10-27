@@ -8,6 +8,12 @@ date: 2026-10-22
 A child's reasoning level is chosen **after** its model, because what a model
 can do is a property of the model.
 
+> **Retained-model preference superseded by
+> [ADR 0015](0015-version-local-routing-and-retained-effort.md):** with known
+> parent effort, retained models now take the next supported non-off rung,
+> rather than preferring medium and low. The historical decision below records
+> the original rule.
+
 ## Context
 
 The specification fixes the order: the request's thinking, then the agent
