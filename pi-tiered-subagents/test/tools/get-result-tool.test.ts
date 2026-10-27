@@ -3,10 +3,10 @@ import { AgentRegistry } from "#src/agents/registry";
 import type { TurnLoopResult } from "#src/lifecycle/subagent-session";
 import { MAX_EXPANDED_LINES, PREVIEW_CHARS } from "#src/ui/get-result-renderer";
 import {
+  createGetResultTool,
   type GetResultParams,
-  GetResultTool,
   type GetResultToolManager,
-} from "#src/tools/get-result-tool";
+} from "../../extensions/index";
 import type { Subagent } from "#src/types";
 import type { Theme } from "#src/ui/display";
 import { gatedScheduler } from "#test/helpers/gated-scheduler";
@@ -47,7 +47,7 @@ async function execute(
   params: GetResultParams,
   signal: AbortSignal = new AbortController().signal,
 ) {
-  const tool = new GetResultTool(manager, testRegistry);
+  const tool = createGetResultTool(manager, testRegistry);
   return tool.execute("tc-1", params, signal, undefined, STUB_CTX);
 }
 
@@ -76,7 +76,7 @@ function queuedAgent(responseText = "Done.") {
   };
 }
 
-describe("GetResultTool — carrier claim", () => {
+describe("createGetResultTool — carrier claim", () => {
   it("claims the outcome for the duration of a wait", async () => {
     const { record, openSlot, manager } = queuedAgent();
     const resultPromise = execute(manager, {
@@ -196,7 +196,7 @@ describe("GetResultTool — carrier claim", () => {
   });
 });
 
-describe("GetResultTool — a wait a resume superseded", () => {
+describe("createGetResultTool — a wait a resume superseded", () => {
   /**
    * An agent whose first run asks a question and ends with `first result`, and
    * a consumer that resumes it the moment that run settles, before the waiter's
@@ -316,7 +316,7 @@ describe("GetResultTool — a wait a resume superseded", () => {
   });
 });
 
-describe("GetResultTool", () => {
+describe("createGetResultTool", () => {
   it("registers the get_subagent_result tool with its contract", () => {
     const def = registeredTool("get_subagent_result");
     expect(def.name).toBe("get_subagent_result");
@@ -605,7 +605,7 @@ describe("GetResultTool", () => {
   });
 });
 
-describe("GetResultTool — progress", () => {
+describe("createGetResultTool — progress", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(80_000);
@@ -648,7 +648,7 @@ describe("GetResultTool — progress", () => {
   });
 });
 
-describe("GetResultTool — bounded wait", () => {
+describe("createGetResultTool — bounded wait", () => {
   const EXPIRY_NOTE =
     "This wait ended after its 120s timeout. The agent was not stopped and is still running.";
 
@@ -828,7 +828,7 @@ describe("GetResultTool — bounded wait", () => {
   });
 });
 
-describe("GetResultTool — TUI rendering", () => {
+describe("createGetResultTool — TUI rendering", () => {
   const theme: Theme = {
     fg: (color: string, text: string) => `[${color}:${text}]`,
     bold: (text: string) => `**${text}**`,
@@ -839,7 +839,9 @@ describe("GetResultTool — TUI rendering", () => {
   const asSdkTheme = theme as never;
 
   function renderRows(
-    result: Awaited<ReturnType<GetResultTool["execute"]>>,
+    result: Awaited<
+      ReturnType<ReturnType<typeof createGetResultTool>["execute"]>
+    >,
     expanded: boolean,
     width = 100,
   ): string[] {

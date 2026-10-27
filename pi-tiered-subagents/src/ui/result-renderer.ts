@@ -3,7 +3,7 @@
  *
  * All functions are stateless: they receive AgentDetails and a Theme, returning
  * formatted strings. No SDK types, no timers, no side effects.
- * Consumed by the renderResult hook in agent-tool.ts.
+ * Consumed by the renderResult hook registered at the extension root.
  */
 
 import type {

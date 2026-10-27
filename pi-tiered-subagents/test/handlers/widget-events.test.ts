@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EventDrivenWidget } from "#src/handlers/widget-events";
-import { WidgetEventsHandler } from "#src/handlers/widget-events";
+import type { EventDrivenWidget } from "../../extensions/index";
+import { WidgetEventsHandler } from "../../extensions/index";
 
 function makeWidget() {
   return {

@@ -6,7 +6,7 @@ import {
   readPersistedNavigationRuns,
   toNavigableSubagent,
 } from "#src/presentation/transcript-adapter";
-import { SessionNavigatorHandler } from "#src/ui/session-navigator";
+import { handleSubagentsSessions } from "../extensions/index";
 import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
 import { makeNavigable } from "#test/helpers/make-navigable";
 import { makeMenuUI } from "#test/helpers/ui-stubs";
@@ -33,7 +33,7 @@ describe("runtime-to-transcript presentation", () => {
         },
       },
     ]);
-    await new SessionNavigatorHandler().handle({
+    await handleSubagentsSessions({
       ui,
       agents: [],
       persisted,
@@ -66,7 +66,7 @@ describe("runtime-to-transcript presentation", () => {
       isSessionReady: () => false,
       outputFile: "/tasks/released.jsonl",
     });
-    await new SessionNavigatorHandler().handle({
+    await handleSubagentsSessions({
       ui,
       agents: [released, retained].map(toNavigableSubagent),
       persisted: [],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import type { TurnLoopResult } from "#src/lifecycle/subagent-session";
-import { GetResultTool } from "#src/tools/get-result-tool";
+import { createGetResultTool } from "../../extensions/index";
 import type { Subagent } from "#src/types";
 import {
   createSubagentSessionStub,
@@ -45,7 +45,7 @@ describe("run-associated result wait", () => {
       }),
     });
     record.start();
-    const tool = new GetResultTool(
+    const tool = createGetResultTool(
       {
         getRecord: (id: string): Subagent | undefined =>
           id === record.id ? record : undefined,

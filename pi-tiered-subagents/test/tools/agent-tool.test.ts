@@ -2,7 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRegistry } from "#src/agents/registry";
 import { defined } from "#src/optional";
-import { AgentTool } from "#src/tools/agent-tool";
+import { createAgentTool } from "../../extensions/index";
 import {
   createToolDeps,
   mockResumeRefusal,
@@ -20,12 +20,12 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
 }
 
 function makeTool(deps: ReturnType<typeof createToolDeps>) {
-  return new AgentTool(
-    deps.manager,
-    deps.subagents,
-    deps.settings,
-    deps.registry,
-  );
+  return createAgentTool({
+    manager: deps.manager,
+    subagents: deps.subagents,
+    settings: deps.settings,
+    registry: deps.registry,
+  });
 }
 
 async function execute(
@@ -42,7 +42,7 @@ async function execute(
   );
 }
 
-describe("AgentTool", () => {
+describe("createAgentTool", () => {
   it("returns tool definition with correct name and label", () => {
     const def = registeredTool("subagent");
     expect(def.name).toBe("subagent");
@@ -113,7 +113,7 @@ describe("AgentTool", () => {
   });
 });
 
-describe("AgentTool — resume path", () => {
+describe("createAgentTool — resume path", () => {
   // What the foreground door starts a resume with: the foreground mode, the tool
   // call's signal, and the claim that keeps the outcome it returns from being
   // announced. The background door passes the background mode and neither of
@@ -661,7 +661,7 @@ describe("AgentTool — resume path", () => {
   });
 });
 
-describe("AgentTool — model resolution error", () => {
+describe("createAgentTool — model resolution error", () => {
   it("returns error when model resolution fails", async () => {
     const deps = createToolDeps();
     const result = await execute(deps, {
@@ -675,7 +675,7 @@ describe("AgentTool — model resolution error", () => {
   });
 });
 
-describe("AgentTool — background execution", () => {
+describe("createAgentTool — background execution", () => {
   it("returns background launch message with agent ID", async () => {
     const deps = createToolDeps();
     const record = createTestSubagent({ status: "running" });
@@ -727,7 +727,7 @@ describe("AgentTool — background execution", () => {
   });
 });
 
-describe("AgentTool — foreground execution", () => {
+describe("createAgentTool — foreground execution", () => {
   it("returns completion message with stats", async () => {
     const deps = createToolDeps();
     deps.manager.spawnAndWait = vi.fn().mockResolvedValue({

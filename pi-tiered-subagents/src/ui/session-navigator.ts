@@ -29,7 +29,6 @@
  * (`docs/decisions/0012-fullscreen-viewer-is-an-overlay.md`).
  */
 
-import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   type Keybinding,
@@ -38,7 +37,6 @@ import {
   matchesKey,
   type OverlayOptions,
   type TUI,
-  type TuiMode,
   type TuiMouseEvent,
   type TuiMouseEventResult,
   truncateToWidth,
@@ -46,7 +44,6 @@ import {
 import { formatModel } from "./display";
 import type { AgentDefinitionLookup, ModelIdentity, Theme } from "./display";
 import { labeledRule } from "./labeled-rule";
-import { fileSnapshotSource, listNavigableAgents } from "./session-navigation";
 import type {
   EntryHeading,
   NavigableSubagent,
@@ -63,24 +60,6 @@ const MIN_VIEWPORT = 3;
 const VIEWPORT_HEIGHT_PCT = 70;
 
 /**
- * Rows Pi's default footer takes: the cwd and stats rows. An extension status
- * adds a third, which the pane covers while open; reserving it instead would
- * expose the editor's bottom border whenever no status is set.
- */
-const PI_FOOTER_ROWS = 2;
-
-/** Where the fullscreen pane floats: the region the docked pane fills in regular mode, above Pi's footer. */
-const FULLSCREEN_OVERLAY: OverlayOptions = {
-  anchor: "bottom-center",
-  width: "100%",
-  maxHeight: `${VIEWPORT_HEIGHT_PCT}%`,
-  margin: { bottom: PI_FOOTER_ROWS },
-};
-
-/** What the mode probe mounts: nothing, since it closes before Pi would mount it. */
-const NOTHING: Component = { render: () => [], invalidate: () => {} };
-
-/**
  * The pane's theme: the shared narrow `Theme` plus the one method only the pane
  * needs. Pi's own `Theme` satisfies it; the widening stays here so the other
  * render sites' theme stubs do not grow.
@@ -90,10 +69,7 @@ export type TranscriptTheme = Theme & {
   getThinkingBorderColor(level: string): (text: string) => string;
 };
 
-/**
- * The `KeybindingsManager` surface the pane reads. Pi passes its manager to
- * every `ui.custom` factory, so the pane honours the operator's remaps.
- */
+/** The `KeybindingsManager` surface the pane reads. */
 export interface PaneKeys {
   matches(data: string, keybinding: Keybinding): boolean;
   getKeys(keybinding: Keybinding): KeyId[];
@@ -154,89 +130,6 @@ export type TranscriptPaneOptions = {
   cwd: string;
   markdownTheme: MarkdownTheme;
 };
-
-/**
- * Handler for the `/subagents:sessions` slash command.
- *
- * Lists navigable subagents, lets the operator pick one, and opens its transcript
- * read-only. Receives UI projections with narrow transcript readers rather than
- * a manager or live sessions. Validated past runs add entries the runtime no
- * longer holds, such as those from before a `/reload`.
- */
-export class SessionNavigatorHandler {
-  async handle({
-    ui,
-    agents,
-    registry,
-    cwd,
-    readFile,
-    persisted,
-  }: SessionNavigatorParams): Promise<void> {
-    const entries = listNavigableAgents(agents, registry, persisted);
-    if (entries.length === 0) {
-      ui.notify("No subagent sessions to view.", "info");
-      return;
-    }
-
-    const choice = await ui.select(
-      "Subagent sessions",
-      entries.map((entry) => entry.label),
-    );
-    const entry = entries.find((candidate) => candidate.label === choice);
-    if (!entry) return;
-
-    let source: TranscriptSource;
-    try {
-      source =
-        entry.kind === "live"
-          ? entry.source
-          : await fileSnapshotSource(entry.outputFile, readFile);
-    } catch {
-      ui.notify("Could not read the session transcript file.", "error");
-      return;
-    }
-    const markdownTheme = getMarkdownTheme();
-    const mode = await probeTuiMode(ui);
-    await ui.custom<undefined>(
-      (tui, theme, keys, done) =>
-        new TranscriptPane({
-          tui,
-          theme,
-          keys,
-          source,
-          heading: entry.heading,
-          done,
-          cwd,
-          markdownTheme,
-        }),
-      viewerMountOptions(mode),
-    );
-  }
-}
-
-/**
- * The TUI's render mode, read before the pane mounts. Pi decides overlay versus
- * docked before it runs a `ui.custom` factory and exposes no mode accessor, so
- * this mounts a factory that closes with `tui.mode` before returning; Pi then
- * never mounts what it returns. A UI that runs no factory (print or RPC mode)
- * resolves `undefined`, which keeps the docked default.
- */
-async function probeTuiMode(ui: SessionNavigatorUI): Promise<TuiMode> {
-  const mode = await ui.custom<TuiMode | undefined>(
-    (tui, _theme, _keys, done) => {
-      done(tui.mode);
-      return NOTHING;
-    },
-  );
-  return mode === "fullscreen" ? "fullscreen" : "regular";
-}
-
-/** Docked in regular mode (ADR 0007); a focused overlay in fullscreen mode, so the viewport keys reach it (ADR 0012). */
-function viewerMountOptions(mode: TuiMode): ViewerMountOptions {
-  return mode === "fullscreen"
-    ? { overlay: true, overlayOptions: FULLSCREEN_OVERLAY }
-    : { overlay: false };
-}
 
 /**
  * Read-only scrollable transcript pane.

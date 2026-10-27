@@ -1,17 +1,17 @@
 /**
  * Terminal presentation module. Pi registration remains at the extension root;
  * execution data reaches these consumers through views and focused actions.
+ *
+ * The tool-registration callbacks live at the extension root, so the UI module
+ * owns the components they build: `Text` for one pre-themed block and
+ * `BoundedLines` for lines that spend one row each. Keeping these here means
+ * no file outside `src/ui` imports the TUI package directly.
  */
 export { AgentWidget } from "./agent-widget.js";
-export { createAgentToolRenderer } from "./agent-tool-renderer.js";
-export {
-  renderGetResultCall,
-  renderGetResultResult,
-} from "./get-result-tool-renderer.js";
-export {
-  createNotificationRenderer,
-  createUpdateRenderer,
-  createWorkspaceNoticeRenderer,
-} from "./notification-renderer.js";
-export { SessionNavigatorHandler } from "./session-navigator.js";
-export { SubagentsSettingsHandler } from "./subagents-settings.js";
+export { BoundedLines } from "./bounded-lines.js";
+export { Text } from "@earendil-works/pi-tui";
+export type {
+  Component,
+  OverlayOptions,
+  TuiMode,
+} from "@earendil-works/pi-tui";

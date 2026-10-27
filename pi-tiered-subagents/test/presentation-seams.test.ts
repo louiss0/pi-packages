@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
-import { renderGetResultCall } from "#src/ui/get-result-tool-renderer";
+import {
+  createAgentToolRenderer,
+  renderGetResultCall,
+} from "../extensions/index";
 import {
   renderStatusLabel,
   renderStatusNote,
@@ -14,7 +16,7 @@ const theme = {
 };
 
 describe("presentation seams verified (stories 97–100)", () => {
-  describe("97 — tool-result and notification renderers live in the UI module", () => {
+  describe("97 — tool callbacks compose UI-owned formatters with UI-owned components", () => {
     it("renders a subagent tool call from owned display contracts", () => {
       const renderer = createAgentToolRenderer((type) => type);
       const call = renderer.renderCall(

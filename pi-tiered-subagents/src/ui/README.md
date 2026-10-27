@@ -6,8 +6,10 @@ presentation consumers. The extension root owns Pi registrations and wires them.
 
 ## Boundary
 
-- Widget, transcript viewer, settings views, tool-call/result renderers,
-  notification renderers, and terminal helpers live here.
+- Widget, transcript viewer, settings views, pure tool-result formatters,
+  notification renderers, and terminal helpers live here. The extension root
+  holds the tool-call/result callbacks and builds their components from this
+  module (`Text`, `BoundedLines`).
 - `view-types.ts` and `session-navigation.ts` own the small structural views and
   transcript-reader contracts. No live manager or child session crosses them.
 - `../presentation/` projects runtime records and persisted entries into those

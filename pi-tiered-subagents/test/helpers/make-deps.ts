@@ -12,10 +12,10 @@ import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
-import {
-  type AgentToolManager,
-  type AgentToolSettings,
-} from "#src/tools/agent-tool";
+import type {
+  AgentToolManager,
+  AgentToolSettings,
+} from "../../extensions/index";
 import { makeModel } from "./make-model";
 import { createTestSubagent, type TestSubagentOptions } from "./make-subagent";
 import { STUB_SNAPSHOT } from "./stub-ctx";
@@ -29,8 +29,8 @@ const defaultRegistry = new AgentRegistry(() => ({
 
 /**
  * Fixture shape returned by `createToolDeps`.
- * Contains the five `AgentTool` constructor params as separate fields so tests
- * can construct the class directly or use individual pieces for spawner/runner tests.
+ * Contains the Agent tool factory's collaborators as separate fields so tests
+ * can build the tool directly or use individual pieces for spawner/runner tests.
  */
 export type AgentToolFixture = {
   manager: AgentToolManager & SubagentsManager;

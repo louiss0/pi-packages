@@ -3,7 +3,7 @@ import {
   type LifecycleManager,
   type LifecycleRuntime,
   SessionLifecycleHandler,
-} from "#src/handlers/lifecycle";
+} from "../../extensions/index";
 
 function createHandler(manager: LifecycleManager, calls: string[]) {
   const runtime: LifecycleRuntime = {

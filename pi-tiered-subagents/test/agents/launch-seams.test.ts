@@ -36,7 +36,7 @@ import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { Subagents } from "#src/service/subagents";
 import { assembleSessionConfig } from "#src/session/session-config";
 import type { AssemblerIO } from "#src/session/session-config";
-import { AgentTool } from "#src/tools/agent-tool";
+import { createAgentTool } from "../../extensions/index";
 import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import { createToolDeps } from "#test/helpers/make-deps";
@@ -91,12 +91,12 @@ const modelRegistry = {
 describe("the tool door", () => {
   it("refuses an unknown agent type instead of running another one", async () => {
     const deps = createToolDeps();
-    const tool = new AgentTool(
-      deps.manager,
-      deps.subagents,
-      deps.settings,
-      deps.registry,
-    );
+    const tool = createAgentTool({
+      manager: deps.manager,
+      subagents: deps.subagents,
+      settings: deps.settings,
+      registry: deps.registry,
+    });
     const outcome = await tool.execute(
       "tool-call-1",
       { prompt: "do it", description: "d", subagent_type: "no-such-agent" },
@@ -111,12 +111,12 @@ describe("the tool door", () => {
     const deps = createToolDeps({
       registry: registryWith("worker", { enabled: false }),
     });
-    const tool = new AgentTool(
-      deps.manager,
-      deps.subagents,
-      deps.settings,
-      deps.registry,
-    );
+    const tool = createAgentTool({
+      manager: deps.manager,
+      subagents: deps.subagents,
+      settings: deps.settings,
+      registry: deps.registry,
+    });
     const outcome = await tool.execute(
       "tool-call-1",
       { prompt: "do it", description: "d", subagent_type: "worker" },

@@ -17,17 +17,15 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import { Check } from "typebox/value";
 import { defined } from "#src/optional";
-import { AgentTool } from "#src/tools/agent-tool";
 import {
-  GetResultTool,
-  type GetResultToolManager,
+  createAgentTool,
+  createGetResultTool,
+  createSteerTool,
   type GetResultParams,
-} from "#src/tools/get-result-tool";
-import {
-  SteerTool,
+  type GetResultToolManager,
   type SteerToolEvents,
   type SteerToolManager,
-} from "#src/tools/steer-tool";
+} from "../../extensions/index";
 import {
   getResultOutputSchema,
   steerOutputSchema,
@@ -137,12 +135,12 @@ describe("subagent structured output", () => {
     params: Record<string, unknown>,
     signal = new AbortController().signal,
   ) {
-    const tool = new AgentTool(
-      deps.manager,
-      deps.subagents,
-      deps.settings,
-      deps.registry,
-    );
+    const tool = createAgentTool({
+      manager: deps.manager,
+      subagents: deps.subagents,
+      settings: deps.settings,
+      registry: deps.registry,
+    });
     return {
       def: registeredTool("subagent"),
       result: await tool.execute("tc-1", params, signal, vi.fn(), makeCtx()),
@@ -409,7 +407,7 @@ describe("get_subagent_result structured output", () => {
     manager: GetResultToolManager,
     params: GetResultParams,
   ) {
-    const tool = new GetResultTool(manager, testRegistry);
+    const tool = createGetResultTool(manager, testRegistry);
     return {
       def: registeredTool("get_subagent_result"),
       result: await tool.execute(
@@ -572,7 +570,7 @@ describe("steer_subagent structured output", () => {
     manager: SteerToolManager,
     params: { agent_id: string; message: string },
   ) {
-    const tool = new SteerTool(manager, makeEvents());
+    const tool = createSteerTool(manager, makeEvents());
     return {
       def: registeredTool("steer_subagent"),
       result: await tool.execute(

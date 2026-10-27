@@ -85,7 +85,7 @@ export type TypeListRegistry = AgentDefinitionLookup;
 
 /**
  * Build the full agent-type list text for the Agent tool description.
- * Extracted from index.ts so it can be called inside createAgentTool.
+ * Used by the tool definition at the extension root.
  */
 export function buildTypeListText(
   registry: TypeListRegistry,

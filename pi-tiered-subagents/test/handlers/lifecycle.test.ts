@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   LifecycleManager,
   LifecycleRuntime,
-} from "#src/handlers/lifecycle";
-import { SessionLifecycleHandler } from "#src/handlers/lifecycle";
+} from "../../extensions/index";
+import { SessionLifecycleHandler } from "../../extensions/index";
 
 describe("SessionLifecycleHandler", () => {
   let runtime: LifecycleRuntime;

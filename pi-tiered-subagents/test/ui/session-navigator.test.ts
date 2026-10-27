@@ -22,10 +22,10 @@ import {
 } from "#src/ui/session-navigation";
 import {
   type PaneKeys,
-  SessionNavigatorHandler,
   type SessionNavigatorParams,
   TranscriptPane,
 } from "#src/ui/session-navigator";
+import { handleSubagentsSessions } from "../../extensions/index";
 import { makeNavigable } from "#test/ui/helpers/make-navigable";
 import { fakeSource, mockTui } from "#test/helpers/transcript-fixtures";
 
@@ -678,7 +678,7 @@ describe("SessionNavigatorHandler", () => {
     agents: SessionNavigatorParams["agents"],
     overrides: Patch<Omit<SessionNavigatorParams, "ui" | "agents">> = {},
   ): Promise<void> {
-    return new SessionNavigatorHandler().handle({
+    return handleSubagentsSessions({
       ui,
       agents,
       registry,

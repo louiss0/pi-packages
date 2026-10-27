@@ -3,7 +3,7 @@
  *
  * All functions are stateless: they receive an AgentReport, returning
  * formatted strings. No SDK types, no timers, no side effects.
- * Consumed by GetResultTool.execute in get-result-tool.ts. Mirrors the
+ * Consumed by the get_subagent_result factory at the extension root. Mirrors the
  * result-renderer.ts pattern used by the subagent tool's TUI renderer.
  */
 

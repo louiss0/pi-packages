@@ -27,7 +27,7 @@ import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationManager } from "#src/observation/notification";
 import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import type { RunConfig } from "#src/runtime";
-import { GetResultTool } from "#src/tools/get-result-tool";
+import { createGetResultTool } from "../../extensions/index";
 import type { AgentDefinition } from "#src/agents/definition";
 import type { Subagent } from "#src/types";
 import {
@@ -2395,7 +2395,7 @@ describe("SubagentManager", () => {
           },
         }));
         const id = spawnBg(manager);
-        const waiter = new GetResultTool(manager, defaultRegistry());
+        const waiter = createGetResultTool(manager, defaultRegistry());
 
         await waiter.execute(
           "tc-1",

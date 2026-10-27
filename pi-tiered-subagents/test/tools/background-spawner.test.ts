@@ -125,7 +125,7 @@ describe("renderBackgroundLaunch", () => {
 describe("spawnBackground", () => {
   /**
    * The door declares a commitment rather than a default, because
-   * resolveSpawnConfig already merged the agent's frontmatter and AgentTool
+   * resolveSpawnConfig already merged the agent's frontmatter and the tool
    * routed here on the result. The distinction is not observable today — the
    * tool only reaches this door when the merged value was already true, where
    * both request kinds resolve alike — but it is the contract #829 builds on to

@@ -357,7 +357,7 @@ A module belongs to the zone of the object it serves, not the zone of what it to
 
 ```text
 src/
-├── index.ts                        entry point, tool registration, event wiring
+├── index.ts                        entry point: every Pi registration and its inlined handler/tool/render logic
 ├── runtime.ts                      SubagentRuntime factory (session-scoped state)
 ├── types.ts                        shared type definitions
 ├── persisted-record.ts             subagents:record session-entry contract (writer's builder, reader's parser)
@@ -416,37 +416,27 @@ src/
 │   ├── service.ts                  SubagentsService interface (spawn, query, abort, steer, resume, workspace seam) + Symbol.for() accessors
 │   └── service-adapter.ts          SubagentsServiceAdapter class wrapping SubagentManager; maps live records to by-value snapshots at the boundary
 │
-├── tools/                          LLM-facing tool implementations
-│   ├── agent-tool.ts               subagent tool definition, validation, dispatch
+├── tools/                          execution adapters still owned by their domains
 │   ├── result-renderer.ts          pure per-status result rendering
 │   ├── spawn-config.ts             pure config resolution
 │   ├── foreground-runner.ts        foreground execution loop
 │   ├── progress-stream.ts          inline spinner progress a foreground run streams to its tool call, for a spawn and a resume alike
 │   ├── background-spawner.ts       background spawn setup + the launch message every background door (spawn, resume) returns
-│   ├── get-result-tool.ts          get_subagent_result tool; an optional timeout bounds a wait without stopping the agent; a wait reports the run it waited on, even when a resume replaced it
 │   ├── get-result-report.ts        pure get_subagent_result report formatter
 │   ├── get-result-renderer.ts      pure get_subagent_result line assembly for the collapsed and expanded TUI views
-│   ├── steer-tool.ts               steer_subagent tool
 │   └── helpers.ts                  shared tool utilities
 │
 ├── ui/                             user-facing presentation
 │   ├── agent-widget.ts             above-editor live status widget
 │   ├── widget-renderer.ts          pure rendering for widget
-│   ├── notification-renderer.ts    notification, mid-run-update, and workspace-notice TUI components
+│   ├── notification-renderer.ts    pure notification message helpers and detail types
 │   ├── display.ts                  pure formatters and shared types
 │   ├── bounded-lines.ts            component spending exactly one clipped terminal row per line
 │   ├── labeled-rule.ts             full-width rule with embedded labels, Pi editor-border style
 │   ├── glyphs.ts                   semantic display-glyph vocabulary (monospace-coverage constraint, #669)
-│   ├── subagents-settings.ts       /subagents:settings command handler
 │   ├── session-navigation.ts       pure session-selection and transcript-source logic
-│   ├── session-navigator.ts        /subagents:sessions command handler
+│   ├── session-navigator.ts        read-only transcript pane
 │   └── transcript-content.ts       transcript rows: per-message component blocks, width-cached (settles incrementally against Pi's state-before-listeners ordering, #689)
-│
-└── handlers/                       event handlers
-    ├── index.ts                    barrel re-export
-    ├── interrupt.ts                turn_start handler — abort all subagents on parent interrupt (ESC), when policy allows
-    ├── lifecycle.ts                session_start, session_before_switch, session_shutdown
-    └── widget-events.ts            widget's host events — session_start (UI context), turn_start (linger aging), session_shutdown (teardown)
 ```
 
 ### Observation model

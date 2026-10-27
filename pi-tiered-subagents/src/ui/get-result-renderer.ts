@@ -4,7 +4,7 @@
  * All functions are stateless: they receive GetResultDetails, the report text,
  * and a Theme, returning the pre-themed lines a BoundedLines component spends
  * one terminal row on each. No SDK types, no timers, no side effects.
- * Consumed by the renderResult hook in get-result-tool.ts. Mirrors the
+ * Consumed by the renderResult hook registered at the extension root. Mirrors the
  * result-renderer.ts pattern used by the subagent tool's renderer.
  */
 

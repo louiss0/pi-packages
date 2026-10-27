@@ -10,11 +10,13 @@ import type {
 import {
   buildPreviewLines,
   buildStatsParts,
-  createNotificationRenderer,
-  createUpdateRenderer,
-  createWorkspaceNoticeRenderer,
   resolveStatusPresentation,
 } from "#src/ui/notification-renderer";
+import {
+  renderNotificationMessage,
+  renderUpdateMessage,
+  renderWorkspaceNoticeMessage,
+} from "../../extensions/index";
 
 /** Minimal theme stub — satisfies RendererTheme structurally. */
 function stubTheme() {
@@ -41,7 +43,7 @@ function makeDetails(
 
 /** Render to a flat string for assertion; uses the public render() API. */
 function renderText(
-  result: ReturnType<ReturnType<typeof createNotificationRenderer>>,
+  result: ReturnType<typeof renderNotificationMessage>,
 ): string {
   expect(result).toBeDefined();
   return result!.render(120).join("\n");
@@ -232,9 +234,9 @@ describe("buildPreviewLines", () => {
   });
 });
 
-describe("createNotificationRenderer", () => {
+describe("renderNotificationMessage", () => {
   it("returns undefined when message has no details", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       defined({ details: undefined }),
       { expanded: false },
@@ -244,7 +246,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("renders completed status with success icon", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails() },
       { expanded: false },
@@ -257,7 +259,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("renders error status with error icon", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails({ status: "error" }) },
       { expanded: false },
@@ -269,7 +271,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("shows full result lines when expanded", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails({ resultPreview: "line1\nline2\nline3" }) },
       { expanded: true },
@@ -282,7 +284,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("shows collapsed preview when not expanded", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails({ resultPreview: "short result" }) },
       { expanded: false },
@@ -293,7 +295,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("shows output file link when present", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails({ outputFile: "/tmp/transcript.jsonl" }) },
       { expanded: false },
@@ -303,7 +305,7 @@ describe("createNotificationRenderer", () => {
   });
 
   it("includes stats line with tool uses and tokens", () => {
-    const renderer = createNotificationRenderer();
+    const renderer = renderNotificationMessage;
     const result = renderer(
       { details: makeDetails({ toolUses: 7, totalTokens: 5000 }) },
       { expanded: false },
@@ -315,7 +317,7 @@ describe("createNotificationRenderer", () => {
   });
 });
 
-describe("createUpdateRenderer", () => {
+describe("renderUpdateMessage", () => {
   function makeUpdate(overrides: Patch<UpdateDetails> = {}): UpdateDetails {
     return {
       description: "Test agent",
@@ -325,14 +327,14 @@ describe("createUpdateRenderer", () => {
   }
 
   it("accepts only Pi theme color names", () => {
-    type RendererTheme = Parameters<ReturnType<typeof createUpdateRenderer>>[2];
+    type RendererTheme = Parameters<typeof renderUpdateMessage>[2];
     expectTypeOf<
       Parameters<RendererTheme["fg"]>[0]
     >().toEqualTypeOf<ThemeColor>();
   });
 
   it("returns undefined when message has no details", () => {
-    const renderer = createUpdateRenderer();
+    const renderer = renderUpdateMessage;
     expect(
       renderer(
         defined({ details: undefined }),
@@ -343,7 +345,7 @@ describe("createUpdateRenderer", () => {
   });
 
   it("draws a running agent as active rather than finished", () => {
-    const renderer = createUpdateRenderer();
+    const renderer = renderUpdateMessage;
     const text = renderText(
       renderer({ details: makeUpdate() }, { expanded: false }, stubTheme()),
     );
@@ -357,7 +359,7 @@ describe("createUpdateRenderer", () => {
   });
 
   it("shows the first line only when collapsed", () => {
-    const renderer = createUpdateRenderer();
+    const renderer = renderUpdateMessage;
     const text = renderText(
       renderer(
         { details: makeUpdate({ message: "headline\nbody" }) },
@@ -371,7 +373,7 @@ describe("createUpdateRenderer", () => {
   });
 
   it("shows every line when expanded", () => {
-    const renderer = createUpdateRenderer();
+    const renderer = renderUpdateMessage;
     const text = renderText(
       renderer(
         { details: makeUpdate({ message: "headline\nbody" }) },
@@ -385,7 +387,7 @@ describe("createUpdateRenderer", () => {
   });
 });
 
-describe("createWorkspaceNoticeRenderer", () => {
+describe("renderWorkspaceNoticeMessage", () => {
   function makeNotice(
     overrides: Patch<WorkspaceNoticeDetails> = {},
   ): WorkspaceNoticeDetails {
@@ -397,7 +399,7 @@ describe("createWorkspaceNoticeRenderer", () => {
   }
 
   it("returns undefined when the message has no details", () => {
-    const renderer = createWorkspaceNoticeRenderer();
+    const renderer = renderWorkspaceNoticeMessage;
     expect(
       renderer(
         defined({ details: undefined }),
@@ -408,7 +410,7 @@ describe("createWorkspaceNoticeRenderer", () => {
   });
 
   it("names the agent and what the teardown saved", () => {
-    const renderer = createWorkspaceNoticeRenderer();
+    const renderer = renderWorkspaceNoticeMessage;
     const text = renderText(
       renderer({ details: makeNotice() }, { expanded: false }, stubTheme()),
     );
@@ -418,7 +420,7 @@ describe("createWorkspaceNoticeRenderer", () => {
   });
 
   it("shows the first line only when collapsed", () => {
-    const renderer = createWorkspaceNoticeRenderer();
+    const renderer = renderWorkspaceNoticeMessage;
     const text = renderText(
       renderer(
         { details: makeNotice({ notice: "headline\nbody" }) },
@@ -432,7 +434,7 @@ describe("createWorkspaceNoticeRenderer", () => {
   });
 
   it("shows every line when expanded", () => {
-    const renderer = createWorkspaceNoticeRenderer();
+    const renderer = renderWorkspaceNoticeMessage;
     const text = renderText(
       renderer(
         { details: makeNotice({ notice: "headline\nbody" }) },

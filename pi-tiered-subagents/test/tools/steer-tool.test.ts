@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  SteerTool,
+  createSteerTool,
   type SteerToolEvents,
   type SteerToolManager,
-} from "#src/tools/steer-tool";
+} from "../../extensions/index";
 import type { Subagent } from "#src/types";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import {
@@ -32,7 +32,7 @@ async function execute(
   events: SteerToolEvents,
   params: { agent_id: string; message: string },
 ) {
-  const tool = new SteerTool(manager, events);
+  const tool = createSteerTool(manager, events);
   return tool.execute(
     "tc-1",
     params,
@@ -42,7 +42,7 @@ async function execute(
   );
 }
 
-describe("SteerTool", () => {
+describe("createSteerTool", () => {
   it("registers the steer_subagent tool with its contract", () => {
     const def = registeredTool("steer_subagent");
     expect(def.name).toBe("steer_subagent");

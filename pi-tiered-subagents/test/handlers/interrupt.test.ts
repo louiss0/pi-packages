@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InterruptManager } from "#src/handlers/interrupt";
-import { InterruptHandler } from "#src/handlers/interrupt";
+import type { InterruptManager } from "../../extensions/index";
+import { InterruptHandler } from "../../extensions/index";
 
 describe("InterruptHandler", () => {
   let manager: InterruptManager;
