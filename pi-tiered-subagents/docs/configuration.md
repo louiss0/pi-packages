@@ -1,5 +1,131 @@
 # Configuration
 
+## Current role-aware model profiles (issue #10)
+
+This section describes this derivative; the upstream reference below is historical.
+Request `model` overrides definition `model`; both are exact `provider/modelId`
+choices and fail if unavailable or misspelled, without any automatic reroute.
+An unpinned custom definition uses worker routing behavior.
+
+Automatic routing uses the resolved agent identifier and the family profile's
+required `group`:
+
+| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| --- | --- | --- |
+| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
+| `researcher` | S | worker |
+| `debug` | M | worker |
+| `reviewer` | Equal: the parent's own size | planner |
+| `explore` | S | worker |
+
+Custom identifiers use worker behavior; this does not add a sixth shipped role.
+The mapping is shipped policy, not operator-configurable settings.
+
+Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
+sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
+Dated snapshots use the size of the tier they belong to.
+
+A size or class target starts at the top matching rung in the parent's version;
+Equal starts at the parent's own rung, not the top of its size. If that version
+has no matching target, only profile-approved cross-version links may reach it.
+From the resolved target, try concrete IDs in preference order, then cheaper
+rungs in the same version, then approved cross-version links, skipping anything
+the session cannot run. No version relationship is inferred. If nothing is
+runnable (including an absent target class), keep the parent's model and report
+why. A reviewer retaining its own rung by Equal is a designed choice, not an
+exhaustion fallback. The launch reason names the role and target as well as the
+chosen model, including retained outcomes.
+
+Flash-named tiers, including the separate flash-lite rung, are worker class;
+pro/non-flash flagship tiers are planner class. These are profile labels, not
+runtime name-based classification. MiniMax M3.1-flash is the new worker rung
+below its planner flagship; M3 and M2.7 have approved links to that flash rung.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
+versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
+approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
+reviewer targets pro, and the other roles retain the parent.
+
+GLM uses a glued-version naming strategy (version adjoining the prefix,
+variants following it) and a planner/worker profile. Kimi is no longer a
+supported automatic-routing family: a Kimi parent requires an explicit model.
+The shipped catalogue is representative of the installed SDK, not a promise of
+vendor availability. Profiles enumerate candidates; session access decides
+which can run. Model routing changes neither exact-pin resolution nor reasoning
+selection.
+
+A replacement must declare `group: "size"` or `group: "planner-worker"`.
+Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
+planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
+labels are reported when read, not silently inferred. Upgrade existing whole
+replacements by adding these labels; version/tier/model/fallback shape and
+whole-family replacement semantics stay the same. Examples are representative
+profile data, not provider-access guarantees.
+
+Set `familyProfiles` through the existing shared settings store. Its value is
+JSON encoded as text under `pi-tiered-subagents` in `settings-extensions.json`.
+The decoded value below shows both groups. Project profiles replace each named
+family whole, leaving other families intact; no tier fragments are merged.
+
+```json
+{
+  "familyProfiles": {
+    "gpt": {
+      "group": "size",
+      "versions": [
+        {
+          "version": "6.1",
+          "tiers": [
+            {
+              "tier": "sol",
+              "size": "L",
+              "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
+              "fallbacks": [{ "version": "6", "tier": "luna" }]
+            }
+          ]
+        },
+        {
+          "version": "6",
+          "tiers": [
+            {
+              "tier": "luna",
+              "size": "M",
+              "models": [{ "provider": "openai", "id": "gpt-6-luna" }]
+            }
+          ]
+        }
+      ]
+    },
+    "minimax": {
+      "group": "planner-worker",
+      "versions": [
+        {
+          "version": "3.1",
+          "tiers": [
+            {
+              "tier": "",
+              "class": "planner",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1" }]
+            },
+            {
+              "tier": "flash",
+              "class": "worker",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1-flash" }]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+## Historical upstream configuration reference
+
+The remainder preserves upstream configuration history, not current model-routing
+instructions. In particular its fuzzy model names, defaults, locks, and runtime
+settings-file description are not the current derivative contract. Consult the
+[README](../README.md) and [status](status.md) for current behavior.
+
 `@gotgenes/pi-subagents` has two configuration surfaces: **agent definition files** that describe an agent type, and a **`subagents.json`** settings file that tunes the runtime.
 Neither is required — every field has a default.
 

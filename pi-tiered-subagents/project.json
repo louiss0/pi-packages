@@ -66,6 +66,13 @@
         "cwd": "{projectRoot}"
       }
     },
+    "regenerate-model-matrix": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsx scripts/regenerate-model-matrix.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
     "mcp-check": {
       "executor": "nx:run-commands",
       "options": {

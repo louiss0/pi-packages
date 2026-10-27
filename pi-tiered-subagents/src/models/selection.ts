@@ -5,7 +5,7 @@
  *
  * 1. **the request** — the model the tool call or the service call names;
  * 2. **the definition** — the model the agent file names;
- * 3. **automatic routing** — one rung down the parent's family ladder.
+ * 3. **automatic routing** — the role's target on the parent's family ladder.
  *
  * The first two are *explicit* choices: they are resolved exactly, and a model
  * the session cannot run is an error rather than a silent fall back to
@@ -26,6 +26,8 @@ import { type RoutingContext, routeModel } from "#src/models/router";
 
 /** What the launch asked for, and what the definition asked for. */
 export interface ModelSelectionRequest {
+  /** The resolved definition's identifier; omitted callers use worker behavior. */
+  readonly agentId?: string;
   /** The model the request names, if any. */
   readonly requestedModel?: string;
   /** The model the definition names, if any. */
@@ -74,7 +76,7 @@ export function selectModel(
     return explicit(request.definitionModel, "definition", registry);
   }
 
-  const outcome = routeModel(request.parentModel, routing);
+  const outcome = routeModel(request.parentModel, routing, request.agentId);
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   if (outcome.kind === "retained") {
     return {

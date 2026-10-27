@@ -3,17 +3,20 @@ import { mergeProfiles, parseProfile } from "#src/models/user-profiles";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import type { FamilyProfile } from "#src/models/profile";
+import { validateProfile } from "#src/models/profile";
 
 const strategies = strategiesByFamily(SHIPPED_STRATEGIES);
 
 /** A profile in the shape the settings file holds. */
 const GPT_PROFILE = {
+  group: "size",
   versions: [
     {
       version: "6.1",
       tiers: [
         {
           tier: "sol",
+          size: "L",
           models: [{ provider: "openai", id: "gpt-6.1-sol" }],
           fallbacks: [{ version: "6", tier: "luna" }],
         },
@@ -23,6 +26,64 @@ const GPT_PROFILE = {
 };
 
 describe("parseProfile", () => {
+  it("requires and preserves planner-worker class labels", () => {
+    const profile = (modelClass: unknown) => ({
+      group: "planner-worker",
+      versions: [
+        {
+          version: "5.3",
+          tiers: [
+            {
+              tier: "flash",
+              class: modelClass,
+              models: [{ provider: "zai", id: "glm-5.3-flash" }],
+            },
+          ],
+        },
+      ],
+    });
+    for (const modelClass of [undefined, "pro", 42]) {
+      expect(parseProfile("glm", profile(modelClass)).ok).toBe(false);
+    }
+    for (const modelClass of ["planner", "worker"]) {
+      const parsed = parseProfile("glm", profile(modelClass));
+      expect(parsed.ok && parsed.profile.versions[0]?.tiers[0]?.class).toBe(
+        modelClass,
+      );
+    }
+  });
+
+  it("requires a supported family group", () => {
+    for (const group of [undefined, "other", 42]) {
+      expect(parseProfile("gpt", { ...GPT_PROFILE, group }).ok).toBe(false);
+    }
+  });
+
+  it("reads and validates the size labels", () => {
+    const parsed = parseProfile("gpt", GPT_PROFILE);
+    expect(parsed.ok && parsed.profile.group).toBe("size");
+    expect(parsed.ok && parsed.profile.versions[0]?.tiers[0]?.size).toBe("L");
+    for (const size of [undefined, "XL", 42]) {
+      expect(
+        parseProfile("gpt", {
+          group: "size",
+          versions: [
+            {
+              version: "6.1",
+              tiers: [
+                {
+                  tier: "sol",
+                  size,
+                  models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+                },
+              ],
+            },
+          ],
+        }).ok,
+      ).toBe(false);
+    }
+  });
+
   it("reads a profile from the settings data", () => {
     const parsed = parseProfile("gpt", GPT_PROFILE);
     expect(parsed.ok).toBe(true);
@@ -45,7 +106,11 @@ describe("parseProfile", () => {
     });
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(Object.keys(parsed.profile)).toEqual(["family", "versions"]);
+    expect(Object.keys(parsed.profile)).toEqual([
+      "family",
+      "group",
+      "versions",
+    ]);
   });
 
   it("refuses a value that is not a profile", () => {
@@ -54,14 +119,21 @@ describe("parseProfile", () => {
   });
 
   it("refuses a profile with no versions", () => {
-    expect(parseProfile("gpt", {}).ok).toBe(false);
+    expect(parseProfile("gpt", { group: "size" })).toEqual({
+      ok: false,
+      problem: "a profile needs a versions list",
+    });
   });
 
   it("refuses a tier with no models", () => {
     const parsed = parseProfile("gpt", {
-      versions: [{ version: "6.1", tiers: [{ tier: "sol" }] }],
+      group: "size",
+      versions: [{ version: "6.1", tiers: [{ tier: "sol", size: "L" }] }],
     });
-    expect(parsed.ok).toBe(false);
+    expect(parsed).toEqual({
+      ok: false,
+      problem: "a tier needs a models list",
+    });
   });
 });
 
@@ -69,12 +141,14 @@ describe("mergeProfiles", () => {
   const global: FamilyProfile[] = [
     {
       family: "gpt",
+      group: "size",
       versions: [
         {
           version: "6.1",
           tiers: [
             {
               tier: "sol",
+              size: "L",
               models: [{ provider: "openai", id: "gpt-6.1-sol" }],
             },
           ],
@@ -111,12 +185,14 @@ describe("mergeProfiles", () => {
     const project: FamilyProfile[] = [
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "7",
             tiers: [
               {
                 tier: "sol",
+                size: "L",
                 models: [{ provider: "openai", id: "gpt-7-sol" }],
               },
             ],
@@ -137,11 +213,16 @@ describe("mergeProfiles", () => {
     const unknown: FamilyProfile[] = [
       {
         family: "llama",
+        group: "size",
         versions: [
           {
             version: "1",
             tiers: [
-              { tier: "", models: [{ provider: "meta", id: "llama-1" }] },
+              {
+                tier: "",
+                size: "M",
+                models: [{ provider: "meta", id: "llama-1" }],
+              },
             ],
           },
         ],
@@ -161,12 +242,14 @@ describe("mergeProfiles", () => {
     const broken: FamilyProfile[] = [
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
             tiers: [
               {
                 tier: "sol",
+                size: "L",
                 models: [{ provider: "openai", id: "claude-opus-5" }],
               },
             ],
@@ -186,5 +269,68 @@ describe("mergeProfiles", () => {
       ),
     );
     expect(problems.join("\n")).toContain("naming structure");
+  });
+});
+
+describe("profile label validation", () => {
+  it("reports missing or invalid group and group-appropriate labels", () => {
+    const profile = {
+      family: "gpt",
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+      ],
+    };
+    // Runtime callers can still hand validation a malformed profile.
+    expect(
+      validateProfile(profile as FamilyProfile, strategies.get("gpt"))
+        .map((p) => p.problem)
+        .join(" "),
+    ).toContain("size");
+    expect(
+      validateProfile(
+        { ...profile, group: "planner-worker" } as FamilyProfile,
+        strategies.get("gpt"),
+      )
+        .map((p) => p.problem)
+        .join(" "),
+    ).toContain("class");
+    expect(
+      validateProfile(
+        { ...profile, group: "unknown" } as unknown as FamilyProfile,
+        strategies.get("gpt"),
+      )
+        .map((p) => p.problem)
+        .join(" "),
+    ).toContain("group");
+  });
+});
+
+describe("shipped profile data", () => {
+  it("labels every rung and resolves every approved fallback", () => {
+    expect(SHIPPED_PROFILES.map((profile) => profile.family).sort()).toEqual([
+      "claude",
+      "deepseek",
+      "gemini",
+      "glm",
+      "gpt",
+      "mimo",
+      "minimax",
+      "qwen",
+    ]);
+    for (const profile of SHIPPED_PROFILES) {
+      expect(
+        validateProfile(profile, strategies.get(profile.family)),
+        profile.family,
+      ).toEqual([]);
+    }
   });
 });

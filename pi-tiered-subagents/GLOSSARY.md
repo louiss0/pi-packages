@@ -59,9 +59,27 @@ specialist.
 
 ## Family
 
-A model series the package can read: `gpt`, `claude`, `gemini`, `kimi`,
+A model series the package can read: `gpt`, `claude`, `gemini`, `glm`,
 `minimax`, `qwen`, `deepseek`, `mimo`. A family has a **naming structure**
 (how its ids are written) and, usually, a **ladder** (the profile data).
+
+## Group
+
+The routing vocabulary a family uses: **size** (`gpt`, `claude`, `qwen`) or
+**planner-worker** (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`). Each family
+belongs to exactly one group.
+
+## Size
+
+A capability label on a size-group tier: **S**, **M**, or **L**. Several tiers
+may share a size; size is not a version or the tier's position in the ladder.
+**Equal** means the parent's own size, anchored at its own rung.
+
+## Class
+
+A role-shape label on a planner/worker-group tier: **planner** or **worker**.
+A class is not an agent identifier: a reviewer targets planner class while
+execution roles target worker class. A family need not offer both classes.
 
 ## Tier
 
@@ -72,15 +90,18 @@ tier with the empty name.
 
 ## Profile
 
-The data that describes a family's ladder: its versions, each version's tiers,
-the concrete ids of each tier, and the rungs a tier may cross to. A profile is
+The data that describes a family's group and ladder: its versions, each version's
+tiers with their size or class labels, concrete ids, and approved cross-version
+links. A profile is
 read, never executed: it holds no matcher, no pattern and no parser.
 
 ## Ladder
 
 A family's versions and tiers in capability order, with the cross-version
-links. The router walks down it: the tiers below the parent's, then the
-approved links.
+links. A role selects a target size or class; the router starts at the top
+matching rung in the parent's version (the parent's own rung for Equal), then
+walks downward through cheaper rungs and approved links. Versions are never
+crossed implicitly; an exhausted or absent target retains the parent.
 
 ## Reasoning level
 

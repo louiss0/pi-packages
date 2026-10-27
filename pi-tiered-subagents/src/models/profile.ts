@@ -13,11 +13,13 @@
  * routing relationship nobody wrote down.
  */
 
-import {
-  type FamilyStrategy,
-  matchesTier,
-  tierNameList,
-} from "#src/models/strategy";
+import type { FamilyStrategy } from "#src/models/strategy";
+import { matchesTier, tierNameList } from "#src/models/strategy";
+
+/** Capability labels used by role-aware routing. */
+export type ModelSize = "S" | "M" | "L";
+export type ModelClass = "planner" | "worker";
+export type FamilyGroup = "size" | "planner-worker";
 
 /** A concrete model: the provider that serves it and its id there. */
 export interface ModelCandidate {
@@ -40,6 +42,10 @@ export interface TierRef {
  */
 export interface TierProfile {
   readonly tier: string;
+  /** Required for a size-group family. */
+  readonly size?: ModelSize;
+  /** Required for a planner-worker family. */
+  readonly class?: ModelClass;
   /** The concrete models of this tier, most preferred first. */
   readonly models: readonly ModelCandidate[];
   /**
@@ -65,6 +71,8 @@ export interface VersionProfile {
 export interface FamilyProfile {
   /** The family this profile describes, e.g. "gpt". */
   readonly family: string;
+  /** Which capability labels govern this family. */
+  readonly group: FamilyGroup;
   /** The versions, most recent first. */
   readonly versions: readonly VersionProfile[];
 }
@@ -77,13 +85,44 @@ export interface ProfileProblem {
   readonly problem: string;
 }
 
+/** Untrusted labels read from a tier before its profile is accepted. */
+interface TierLabels {
+  readonly size?: unknown;
+  readonly class?: unknown;
+}
+
+/** Shared label rules for settings parsing and complete-profile validation. */
+export function tierLabelProblems(
+  group: FamilyGroup,
+  labels: TierLabels,
+): string[] {
+  const problems: string[] = [];
+  if (
+    (group === "size" || labels.size !== undefined) &&
+    labels.size !== "S" &&
+    labels.size !== "M" &&
+    labels.size !== "L"
+  ) {
+    problems.push('a size-group tier needs a size: "S", "M", or "L"');
+  }
+  if (
+    (group === "planner-worker" || labels.class !== undefined) &&
+    labels.class !== "planner" &&
+    labels.class !== "worker"
+  ) {
+    problems.push('a planner-worker tier needs a class: "planner" or "worker"');
+  }
+  return problems;
+}
+
 /**
  * Check a profile against the family's naming structure.
  *
  * Returns the problems; an empty list means the profile is usable. The checks
  * are the ones that keep a profile from creating relationships nobody wrote:
  *
- * - the family is a plain identifier;
+ * - the family is a plain identifier with a supported group;
+ * - every tier carries the label required by that group;
  * - the versions and the tiers within a version are unique;
  * - every model names a provider and an id;
  * - every model belongs to this family, at this version, and to the tier it
@@ -115,6 +154,13 @@ export function validateProfile(
     });
   }
 
+  if (profile.group !== "size" && profile.group !== "planner-worker") {
+    problems.push({
+      where: profile.family,
+      problem: 'a profile needs a group: "size" or "planner-worker"',
+    });
+  }
+
   const seenVersions = new Set<string>();
   for (const version of profile.versions) {
     const where = `${profile.family} ${version.version}`;
@@ -130,6 +176,12 @@ export function validateProfile(
     const seenTiers = new Set<string>();
     for (const tier of version.tiers) {
       const tierWhere = `${where} tier "${tier.tier}"`;
+      problems.push(
+        ...tierLabelProblems(profile.group, tier).map((problem) => ({
+          where: tierWhere,
+          problem,
+        })),
+      );
       if (seenTiers.has(tier.tier)) {
         problems.push({
           where: tierWhere,

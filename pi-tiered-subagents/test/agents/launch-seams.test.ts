@@ -30,6 +30,7 @@ import {
 import { AgentRegistry } from "#src/agents/registry";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ModelInfo } from "#src/agents/resolver";
+import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { Subagents } from "#src/service/subagents";
@@ -581,6 +582,45 @@ describe("both doors resolve alike", () => {
     );
     expect(tool.execution.runInBackground).toBe(false);
     expect(tool.execution.inheritContext).toBe(false);
+  });
+});
+
+describe("automatic model selection at launch", () => {
+  it.each([
+    ["reviewer", "claude-opus-4-5"],
+    ["worker", "claude-sonnet-4-5"],
+    ["researcher", "claude-haiku-4-5"],
+  ])("carries the resolved %s identifier into routing", (role, expected) => {
+    const available = [
+      "claude-opus-4-5",
+      "claude-sonnet-4-5",
+      "claude-haiku-4-5",
+    ].map((id) => makeModel({ provider: "anthropic", id }));
+    const result = resolveSpawnConfig(
+      { subagent_type: role, prompt: "do it", description: "d" },
+      registryWith(role, {}),
+      {
+        parentModel: available[0]!,
+        modelRegistry: {
+          getAll: () => available,
+          getAvailable: () => available,
+          find: (provider, id) =>
+            available.find((m) => m.provider === provider && m.id === id),
+        },
+        ladders: {
+          profiles: new Map(SHIPPED_PROFILES.map((p) => [p.family, p])),
+          strategies: strategiesByFamily(SHIPPED_STRATEGIES),
+        },
+      },
+      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
+    );
+    expect(result).not.toHaveProperty("error");
+    if ("error" in result) return;
+    expect(result.execution.modelIdentity).toEqual({
+      provider: "anthropic",
+      id: expected,
+    });
+    expect(result.execution.modelSelection.reason).toContain(role);
   });
 });
 

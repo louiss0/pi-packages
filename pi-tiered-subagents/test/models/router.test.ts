@@ -49,8 +49,8 @@ describe("the shipped profiles", () => {
       "claude",
       "deepseek",
       "gemini",
+      "glm",
       "gpt",
-      "kimi",
       "mimo",
       "minimax",
       "qwen",
@@ -65,11 +65,16 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
             tiers: [
-              { tier: "sol", models: [model("openai", "claude-opus-5")] },
+              {
+                tier: "sol",
+                size: "L",
+                models: [model("openai", "claude-opus-5")],
+              },
             ],
           },
         ],
@@ -83,10 +88,17 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
-            tiers: [{ tier: "sol", models: [model("openai", "gpt-6-sol")] }],
+            tiers: [
+              {
+                tier: "sol",
+                size: "L",
+                models: [model("openai", "gpt-6-sol")],
+              },
+            ],
           },
         ],
       },
@@ -99,10 +111,17 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
-            tiers: [{ tier: "luna", models: [model("openai", "gpt-6.1-sol")] }],
+            tiers: [
+              {
+                tier: "luna",
+                size: "M",
+                models: [model("openai", "gpt-6.1-sol")],
+              },
+            ],
           },
         ],
       },
@@ -115,12 +134,14 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
             tiers: [
               {
                 tier: "sol",
+                size: "L",
                 models: [model("openai", "gpt-6.1-sol")],
                 fallbacks: [{ version: "9.9", tier: "luna" }],
               },
@@ -137,12 +158,14 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "gpt",
+        group: "size",
         versions: [
           {
             version: "6.1",
             tiers: [
               {
                 tier: "sol",
+                size: "L",
                 models: [model("openai", "gpt-6.1-sol")],
                 fallbacks: [{ version: "6.1", tier: "nope" }],
               },
@@ -159,8 +182,12 @@ describe("validateProfile", () => {
     const problems = validateProfile(
       {
         family: "llama",
+        group: "size",
         versions: [
-          { version: "1", tiers: [{ tier: "", models: [model("x", "y")] }] },
+          {
+            version: "1",
+            tiers: [{ tier: "", size: "M", models: [model("x", "y")] }],
+          },
         ],
       },
       undefined,
@@ -172,7 +199,107 @@ describe("validateProfile", () => {
 });
 
 describe("routeModel", () => {
-  it("steps down one tier in the parent's own version", () => {
+  it("keeps review at the parent's size instead of stepping down", () => {
+    const parent = model("anthropic", "claude-opus-4-5");
+    const outcome = routeModel(
+      parent,
+      context([parent, model("anthropic", "claude-sonnet-4-5")]),
+      "reviewer",
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect(outcome.modelId).toBe("claude-opus-4-5");
+    expect(outcome.reason).toContain("reviewer targets L");
+  });
+
+  it.each([
+    ["worker", "claude-opus-4-5", "claude-sonnet-4-5", "M"],
+    ["researcher", "claude-opus-4-5", "claude-haiku-4-5", "S"],
+    ["explore", "claude-sonnet-4-5", "claude-haiku-4-5", "S"],
+    ["debug", "claude-haiku-4-5", "claude-sonnet-4-5", "M"],
+    ["reviewer", "claude-sonnet-4-5", "claude-sonnet-4-5", "M"],
+    ["worker", "claude-haiku-4-5", "claude-haiku-4-5", "S"],
+    ["custom-editor", "claude-opus-4-5", "claude-sonnet-4-5", "M"],
+    ["reviewer", "claude-opus-4-5-20251101", "claude-opus-4-5", "L"],
+  ])("%s from %s selects %s (size %s)", (role, parentId, expected, target) => {
+    const available = [
+      "claude-opus-4-5",
+      "claude-sonnet-4-5",
+      "claude-haiku-4-5",
+    ].map((id) => model("anthropic", id));
+    const outcome = routeModel(
+      model("anthropic", parentId),
+      context(available),
+      role,
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect([outcome.provider, outcome.modelId]).toEqual([
+      "anthropic",
+      expected,
+    ]);
+    expect(outcome.reason).toContain(`${role} targets ${target}`);
+  });
+
+  it.each([
+    ["openai", "gpt-6.1-sol", "worker", "gpt-6-luna", "M"],
+    ["openai", "gpt-6-astra", "worker", "gpt-6-luna", "M"],
+    ["openai", "gpt-6-sol", "reviewer", "gpt-6-sol", "L"],
+    ["openai", "gpt-5.6-luna", "debug", "gpt-5.6-terra", "M"],
+    ["openai", "gpt-5.6-terra", "debug", "gpt-5.6-terra", "M"],
+    ["openai", "gpt-5.4", "researcher", "gpt-5.4-mini", "S"],
+    ["openai", "gpt-5.4-nano", "worker", "gpt-5.4-mini", "S"],
+    ["qwen-token-plan", "qwen3.7-max", "worker", "qwen3.7-plus", "M"],
+    ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
+    ["minimax", "MiniMax-M3.1", "debug", "MiniMax-M3.1-flash", "worker"],
+    ["minimax", "MiniMax-M3.1-flash", "reviewer", "MiniMax-M3.1", "planner"],
+    ["xiaomi", "mimo-v2.6-pro", "worker", "mimo-v2.6-flash", "worker"],
+    [
+      "xiaomi",
+      "mimo-v2.6-flash",
+      "reviewer",
+      "mimo-v2.6-pro-ultraspeed",
+      "planner",
+    ],
+    ["zai", "glm-5.3", "worker", "glm-5.3-flash", "worker"],
+    ["zai", "glm-5.3-flash", "reviewer", "glm-5.3", "planner"],
+    ["deepseek", "deepseek-v4-pro", "reviewer", "deepseek-v4-pro", "planner"],
+  ])("%s/%s routes %s to %s (%s)", (provider, parentId, role, expected, target) => {
+    const available = SHIPPED_PROFILES.flatMap((profile) =>
+      profile.versions.flatMap((version) =>
+        version.tiers.flatMap((tier) =>
+          tier.models.map((candidate) =>
+            model(candidate.provider, candidate.id),
+          ),
+        ),
+      ),
+    );
+    const outcome = routeModel(
+      model(provider, parentId),
+      context(available),
+      role,
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect([outcome.provider, outcome.modelId]).toEqual([provider, expected]);
+    expect(outcome.reason).toContain(`${role} targets ${target}`);
+  });
+
+  it.each([
+    "worker",
+    "explore",
+    "researcher",
+    "debug",
+  ])("retains DeepSeek when %s has no worker class", (role) => {
+    const parent = model("deepseek", "deepseek-v4-pro");
+    const outcome = routeModel(parent, context([parent]), role);
+    expect(outcome.kind).toBe("retained");
+    if (outcome.kind !== "retained") return;
+    expect(outcome.model).toBe(parent);
+    expect(outcome.reason).toContain(`${role} targets worker`);
+  });
+
+  it("steps down one size in the parent's own version", () => {
     const outcome = routeModel(
       model("openai", "gpt-5.6-sol"),
       context([
@@ -227,16 +354,27 @@ describe("routeModel", () => {
   it("does not cross into a version the profile does not approve", () => {
     const profile: FamilyProfile = {
       family: "gpt",
+      group: "size",
       versions: [
         {
           version: "6.1",
-          tiers: [{ tier: "sol", models: [model("openai", "gpt-6.1-sol")] }],
+          tiers: [
+            {
+              tier: "sol",
+              size: "L",
+              models: [model("openai", "gpt-6.1-sol")],
+            },
+          ],
         },
         {
           version: "6",
           tiers: [
-            { tier: "sol", models: [model("openai", "gpt-6-sol")] },
-            { tier: "luna", models: [model("openai", "gpt-6-luna")] },
+            { tier: "sol", size: "L", models: [model("openai", "gpt-6-sol")] },
+            {
+              tier: "luna",
+              size: "M",
+              models: [model("openai", "gpt-6-luna")],
+            },
           ],
         },
       ],
@@ -251,13 +389,14 @@ describe("routeModel", () => {
     expect(outcome.kind).toBe("retained");
   });
 
-  it("keeps the parent's model when the ladder has nothing left", () => {
-    const parent = model("openai", "gpt-5.4-nano");
+  it("keeps the parent's model when no target or cheaper rung is runnable", () => {
+    const parent = model("anthropic", "claude-opus-4-5");
     const outcome = routeModel(parent, context([parent]));
     expect(outcome.kind).toBe("retained");
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
-    expect(outcome.reason).toContain("no lower gpt tier is available");
+    expect(outcome.reason).toContain("worker targets M");
+    expect(outcome.reason).toContain("keeping claude-opus-4-5");
   });
 
   it("keeps the parent's model when its family has no profile", () => {
@@ -287,8 +426,10 @@ describe("routeModel", () => {
   });
 
   it("keeps the parent's model when there is no parent", () => {
-    const outcome = routeModel(undefined, context([]));
+    const outcome = routeModel(undefined, context([]), "reviewer");
     expect(outcome.kind).toBe("retained");
+    if (outcome.kind === "retained")
+      expect(outcome.reason).toContain("reviewer targets");
   });
 
   it("steps down a Claude line within its version", () => {
@@ -304,7 +445,46 @@ describe("routeModel", () => {
     expect(outcome.modelId).toBe("claude-sonnet-5");
   });
 
-  it("steps down a Gemini tier within its version", () => {
+  it.each([
+    "worker",
+    "explore",
+    "researcher",
+    "debug",
+    "custom-role",
+  ])("%s uses the worker class even from a worker parent", (role) => {
+    const parent = model("google", "gemini-2.5-flash-lite");
+    const outcome = routeModel(
+      parent,
+      context([
+        parent,
+        model("google", "gemini-2.5-pro"),
+        model("google", "gemini-2.5-flash"),
+      ]),
+      role,
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect(outcome.modelId).toBe("gemini-2.5-flash");
+    expect(outcome.reason).toContain(`${role} targets worker`);
+  });
+
+  it("steps a worker parent up to the planner class for review", () => {
+    const parent = model("google", "gemini-2.5-flash");
+    const outcome = routeModel(
+      parent,
+      context([parent, model("google", "gemini-2.5-pro")]),
+      "reviewer",
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect([outcome.provider, outcome.modelId]).toEqual([
+      "google",
+      "gemini-2.5-pro",
+    ]);
+    expect(outcome.reason).toContain("reviewer targets planner");
+  });
+
+  it("uses a Gemini worker tier within its version", () => {
     const outcome = routeModel(
       model("google", "gemini-2.5-pro"),
       context([
@@ -317,30 +497,112 @@ describe("routeModel", () => {
     expect(outcome.modelId).toBe("gemini-2.5-flash");
   });
 
-  it("steps down a Kimi version when its own has no lower tier", () => {
+  it.each([
+    ["google", "gemini-3.7-flash", "reviewer", "gemini-2.5-pro", "planner"],
+    ["google", "gemini-3.5-flash", "reviewer", "gemini-2.5-pro", "planner"],
+    ["minimax", "MiniMax-M3", "worker", "MiniMax-M3.1-flash", "worker"],
+    ["minimax", "MiniMax-M2.7", "explore", "MiniMax-M3.1-flash", "worker"],
+    ["qwen-token-plan", "qwen3.7-max", "researcher", "qwen3.6-flash", "S"],
+    ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
+  ])("%s/%s reaches the %s target via approved links", (provider, parentId, role, expected, target) => {
+    const parent = model(provider, parentId);
     const outcome = routeModel(
-      model("moonshotai", "kimi-k3"),
-      context([
-        model("moonshotai", "kimi-k3"),
-        model("moonshotai", "kimi-k2.7-code"),
-      ]),
+      parent,
+      context([parent, model(provider, expected)]),
+      role,
     );
     expect(outcome.kind).toBe("routed");
     if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("kimi-k2.7-code");
+    expect([outcome.provider, outcome.modelId]).toEqual([provider, expected]);
+    expect(outcome.reason).toContain(`${role} targets ${target}`);
   });
 
-  it("keeps walking down the approved links when a tier is unavailable", () => {
+  it("keeps walking down approved links when a target model is unavailable", () => {
     const outcome = routeModel(
-      model("moonshotai", "kimi-k3"),
-      context([
-        model("moonshotai", "kimi-k3"),
-        model("moonshotai", "kimi-k2.6"),
-      ]),
+      model("openai", "gpt-6.1-sol"),
+      context([model("openai", "gpt-5.6-luna")]),
     );
     expect(outcome.kind).toBe("routed");
     if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("kimi-k2.6");
+    expect(outcome.modelId).toBe("gpt-5.6-luna");
+  });
+
+  it("tries the next approved target path when the first is unrunnable", () => {
+    const parent = model("google", "gemini-3.7-flash");
+    const profile: FamilyProfile = {
+      family: "gemini",
+      group: "planner-worker",
+      versions: [
+        {
+          version: "3.7",
+          tiers: [
+            {
+              tier: "flash",
+              class: "worker",
+              models: [parent],
+              fallbacks: [
+                { version: "3.1", tier: "pro-preview" },
+                { version: "2.5", tier: "pro" },
+              ],
+            },
+          ],
+        },
+        {
+          version: "3.1",
+          tiers: [
+            {
+              tier: "pro-preview",
+              class: "planner",
+              models: [model("google", "gemini-3.1-pro-preview")],
+            },
+          ],
+        },
+        {
+          version: "2.5",
+          tiers: [
+            {
+              tier: "pro",
+              class: "planner",
+              models: [model("google", "gemini-2.5-pro")],
+            },
+          ],
+        },
+      ],
+    };
+    const outcome = routeModel(
+      parent,
+      context([model("google", "gemini-2.5-pro")], [profile]),
+      "reviewer",
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect(outcome.modelId).toBe("gemini-2.5-pro");
+  });
+
+  it("degrades review downward when its planner target is unavailable", () => {
+    const parent = model("google", "gemini-2.5-pro");
+    const outcome = routeModel(
+      parent,
+      context([model("google", "gemini-2.5-flash")]),
+      "reviewer",
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect(outcome.modelId).toBe("gemini-2.5-flash");
+    expect(outcome.reason).toContain("reviewer targets planner");
+  });
+
+  it("does not promote a worker target through a planner-only cross-version link", () => {
+    const parent = model("google", "gemini-3.7-flash");
+    const outcome = routeModel(
+      parent,
+      context([model("google", "gemini-2.5-pro")]),
+      "worker",
+    );
+    expect(outcome.kind).toBe("retained");
+    if (outcome.kind !== "retained") return;
+    expect(outcome.model).toBe(parent);
+    expect(outcome.reason).toContain("worker targets worker");
   });
 
   it("never chooses a model the session cannot run", () => {

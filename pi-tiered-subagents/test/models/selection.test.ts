@@ -111,6 +111,21 @@ describe("resolveExactModel", () => {
 });
 
 describe("selectModel", () => {
+  it("routes for the resolved agent identifier", () => {
+    const result = selectModel(
+      { parentModel: SOL, agentId: "reviewer" },
+      registry([SOL, LUNA]),
+      routing([SOL, LUNA]),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.selection.identity).toEqual({
+      provider: "openai",
+      id: "gpt-6.1-sol",
+    });
+    expect(result.selection.reason).toContain("reviewer");
+  });
+
   it("takes the request's model over the definition's", () => {
     const result = selectModel(
       {

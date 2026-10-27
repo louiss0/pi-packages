@@ -110,7 +110,7 @@ protected by an equivalent host gate.
 | `src/models/strategy.ts` | How one family's ids are read: the version and the tier. |
 | `src/models/profile.ts` | What a profile says, and how a malformed one is refused. |
 | `src/models/profiles.ts` | The ladders this package ships. |
-| `src/models/router.ts` | The walk: one tier down, then the approved cross-version links. |
+| `src/models/router.ts` | Role-aware size/class targets, then the downward walk and approved cross-version links. |
 | `src/models/selection.ts` | The precedence: the request, then the definition, then the routing. |
 | `src/models/user-profiles.ts` | The operator's profiles, read from the settings layers. |
 
@@ -125,14 +125,46 @@ runtime uses:
 {
   "familyProfiles": {
     "gpt": {
+      "group": "size",
       "versions": [
         {
           "version": "6.1",
           "tiers": [
             {
               "tier": "sol",
+              "size": "L",
               "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
               "fallbacks": [{ "version": "6", "tier": "luna" }]
+            }
+          ]
+        },
+        {
+          "version": "6",
+          "tiers": [
+            {
+              "tier": "luna",
+              "size": "M",
+              "models": [{ "provider": "openai", "id": "gpt-6-luna" }]
+            }
+          ]
+        }
+      ]
+    },
+    "minimax": {
+      "group": "planner-worker",
+      "versions": [
+        {
+          "version": "3.1",
+          "tiers": [
+            {
+              "tier": "",
+              "class": "planner",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1" }]
+            },
+            {
+              "tier": "flash",
+              "class": "worker",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1-flash" }]
             }
           ]
         }
@@ -152,6 +184,78 @@ extension-owned trust check, and round-trips the profiles so a
 `/subagents:settings` edit does not erase them. The model domain reads the
 data and validates it; it never touches a file of its own.
 
+### Role-aware routing follow-up (issue #10)
+
+Automatic routing uses the resolved agent identifier and the family profile's
+required `group`:
+
+| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| --- | --- | --- |
+| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
+| `researcher` | S | worker |
+| `debug` | M | worker |
+| `reviewer` | Equal: the parent's own size | planner |
+| `explore` | S | worker |
+
+Custom identifiers use worker behavior; this does not add a sixth shipped role.
+The mapping is shipped policy, not operator-configurable settings.
+
+Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
+sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
+Dated snapshots use the size of the tier they belong to.
+
+A size or class target starts at the top matching rung in the parent's version;
+Equal starts at the parent's own rung, not the top of its size. If that version
+has no matching target, only profile-approved cross-version links may reach it.
+From the resolved target, try concrete IDs in preference order, then cheaper
+rungs in the same version, then approved cross-version links, skipping anything
+the session cannot run. No version relationship is inferred. If nothing is
+runnable (including an absent target class), keep the parent's model and report
+why. A reviewer retaining its own rung by Equal is a designed choice, not an
+exhaustion fallback. The launch reason names the role and target as well as the
+chosen model, including retained outcomes.
+
+Flash-named tiers, including the separate flash-lite rung, are worker class;
+pro/non-flash flagship tiers are planner class. These are profile labels, not
+runtime name-based classification. MiniMax M3.1-flash is the new worker rung
+below its planner flagship; M3 and M2.7 have approved links to that flash rung.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
+versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
+approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
+reviewer targets pro, and the other roles retain the parent.
+
+GLM uses a glued-version naming strategy (version adjoining the prefix,
+variants following it) and a planner/worker profile. Kimi is no longer a
+supported automatic-routing family: a Kimi parent requires an explicit model.
+The shipped catalogue is representative of the installed SDK, not a promise of
+vendor availability. Profiles enumerate candidates; session access decides
+which can run. Model routing changes neither exact-pin resolution nor reasoning
+selection.
+
+A replacement must declare `group: "size"` or `group: "planner-worker"`.
+Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
+planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
+labels are reported when read, not silently inferred. Upgrade existing whole
+replacements by adding these labels; version/tier/model/fallback shape and
+whole-family replacement semantics stay the same. Examples are representative
+profile data, not provider-access guarantees.
+
+[ADR 0014](adr/0014-role-aware-model-routing.md) supersedes only ADR 0007's
+uniform automatic step-down rule. The role-aware [model matrix](model-matrix.md)
+is generated through the implementation. Verification for this increment:
+
+- `pnpm nx run-many -t test --parallel=2`: all seven workspace projects passed
+  (one project used its Nx cache).
+- Final `pnpm nx run pi-tiered-subagents:test`: 135 files passed; 2,520 tests
+  passed and one skipped, including the role-aware matrix evidence.
+- `typecheck`, `lint`, and `metadata` targets passed. Typechecking still reports
+  the recorded twelve third-party settings-source diagnostics per configuration;
+  there are no package-owned diagnostics.
+- The standards/spec review resolved duplicated label rules and confirmed the
+  generic downward fallback also applies to review when its target is unavailable.
+  A regression verifies alternate approved target paths are tried after an
+  unrunnable first path.
+
 ### What the model selection does now
 
 | Area | Stories | State |
@@ -162,7 +266,7 @@ data and validates it; it never touches a file of its own.
 | An explicit choice works without a known family | 59 | Done. |
 | Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover the eight agreed families. |
 | Cross-version links are declared, never inferred | 62 | Done. A link names the version and the tier it may cross to. |
-| The walk steps down, past a tier the session cannot run | 63 | Done. |
+| The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
 | An unplaceable family is an error | 66 | Done. |
 | A family with nothing to offer keeps the parent's model | 67 | Done. |
@@ -455,7 +559,9 @@ The recovered suite pins the behaviour this derivative must preserve:
    resolved a model name by scoring every model in the registry, so a typo
    could run a different model than the one asked for. A model is now named
    `provider/modelId` and resolved exactly or the launch fails, and a child
-   that names no model runs one tier down its parent's ladder. See
+   that names no model now uses role-aware size/class targets. ADR 0014
+   supersedes the uniform model step-down rule only; see
+   [adr/0014](adr/0014-role-aware-model-routing.md) and
    [adr/0007](adr/0007-the-childs-model-is-one-tier-down.md).
 8. **The reasoning level is chosen after the model, from what the model
    supports.** Upstream took the caller's level or the parent's, and never

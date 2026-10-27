@@ -96,17 +96,14 @@ describe("the Gemini naming structure", () => {
   });
 });
 
-describe("the Kimi naming structure", () => {
-  it("reads the version behind its letter", () => {
-    expect(parse("kimi", "kimi-k2.6")).toEqual({
-      family: "kimi",
-      version: "2.6",
+describe("the GLM naming structure", () => {
+  it("reads the catalogue flagship and flash variant", () => {
+    expect(parse("glm", "glm-5.3")).toEqual({
+      family: "glm",
+      version: "5.3",
       tierCandidates: [],
     });
-  });
-
-  it("reads a variant", () => {
-    expect(parse("kimi", "kimi-k2.7-code")?.tierCandidates).toEqual(["code"]);
+    expect(parse("glm", "glm-5.3-flash")?.tierCandidates).toEqual(["flash"]);
   });
 });
 
@@ -166,8 +163,8 @@ describe("the shipped strategies", () => {
       "claude",
       "deepseek",
       "gemini",
+      "glm",
       "gpt",
-      "kimi",
       "mimo",
       "minimax",
       "qwen",
@@ -175,7 +172,7 @@ describe("the shipped strategies", () => {
   });
 
   it("place no id in two families", () => {
-    for (const id of ["gpt-6.1-sol", "claude-opus-5", "kimi-k3"]) {
+    for (const id of ["gpt-6.1-sol", "claude-opus-5", "glm-5.3-flash"]) {
       const families = SHIPPED_STRATEGIES.filter(
         (strategy) => strategy.parse(id) !== undefined,
       );

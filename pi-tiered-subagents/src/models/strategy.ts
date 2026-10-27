@@ -3,7 +3,7 @@
  *
  * A family's ids follow a naming structure, and the structure differs between
  * families: `gpt-6.1-sol` puts the version before the tier, `claude-opus-5`
- * puts the line first, `kimi-k2.6` glues a letter to the version, and
+ * puts the line first, `qwen3.7-max` glues the version to the prefix, and
  * `MiniMax-M2.7` capitalizes. A strategy knows one family's structure and
  * reports the parts a profile's ladder is written in.
  *
@@ -169,7 +169,7 @@ function gluedVersionFamily(family: string, prefix: string): FamilyStrategy {
  * A family whose id is `<prefix><tag><version>[-<variant>…]`, with a letter
  * in front of the version.
  *
- * Kimi (`kimi-k2.6`), MiMo (`mimo-v2.5`), DeepSeek (`deepseek-v4.1-flash`) and
+ * MiMo (`mimo-v2.5`), DeepSeek (`deepseek-v4.1-flash`) and
  * MiniMax (`MiniMax-M2.7`).
  */
 function taggedVersionFamily(
@@ -282,7 +282,7 @@ export const SHIPPED_STRATEGIES: readonly FamilyStrategy[] = [
   gluedVersionFamily("gpt", "gpt-"),
   gluedVersionFamily("gemini", "gemini-"),
   gluedVersionFamily("qwen", "qwen"),
-  taggedVersionFamily("kimi", "kimi-", "k"),
+  gluedVersionFamily("glm", "glm-"),
   taggedVersionFamily("mimo", "mimo-", "v"),
   taggedVersionFamily("deepseek", "deepseek-", "v"),
   taggedVersionFamily("minimax", "minimax-", "m"),

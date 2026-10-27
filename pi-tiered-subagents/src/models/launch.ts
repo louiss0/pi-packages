@@ -8,7 +8,7 @@
  *
  * One resolver answers it, so the two doors cannot drift apart. It resolves the
  * model first — the request's own choice, then the definition's, then the
- * automatic step down the parent's ladder — and the reasoning level after it,
+ * automatic role target on the parent's ladder — and the reasoning level after it,
  * because what a model can do is a property of the model.
  */
 
@@ -35,6 +35,8 @@ export interface LaunchModelContext {
 
 /** What the request and the definition asked for. */
 export interface LaunchModelRequest {
+  /** The resolved definition's identifier. */
+  readonly agentId?: string;
   /** The model the request named, when it named one. */
   readonly requestedModel?: string;
   /** The model the definition named, when it named one. */
@@ -79,6 +81,7 @@ export function resolveLaunchModel(
   const selection = selectModel(
     {
       ...defined({
+        agentId: request.agentId,
         requestedModel: request.requestedModel,
         definitionModel: request.definitionModel,
         parentModel: context.parentModel,

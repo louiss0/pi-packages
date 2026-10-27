@@ -96,10 +96,51 @@ A model is named exactly, as `provider/modelId`:
 A name that the session cannot run fails the launch; it never falls back to
 another model.
 
-A child that names no model runs **one tier down its parent's**, in that
-family's ladder — the tier below the parent's in the parent's own version, and
-then the versions the profile approves crossing into. The launch note says
-which model was chosen and why.
+Automatic routing uses the resolved agent identifier and the family profile's
+required `group`:
+
+| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| --- | --- | --- |
+| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
+| `researcher` | S | worker |
+| `debug` | M | worker |
+| `reviewer` | Equal: the parent's own size | planner |
+| `explore` | S | worker |
+
+Custom identifiers use worker behavior; this does not add a sixth shipped role.
+The mapping is shipped policy, not operator-configurable settings.
+
+Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
+sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
+Dated snapshots use the size of the tier they belong to.
+
+A size or class target starts at the top matching rung in the parent's version;
+Equal starts at the parent's own rung, not the top of its size. If that version
+has no matching target, only profile-approved cross-version links may reach it.
+From the resolved target, try concrete IDs in preference order, then cheaper
+rungs in the same version, then approved cross-version links, skipping anything
+the session cannot run. No version relationship is inferred. If nothing is
+runnable (including an absent target class), keep the parent's model and report
+why. A reviewer retaining its own rung by Equal is a designed choice, not an
+exhaustion fallback. The launch reason names the role and target as well as the
+chosen model, including retained outcomes.
+
+Flash-named tiers, including the separate flash-lite rung, are worker class;
+pro/non-flash flagship tiers are planner class. These are profile labels, not
+runtime name-based classification. MiniMax M3.1-flash is the new worker rung
+below its planner flagship; M3 and M2.7 have approved links to that flash rung.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
+versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
+approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
+reviewer targets pro, and the other roles retain the parent.
+
+GLM uses a glued-version naming strategy (version adjoining the prefix,
+variants following it) and a planner/worker profile. Kimi is no longer a
+supported automatic-routing family: a Kimi parent requires an explicit model.
+The shipped catalogue is representative of the installed SDK, not a promise of
+vendor availability. Profiles enumerate candidates; session access decides
+which can run. Model routing changes neither exact-pin resolution nor reasoning
+selection.
 
 The ladders are data. An operator can replace a family whole in the runtime's
 settings file, under `familyProfiles`:
@@ -108,14 +149,46 @@ settings file, under `familyProfiles`:
 {
   "familyProfiles": {
     "gpt": {
+      "group": "size",
       "versions": [
         {
           "version": "6.1",
           "tiers": [
             {
               "tier": "sol",
+              "size": "L",
               "models": [{ "provider": "openai", "id": "gpt-6.1-sol" }],
               "fallbacks": [{ "version": "6", "tier": "luna" }]
+            }
+          ]
+        },
+        {
+          "version": "6",
+          "tiers": [
+            {
+              "tier": "luna",
+              "size": "M",
+              "models": [{ "provider": "openai", "id": "gpt-6-luna" }]
+            }
+          ]
+        }
+      ]
+    },
+    "minimax": {
+      "group": "planner-worker",
+      "versions": [
+        {
+          "version": "3.1",
+          "tiers": [
+            {
+              "tier": "",
+              "class": "planner",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1" }]
+            },
+            {
+              "tier": "flash",
+              "class": "worker",
+              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1-flash" }]
             }
           ]
         }
@@ -124,6 +197,14 @@ settings file, under `familyProfiles`:
   }
 }
 ```
+
+A replacement must declare `group: "size"` or `group: "planner-worker"`.
+Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
+planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
+labels are reported when read, not silently inferred. Upgrade existing whole
+replacements by adding these labels; version/tier/model/fallback shape and
+whole-family replacement semantics stay the same. Examples are representative
+profile data, not provider-access guarantees.
 
 Only data is read: a value the schema does not name is ignored, never
 evaluated. A family this package cannot read the names of is refused.
@@ -209,10 +290,12 @@ version 25.0.1, by Chris Lasher, under the MIT licence. That project describes
 itself as a friendly fork of
 [@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents).
 
-The following are preserved upstream reference snapshots, not newly accepted
-architecture decisions or configuration instructions for this derivative:
+The following retain upstream reference snapshots, not newly accepted
+architecture decisions or configuration instructions for this derivative
+(except the explicitly labeled current model-profile section in configuration):
 
-- [Configuration reference](docs/configuration.md).
+- [Configuration reference](docs/configuration.md) — current role-aware profile
+  guidance followed by the preserved upstream reference.
 - [Comparison with upstream](docs/comparison-with-upstream.md).
 - [Architecture](docs/architecture/architecture.md) and its linked history.
 - [Decision records](docs/decisions/).

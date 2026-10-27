@@ -171,9 +171,10 @@ export function resolveSpawn(
 
   // Resolve the model and the reasoning level, through the same resolver the
   // invocation merge answers for: the request's own choice, then the
-  // definition's, then the automatic step down the parent's ladder.
+  // definition's, then the role's automatic target on the parent's ladder.
   const launch = resolveLaunchModel(
     defined({
+      agentId: request.definition.id,
       requestedModel: resolvedInvocation.modelFromParams
         ? resolvedInvocation.model
         : undefined,

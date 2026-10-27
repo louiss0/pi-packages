@@ -8,6 +8,12 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 >
 > **Authority:** this specification supersedes earlier requirements for extension-owned project-trust gating, foreground concurrency exemptions, mutable launch-time configuration lookup, and preservation of the inherited synchronous programmatic spawn interface. Product behavior not explicitly changed here remains governed by the original specification and accepted decisions.
 
+> **Later routing decision:** [issue #10](https://github.com/louiss0/pi-packages/issues/10)
+> and [ADR 0014](adr/0014-role-aware-model-routing.md) supersede only the uniform
+> automatic-model rule preserved here. The supported families replace Kimi with
+> GLM. Exact pins, captured launch ownership, and reasoning policy are unchanged
+> by issue #10.
+
 ## Problem Statement
 
 The maintainer migrated a fork-derived subagent runtime into this workspace using several models and now wants to own and evolve its architecture rather than maintain a renamed copy. The package has useful lifecycle functionality and extensive characterization coverage, but selecting an agent, preparing a launch, capturing parent inputs, and translating execution options are distributed across tool handlers, programmatic callers, the manager, and session assembly. An accepted request can therefore depend on configuration read at different times, and tests sometimes preserve concrete class structure or cast test doubles into SDK classes instead of checking meaningful behavior.
@@ -303,6 +309,66 @@ flowchart LR
 - Exact allowed names do not freeze implementation binaries, guarantee third-party tool availability, or constitute a sandbox. Preserve ordinary missing-tool behavior; do not add a special web prerequisite or silently widen capabilities to compensate.
 - Protocol tools such as ask-parent and permitted mid-run updates remain distinct from capability tools. Their installation does not authorize recursive delegation or alter read-only/file-changing classification.
 - Assemble environment- and child-directory-specific prompt/resource contributions at execution, using captured definition/identity policy and the actual prepared workspace. Do not preallocate the SDK session or claim to freeze the filesystem. Preserve the child's own tool guidance and exclusion of parent-only orchestration/harness text.
+
+### Role-aware model selection follow-up (issue #10)
+
+The existing model-selection seam receives the resolved definition identifier;
+request pin, then definition pin, then automatic routing remains the precedence.
+No new launch authority or reroute-after-acceptance path is introduced.
+
+Automatic routing uses the resolved agent identifier and the family profile's
+required `group`:
+
+| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| --- | --- | --- |
+| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
+| `researcher` | S | worker |
+| `debug` | M | worker |
+| `reviewer` | Equal: the parent's own size | planner |
+| `explore` | S | worker |
+
+Custom identifiers use worker behavior; this does not add a sixth shipped role.
+The mapping is shipped policy, not operator-configurable settings.
+
+Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
+sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
+Dated snapshots use the size of the tier they belong to.
+
+A size or class target starts at the top matching rung in the parent's version;
+Equal starts at the parent's own rung, not the top of its size. If that version
+has no matching target, only profile-approved cross-version links may reach it.
+From the resolved target, try concrete IDs in preference order, then cheaper
+rungs in the same version, then approved cross-version links, skipping anything
+the session cannot run. No version relationship is inferred. If nothing is
+runnable (including an absent target class), keep the parent's model and report
+why. A reviewer retaining its own rung by Equal is a designed choice, not an
+exhaustion fallback. The launch reason names the role and target as well as the
+chosen model, including retained outcomes.
+
+Flash-named tiers, including the separate flash-lite rung, are worker class;
+pro/non-flash flagship tiers are planner class. These are profile labels, not
+runtime name-based classification. MiniMax M3.1-flash is the new worker rung
+below its planner flagship; M3 and M2.7 have approved links to that flash rung.
+This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Flash-only Gemini 3.x
+versions have approved links to the 2.5 pro planner rung, and Qwen 3.7 has an
+approved path to 3.6 flash for S. DeepSeek has planner but no worker class:
+reviewer targets pro, and the other roles retain the parent.
+
+GLM uses a glued-version naming strategy (version adjoining the prefix,
+variants following it) and a planner/worker profile. Kimi is no longer a
+supported automatic-routing family: a Kimi parent requires an explicit model.
+The shipped catalogue is representative of the installed SDK, not a promise of
+vendor availability. Profiles enumerate candidates; session access decides
+which can run. Model routing changes neither exact-pin resolution nor reasoning
+selection.
+
+A replacement must declare `group: "size"` or `group: "planner-worker"`.
+Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
+planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
+labels are reported when read, not silently inferred. Upgrade existing whole
+replacements by adding these labels; version/tier/model/fallback shape and
+whole-family replacement semantics stay the same. Examples are representative
+profile data, not provider-access guarantees.
 
 ### 6. Turn policy and captured versus live settings
 

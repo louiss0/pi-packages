@@ -9,6 +9,12 @@ A child that names no model runs on **one tier down its parent's**, in the
 family's own ladder. A child that names one — in the request or in the agent
 definition — runs on exactly that model, or the launch fails.
 
+> **Partially superseded by [ADR 0014](0014-role-aware-model-routing.md):**
+> automatic routing is now role-aware rather than uniformly one tier down.
+> Exact explicit resolution, data-only profiles, whole-family replacement,
+> approved cross-version links, and retain/error outcomes remain in force.
+> The family examples below are historical; GLM replaces Kimi in supported data.
+
 ## Context
 
 The alternative is a heuristic: find a model with a similar name, or the

@@ -20,8 +20,9 @@
  * touches a file of its own.
  */
 
-import { type FamilyProfile, validateProfile } from "#src/models/profile";
-import { type FamilyStrategy } from "#src/models/strategy";
+import type { FamilyProfile, ModelClass, ModelSize } from "#src/models/profile";
+import { tierLabelProblems, validateProfile } from "#src/models/profile";
+import type { FamilyStrategy } from "#src/models/strategy";
 
 /** The profiles in effect, and what was wrong with the ones that were not. */
 export interface LoadedProfiles {
@@ -107,6 +108,13 @@ export function parseProfile(
     return { ok: false, problem: "a profile is an object" };
   }
   const raw = value as Record<string, unknown>;
+  const group = raw.group;
+  if (group !== "size" && group !== "planner-worker") {
+    return {
+      ok: false,
+      problem: 'a profile needs a group: "size" or "planner-worker"',
+    };
+  }
   const versions = raw.versions;
   if (!Array.isArray(versions)) {
     return { ok: false, problem: "a profile needs a versions list" };
@@ -133,6 +141,10 @@ export function parseProfile(
       if (typeof tier.tier !== "string") {
         return { ok: false, problem: "a tier needs a tier name" };
       }
+      const labelProblem = tierLabelProblems(group, tier)[0];
+      if (labelProblem) return { ok: false, problem: labelProblem };
+      const size = tier.size;
+      const modelClass = tier.class;
       if (!Array.isArray(tier.models)) {
         return { ok: false, problem: "a tier needs a models list" };
       }
@@ -155,6 +167,10 @@ export function parseProfile(
       }
       tiers.push({
         tier: tier.tier,
+        ...(size === "S" || size === "M" || size === "L" ? { size } : {}),
+        ...(modelClass === "planner" || modelClass === "worker"
+          ? { class: modelClass }
+          : {}),
         models,
         ...(Array.isArray(tier.fallbacks)
           ? {
@@ -173,7 +189,7 @@ export function parseProfile(
     parsedVersions.push({ version: version.version, tiers });
   }
 
-  return { ok: true, profile: { family, versions: parsedVersions } };
+  return { ok: true, profile: { family, group, versions: parsedVersions } };
 }
 
 /** A version as the settings data is read into. */
@@ -185,6 +201,8 @@ interface MutableVersion {
 /** A tier as the settings data is read into. */
 interface MutableTier {
   tier: string;
+  size?: ModelSize;
+  class?: ModelClass;
   models: { provider: string; id: string }[];
   fallbacks?: { version: string; tier: string }[];
 }
