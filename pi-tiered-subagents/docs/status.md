@@ -311,7 +311,7 @@ is known.
 
 | Rule | Stories | State |
 | --- | --- | --- |
-| Automatic defaults: medium, then low, then the lowest supported non-off | 68 | Done. The supported levels come from Pi's own report about the model, not from its name. |
+| Automatic defaults: medium, then low, then the lowest supported non-off, or one rung below the parent's effort when it is known | 68 | Done, with a recorded deviation: no parent effort → the specified order; parent effort known → one rung down the child's own array. See [adr/0013](adr/0013-the-child-steps-one-rung-down-in-reasoning.md). The supported levels come from Pi's own report about the model, not from its name. |
 | Retained-model automatic effort takes the next supported non-off rung | 69; ADR 0015 | With known parent effort, choose the highest supported level strictly below it, skipping gaps; at the floor, effort stays. No fixed medium/low preference applies. Without parent effort, medium/low/lowest non-off remains. Explicit request/definition levels still win. |
 | The request's level wins over the definition's | 70 | Done. |
 | An unsupported level is clamped, never rejected | 71 | Done. The clamp is Pi's own, so the runtime cannot disagree with Pi about a level, and it never lands on "off" for a reasoning model. |
@@ -623,6 +623,13 @@ The recovered suite pins the behaviour this derivative must preserve:
     asserted to make them pass; `src/optional.ts` holds the vocabulary that
     makes omission expressible. See *The type system as a seam* above.
     ARCHITECTURE-SPEC stories 104–105.
+14. **A child's default reasoning is one rung below its parent's.** The
+    specified automatic order (medium → low → lowest supported non-off) is kept
+    only when no parent effort is known; when it is known, the child steps one
+    rung down **in its own model's level array**, and lands on that model's
+    floor where no rung exists. This partially supersedes SPEC story 68 and the
+    matching line in ARCHITECTURE-SPEC. See
+    [adr/0013](adr/0013-the-child-steps-one-rung-down-in-reasoning.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 
