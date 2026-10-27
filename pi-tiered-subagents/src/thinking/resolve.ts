@@ -5,9 +5,12 @@
  * is a property of the model.
  *
  * The order of precedence is the request, then the definition, then the
- * automatic choice. The automatic choice prefers **medium**, then **low**,
- * then the lowest supported non-off level — and never turns reasoning off on a
- * model that has it.
+ * automatic choice. The automatic choice **steps one rung down from the
+ * effort the parent was running at**: the highest level the child's model
+ * supports that is strictly below the parent's, skipping levels the model does
+ * not have. With no parent effort to step down from, it prefers **medium**,
+ * then **low**, then the lowest supported non-off level. It never turns
+ * reasoning off on a model that has it.
  *
  * Two rules make the fallback honest:
  *
@@ -24,17 +27,15 @@
  */
 
 import { type Model } from "@earendil-works/pi-ai";
-import {
-  THINKING_LEVELS,
-  type SubagentThinkingLevel,
-} from "#src/config/thinking-level";
+import { type SubagentThinkingLevel } from "#src/config/thinking-level";
+import { EFFORT, levelBelow, stepDown } from "#src/thinking/levels";
 import {
   supportedLevels as adapterSupportedLevels,
   clampLevel as adapterClampLevel,
 } from "#src/agents/sdk-adapter";
 
 /** The levels, in ascending order of effort. */
-const EFFORT: readonly SubagentThinkingLevel[] = THINKING_LEVELS;
+const EFFORT_ORDER: readonly SubagentThinkingLevel[] = EFFORT;
 
 /** Where the level came from. */
 export type ThinkingSource =
@@ -142,6 +143,13 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
     return retainedParent(request.parentLevel, supported);
   }
 
+  // The child has its own model, so it steps down from the parent's effort
+  // rather than taking a fixed default. "One rung" is expressed in the child's
+  // own array: gapped ladders skip the levels the model does not have.
+  if (request.parentLevel !== undefined) {
+    return belowParent(request.parentLevel, supported, model);
+  }
+
   const level = automaticLevel(nonOff);
   if (!level) {
     return {
@@ -229,6 +237,56 @@ function automaticLevel(
 }
 
 /**
+ * The level for a child that runs on its own model: one rung below the parent.
+ *
+ * The rung is the highest level *this model* supports below the parent's, so a
+ * model that reports `["low", "high", "max"]` steps from `max` to `high` and
+ * from `high` to `low`, never to a level it cannot run and never to `off`.
+ *
+ * Where there is no rung below, the model's own floor is used. That floor can
+ * be the parent's own effort (nothing lower exists, so nothing changes) or, on
+ * a model that cannot go as low as the parent, above it — an unavoidable
+ * property of the model, said plainly in the launch note rather than hidden.
+ */
+function belowParent(
+  parentLevel: SubagentThinkingLevel,
+  supported: readonly SubagentThinkingLevel[],
+  model: Model<any>,
+): ThinkingDecision {
+  const below = levelBelow(supported, parentLevel);
+  if (below !== undefined) {
+    return {
+      level: below,
+      applicable: true,
+      source: "parent",
+      clamped: false,
+      reason: `the parent was running at ${parentLevel}, so the child runs one rung down at ${below}`,
+    };
+  }
+
+  const floor = stepDown(supported, parentLevel);
+  if (floor !== undefined && floor === parentLevel) {
+    return {
+      level: floor,
+      applicable: true,
+      source: "parent",
+      clamped: false,
+      reason: `${model.provider}/${model.id} supports no level below ${parentLevel}, so the parent's effort stands`,
+    };
+  }
+
+  return {
+    ...(floor ? { level: floor } : {}),
+    applicable: true,
+    source: "parent",
+    clamped: false,
+    reason: floor
+      ? `the lowest level ${model.provider}/${model.id} supports is ${floor}, above the parent's ${parentLevel}; the model has no lower rung`
+      : `${model.provider}/${model.id} supports no reasoning level below off`,
+  };
+}
+
+/**
  * The level for a child that keeps the parent's model.
  *
  * The next supported non-off rung below the parent's effort is used. Gaps are
@@ -253,9 +311,9 @@ function retainedParent(
     };
   }
 
-  const parentEffort = EFFORT.indexOf(parentLevel);
+  const parentEffort = EFFORT_ORDER.indexOf(parentLevel);
   const nextLower = nonOff
-    .filter((level) => EFFORT.indexOf(level) < parentEffort)
+    .filter((level) => EFFORT_ORDER.indexOf(level) < parentEffort)
     .at(-1);
   if (nextLower) {
     return {
