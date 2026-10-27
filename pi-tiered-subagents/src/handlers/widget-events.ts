@@ -19,9 +19,9 @@ export interface EventDrivenWidget {
 }
 
 /** Minimal context shape for session_start — only the field the handler reads. */
-interface SessionStartCtx {
+type SessionStartCtx = {
   ui: unknown;
-}
+};
 
 /**
  * Feeds the widget the three host events it depends on.

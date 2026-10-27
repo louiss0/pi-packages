@@ -4,16 +4,16 @@
  */
 
 /** A model as the UI names it, without an SDK model or provider registry. */
-export interface ModelIdentity {
-  readonly provider: string;
-  readonly id: string;
-}
+export type ModelIdentity = Readonly<{
+  provider: string;
+  id: string;
+}>;
 
 /** Only the definition fields needed to label an agent. */
-export interface AgentDefinitionView {
-  readonly id: string;
-  readonly displayName: string;
-}
+export type AgentDefinitionView = Readonly<{
+  id: string;
+  displayName: string;
+}>;
 
 /** Label lookup, not definition selection or launch policy. */
 export interface AgentDefinitionLookup {
@@ -21,18 +21,18 @@ export interface AgentDefinitionLookup {
 }
 
 /** Recorded turn-budget facts, not a turn-limit policy or tracker. */
-export interface TurnBudget {
-  readonly maxTurns?: number;
-  readonly used: number;
-  readonly phase: "within" | "warned" | "exhausted";
-}
+export type TurnBudget = Readonly<{
+  maxTurns?: number;
+  used: number;
+  phase: "within" | "warned" | "exhausted";
+}>;
 
 /** Lifetime token components, excluding repeatedly-read cache tokens. */
-export interface LifetimeUsage {
-  readonly input: number;
-  readonly output: number;
-  readonly cacheWrite: number;
-}
+export type LifetimeUsage = Readonly<{
+  input: number;
+  output: number;
+  cacheWrite: number;
+}>;
 
 export type AgentStatus =
   | "queued"
@@ -43,41 +43,41 @@ export type AgentStatus =
   | "error";
 
 /** Minimal agent snapshot for rendering — no class methods or mutation surface. */
-export interface WidgetAgent {
-  readonly id: string;
-  readonly type: string;
-  readonly status: AgentStatus;
-  readonly description: string;
-  readonly toolUses: number;
-  readonly startedAt: number;
-  readonly completedAt?: number | undefined;
-  readonly error?: string | undefined;
-  readonly lifetimeUsage?: LifetimeUsage | undefined;
-  readonly compactionCount: number;
+export type WidgetAgent = Readonly<{
+  id: string;
+  type: string;
+  status: AgentStatus;
+  description: string;
+  toolUses: number;
+  startedAt: number;
+  completedAt?: number | undefined;
+  error?: string | undefined;
+  lifetimeUsage?: LifetimeUsage | undefined;
+  compactionCount: number;
   /** The run's recorded budget; absent until its turn loop starts. */
-  readonly turnBudget?: TurnBudget | undefined;
-  readonly activeTools: ReadonlyMap<string, string>;
-  readonly responseText: string;
+  turnBudget?: TurnBudget | undefined;
+  activeTools: ReadonlyMap<string, string>;
+  responseText: string;
   /** Context-window utilisation (0–100), or null when unavailable. */
-  readonly contextPercent: number | null;
+  contextPercent: number | null;
   /** The model the agent runs, once known. */
-  readonly model?: ModelIdentity | undefined;
-}
+  model?: ModelIdentity | undefined;
+}>;
 
 /** The widget's audience, already filtered and copied by its runtime adapter. */
 export interface WidgetSource {
-  listAgents(): readonly WidgetAgent[];
+  listAgents(): ReadonlyArray<WidgetAgent>;
 }
 
 /** Identity-only lifecycle notifications keep widget observers structural. */
-export interface WidgetAgentIdentity {
-  readonly id: string;
-}
+export type WidgetAgentIdentity = Readonly<{
+  id: string;
+}>;
 
 /** Resolved launch facts that terminal tags name; no resolver dependency. */
-export interface InvocationTags {
-  readonly thinking?: string;
-  readonly maxTurns?: number;
-  readonly inheritContext: boolean;
-  readonly runInBackground: boolean;
-}
+export type InvocationTags = Readonly<{
+  thinking?: string;
+  maxTurns?: number;
+  inheritContext: boolean;
+  runInBackground: boolean;
+}>;

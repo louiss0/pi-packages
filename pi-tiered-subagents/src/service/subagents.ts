@@ -81,15 +81,15 @@ export interface SubagentsManager {
 }
 
 /** One captured request, ready to be accepted or rejected by the manager. */
-export interface PreparedSubagentsLaunch {
-  readonly owner: SessionOwner;
-  readonly config: PreparedLaunch["config"];
-  readonly childShaping: ChildShapingSettings;
+export type PreparedSubagentsLaunch = Readonly<{
+  owner: SessionOwner;
+  config: PreparedLaunch["config"];
+  childShaping: ChildShapingSettings;
   /** Exact capability allowlist captured and expanded before acceptance. */
-  readonly toolNames: readonly string[];
-  readonly snapshot: ParentSnapshot;
-  readonly parentSession: ParentSessionInfo;
-}
+  toolNames: ReadonlyArray<string>;
+  snapshot: ParentSnapshot;
+  parentSession: ParentSessionInfo;
+}>;
 
 export type SubagentsPreparationOutcome =
   | { readonly kind: "prepared"; readonly value: PreparedSubagentsLaunch }
@@ -106,10 +106,10 @@ export type SubagentsPreparationOutcome =
       readonly message: string;
     };
 
-export interface ForegroundLaunchOptions {
-  readonly signal?: AbortSignal;
-  readonly observer?: SubagentLifecycleObserver;
-}
+export type ForegroundLaunchOptions = Readonly<{
+  signal?: AbortSignal;
+  observer?: SubagentLifecycleObserver;
+}>;
 
 export class Subagents {
   constructor(

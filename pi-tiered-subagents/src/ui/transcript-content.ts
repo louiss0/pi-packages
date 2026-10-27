@@ -39,12 +39,12 @@ import { GLYPHS } from "./glyphs";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The SDK/TUI environment Pi's per-entry components need, plus the transcript's source. */
-export interface TranscriptContentOptions {
+export type TranscriptContentOptions = {
   tui: TUI;
   cwd: string;
   markdownTheme: MarkdownTheme;
   source: TranscriptSource;
-}
+};
 
 /**
  * The transcript's renderable rows: settled history rendered through Pi's
@@ -81,12 +81,12 @@ export class TranscriptContent {
   /** Width `blocks` and `settledRows` were rendered at. */
   private settledWidth: number | undefined;
   /** Concatenation of every block's rows, or undefined when the cache is cold. */
-  private settledRows: readonly string[] | undefined;
+  private settledRows: ReadonlyArray<string> | undefined;
   /** The message being streamed right now, rendered below settled history. */
   private inFlight: AssistantMessageComponent | undefined;
   /** Width `inFlightRows` was rendered at. */
   private inFlightWidth: number | undefined;
-  private inFlightRows: readonly string[] | undefined;
+  private inFlightRows: ReadonlyArray<string> | undefined;
 
   constructor(options: TranscriptContentOptions) {
     this.options = options;
@@ -151,7 +151,7 @@ export class TranscriptContent {
   // ---- Private ----
 
   /** Settled rows at `width`; each block renders once per width and content change. */
-  private settled(width: number): readonly string[] {
+  private settled(width: number): ReadonlyArray<string> {
     if (this.settledWidth !== width) {
       this.settledWidth = width;
       for (const block of this.blocks) block.rows = undefined;
@@ -170,7 +170,7 @@ export class TranscriptContent {
   }
 
   /** Rows below settled history: the in-flight message, then the activity row. */
-  private tail(width: number): readonly string[] {
+  private tail(width: number): ReadonlyArray<string> {
     const rows = [...this.inFlightRendered(width)];
     const streaming = this.options.source.streaming();
     if (streaming) {
@@ -181,7 +181,7 @@ export class TranscriptContent {
   }
 
   /** The in-flight message's rows, re-rendered independently of settled history. */
-  private inFlightRendered(width: number): readonly string[] {
+  private inFlightRendered(width: number): ReadonlyArray<string> {
     if (!this.inFlight) return [];
     if (this.inFlightWidth !== width) {
       this.inFlightWidth = width;
@@ -238,7 +238,9 @@ export class TranscriptContent {
     this.settledRows = undefined;
   }
 
-  private hasRewrittenHistory(messages: readonly SessionMessage[]): boolean {
+  private hasRewrittenHistory(
+    messages: ReadonlyArray<SessionMessage>,
+  ): boolean {
     if (messages.length < this.consumedCount) return true;
     return (
       this.consumedCount > 0 &&
@@ -372,16 +374,16 @@ export class TranscriptContent {
 }
 
 /** One settled message's components plus its rows at the current width. */
-interface SettledBlock {
+type SettledBlock = {
   readonly container: Container;
-  rows: readonly string[] | undefined;
-}
+  rows: ReadonlyArray<string> | undefined;
+};
 
 /** A tool call awaiting its result, and the block whose rows it will invalidate. */
-interface PendingTool {
-  readonly component: ToolExecutionComponent;
-  readonly block: SettledBlock;
-}
+type PendingTool = Readonly<{
+  component: ToolExecutionComponent;
+  block: SettledBlock;
+}>;
 
 /** The assistant variant of a session message, as Pi's components consume it. */
 type AssistantSessionMessage = Extract<SessionMessage, { role: "assistant" }>;
@@ -406,7 +408,7 @@ function inFlightAssistantMessage(
  */
 function addUserComponents(
   container: Container,
-  content: string | readonly { type: string; text?: string }[],
+  content: string | ReadonlyArray<{ type: string; text?: string }>,
   markdownTheme: MarkdownTheme,
   hasPrecedingContent: boolean,
 ): void {
@@ -432,7 +434,7 @@ function addUserComponents(
 
 /** Concatenate the text blocks of a user message's content (mirrors Pi). */
 function userMessageText(
-  content: string | readonly { type: string; text?: string }[],
+  content: string | ReadonlyArray<{ type: string; text?: string }>,
 ): string {
   if (typeof content === "string") return content;
   return content

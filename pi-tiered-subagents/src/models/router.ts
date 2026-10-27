@@ -26,20 +26,20 @@ import {
 } from "#src/models/strategy";
 
 /** The models the session can run, and the profiles and strategies to use. */
-export interface RoutingContext {
+export type RoutingContext = Readonly<{
   /** The models the session can run, as the session's own resolution reports them. */
-  readonly available: readonly Model<any>[];
+  available: ReadonlyArray<Model<any>>;
   /** The family profiles, by family. */
-  readonly profiles: ReadonlyMap<string, FamilyProfile>;
+  profiles: ReadonlyMap<string, FamilyProfile>;
   /** The naming structures, by family. */
-  readonly strategies: ReadonlyMap<string, FamilyStrategy>;
-}
+  strategies: ReadonlyMap<string, FamilyStrategy>;
+}>;
 
 /** The ladders the routing walks: the profiles and the naming structures. */
-export interface RoutingLadders {
-  readonly profiles: ReadonlyMap<string, FamilyProfile>;
-  readonly strategies: ReadonlyMap<string, FamilyStrategy>;
-}
+export type RoutingLadders = Readonly<{
+  profiles: ReadonlyMap<string, FamilyProfile>;
+  strategies: ReadonlyMap<string, FamilyStrategy>;
+}>;
 
 /**
  * Build a routing context for the models the session can run right now.
@@ -49,7 +49,7 @@ export interface RoutingLadders {
  */
 export function routingContext(
   ladders: RoutingLadders,
-  available: readonly Model<any>[],
+  available: ReadonlyArray<Model<any>>,
 ): RoutingContext {
   return {
     available,
@@ -183,7 +183,7 @@ export function routeModel(
 
 /** The first runnable target/cheaper rung within the one selected version. */
 function pickRunnableTier(
-  tiers: readonly TierProfile[],
+  tiers: ReadonlyArray<TierProfile>,
   target: RoutingTarget,
   available: ReadonlyMap<string, Model<any>>,
 ) {
@@ -197,7 +197,7 @@ function pickRunnableTier(
 
 /** The available models, by provider and id. */
 function indexAvailable(
-  available: readonly Model<any>[],
+  available: ReadonlyArray<Model<any>>,
 ): Map<string, Model<any>> {
   const index = new Map<string, Model<any>>();
   for (const model of available) {
@@ -208,7 +208,7 @@ function indexAvailable(
 
 /** The first candidate of a tier the session can run. */
 function pickAvailable(
-  candidates: readonly ModelCandidate[],
+  candidates: ReadonlyArray<ModelCandidate>,
   available: ReadonlyMap<string, Model<any>>,
 ): { candidate: ModelCandidate; model: Model<any> } | undefined {
   for (const candidate of candidates) {
@@ -230,6 +230,6 @@ function strategyFor(
 }
 
 /** The tier names a model's id carries — for a message. */
-export function tierNamesOf(candidates: readonly string[]): string[] {
+export function tierNamesOf(candidates: ReadonlyArray<string>): string[] {
   return candidateJoins(candidates).filter((join) => join !== "");
 }

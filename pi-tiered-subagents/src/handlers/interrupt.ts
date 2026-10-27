@@ -16,9 +16,9 @@ export interface InterruptManager {
 }
 
 /** Minimal context shape — only the field the handler reads. */
-interface InterruptCtx {
+type InterruptCtx = {
   signal: AbortSignal | undefined;
-}
+};
 
 /**
  * Latches the current parent abort signal and aborts all subagents when it fires,

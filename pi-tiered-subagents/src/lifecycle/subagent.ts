@@ -168,7 +168,7 @@ export interface SubagentExecution {
    * exactly the tools the runtime classified it by. Absent, the session
    * factory resolves the definition's selection itself.
    */
-  toolNames?: readonly string[];
+  toolNames?: ReadonlyArray<string>;
 }
 
 /**
@@ -178,7 +178,7 @@ export interface SubagentExecution {
 export type RunScheduler = (thunk: () => Promise<void>) => Promise<void>;
 
 /** What one resume of a subagent is started with. */
-export interface ResumeRunOptions {
+export type ResumeRunOptions = {
   /**
    * Whether the resume runs in the background. The front door that starts it
    * decides, so a resume need not run in the mode the agent was spawned in.
@@ -192,9 +192,9 @@ export interface ResumeRunOptions {
    * announced like any other completion.
    */
   claimOutcome?: boolean;
-}
+};
 
-export interface SubagentInit {
+export type SubagentInit = {
   // Identity
   id: string;
   type: SubagentType;
@@ -219,7 +219,7 @@ export interface SubagentInit {
 
   /** Seeds for the initial run's outcome; production never passes them. */
   outcome?: RunOutcomeInit;
-}
+};
 
 export class Subagent {
   // Identity — set once at construction
@@ -265,7 +265,7 @@ export class Subagent {
   get pendingQuestion(): string | undefined {
     return this.currentRun.pendingQuestion;
   }
-  get runUpdates(): readonly string[] {
+  get runUpdates(): ReadonlyArray<string> {
     return this.currentRun.runUpdates;
   }
   /**
@@ -522,12 +522,12 @@ export class Subagent {
   }
 
   /** The session's message history, or an empty array if no session. */
-  get messages(): readonly unknown[] {
+  get messages(): ReadonlyArray<unknown> {
     return this.subagentSession?.messages ?? [];
   }
 
   /** The session's message history typed for Pi's session-rendering machinery, or empty if no session. */
-  get agentMessages(): readonly SessionMessage[] {
+  get agentMessages(): ReadonlyArray<SessionMessage> {
     return this.subagentSession?.agentMessages ?? [];
   }
 

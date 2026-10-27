@@ -27,10 +27,10 @@ export const CHILD_SHUTDOWN_TIMEOUT_MS = 5_000;
 const SESSION_SHUTDOWN = "session_shutdown";
 
 /** The event a disposed child session dispatches to its extensions. */
-interface ChildSessionShutdownEvent {
+type ChildSessionShutdownEvent = {
   type: typeof SESSION_SHUTDOWN;
   reason: "quit";
-}
+};
 
 /**
  * Narrow session seam — only what child shutdown reads.

@@ -5,11 +5,11 @@
 import { debugLog } from "#src/debug";
 import type { ShellExec } from "#src/types";
 
-export interface EnvInfo {
+export type EnvInfo = {
   isGitRepo: boolean;
   branch: string;
   platform: string;
-}
+};
 
 export async function detectEnv(
   exec: ShellExec,

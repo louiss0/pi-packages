@@ -16,7 +16,7 @@ import {
 } from "#src/observation/outcome-delivery";
 
 /** The data a get_subagent_result report renders from — only what the formatter reads. */
-export interface AgentReport {
+export type AgentReport = {
   // A read view over a live record: every optional also takes an explicit
   // `undefined`, so a fixture can clear a defaulted field in one call.
   id: string;
@@ -42,7 +42,7 @@ export interface AgentReport {
   /** Persisted transcript path; rendered as a pointer so the parent can read it directly. */
   transcriptPath?: string | undefined;
   /** The updates the agent sent while this call's carrier held the outcome. */
-  runUpdates?: readonly string[] | undefined;
+  runUpdates?: ReadonlyArray<string> | undefined;
   /** The question the agent ended its turn with, when it declared one. */
   pendingQuestion?: string | undefined;
   /**
@@ -66,17 +66,17 @@ export interface AgentReport {
   waitExpiredAfter?: number | undefined;
   /** What a running agent is doing and when it last moved; absent for any other status. */
   progress?: ReportProgress;
-}
+};
 
 /** A running agent's progress facts, pre-formatted for the report. */
-interface ReportProgress {
+type ReportProgress = {
   /** What the agent is doing now, as the widget words it. */
   activity: string;
   /** Turns the run has completed; absent before its turn loop reports a budget. */
   turns: number | undefined;
   /** Pre-formatted time since the run's last session event. */
   sinceLastProgress: string;
-}
+};
 
 /** Assemble the stats parts: Tool uses / tokens? / Context? / Compactions? / Duration. */
 export function renderStatsParts(report: AgentReport): string[] {

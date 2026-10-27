@@ -20,6 +20,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_CTX } from "#test/helpers/stub-ctx";
+import { registeredTool } from "#test/helpers/registered-tools";
 import { textOf } from "#test/helpers/text-of";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
 
@@ -316,14 +317,14 @@ describe("GetResultTool — a wait a resume superseded", () => {
 });
 
 describe("GetResultTool", () => {
-  it("returns tool definition with correct name", () => {
-    const tool = new GetResultTool(makeManager(), testRegistry);
-    expect(tool.toToolDefinition().name).toBe("get_subagent_result");
+  it("registers the get_subagent_result tool with its contract", () => {
+    const def = registeredTool("get_subagent_result");
+    expect(def.name).toBe("get_subagent_result");
   });
 
   it("includes promptSnippet", () => {
-    const tool = new GetResultTool(makeManager(), testRegistry);
-    expect(tool.toToolDefinition().promptSnippet).toBe(
+    const def = registeredTool("get_subagent_result");
+    expect(def.promptSnippet).toBe(
       "Check status and retrieve results from a background agent.",
     );
   });
@@ -816,10 +817,7 @@ describe("GetResultTool — bounded wait", () => {
   });
 
   it("tells the model that an expired wait does not stop the agent", () => {
-    const definition = new GetResultTool(
-      makeManager(),
-      testRegistry,
-    ).toToolDefinition();
+    const definition = registeredTool("get_subagent_result");
 
     expect(definition.description).toContain(
       "this does not stop or abort the agent",
@@ -845,10 +843,7 @@ describe("GetResultTool — TUI rendering", () => {
     expanded: boolean,
     width = 100,
   ): string[] {
-    const { renderResult } = new GetResultTool(
-      makeManager(),
-      testRegistry,
-    ).toToolDefinition();
+    const { renderResult } = registeredTool("get_subagent_result");
     if (!renderResult)
       throw new Error("get_subagent_result registers no renderResult");
     const component = renderResult(
@@ -908,10 +903,7 @@ describe("GetResultTool — TUI rendering", () => {
 
   describe("call rendering", () => {
     it("names the agent being retrieved", () => {
-      const { renderCall } = new GetResultTool(
-        makeManager(),
-        testRegistry,
-      ).toToolDefinition();
+      const { renderCall } = registeredTool("get_subagent_result");
       if (!renderCall)
         throw new Error("get_subagent_result registers no renderCall");
 
@@ -925,10 +917,7 @@ describe("GetResultTool — TUI rendering", () => {
     });
 
     it("names the bound of a bounded wait", () => {
-      const { renderCall } = new GetResultTool(
-        makeManager(),
-        testRegistry,
-      ).toToolDefinition();
+      const { renderCall } = registeredTool("get_subagent_result");
       if (!renderCall)
         throw new Error("get_subagent_result registers no renderCall");
 

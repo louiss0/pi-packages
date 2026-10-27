@@ -61,7 +61,7 @@ export type {
  * place here (and what the snapshot deliberately withholds) is decided in
  * `docs/decisions/0005-subagent-record-admission-policy.md`.
  */
-export interface SubagentRecord {
+export type SubagentRecord = {
   id: string;
   type: string;
   description: string;
@@ -118,10 +118,10 @@ export interface SubagentRecord {
    * starts; the other reasons are final.
    */
   resumeRefusal?: ResumeRefusal;
-}
+};
 
 /** Options for resuming an agent via the service. */
-export interface ResumeOptions {
+export type ResumeOptions = {
   /**
    * Declare that the caller will deliver the resumed outcome to the parent,
    * suppressing the completion nudge for it. Omitted, the resumed outcome is
@@ -135,7 +135,7 @@ export interface ResumeOptions {
    * fired stops the resume before its first turn.
    */
   signal?: AbortSignal;
-}
+};
 
 /**
  * What a resume attempt produced.
@@ -148,7 +148,7 @@ export type ResumeResult =
   | { kind: "refused"; reason: ResumeRefusalReason };
 
 /** Options shared by `launch` and `run`. */
-export interface LaunchOptions {
+export type LaunchOptions = {
   description?: string;
   model?: string;
   /**
@@ -168,7 +168,7 @@ export interface LaunchOptions {
    * owns (story 80).
    */
   signal?: AbortSignal;
-}
+};
 
 /** Why a launch or run was refused before any child existed. */
 export type LaunchRejectionReason =
@@ -181,11 +181,11 @@ export type LaunchRejectionReason =
   | "cancelled";
 
 /** The expected refusal shape: an ordinary answer, never an exception. */
-export interface LaunchRejected {
-  readonly kind: "rejected";
-  readonly reason: LaunchRejectionReason;
-  readonly message: string;
-}
+export type LaunchRejected = Readonly<{
+  kind: "rejected";
+  reason: LaunchRejectionReason;
+  message: string;
+}>;
 
 /**
  * What a `launch` produced.

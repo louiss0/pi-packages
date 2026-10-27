@@ -23,7 +23,9 @@ export type ThinkingLevel =
   | "max";
 
 /** Supported levels from SDK, mapped to Pi names. */
-export function supportedLevels(model?: Model<any>): readonly ThinkingLevel[] {
+export function supportedLevels(
+  model?: Model<any>,
+): ReadonlyArray<ThinkingLevel> {
   if (!model) return ["off"];
   const sdk = getSupportedThinkingLevels(model);
   const withOff = sdk.includes("off") ? sdk : [...sdk, "off"];
@@ -68,7 +70,7 @@ export function modelIdentity(
 
 /** Adapter interface for test verification. */
 export interface SdkAdapterInterface {
-  supportedLevels(model?: Model<any>): readonly ThinkingLevel[];
+  supportedLevels(model?: Model<any>): ReadonlyArray<ThinkingLevel>;
   clampLevel(level: ThinkingLevel, model?: Model<any>): ThinkingLevel;
   canReason(model?: Model<any>): boolean;
   modelIdentity(

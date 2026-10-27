@@ -21,13 +21,16 @@
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import { addUsage } from "#src/lifecycle/usage";
 
-export type SubagentStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "aborted"
-  | "stopped"
-  | "error";
+export const SUBAGENT_STATUSES = [
+  "queued",
+  "running",
+  "completed",
+  "aborted",
+  "stopped",
+  "error",
+] as const;
+
+export type SubagentStatus = (typeof SUBAGENT_STATUSES)[number];
 
 // ---- Status classification predicates ----
 // The single decision point for the re-derived status groupings. Instance
@@ -49,7 +52,7 @@ export function isRunningStatus(status: SubagentStatus): boolean {
   return status === "running";
 }
 
-export interface SubagentStateInit {
+export type SubagentStateInit = {
   /** When the run last made progress; defaults to when the state was created. */
   lastProgressAt?: number;
   // Stats — seed a populated value without replaying the accumulation methods
@@ -59,7 +62,7 @@ export interface SubagentStateInit {
   // Live activity — activeTools is seeded by name (each entry calls addActiveTool)
   activeTools?: string[];
   responseText?: string;
-}
+};
 
 export class SubagentState {
   // Stats — accumulated via mutation methods, readable via getters

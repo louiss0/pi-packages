@@ -26,7 +26,9 @@ export type TurnPolicy =
   | { readonly kind: "unlimited" };
 
 /** What the harness has done about a run's turn limit, in the order it happens. */
-export type TurnBudgetPhase = "within" | "warned" | "exhausted";
+export const TURN_BUDGET_PHASES = ["within", "warned", "exhausted"] as const;
+
+export type TurnBudgetPhase = (typeof TURN_BUDGET_PHASES)[number];
 
 /**
  * A run's turn budget and its use. Present only when a limit exists.
@@ -35,24 +37,24 @@ export type TurnBudgetPhase = "within" | "warned" | "exhausted";
  * warned or stopped the run is an event, and an agent that answered on its last
  * permitted turn has the same counts as one the harness cut off.
  */
-export interface TurnBudget {
+export type TurnBudget = {
   /** The ceiling; absent for an unlimited run. */
   maxTurns?: number;
   /** Successful turns completed in this run. */
   used: number;
   phase: TurnBudgetPhase;
-}
+};
 
 /** What the turn loop must do after a turn boundary: warn the child, stop it, or nothing. */
 export type TurnBudgetAction = "warn" | "stop" | undefined;
 
 /** How one turn ended, as far as the budget is concerned. */
-export interface TurnOutcome {
+export type TurnOutcome = {
   /** The response errored or was aborted; such a turn does not spend budget. */
   failed: boolean;
   /** The turn ran tools, so the agent loop goes on to another turn. */
   ranTools: boolean;
-}
+};
 
 /**
  * The raw inputs one launch's turn policy is resolved from.
@@ -60,17 +62,17 @@ export interface TurnOutcome {
  * Each is absent when that layer says nothing about the ceiling; the first one
  * present wins, which is the request → definition → operator precedence.
  */
-export interface TurnPolicyInputs {
+export type TurnPolicyInputs = Readonly<{
   /**
    * The ceiling the request and the definition resolved to, in that order.
    * `0` at either layer is a deliberate "unlimited" and is not replaced.
    */
-  readonly resolvedMaxTurns?: number;
+  resolvedMaxTurns?: number;
   /** The operator's default ceiling; `0` is a deliberate "unlimited". */
-  readonly defaultMaxTurns?: number;
+  defaultMaxTurns?: number;
   /** Turns left when the child is warned about its budget. */
-  readonly wrapUpTurns?: number;
-}
+  wrapUpTurns?: number;
+}>;
 
 /**
  * Wrap-up turns when no layer names any.

@@ -18,14 +18,14 @@
 import { resolve } from "node:path";
 
 /** A child waiting for the slot. */
-interface Waiter {
+type Waiter = Readonly<{
   /** The child waiting. */
-  readonly id: string;
+  id: string;
   /** Whether the slot was granted (true) or the wait was cancelled (false). */
-  readonly resolve: (granted: boolean) => void;
+  resolve: (granted: boolean) => void;
   /** Detaches the cancellation listener, once the wait is over. */
-  readonly detach: () => void;
-}
+  detach: () => void;
+}>;
 
 /**
  * The exclusive slot for one workspace.

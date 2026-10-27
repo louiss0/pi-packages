@@ -21,7 +21,7 @@ import type {
 interface TranscriptRecord extends PersistedRunSummary {
   readonly activeTools: ReadonlyMap<string, string>;
   readonly responseText: string;
-  readonly agentMessages: readonly SessionMessage[];
+  readonly agentMessages: ReadonlyArray<SessionMessage>;
   readonly model:
     | { readonly provider: string; readonly id: string }
     | undefined;
@@ -64,7 +64,7 @@ export function liveSource(record: TranscriptRecord): TranscriptSource {
 
 /** Validate durable runtime entries before handing plain picker projections to the UI. */
 export function readPersistedNavigationRuns(
-  entries: readonly SessionEntryLike[],
+  entries: ReadonlyArray<SessionEntryLike>,
 ): PersistedNavigationRun[] {
   return readPersistedRuns(entries).map(toNavigationRun);
 }

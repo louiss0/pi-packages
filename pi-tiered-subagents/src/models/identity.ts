@@ -15,10 +15,10 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "#src/models/registry";
 
 /** A model named exactly: the provider that serves it and its id there. */
-export interface ExactModelIdentity {
-  readonly provider: string;
-  readonly id: string;
-}
+export type ExactModelIdentity = Readonly<{
+  provider: string;
+  id: string;
+}>;
 
 /** The models a session can run, as the session's own resolution reports them. */
 export type AvailableModels = ModelRegistry;

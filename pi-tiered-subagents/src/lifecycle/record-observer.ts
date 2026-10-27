@@ -9,9 +9,9 @@
 import type { SubagentState } from "#src/lifecycle/subagent-state";
 import type { CompactionInfo, SubscribableSession } from "#src/types";
 
-export interface SubagentObserverOptions {
+export type SubagentObserverOptions = {
   onCompact?: (info: CompactionInfo) => void;
-}
+};
 
 /**
  * Subscribe to session events and accumulate stats on the subagent state.

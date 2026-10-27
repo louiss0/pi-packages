@@ -36,7 +36,7 @@ function model(provider: string, id: string): ModelCandidate {
  *
  * Ordered by family, so a reader can find one; the order carries no meaning.
  */
-export const SHIPPED_PROFILES: readonly FamilyProfile[] = [
+export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
   {
     family: "gpt",
     group: "size",

@@ -25,11 +25,11 @@ import {
 } from "#src/config/thinking-level";
 
 /** The levels, in ascending order of effort. */
-export const EFFORT: readonly SubagentThinkingLevel[] = THINKING_LEVELS;
+export const EFFORT: ReadonlyArray<SubagentThinkingLevel> = THINKING_LEVELS;
 
 /** The levels a model reasons at, ascending, with "off" removed. */
 export function reasoningLevels(
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
 ): SubagentThinkingLevel[] {
   return EFFORT.filter((level) => level !== "off" && supported.includes(level));
 }
@@ -43,7 +43,7 @@ export function reasoningLevels(
  * "keep the parent's effort" or "use the model's floor".
  */
 export function levelBelow(
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
   parent: SubagentThinkingLevel,
 ): SubagentThinkingLevel | undefined {
   const parentEffort = EFFORT.indexOf(parent);
@@ -66,7 +66,7 @@ export function levelBelow(
  * that did not happen.
  */
 export function stepDown(
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
   parent: SubagentThinkingLevel,
 ): SubagentThinkingLevel | undefined {
   return levelBelow(supported, parent) ?? reasoningLevels(supported)[0];

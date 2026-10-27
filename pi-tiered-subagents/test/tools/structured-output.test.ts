@@ -50,6 +50,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_CTX } from "#test/helpers/stub-ctx";
+import { registeredTool } from "#test/helpers/registered-tools";
 import { textOf } from "#test/helpers/text-of";
 
 // ---- Shared helpers ----
@@ -99,29 +100,17 @@ const testRegistry = new AgentRegistry(() => ({
 
 describe("tool definitions declare output schemas", () => {
   it("subagent declares the subagent output schema", () => {
-    const def = new AgentTool(
-      createToolDeps().manager,
-      createToolDeps().subagents,
-      createToolDeps().settings,
-      createToolDeps().registry,
-      "/home/user/.pi",
-    ).toToolDefinition();
+    const def = registeredTool("subagent");
     expect(def.outputSchema).toBe(subagentOutputSchema);
   });
 
   it("get_subagent_result declares the get-result output schema", () => {
-    const def = new GetResultTool(
-      { getRecord: () => undefined },
-      testRegistry,
-    ).toToolDefinition();
+    const def = registeredTool("get_subagent_result");
     expect(def.outputSchema).toBe(getResultOutputSchema);
   });
 
   it("steer_subagent declares the steer output schema", () => {
-    const def = new SteerTool(
-      { getRecord: () => undefined },
-      { emit: vi.fn() },
-    ).toToolDefinition();
+    const def = registeredTool("steer_subagent");
     expect(def.outputSchema).toBe(steerOutputSchema);
   });
 
@@ -153,10 +142,9 @@ describe("subagent structured output", () => {
       deps.subagents,
       deps.settings,
       deps.registry,
-      deps.agentDir,
     );
     return {
-      def: tool.toToolDefinition(),
+      def: registeredTool("subagent"),
       result: await tool.execute("tc-1", params, signal, vi.fn(), makeCtx()),
     };
   }
@@ -423,7 +411,7 @@ describe("get_subagent_result structured output", () => {
   ) {
     const tool = new GetResultTool(manager, testRegistry);
     return {
-      def: tool.toToolDefinition(),
+      def: registeredTool("get_subagent_result"),
       result: await tool.execute(
         "tc-1",
         params,
@@ -586,7 +574,7 @@ describe("steer_subagent structured output", () => {
   ) {
     const tool = new SteerTool(manager, makeEvents());
     return {
-      def: tool.toToolDefinition(),
+      def: registeredTool("steer_subagent"),
       result: await tool.execute(
         "tc-1",
         params,

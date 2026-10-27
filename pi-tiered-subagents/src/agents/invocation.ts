@@ -17,34 +17,34 @@ import type { SubagentThinkingLevel } from "#src/config/thinking-level";
 import { defined } from "#src/optional";
 
 /** The resolved per-run settings of one launch. */
-export interface ResolvedInvocation {
+export type ResolvedInvocation = Readonly<{
   /**
    * The model the launch runs on, when one was named.
    *
    * A request names a model; a definition may fix one; neither means the
    * launch takes the parent's model or an automatically routed one.
    */
-  readonly model?: string;
+  model?: string;
   /** Whether the model came from the request rather than the definition. */
-  readonly modelFromParams: boolean;
+  modelFromParams: boolean;
   /** The reasoning level the launch runs at, when one was chosen. */
-  readonly thinking?: SubagentThinkingLevel;
+  thinking?: SubagentThinkingLevel;
   /** The turn ceiling for the launch, when one was named. */
-  readonly maxTurns?: number;
+  maxTurns?: number;
   /** Whether the child starts from the parent's conversation. */
-  readonly inheritContext: boolean;
+  inheritContext: boolean;
   /** Whether the launch runs in the background. */
-  readonly runInBackground: boolean;
-}
+  runInBackground: boolean;
+}>;
 
 /** The fields a caller may name in one launch. */
-export interface InvocationParams {
-  readonly model?: string;
-  readonly thinking?: SubagentThinkingLevel;
-  readonly maxTurns?: number;
-  readonly inheritContext?: boolean;
-  readonly runInBackground?: boolean;
-}
+export type InvocationParams = Readonly<{
+  model?: string;
+  thinking?: SubagentThinkingLevel;
+  maxTurns?: number;
+  inheritContext?: boolean;
+  runInBackground?: boolean;
+}>;
 
 /**
  * A front door's answer to "should this agent run in the background?".

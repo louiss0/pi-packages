@@ -10,10 +10,10 @@ import type { TextContent, ToolCall } from "@earendil-works/pi-ai";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /** Extracted text parts and tool names from assistant message content. */
-export interface AssistantContentParts {
+export type AssistantContentParts = {
   textParts: string[];
   toolNames: string[];
-}
+};
 
 // ── Functions ─────────────────────────────────────────────────────────────────
 

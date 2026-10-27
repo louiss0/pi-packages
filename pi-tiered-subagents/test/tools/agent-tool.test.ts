@@ -5,10 +5,10 @@ import { defined } from "#src/optional";
 import { AgentTool } from "#src/tools/agent-tool";
 import {
   createToolDeps,
-  createToolDepsWithDisabledBuiltInAgents,
   mockResumeRefusal,
   mockResumeStart,
 } from "#test/helpers/make-deps";
+import { registeredTool } from "#test/helpers/registered-tools";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import { textOf } from "#test/helpers/text-of";
 
@@ -25,7 +25,6 @@ function makeTool(deps: ReturnType<typeof createToolDeps>) {
     deps.subagents,
     deps.settings,
     deps.registry,
-    deps.agentDir,
   );
 }
 
@@ -45,20 +44,20 @@ async function execute(
 
 describe("AgentTool", () => {
   it("returns tool definition with correct name and label", () => {
-    const def = makeTool(createToolDeps()).toToolDefinition();
+    const def = registeredTool("subagent");
     expect(def.name).toBe("subagent");
     expect(def.label).toBe("Subagent");
   });
 
   it("includes promptSnippet", () => {
-    const def = makeTool(createToolDeps()).toToolDefinition();
+    const def = registeredTool("subagent");
     expect(def.promptSnippet).toBe(
       "Launch a specialized agent for complex, multi-step tasks.",
     );
   });
 
   it("derives type list from registry — includes the shipped specialists", () => {
-    const def = makeTool(createToolDeps()).toToolDefinition();
+    const def = registeredTool("subagent");
     expect(def.description).toContain(
       "- explore: Locate files and trace how existing behaviour works",
     );
@@ -68,7 +67,7 @@ describe("AgentTool", () => {
   });
 
   it("lists the shipped specialists' guidelines in registry order", () => {
-    const def = makeTool(createToolDeps()).toToolDefinition();
+    const def = registeredTool("subagent");
     const guidelines = [
       "- Use debug for: Diagnose a failure and recommend a repair",
       "- Use explore for: Locate files and trace how existing behaviour works",
@@ -79,18 +78,6 @@ describe("AgentTool", () => {
     for (const line of guidelines) expect(def.description).toContain(line);
     const positions = guidelines.map((line) => def.description.indexOf(line));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
-  });
-
-  it.for([
-    "explore",
-    "reviewer",
-    "worker",
-  ])("omits the type-list entry and guideline for a disabled specialist %s", (name) => {
-    const def = makeTool(
-      createToolDepsWithDisabledBuiltInAgents(name),
-    ).toToolDefinition();
-    expect(def.description).not.toContain(`- ${name}:`);
-    expect(def.description).not.toContain(`- Use ${name} for `);
   });
 
   it("loads a fresh definition catalog on each execute", async () => {

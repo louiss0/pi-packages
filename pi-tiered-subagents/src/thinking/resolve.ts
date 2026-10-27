@@ -35,7 +35,7 @@ import {
 } from "#src/agents/sdk-adapter";
 
 /** The levels, in ascending order of effort. */
-const EFFORT_ORDER: readonly SubagentThinkingLevel[] = EFFORT;
+const EFFORT_ORDER: ReadonlyArray<SubagentThinkingLevel> = EFFORT;
 
 /** Where the level came from. */
 export type ThinkingSource =
@@ -46,34 +46,34 @@ export type ThinkingSource =
   | "none";
 
 /** The level the child runs at, and what was decided. */
-export interface ThinkingDecision {
+export type ThinkingDecision = Readonly<{
   /**
    * The level the child runs at.
    *
    * Undefined when the model does not reason: the setting is not applicable
    * rather than wrong.
    */
-  readonly level?: SubagentThinkingLevel;
+  level?: SubagentThinkingLevel;
   /** Whether the model reasons at all. */
-  readonly applicable: boolean;
+  applicable: boolean;
   /** Where the level came from. */
-  readonly source: ThinkingSource;
+  source: ThinkingSource;
   /** Whether a requested level had to be clamped to what the model supports. */
-  readonly clamped: boolean;
+  clamped: boolean;
   /** A sentence for the launch note. */
-  readonly reason: string;
-}
+  reason: string;
+}>;
 
 /** What the resolution needs to know. */
-export interface ThinkingRequest {
+export type ThinkingRequest = Readonly<{
   /** The level the request names, when it names one. */
-  readonly requested?: SubagentThinkingLevel;
+  requested?: SubagentThinkingLevel;
   /** The level the definition names, when it names one. */
-  readonly defined?: SubagentThinkingLevel;
+  defined?: SubagentThinkingLevel;
   /** The model the child runs on. */
-  readonly model?: Model<any>;
+  model?: Model<any>;
   /** The effort the parent was running at, when the parent has one. */
-  readonly parentLevel?: SubagentThinkingLevel;
+  parentLevel?: SubagentThinkingLevel;
   /**
    * Whether the parent's model was kept because no lower target was
    * available.
@@ -81,8 +81,8 @@ export interface ThinkingRequest {
    * Absent means the model changed — the default is a child that works on its
    * own model, and the retained-parent rule does not apply.
    */
-  readonly parentModelKept?: boolean;
-}
+  parentModelKept?: boolean;
+}>;
 
 /**
  * Resolve the reasoning level for a launch.
@@ -120,7 +120,7 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
 
   const supported = adapterSupportedLevels(
     model,
-  ) as readonly SubagentThinkingLevel[];
+  ) as ReadonlyArray<SubagentThinkingLevel>;
   const nonOff = supported.filter((level) => level !== "off");
 
   if (nonOff.length === 0) {
@@ -177,7 +177,7 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
 function explicit(
   requested: SubagentThinkingLevel,
   source: "request" | "definition",
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
   model: Model<any>,
 ): ThinkingDecision {
   // A model that reasons does not reason less because the caller asked it to:
@@ -228,7 +228,7 @@ function explicit(
  * level.
  */
 function automaticLevel(
-  nonOff: readonly SubagentThinkingLevel[],
+  nonOff: ReadonlyArray<SubagentThinkingLevel>,
 ): SubagentThinkingLevel | undefined {
   if (nonOff.includes("medium")) return "medium";
   if (nonOff.includes("low")) return "low";
@@ -250,7 +250,7 @@ function automaticLevel(
  */
 function belowParent(
   parentLevel: SubagentThinkingLevel,
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
   model: Model<any>,
 ): ThinkingDecision {
   const below = levelBelow(supported, parentLevel);
@@ -294,7 +294,7 @@ function belowParent(
  */
 function retainedParent(
   parentLevel: SubagentThinkingLevel | undefined,
-  supported: readonly SubagentThinkingLevel[],
+  supported: ReadonlyArray<SubagentThinkingLevel>,
 ): ThinkingDecision {
   const nonOff = supported.filter((level) => level !== "off");
 

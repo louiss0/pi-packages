@@ -169,7 +169,7 @@ runtime uses:
 }
 ```
 
-Only data is read: a value the schema does not name is ignored, never
+Only declared data is read: a field the schema does not name is rejected, never
 evaluated. A replacement profile with an unsupported naming structure is
 refused — the eight shipped strategies are the structures this package can
 read. This is profile validation, not an unknown-parent-family error: an
@@ -233,11 +233,14 @@ selection.
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels. Version/tier/model shape and whole-family
-replacement semantics stay the same; version fallback links are removed from
-the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
-the same unknown-field rule as any other unrecognized field. Examples are representative
+labels are reported when read, not silently inferred. Version names, tier names,
+provider names, and model ids are trimmed; a name that becomes blank is rejected,
+while an empty tier name remains the version's default model. Unknown profile
+fields are rejected with path-aware diagnostics, except an obsolete tier-level
+`fallbacks` field, which is accepted and discarded along with its contents.
+Upgrade existing whole replacements by adding these labels. Version/tier/model
+shape and whole-family replacement semantics stay the same; version fallback links
+are removed from the schema, shipped data, and runtime. Examples are representative
 profile data, not provider-access guarantees.
 
 [ADR 0014](adr/0014-role-aware-model-routing.md) supersedes only ADR 0007's
@@ -297,7 +300,7 @@ Verification for this follow-up:
 | Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
 | An explicit choice works without a known family | 59 | Done. |
 | Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover the eight agreed families. |
-| Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; old `fallbacks` is ignored as an unknown field. |
+| Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; obsolete tier-level `fallbacks` is accepted and discarded. |
 | The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
 | An unknown parent family retains the parent | 66; ADR 0015 | No guessed family, price ranking, or cross-version fallback. |

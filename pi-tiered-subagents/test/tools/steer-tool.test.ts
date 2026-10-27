@@ -12,6 +12,7 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_CTX } from "#test/helpers/stub-ctx";
+import { registeredTool } from "#test/helpers/registered-tools";
 import { textOf } from "#test/helpers/text-of";
 
 function makeManager(
@@ -42,14 +43,14 @@ async function execute(
 }
 
 describe("SteerTool", () => {
-  it("returns tool definition with correct name", () => {
-    const tool = new SteerTool(makeManager(), makeEvents());
-    expect(tool.toToolDefinition().name).toBe("steer_subagent");
+  it("registers the steer_subagent tool with its contract", () => {
+    const def = registeredTool("steer_subagent");
+    expect(def.name).toBe("steer_subagent");
   });
 
   it("includes promptSnippet", () => {
-    const tool = new SteerTool(makeManager(), makeEvents());
-    expect(tool.toToolDefinition().promptSnippet).toBe(
+    const def = registeredTool("steer_subagent");
+    expect(def.promptSnippet).toBe(
       "Send a mid-run message to redirect a running background agent.",
     );
   });

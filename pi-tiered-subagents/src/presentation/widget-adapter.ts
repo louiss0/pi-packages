@@ -19,7 +19,7 @@ interface WidgetRecord extends Omit<WidgetAgent, "model" | "contextPercent"> {
 
 /** No manager mutation, session access, or lifecycle policy crosses this seam. */
 export interface WidgetRecordSource {
-  listAgents(): readonly WidgetRecord[];
+  listAgents(): ReadonlyArray<WidgetRecord>;
 }
 
 /**

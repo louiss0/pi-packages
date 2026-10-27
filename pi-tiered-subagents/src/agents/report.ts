@@ -27,7 +27,7 @@ export class DefinitionErrorReporter {
    * definition file that stays broken does not fill the parent's transcript
    * with the same complaint.
    */
-  reportNew(errors: readonly string[]): void {
+  reportNew(errors: ReadonlyArray<string>): void {
     const unseen = errors.filter((error) => !this.reported.has(error));
     for (const error of errors) this.reported.add(error);
     if (unseen.length === 0) return;

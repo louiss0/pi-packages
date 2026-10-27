@@ -29,22 +29,22 @@ import type { ModelRegistry } from "#src/models/registry";
 import type { RoutingLadders } from "#src/models/router";
 
 /** Caller-specific names translated into one preparation request. */
-export interface LaunchRequest {
-  readonly type: string;
-  readonly prompt: string;
-  readonly description?: string;
-  readonly model?: string;
+export type LaunchRequest = Readonly<{
+  type: string;
+  prompt: string;
+  description?: string;
+  model?: string;
   /** Kept as a string until this shared validation boundary. */
-  readonly thinking?: string;
-  readonly maxTurns?: number;
-  readonly inheritContext?: boolean;
-  readonly runInBackground?: boolean;
-}
+  thinking?: string;
+  maxTurns?: number;
+  inheritContext?: boolean;
+  runInBackground?: boolean;
+}>;
 
 /** A definition and all execution decisions captured for one accepted request. */
-export interface PreparedLaunch {
-  readonly definition: AgentDefinition;
-  readonly config: ResolvedSpawnConfig;
+export type PreparedLaunch = Readonly<{
+  definition: AgentDefinition;
+  config: ResolvedSpawnConfig;
   /**
    * The child-shaping settings in force when the request was made.
    *
@@ -53,8 +53,8 @@ export interface PreparedLaunch {
    * policy it was asked under rather than adopting a later edit
    * (ARCHITECTURE-SPEC stories 56 and 57).
    */
-  readonly childShaping: ChildShapingSettings;
-}
+  childShaping: ChildShapingSettings;
+}>;
 
 /**
  * The settings that shape a child, captured with the launch.
@@ -62,14 +62,14 @@ export interface PreparedLaunch {
  * Copied at capture: the excluded list and the inheritance record are fresh
  * arrays/objects, so later settings edits reach only the next launch.
  */
-export interface ChildShapingSettings {
+export type ChildShapingSettings = Readonly<{
   /** Whether a background child gets the `notify_parent` channel. */
-  readonly midRunUpdates: boolean;
+  midRunUpdates: boolean;
   /** The extension packages the child's resource loader must not resolve. */
-  readonly excludedExtensionPackages: readonly string[];
+  excludedExtensionPackages: ReadonlyArray<string>;
   /** Per-provider prompt-inheritance strategy; unlisted providers inherit "full". */
-  readonly promptInheritance: Readonly<Record<string, PromptInheritance>>;
-}
+  promptInheritance: Readonly<Record<string, PromptInheritance>>;
+}>;
 
 /** Resolve the strategy a child on `provider` adopts from captured settings. */
 export function capturedPromptInheritance(

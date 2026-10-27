@@ -150,15 +150,15 @@ export function widgetLineBudget(terminalRows: number): number {
   );
 }
 
-interface AgentCategories {
+type AgentCategories = {
   running: WidgetAgent[];
   queued: WidgetAgent[];
   finished: WidgetAgent[];
-}
+};
 
 /** Partition agents into rendering buckets. */
 function categorizeAgents(
-  agents: readonly WidgetAgent[],
+  agents: ReadonlyArray<WidgetAgent>,
   shouldShowFinished: (agentId: string, status: string) => boolean,
 ): AgentCategories {
   return {
@@ -174,13 +174,13 @@ function categorizeAgents(
   };
 }
 
-interface WidgetSections {
+type WidgetSections = {
   finishedLines: string[];
   runningLines: [string, string][];
   queuedLine: string | undefined;
   /** Agents behind `queuedLine`, which collapses all of them into one row. */
   queuedCount: number;
-}
+};
 
 /** Render each agent bucket into pre-formatted lines with ├─ tree connectors. */
 function buildSections(
@@ -320,7 +320,7 @@ function assembleOverflow(
 
 /** Pure rendering of the widget body. Returns lines to display. */
 export function renderWidgetLines(params: {
-  agents: readonly WidgetAgent[];
+  agents: ReadonlyArray<WidgetAgent>;
   registry: AgentDefinitionLookup;
   spinnerFrame: number;
   terminalWidth: number;

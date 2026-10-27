@@ -38,7 +38,7 @@ import {
 } from "#src/ui/display";
 
 /** Model info extracted from the parent session context. */
-export interface ModelInfo {
+export type ModelInfo = {
   /** The parent model, when the parent is running one. */
   parentModel?: Model<any>;
   /** The registry to resolve names against, when the parent has one. */
@@ -47,19 +47,19 @@ export interface ModelInfo {
   ladders: RoutingLadders;
   /** The effort the parent was running at, when the parent has one. */
   parentThinkingLevel?: ThinkingLevel;
-}
+};
 
 /** Identity: who is being spawned. */
-export interface SpawnIdentity {
+export type SpawnIdentity = {
   subagentType: string;
   rawType: SubagentType;
   displayName: string;
   /** The definition the request resolved to. */
   definition: AgentDefinition;
-}
+};
 
 /** Execution: how the agent will run. */
-export interface SpawnExecution {
+export type SpawnExecution = {
   prompt: string;
   description: string;
   /** The resolved model identity, copied into the accepted launch. */
@@ -80,30 +80,30 @@ export interface SpawnExecution {
   thinking?: ThinkingLevel;
   inheritContext: boolean;
   runInBackground: boolean;
-}
+};
 
 /** Presentation: display/UI values derived from identity and execution. */
-export interface SpawnPresentation {
+export type SpawnPresentation = {
   agentTags: string[];
   detailBase: Pick<
     AgentDetails,
     "displayName" | "description" | "subagentType" | "modelName" | "tags"
   >;
-}
+};
 
 /** Fully resolved config for spawning an agent — composed of domain-aligned sub-interfaces. */
-export interface ResolvedSpawnConfig {
+export type ResolvedSpawnConfig = {
   identity: SpawnIdentity;
   execution: SpawnExecution;
   presentation: SpawnPresentation;
   /** Model-visible advisories about how this spawn resolved. Both runners render them. */
   notes: string[];
-}
+};
 
 /** Error result when resolution fails. */
-export interface SpawnConfigError {
+export type SpawnConfigError = {
   error: string;
-}
+};
 
 /**
  * The one input every spawn door feeds the resolver.
@@ -112,41 +112,41 @@ export interface SpawnConfigError {
  * ones the caller left open — the same precedence the invocation merge applies,
  * so a door that has no definition to refine from simply omits the refinements.
  */
-export interface SpawnRequest {
+export type SpawnRequest = Readonly<{
   /** The definition the spawn names, already resolved. */
-  readonly definition: AgentDefinition;
+  definition: AgentDefinition;
   /** The prompt for the child. */
-  readonly prompt: string;
+  prompt: string;
   /** The description for the record, when the caller gave one. */
-  readonly description?: string;
+  description?: string;
   /** The model the caller named, when it did. */
-  readonly requestedModel?: string;
+  requestedModel?: string;
   /** The reasoning level the caller named, when it did. */
-  readonly requestedThinking?: SubagentThinkingLevel;
+  requestedThinking?: SubagentThinkingLevel;
   /** The turn ceiling the caller named, before the definition fills it. */
-  readonly requestedMaxTurns?: number;
+  requestedMaxTurns?: number;
   /** The caller's context preference, before the definition fills it. */
-  readonly inheritContext?: boolean;
+  inheritContext?: boolean;
   /** The caller's background preference, before the definition fills it. */
-  readonly runInBackground?: boolean;
+  runInBackground?: boolean;
   /** The type as the caller spelled it, before the registry normalized it. */
-  readonly rawType?: SubagentType;
+  rawType?: SubagentType;
   /** The session facts the automatic routing reads. */
-  readonly modelInfo: ModelInfo;
+  modelInfo: ModelInfo;
   /**
    * The operator's turn-budget defaults, captured with the launch.
    *
    * Read at preparation, so a queued child runs with the budget that was in
    * force when the request was made.
    */
-  readonly settings: TurnSettings;
-}
+  settings: TurnSettings;
+}>;
 
 /** The operator's turn-budget defaults the resolver reads. */
-export interface TurnSettings {
-  readonly defaultMaxTurns: number | undefined;
-  readonly wrapUpTurns: number;
-}
+export type TurnSettings = Readonly<{
+  defaultMaxTurns: number | undefined;
+  wrapUpTurns: number;
+}>;
 
 /**
  * Resolve all config for spawning an agent.

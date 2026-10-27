@@ -45,12 +45,12 @@ import {
  * below — because a standalone label and a mid-sentence parenthetical are
  * different grammar, not different facts.
  */
-interface StatusMeaning {
+type StatusMeaning = {
   /** Sentence-initial label, e.g. "Wrapped up". */
   label: string;
   /** Why, without terminal punctuation, e.g. "after turn-budget warning". */
   detail: string;
-}
+};
 
 /** A run that finished on its own after the harness warned it about its turn limit. */
 const WRAPPED_UP: StatusMeaning = {
@@ -69,11 +69,11 @@ const WRAPPED_UP: StatusMeaning = {
  * `defined()` instead — there, "unset" and "set to nothing" are different facts
  * worth preserving.
  */
-export interface StatusOutcome {
+export type StatusOutcome = {
   status: SubagentStatus;
   error?: string | undefined;
   turnBudget?: TurnBudget | undefined;
-}
+};
 
 function statusMeaning(outcome: StatusOutcome): StatusMeaning | undefined {
   switch (outcome.status) {
@@ -148,7 +148,7 @@ export function renderStatusNote(outcome: StatusOutcome): string {
  * Only what the body formatter reads. Narrower than any record type so a
  * caller cannot come to depend on fields this module does not use.
  */
-export interface OutcomeBody {
+export type OutcomeBody = {
   status: SubagentStatus;
   // A read view over a live record, so the optionals take an explicit
   // `undefined` — see the note on `StatusOutcome`.
@@ -156,7 +156,7 @@ export interface OutcomeBody {
   error?: string | undefined;
   /** Whether the agent was stopped before the limiter ever admitted it. */
   stoppedWhileQueued: boolean;
-}
+};
 
 /**
  * The trailing affordance for a child that ended its turn with a question.
@@ -222,9 +222,9 @@ export function renderWorkspaceNotice(notice: string | undefined): string {
  * The fields rather than a record, so a carrier holding any shape can call it
  * — both `Subagent` and `AgentReport` satisfy this structurally.
  */
-export interface OutcomeAddenda {
+export type OutcomeAddenda = {
   id: string;
-  runUpdates?: readonly string[] | undefined;
+  runUpdates?: ReadonlyArray<string> | undefined;
   workspaceNotice?: string | undefined;
   pendingQuestion?: string | undefined;
   /**
@@ -235,7 +235,7 @@ export interface OutcomeAddenda {
    * fail-open this field exists to close.
    */
   resumeRefusal: ResumeRefusal | undefined;
-}
+};
 
 /** The addenda tail every outcome carrier appends, in one order. */
 export function renderOutcomeAddenda(outcome: OutcomeAddenda): string {
@@ -259,7 +259,7 @@ export function renderOutcomeAddenda(outcome: OutcomeAddenda): string {
  * free to receive as they happened.
  */
 export function renderRunUpdates(
-  updates: readonly string[] | undefined,
+  updates: ReadonlyArray<string> | undefined,
 ): string {
   if (!updates?.length) return "";
   const quoted = updates

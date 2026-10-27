@@ -7,15 +7,15 @@ import type { ProjectContextLoader } from "#src/session/project-context";
 import type { PromptInheritance } from "#src/types";
 
 /** The prompt configuration a child is built from. */
-export interface AgentPromptConfig {
+export type AgentPromptConfig = {
   /** The agent's identifier, as the `<active_agent>` tag names it. */
   name: string;
   /** The agent's standing instructions — the definition's body. */
   instructions: string;
-}
+};
 
 /** The parent session's contribution to a child prompt, plus the cwd that text claims. */
-export interface InheritedPrompt {
+export type InheritedPrompt = {
   /** The parent agent's effective system prompt. */
   systemPrompt: string;
   /** The parent's working directory — the cwd its prompt footer names. */
@@ -32,7 +32,7 @@ export interface InheritedPrompt {
    * such parts.
    */
   portablePrompt?: string;
-}
+};
 
 /**
  * Build the system prompt for an agent from its definition.
@@ -316,7 +316,9 @@ function inheritedIdentity(
  * marker to locate it by, and the shape is no longer rendered by the Pi this
  * package supports.
  */
-function withoutHarnessSections(head: readonly string[]): readonly string[] {
+function withoutHarnessSections(
+  head: ReadonlyArray<string>,
+): ReadonlyArray<string> {
   const surface = piToolSurface(head);
   if (!surface) return head;
   // Everything above the tool surface is Pi's own preamble: the identity it
@@ -336,7 +338,7 @@ function withoutHarnessSections(head: readonly string[]): readonly string[] {
  * above the addendum, the project context, the catalogue, and the cwd. A
  * `<docs>` tag quoted in one of those is the operator's text, and it stays.
  */
-function withoutDocs(head: readonly string[]): readonly string[] {
+function withoutDocs(head: ReadonlyArray<string>): ReadonlyArray<string> {
   const bound = head.findIndex((line) => SECTIONS_BELOW_DOCS.has(line));
   const limit = bound === -1 ? head.length : bound;
   const docsAt = head.indexOf(DOCS_SECTION_OPEN);
@@ -362,7 +364,7 @@ function withoutDocs(head: readonly string[]): readonly string[] {
  * reads exactly as Pi renders it without them.
  */
 function piToolSurface(
-  head: readonly string[],
+  head: ReadonlyArray<string>,
 ): { readonly toolsAt: number; readonly spanEnd: number } | null {
   const bound = laterSectionStart(head);
   const toolsAt = head.indexOf(TOOLS_SECTION_OPEN);
@@ -384,7 +386,7 @@ function piToolSurface(
  * Line index of the first section Pi renders below `<rules>`, or the line
  * count when the head carries none of them.
  */
-function laterSectionStart(head: readonly string[]): number {
+function laterSectionStart(head: ReadonlyArray<string>): number {
   const at = head.findIndex((line) => SECTIONS_BELOW_RULES.has(line));
   return at === -1 ? head.length : at;
 }
@@ -397,11 +399,11 @@ function laterSectionStart(head: readonly string[]): number {
 type PromptShape = "footer" | "section" | "unanchored";
 
 /** Where the session-resolved tail begins, and the prompt shape that placed it. */
-interface AnchoredTail {
+type AnchoredTail = Readonly<{
   /** Line index at which the tail begins, or -1 when none is present. */
-  readonly at: number;
-  readonly shape: PromptShape;
-}
+  at: number;
+  shape: PromptShape;
+}>;
 
 /**
  * Where Pi's per-session layers begin, and the prompt shape that anchored them.
@@ -414,7 +416,7 @@ interface AnchoredTail {
  * `buildSystemPrompt` applies.
  */
 function sessionResolvedTailStart(
-  lines: readonly string[],
+  lines: ReadonlyArray<string>,
   parentCwd: string,
   cutProjectContext: boolean,
 ): AnchoredTail {
@@ -439,7 +441,7 @@ function sessionResolvedTailStart(
  * that extends the cut past this anchor.
  */
 function cwdAnchoredTailStart(
-  lines: readonly string[],
+  lines: ReadonlyArray<string>,
   parentCwd: string,
 ): AnchoredTail {
   const footerAt = lines.lastIndexOf(
@@ -468,7 +470,10 @@ function cwdAnchoredTailStart(
  * shares a prefix with the parent's — is not mistaken for it, the same
  * whole-line discipline the 0.85 footer anchor applies.
  */
-function cwdSectionStart(lines: readonly string[], parentCwd: string): number {
+function cwdSectionStart(
+  lines: ReadonlyArray<string>,
+  parentCwd: string,
+): number {
   for (
     let openAt = lines.lastIndexOf(CWD_SECTION_OPEN);
     openAt !== -1;
@@ -498,7 +503,7 @@ function cwdSectionStart(lines: readonly string[], parentCwd: string): number {
  * to the tail for the project-context anchor.
  */
 function skillsSectionWrapperStart(
-  lines: readonly string[],
+  lines: ReadonlyArray<string>,
   cwdAt: number,
 ): number {
   let closeAt = cwdAt - 1;
@@ -522,7 +527,10 @@ function skillsSectionWrapperStart(
  * `PROJECT_CONTEXT_LEAD_IN` — which keeps a context file quoting the opening —
  * later in the document than the real one — from being taken for it.
  */
-function projectContextStart(lines: readonly string[], tailAt: number): number {
+function projectContextStart(
+  lines: ReadonlyArray<string>,
+  tailAt: number,
+): number {
   let closeAt = tailAt - 1;
   while (closeAt >= 0 && lines[closeAt] === "") closeAt--;
   if (closeAt < 0 || lines[closeAt] !== PROJECT_CONTEXT_CLOSE) return -1;
@@ -548,7 +556,7 @@ function projectContextStart(lines: readonly string[], tailAt: number): number {
  * prose quoting Pi's heading ahead of the section is not mistaken for it.
  */
 function skillsSectionStart(
-  lines: readonly string[],
+  lines: ReadonlyArray<string>,
   footerAt: number,
 ): number {
   const catalogueEnd = catalogueCloseBefore(lines, footerAt);
@@ -571,7 +579,7 @@ function skillsSectionStart(
  * output; the last closing tag is the best remaining guess.
  */
 function catalogueCloseBefore(
-  lines: readonly string[],
+  lines: ReadonlyArray<string>,
   footerAt: number,
 ): number {
   if (footerAt === -1) {

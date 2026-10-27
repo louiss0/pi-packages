@@ -50,7 +50,7 @@ export interface RunOutcome {
   readonly pendingQuestion: string | undefined;
   readonly workspaceNotice: string | undefined;
   /** The updates no announcement delivered; what the carrier still owes. */
-  readonly runUpdates: readonly string[];
+  readonly runUpdates: ReadonlyArray<string>;
   /** The run's turn limit and its use; absent when no limit applied. */
   readonly turnBudget: TurnBudget | undefined;
   /** A resume replaced this run after it settled. */
@@ -68,7 +68,7 @@ interface RunUpdate {
 }
 
 /** Seeds for a run's outcome, for a record built in a known state (test fixtures). */
-export interface RunOutcomeInit {
+export type RunOutcomeInit = {
   status?: SubagentStatus;
   result?: string;
   error?: string;
@@ -83,10 +83,10 @@ export interface RunOutcomeInit {
   /** The run's turn limit and its use. */
   turnBudget?: TurnBudget;
   /** Updates the child sent, in order, each still owed to a carrier. */
-  runUpdates?: readonly string[];
+  runUpdates?: ReadonlyArray<string>;
   /** Time the parent collected the outcome; undefined = obligation still open. */
   consumedAt?: number;
-}
+};
 
 /** One run of a subagent (the initial run or a resume): its outcome, and the handles it holds until it ends. */
 export class SubagentRun implements RunOutcome {
@@ -164,7 +164,7 @@ export class SubagentRun implements RunOutcome {
   // through whichever channel could reach it, and no carrier repeats it.
   private readonly updates: RunUpdate[] = [];
   /** The updates no announcement delivered: what an outcome carrier must render. */
-  get runUpdates(): readonly string[] {
+  get runUpdates(): ReadonlyArray<string> {
     return this.updates
       .filter((update) => !update.announced)
       .map((update) => update.message);

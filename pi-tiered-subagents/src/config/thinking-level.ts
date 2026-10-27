@@ -29,7 +29,7 @@ export const THINKING_LEVELS = [
   "high",
   "xhigh",
   "max",
-] as const satisfies readonly (SdkThinkingLevel | "off")[];
+] as const satisfies ReadonlyArray<SdkThinkingLevel | "off">;
 
 /** A thinking level as an agent file or a spawn caller may spell it. */
 export type SubagentThinkingLevel = (typeof THINKING_LEVELS)[number];

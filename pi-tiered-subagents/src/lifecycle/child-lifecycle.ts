@@ -45,39 +45,39 @@ export const SUBAGENT_CHILD_COMPLETED = "subagents:child:completed";
 export const SUBAGENT_CHILD_DISPOSED = "subagents:child:disposed";
 
 /** Payload for `subagents:child:spawning`. */
-export interface ChildSpawningEvent {
+export type ChildSpawningEvent = {
   agentName: string;
   parentSessionId?: string;
-}
+};
 
 /** Payload for `subagents:child:session-created`. */
-export interface ChildSessionCreatedEvent {
+export type ChildSessionCreatedEvent = {
   /** Child session id — the registry key. Unique per child; concurrent
    * siblings of the same parent occupy distinct keys. */
   sessionId: string;
   parentSessionId?: string;
-}
+};
 
 /** Payload for `subagents:child:bound`. */
-export interface ChildBoundEvent {
+export type ChildBoundEvent = {
   /** Child session id — the same key `session-created` carried. */
   sessionId: string;
   parentSessionId?: string;
-}
+};
 
 /** Payload for `subagents:child:completed`. */
-export interface ChildCompletedEvent {
+export type ChildCompletedEvent = {
   sessionDir: string;
   agentName: string;
   /** The run's turn limit and its use; absent when no limit applied. */
   turnBudget?: TurnBudget;
-}
+};
 
 /** Payload for `subagents:child:disposed`. */
-export interface ChildDisposedEvent {
+export type ChildDisposedEvent = {
   /** Child session id — the registry key. Must match `session-created`. */
   sessionId: string;
-}
+};
 
 /** Narrow emit seam — injected, never imports the Pi SDK. */
 export type LifecycleEmit = (channel: string, data: unknown) => void;

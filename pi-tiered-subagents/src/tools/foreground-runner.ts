@@ -30,10 +30,10 @@ import { type AgentDetails, formatMs } from "#src/ui/display";
 export type ForegroundManagerDeps = Pick<Subagents, "spawnAndWait">;
 
 /** All values the foreground runner needs beyond the resolved config. */
-export interface ForegroundParams {
+export type ForegroundParams = {
   config: ResolvedSpawnConfig;
   launch: PreparedSubagentsLaunch;
-}
+};
 
 /**
  * The operator-facing sentence for a launch refused before a child was created.

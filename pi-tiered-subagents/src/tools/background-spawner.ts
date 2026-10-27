@@ -18,14 +18,14 @@ import type { AgentDetails } from "#src/ui/display";
 export type BackgroundManagerDeps = Pick<Subagents, "spawn" | "getRecord">;
 
 /** All values the background spawner needs beyond the resolved config. */
-export interface BackgroundParams {
+export type BackgroundParams = {
   config: ResolvedSpawnConfig;
   launch: PreparedSubagentsLaunch;
   settings: { readonly maxConcurrent: number };
-}
+};
 
 /** What a background launch reports: one shape for every door that returns before the run ends. */
-export interface BackgroundLaunch {
+export type BackgroundLaunch = {
   /** The leading line, e.g. "Agent started in background." */
   headline: string;
   id: string;
@@ -33,11 +33,11 @@ export interface BackgroundLaunch {
   description: string;
   detailBase: SpawnPresentation["detailBase"];
   /** Advisories that lead the result; omitted when the door has none. */
-  notes?: readonly string[];
+  notes?: ReadonlyArray<string>;
   outputFile?: string;
   /** Present only when the launch is waiting for a concurrency slot. */
   queuePosition?: { maxConcurrent: number };
-}
+};
 
 /**
  * Spawn a background agent and return the tool result immediately.

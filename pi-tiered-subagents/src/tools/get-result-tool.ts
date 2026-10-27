@@ -1,5 +1,3 @@
-import { defineTool } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import type { RunOutcome } from "#src/lifecycle/subagent-run";
@@ -8,17 +6,12 @@ import {
   PREVIEW_CHARS,
 } from "#src/ui/get-result-renderer";
 import {
-  renderGetResultCall,
-  renderGetResultResult,
-} from "#src/ui/get-result-tool-renderer";
-import {
   type AgentReport,
   formatAgentReport,
 } from "#src/tools/get-result-report";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
 import {
   type GetResultToolOutput,
-  getResultOutputSchema,
   withStructured,
 } from "#src/tools/structured-output";
 import type { Subagent } from "#src/types";
@@ -37,21 +30,21 @@ export interface GetResultToolManager {
 }
 
 /** The arguments a get_subagent_result call carries. */
-export interface GetResultParams {
+export type GetResultParams = {
   agent_id: string;
   wait?: boolean;
   verbose?: boolean;
   /** Seconds; bounds only a `wait: true` call. Absent = wait until the agent settles. */
   timeout?: number;
-}
+};
 
 /** What collecting the outcome produced: the run this call reports, and how its wait ended. */
-interface CollectedOutcome {
+type CollectedOutcome = {
   /** The run whose outcome this call reports: the one it waited on, or the latest. */
   run: RunOutcome;
   /** The bound, in seconds, of a wait that ended at it with the agent still running. */
   waitExpiredAfter?: number;
-}
+};
 
 /** setTimeout's ceiling, the same one Pi's bash tool enforces. */
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
@@ -257,54 +250,6 @@ export class GetResultTool {
       error: outcome.error,
       turnBudget: outcome.turnBudget,
       modelName: modelLabel(record.modelIdentity),
-    });
-  }
-
-  toToolDefinition() {
-    return defineTool({
-      name: "get_subagent_result" as const,
-      label: "Get Agent Result",
-      promptSnippet:
-        "Check status and retrieve results from a background agent.",
-      description:
-        "Check status and retrieve results from a background agent. Use the agent ID returned by Agent with run_in_background. " +
-        "With wait: true and a timeout, the wait ends at the timeout and returns the agent's current progress; " +
-        "this does not stop or abort the agent, unlike bash's timeout.",
-      parameters: Type.Object({
-        agent_id: Type.String({
-          description: "The agent ID to check.",
-        }),
-        wait: Type.Optional(
-          Type.Boolean({
-            description:
-              "If true, wait for the agent to complete before returning. Default: false.",
-          }),
-        ),
-        verbose: Type.Optional(
-          Type.Boolean({
-            description:
-              "If true, include the agent's full conversation (messages + tool calls). Default: false.",
-          }),
-        ),
-        timeout: Type.Optional(
-          Type.Number({
-            description:
-              "Seconds to wait when wait is true (optional, no default: wait until the agent finishes). " +
-              "An expired wait does not stop the agent; if its progress is unchanged since your last check, do not simply wait again.",
-          }),
-        ),
-      }),
-      outputSchema: getResultOutputSchema,
-      renderCall: renderGetResultCall,
-      renderResult: renderGetResultResult,
-
-      execute: (
-        toolCallId: string,
-        params: GetResultParams,
-        signal: AbortSignal,
-        onUpdate: unknown,
-        ctx: unknown,
-      ) => this.execute(toolCallId, params, signal, onUpdate, ctx),
     });
   }
 }

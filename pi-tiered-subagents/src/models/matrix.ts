@@ -6,10 +6,10 @@ import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { routeModel } from "#src/models/router";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 
-export interface ModelMatrixRegion {
-  readonly name: string;
-  readonly markdown: string;
-}
+export type ModelMatrixRegion = Readonly<{
+  name: string;
+  markdown: string;
+}>;
 
 /** Router inputs here are identities only; generation never calls a provider. */
 function identity(candidate: ModelCandidate): Model<"openai-completions"> {

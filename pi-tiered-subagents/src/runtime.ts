@@ -24,10 +24,10 @@ import type { SessionContext } from "#src/types";
  * allowance are resolved into a `TurnPolicy` when the launch is prepared, so a
  * change to them reaches only the next launch.
  */
-export interface RunConfig {
+export type RunConfig = Readonly<{
   /** Whether a background child gets the `notify_parent` channel. */
-  readonly midRunUpdates: boolean;
-}
+  midRunUpdates: boolean;
+}>;
 
 /**
  * All mutable state owned by the pi-subagents extension.

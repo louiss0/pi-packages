@@ -30,13 +30,13 @@ export type StreamedRecord = Pick<
   | "responseText"
 >;
 
-export interface ProgressStreamParams {
+export type ProgressStreamParams = {
   /** The call's presentation, which every update carries under its live fields. */
   detailBase: SpawnPresentation["detailBase"];
   onUpdate: ((update: AgentToolResult<AgentDetails>) => void) | undefined;
   /** The record to render; undefined until the run's session exists. */
   getRecord: () => StreamedRecord | undefined;
-}
+};
 
 /** Progress update cadence; the terminal renderer owns the animation frames. */
 const PROGRESS_INTERVAL_MS = 80;

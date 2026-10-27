@@ -31,7 +31,7 @@ import { defined } from "#src/optional";
  */
 export type ToolSelection =
   | { readonly kind: "inherit" }
-  | { readonly kind: "explicit"; readonly names: readonly string[] };
+  | { readonly kind: "explicit"; readonly names: ReadonlyArray<string> };
 
 /** Which layer a definition's values came from. */
 export type DefinitionOrigin = "shipped" | "global" | "project";
@@ -42,32 +42,32 @@ export type DefinitionOrigin = "shipped" | "global" | "project";
  * Every field is resolved: there is no "unspecified" state here, only in the
  * patches that produce it.
  */
-export interface AgentDefinition {
+export type AgentDefinition = Readonly<{
   /** Normalized identifier: lowercased, unique across the registry. */
-  readonly id: string;
+  id: string;
   /** Readable label, separate from the identifier. */
-  readonly displayName: string;
+  displayName: string;
   /** One line saying what this agent is for. */
-  readonly description: string;
+  description: string;
   /** The agent's standing instructions — the Markdown body. */
-  readonly instructions: string;
+  instructions: string;
   /** The tools the child may use. */
-  readonly tools: ToolSelection;
+  tools: ToolSelection;
   /** A fixed model, when the definition names one. */
-  readonly model?: string;
+  model?: string;
   /** A fixed reasoning level, when the definition names one. */
-  readonly thinking?: SubagentThinkingLevel;
+  thinking?: SubagentThinkingLevel;
   /** A turn ceiling for the child, when the definition names one. */
-  readonly maxTurns?: number;
+  maxTurns?: number;
   /** Whether the child starts from the parent's conversation. */
-  readonly inheritContext: boolean;
+  inheritContext: boolean;
   /** Whether the child runs in the background by default. */
-  readonly runInBackground: boolean;
+  runInBackground: boolean;
   /** Whether the agent may be requested at all. */
-  readonly enabled: boolean;
+  enabled: boolean;
   /** The layer the definition's values came from. */
-  readonly origin: DefinitionOrigin;
-}
+  origin: DefinitionOrigin;
+}>;
 
 /**
  * What one layer contributes to a definition.
@@ -75,18 +75,18 @@ export interface AgentDefinition {
  * `undefined` means the layer says nothing about the field; `null` clears an
  * inherited value. See the module comment for the full vocabulary.
  */
-export interface AgentDefinitionPatch {
-  readonly displayName?: string | null;
-  readonly description?: string | null;
-  readonly instructions?: string | null;
-  readonly tools?: ToolSelection | null;
-  readonly model?: string | null;
-  readonly thinking?: SubagentThinkingLevel | null;
-  readonly maxTurns?: number | null;
-  readonly inheritContext?: boolean | null;
-  readonly runInBackground?: boolean | null;
-  readonly enabled?: boolean | null;
-}
+export type AgentDefinitionPatch = Readonly<{
+  displayName?: string | null;
+  description?: string | null;
+  instructions?: string | null;
+  tools?: ToolSelection | null;
+  model?: string | null;
+  thinking?: SubagentThinkingLevel | null;
+  maxTurns?: number | null;
+  inheritContext?: boolean | null;
+  runInBackground?: boolean | null;
+  enabled?: boolean | null;
+}>;
 
 /** The tool names this package registers for managing subagents. */
 export const SUBAGENT_TOOL_NAMES = [
@@ -217,7 +217,7 @@ function mergedTools(
  */
 export function resolveChildToolNames(
   selection: ToolSelection,
-  parentActiveTools: readonly string[],
+  parentActiveTools: ReadonlyArray<string>,
 ): string[] {
   const names =
     selection.kind === "explicit" ? selection.names : parentActiveTools;
@@ -226,7 +226,7 @@ export function resolveChildToolNames(
 
 /** Whether a tool name is one of this package's subagent-management tools. */
 export function isSubagentTool(name: string): boolean {
-  return (SUBAGENT_TOOL_NAMES as readonly string[]).includes(name);
+  return (SUBAGENT_TOOL_NAMES as ReadonlyArray<string>).includes(name);
 }
 
 /**

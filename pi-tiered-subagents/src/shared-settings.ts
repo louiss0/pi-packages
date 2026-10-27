@@ -45,12 +45,12 @@ import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 export const SETTINGS_EXTENSION_NAME = "pi-tiered-subagents";
 
 /** The scopes the shared store reads and writes. */
-export interface SharedScopes {
+export type SharedScopes = Readonly<{
   /** The operator's global directory — Pi's agent directory. */
-  readonly agentDir: string;
+  agentDir: string;
   /** The project directory — the project's file. */
-  readonly cwd: string;
-}
+  cwd: string;
+}>;
 
 /**
  * Which file of the shared store a setting is read from.
@@ -245,7 +245,7 @@ export function writeJson(id: string, value: unknown, cwd: string): void {
  * read and written, it is just not editable there. The family profiles are
  * data rather than a value a menu can offer, so they are not listed.
  */
-export const SHARED_SETTING_DEFINITIONS: readonly SettingDefinition[] = [
+export const SHARED_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
   {
     id: "maxConcurrent",
     label: "Max concurrent subagents",

@@ -309,7 +309,7 @@ flowchart LR
 ### 5. Models, reasoning, tools, and prompt assembly
 
 - The model-catalog adapter captures exact identities, available candidates, and SDK-reported reasoning capabilities into owned values. Use public model-resolution and reasoning-support APIs. Credentials, mutable registries, and concrete SDK model/session objects remain inside integration implementation.
-- Preserve exact explicit choice and family-ladder selection, updated by ADR 0015: automatic routing stays in the exact parent family/version; unknown families and exhausted or absent same-version targets retain the parent. No version fallback links exist in schema, data, or runtime; old `fallbacks` fields are ignored as unknown fields.
+- Preserve exact explicit choice and family-ladder selection, updated by ADR 0015: automatic routing stays in the exact parent family/version; unknown families and exhausted or absent same-version targets retain the parent. No version fallback links exist in schema, data, or runtime; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
 - Preserve Pi-compatible thinking-level clamping. Translate SDK behavior into owned capability data or a narrow compatibility adapter, with differential/contract verification against public SDK helpers. Do not silently replace clamping with a new independent ranking algorithm to satisfy an import rule.
 - With known parent effort, automatic reasoning takes the next supported non-off rung below it in the chosen model's own level array, skipping gaps and landing on the model floor when no lower rung exists. Retained models use the same rule, with no fixed medium/low preference; at the parent's floor effort stays. Without parent effort, preserve medium/low/lowest-supported-non-off order. Explicit request/definition reasoning wins with Pi-compatible clamping; non-reasoning not-applicable state and explicit-off policy remain unchanged.
 - Materialize the exact accepted identity in the SDK adapter. Later provider or availability failure is an execution failure, not permission to select another model. Do not let SDK implicit default/fallback behavior silently undo this invariant.
@@ -374,11 +374,15 @@ selection.
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Upgrade existing whole
+labels are reported when read, not silently inferred. Version names, tier names,
+provider names, and model ids are trimmed; a name that becomes blank is rejected,
+while an empty tier name remains the version's default model. Unknown profile
+fields are rejected with path-aware diagnostics so a misspelled key cannot be
+silently ignored. The one exception is an obsolete tier-level `fallbacks` field,
+which is accepted and discarded along with its contents. Upgrade existing whole
 replacements by adding these labels. Version/tier/model shape and whole-family
 replacement semantics stay the same; version fallback links are removed from
-the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
-the same unknown-field rule as any other unrecognized field. Examples are representative
+the schema, shipped data, and runtime. Examples are representative
 profile data, not provider-access guarantees.
 
 ### Routing-target ownership
@@ -536,16 +540,16 @@ Modernization is normative where it strengthens these seams. It is not permissio
 | Control-flow narrowing and exhaustive handling | Closed semantic alternatives that consumers must fully handle | New variants cannot silently inherit a default-success path | Exhaustive switch/never check or complete typed dispatch table |
 | `satisfies` | Fixed strategy/profile registries, outcome maps, and typed fixtures where literal inference matters | Validates shape without replacing useful inferred types | Incorrect keys/values fail typecheck |
 | `as const` with `satisfies` where appropriate | Fixed literal vocabularies/tables that genuinely need narrow readonly literal inference | Keeps identifiers/discriminants precise | No assertion used to bypass incompatibility |
-| `readonly` properties and collections | Owned catalogs, captures, plans, public snapshots, UI views | Communicates immutable use and blocks accidental writes | Mutation-isolation tests prove copy behavior too |
+| `readonly` properties and collections | Wholly read-only data records use `Readonly`; read-only collections use `ReadonlyArray`, while `ReadonlyMap`/`ReadonlySet` keep their collection-specific protection | Communicates immutable use and blocks accidental writes without repeating field modifiers | Mutation-isolation and compile-time contract tests prove copy behavior and protected fields |
 | `unknown` plus runtime validation | Frontmatter, persisted records, JSON settings, and other untrusted-shaped data | Static types cannot validate input bytes | Malformed input produces typed diagnostics at entry |
-| Local structural interfaces | ChildSession, model/loader adapters, handler inputs, UI views/actions | Fakes and real adapters cross the same seam without class casts | Production and test adapters typecheck against the contract |
+| Behavioral collaborator interfaces | ChildSession, manager/IO/ports, renderer surfaces, and other collaborators with behavior | Fakes and real adapters cross the same seam without class casts | Production and test adapters typecheck against the contract |
 | `Record`/mapped types and ordinary utility types | Complete maps over finite owned vocabularies and deliberate narrow views | Localizes completeness checks without inventing a type framework | Missing required map members fail typecheck |
 | `noUncheckedIndexedAccess` | Enable for the runtime and internal UI module, staged as needed | Catalog, ladder, array, and queue reads can be absent | Real handling of absence, not added non-null assertions |
 | `exactOptionalPropertyTypes` | Enable throughout the project, staged as needed | Omitted differs from explicitly supplied undefined | Fixtures and builders preserve absent/cleared/empty distinctions |
 | Strict typing and unknown catch values | Retain strict mode and strengthen refactored code | Expected rejection differs from arbitrary thrown values | No broad any/unknown-to-concrete escape in core contracts |
 | Type-only imports and named exports | Refactored modules, except framework-required default exports such as the Pi factory | Makes dependency direction and public names explicit | Lint/typecheck; no new namespace-based extension framework |
 
-- Choose an interface for ordinary object contracts and a type alias for discriminated unions/intersections where appropriate. Allow inference when it remains accurate; do not annotate every local variable.
+- Declare data-only object shapes as type aliases and behavioral collaborator contracts as interfaces. Retain classes and their ownership responsibilities. Use `Readonly` for wholly read-only data records and `ReadonlyArray` for read-only arrays; preserve selective property modifiers, class-field modifiers, `ReadonlyMap`, and `ReadonlySet`. Preserve exact optional-property semantics and custom patch/defined-field utilities, and do not introduce artificial projections solely to eliminate repeated fields. Allow inference when it remains accurate; do not annotate every local variable.
 - Prefer `as const satisfies` to a plain const assertion when checking a fixed table against a contract. Do not force const assertions onto dynamic data or use assertions as validation.
 - Do not solve strictness failures by widening everything to any, adding non-null assertions, or casting through unknown into an SDK class. Any unavoidable SDK compatibility cast must be narrowly contained and justified in the adapter, with an integration check; it cannot leak to caller contracts.
 - Use expected compile failures deliberately in type tests with the appropriate compiler expectation mechanism. Do not add blanket suppression comments or relax UI contracts merely to copy inherited debt.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mergeProfiles, parseProfile } from "#src/models/user-profiles";
+import {
+  mergeProfiles,
+  parseProfile,
+  parseUserProfiles,
+} from "#src/models/user-profiles";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import type { FamilyProfile } from "#src/models/profile";
@@ -128,32 +132,30 @@ describe("parseProfile", () => {
     }
   });
 
-  it("ignores a field the schema does not name", () => {
+  it("rejects a field the schema does not name", () => {
     const parsed = parseProfile("gpt", {
       ...GPT_PROFILE,
       // A matcher would be code to run; it is not read.
       match: "^gpt-.*$",
       parser: "javascript",
     });
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    expect(Object.keys(parsed.profile)).toEqual([
-      "family",
-      "group",
-      "versions",
-    ]);
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("match");
   });
 
   it("refuses a value that is not a profile", () => {
     expect(parseProfile("gpt", "gpt").ok).toBe(false);
     expect(parseProfile("gpt", 42).ok).toBe(false);
+    expect(parseProfile("gpt", []).ok).toBe(false);
+    expect(parseProfile("gpt", null).ok).toBe(false);
   });
 
   it("refuses a profile with no versions", () => {
-    expect(parseProfile("gpt", { group: "size" })).toEqual({
-      ok: false,
-      problem: "a profile needs a versions list",
-    });
+    const parsed = parseProfile("gpt", { group: "size" });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("versions");
   });
 
   it("refuses a tier with no models", () => {
@@ -161,10 +163,213 @@ describe("parseProfile", () => {
       group: "size",
       versions: [{ version: "6.1", tiers: [{ tier: "sol", size: "L" }] }],
     });
-    expect(parsed).toEqual({
-      ok: false,
-      problem: "a tier needs a models list",
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("versions[0].tiers[0].models");
+  });
+
+  it("trims version, tier, provider, and model id without rewriting identity", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [
+        {
+          version: " 6.1 RC ",
+          tiers: [
+            {
+              tier: " So L ",
+              size: "L",
+              models: [{ provider: " Open AI ", id: " GPT 6.1 Sol " }],
+            },
+          ],
+        },
+      ],
     });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.profile.versions[0]?.version).toBe("6.1 RC");
+    expect(parsed.profile.versions[0]?.tiers[0]?.tier).toBe("So L");
+    expect(parsed.profile.versions[0]?.tiers[0]?.models[0]).toEqual({
+      provider: "Open AI",
+      id: "GPT 6.1 Sol",
+    });
+  });
+
+  it("does not accept an explicitly undefined optional label", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              size: undefined,
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("versions[0].tiers[0].size");
+  });
+
+  it("names the label field a group problem belongs to", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              size: "L",
+              class: 42,
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("versions[0].tiers[0].class");
+  });
+
+  it("orders array indexes numerically", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: Array.from({ length: 11 }, (_, index) => ({
+        version: `v${index}`,
+        tiers: [
+          {
+            tier: "sol",
+            models: [{ provider: "openai", id: `gpt-${index}-sol` }],
+          },
+        ],
+      })),
+    });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem.indexOf("versions[2].tiers")).toBeLessThan(
+      parsed.problem.indexOf("versions[10].tiers"),
+    );
+  });
+
+  it("preserves the empty default-tier name", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [
+        {
+          version: "5.5",
+          tiers: [
+            {
+              tier: "   ",
+              size: "M",
+              models: [{ provider: "openai", id: "gpt-5.5" }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.ok && parsed.profile.versions[0]?.tiers[0]?.tier).toBe("");
+  });
+
+  it("rejects identities that become blank after trimming", () => {
+    const profile = (version: string, provider: string, id: string) => ({
+      group: "size",
+      versions: [
+        {
+          version,
+          tiers: [{ tier: "sol", size: "L", models: [{ provider, id }] }],
+        },
+      ],
+    });
+    const cases: ReadonlyArray<readonly [string, string, string]> = [
+      ["   ", "openai", "gpt-6.1-sol"],
+      ["6.1", "   ", "gpt-6.1-sol"],
+      ["6.1", "openai", "   "],
+    ];
+    for (const [version, provider, id] of cases) {
+      const parsed = parseProfile("gpt", profile(version, provider, id));
+      expect(parsed.ok, `${version}/${provider}/${id}`).toBe(false);
+      if (!parsed.ok) expect(parsed.problem).toMatch(/versions|provider|id/);
+    }
+  });
+
+  it("reports a missing group label alongside another structural problem", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [{ version: "   ", tiers: [{ tier: "sol", models: [] }] }],
+    });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.problem).toContain("versions[0].version");
+    expect(parsed.problem).toContain("versions[0].tiers[0].size");
+  });
+
+  it("reports every structural problem with a deterministic field path", () => {
+    const broken = {
+      group: "size",
+      versions: [
+        {
+          version: "   ",
+          tiers: [
+            {
+              tier: "sol",
+              size: "XL",
+              models: [{ provider: "   ", id: "   " }],
+              obsolete: true,
+            },
+          ],
+          extra: true,
+        },
+      ],
+      ignored: true,
+    };
+    const first = parseProfile("gpt", broken);
+    const second = parseProfile("gpt", broken);
+    expect(first.ok).toBe(false);
+    expect(second.ok).toBe(false);
+    if (first.ok || second.ok) return;
+    expect(first.problem).toBe(second.problem);
+    for (const path of [
+      "ignored",
+      "versions[0].extra",
+      "versions[0].tiers[0].obsolete",
+      "versions[0].version",
+      "versions[0].tiers[0].size",
+      "versions[0].tiers[0].models[0].provider",
+      "versions[0].tiers[0].models[0].id",
+    ]) {
+      expect(first.problem, path).toContain(path);
+    }
+  });
+});
+
+describe("parseUserProfiles", () => {
+  it("rejects malformed families independently", () => {
+    const valid = { ...GPT_PROFILE };
+    const broken = {
+      ...GPT_PROFILE,
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              size: "XL",
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = parseUserProfiles({ gpt: valid, claude: broken });
+    expect(parsed.profiles.map((profile) => profile.family)).toEqual(["gpt"]);
+    expect(parsed.problems.join("\n")).toContain("claude");
+    expect(parsed.problems.join("\n")).toContain("versions[0].tiers[0].size");
   });
 });
 
@@ -267,6 +472,43 @@ describe("mergeProfiles", () => {
     );
     expect(profiles.has("llama")).toBe(false);
     expect(problems.join("\n")).toContain("naming structure");
+  });
+
+  it("runs domain checks on normalized identities", () => {
+    const parsed = parseProfile("gpt", {
+      group: "size",
+      versions: [
+        {
+          version: "6.1",
+          tiers: [
+            {
+              tier: "sol",
+              size: "L",
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+        {
+          version: " 6.1 ",
+          tiers: [
+            {
+              tier: "sol",
+              size: "L",
+              models: [{ provider: "openai", id: "gpt-6.1-sol" }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const { problems } = mergeProfiles(
+      SHIPPED_PROFILES as FamilyProfile[],
+      [parsed.profile],
+      [],
+      strategies,
+    );
+    expect(problems.join("\n")).toContain("listed twice");
   });
 
   it("refuses a profile whose models do not follow the naming structure", () => {

@@ -23,8 +23,8 @@ const DASH = "─";
 export function labeledRule(
   width: number,
   paint: (rule: string) => string,
-  left: readonly string[],
-  right: readonly string[] = [],
+  left: ReadonlyArray<string>,
+  right: ReadonlyArray<string> = [],
 ): string {
   for (const leftLabel of left) {
     for (const rightLabel of [...right, undefined]) {

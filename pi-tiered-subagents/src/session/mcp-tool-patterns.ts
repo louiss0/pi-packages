@@ -11,7 +11,7 @@
 
 /** Reject SDK selection syntax left after request-time MCP pattern expansion. */
 export function concreteToolNamesError(
-  toolNames: readonly string[],
+  toolNames: ReadonlyArray<string>,
 ): string | undefined {
   return toolNames.some((name) => name.includes("*") || /^[+-]/.test(name))
     ? "Child capabilities require concrete tool names; unresolved patterns and +/- tool modifiers are not supported."
@@ -19,12 +19,12 @@ export function concreteToolNamesError(
 }
 
 /** An agent's allowlist with its MCP patterns expanded. */
-export interface ExpandedTools {
+export type ExpandedTools = {
   /** Literal entries kept, each pattern replaced by its matches, deduplicated, order preserved. */
   toolNames: string[];
   /** Patterns that matched none of the available tools. */
   unmatchedPatterns: string[];
-}
+};
 
 /**
  * Expand each `mcp__` entry containing `*` into the `available` names it
@@ -32,8 +32,8 @@ export interface ExpandedTools {
  * match. Every other entry is kept as written.
  */
 export function expandMcpToolPatterns(
-  declared: readonly string[],
-  available: readonly string[],
+  declared: ReadonlyArray<string>,
+  available: ReadonlyArray<string>,
 ): ExpandedTools {
   const toolNames = new Set<string>();
   const unmatchedPatterns: string[] = [];

@@ -109,20 +109,20 @@ export type ResumeStart =
 export type ResumeCallOptions = ResumeRunOptions;
 
 /** The exact run a foreground wait observed, even if a resume replaces it. */
-export interface ForegroundRunOutcome {
-  readonly record: Subagent;
-  readonly run: RunOutcome;
-}
+export type ForegroundRunOutcome = Readonly<{
+  record: Subagent;
+  run: RunOutcome;
+}>;
 
 /** A spawn's resolved identity and mode — the invariants every front door shares. */
-interface ResolvedSpawn {
+type ResolvedSpawn = {
   type: SubagentType;
   isBackground: boolean;
   /** The exact definition selected during preparation. */
   definition: AgentDefinition;
   /** The tools the child will get — the basis of its workspace impact. */
   tools: ToolSelection;
-}
+};
 
 /**
  * What a child may change, and where.
@@ -130,26 +130,26 @@ interface ResolvedSpawn {
  * The plan a child's admission follows: the slot it takes when it may change
  * files, and the lever that ends its wait.
  */
-interface WorkspacePlan {
+type WorkspacePlan = Readonly<{
   /** The slot of the workspace the child works in. */
-  readonly gate: WorkspaceGate;
+  gate: WorkspaceGate;
   /** What the child's tools may change. */
-  readonly impact: WorkspaceImpact;
+  impact: WorkspaceImpact;
   /** The child's id — the slot's holder while the child runs. */
-  readonly id: string;
+  id: string;
   /** The lever that cancels a wait for the slot, when the caller named one. */
-  readonly signal?: AbortSignal;
-}
+  signal?: AbortSignal;
+}>;
 
 /**
  * Session-retention windows (minutes). `SettingsManager` satisfies this
  * structurally; a live getter (`getRetentionPolicy`) lets the sweep read the
  * current values without a construction-time settings dependency.
  */
-export interface RetentionPolicy {
-  readonly consumedSessionRetentionMinutes: number;
-  readonly unconsumedSessionRetentionMinutes: number;
-}
+export type RetentionPolicy = Readonly<{
+  consumedSessionRetentionMinutes: number;
+  unconsumedSessionRetentionMinutes: number;
+}>;
 
 const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   consumedSessionRetentionMinutes: 10,
@@ -160,18 +160,18 @@ const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
  * Only what the retention rule reads. Narrower than `Subagent` so the rule
  * stays a plain function over four facts, testable without spawning an agent.
  */
-export interface RetentionCandidate {
+export type RetentionCandidate = {
   consumed: boolean;
   completedAt: number | undefined;
   consumedAt: number | undefined;
   pendingQuestion: string | undefined;
-}
+};
 
 /** When a terminal record's session-release window opened, and how long it runs. */
-export interface RetentionWindow {
+export type RetentionWindow = {
   referenceAt: number;
   windowMinutes: number;
-}
+};
 
 /**
  * Pick the retention window for one terminal record.
@@ -262,7 +262,7 @@ export interface SubagentManagerOptions {
   workspaceGates?: WorkspaceGateRegistry;
 }
 
-export interface AgentSpawnConfig {
+export type AgentSpawnConfig = {
   description: string;
   /** Definition selected and copied by LaunchPreparer; absent only for internal legacy callers. */
   definition?: AgentDefinition;
@@ -273,7 +273,7 @@ export interface AgentSpawnConfig {
    */
   childShaping?: ChildShapingSettings;
   /** Exact capability allowlist captured by shared preparation. */
-  toolNames?: readonly string[];
+  toolNames?: ReadonlyArray<string>;
   /** Exact model choice captured by preparation; materialized at child creation. */
   modelIdentity?: ExactModelIdentity;
   /**
@@ -320,7 +320,7 @@ export interface AgentSpawnConfig {
   observer?: SubagentLifecycleObserver;
   /** Parent session identity - grouped fields that travel together from the tool boundary. */
   parentSession?: ParentSessionInfo;
-}
+};
 
 export class SubagentManager {
   private agents = new Map<string, Subagent>();

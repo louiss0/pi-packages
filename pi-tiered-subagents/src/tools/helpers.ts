@@ -55,7 +55,7 @@ export function buildDetails(
 }
 
 /** Render a spawn's advisories as the prefix a result's leading line follows, or "" when there are none. */
-export function renderSpawnNotes(notes: readonly string[]): string {
+export function renderSpawnNotes(notes: ReadonlyArray<string>): string {
   return notes.length > 0 ? `${notes.join("\n")}\n\n` : "";
 }
 

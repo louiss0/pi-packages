@@ -31,7 +31,7 @@ import {
 } from "#src/shared-settings";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { PromptInheritance } from "#src/types";
-export interface SubagentsSettings {
+export type SubagentsSettings = {
   maxConcurrent?: number;
   /**
    * 0 = unlimited — the extension's single source of truth for that convention:
@@ -83,7 +83,7 @@ export interface SubagentsSettings {
    * carries them, so that saving the settings does not erase them.
    */
   familyProfiles?: Record<string, unknown>;
-}
+};
 
 /**
  * The values a save writes into the project's file.
@@ -95,7 +95,7 @@ export interface SubagentsSettings {
  * hand-edited value must round-trip, and the operator's own value must not
  * be copied into the project's file.
  */
-export interface SettingsSnapshot {
+export type SettingsSnapshot = {
   maxConcurrent: number;
   defaultMaxTurns: number;
   wrapUpTurns: number;
@@ -117,7 +117,7 @@ export interface SettingsSnapshot {
    * `/subagents:settings` edit must not erase them.
    */
   familyProfiles?: Record<string, unknown>;
-}
+};
 
 /** Emit callback — a subset of `pi.events.emit` to keep helpers testable. */
 export type SettingsEmit = (event: string, payload: unknown) => void;
@@ -225,7 +225,7 @@ export class SettingsManager {
 
   // ── excludedExtensionPackages: hand-edited only; no /subagents:settings affordance ──
 
-  get excludedExtensionPackages(): readonly string[] {
+  get excludedExtensionPackages(): ReadonlyArray<string> {
     return this._excludedExtensionPackages;
   }
 
@@ -627,9 +627,9 @@ export function loadSettings(agentDir: string, cwd: string): SubagentsSettings {
 }
 
 /** What one load found: the merged settings, and the project's own layer. */
-export interface LoadedSettings {
+export type LoadedSettings = Readonly<{
   /** The merged settings: the project's values over the operator's. */
-  readonly settings: SubagentsSettings;
+  settings: SubagentsSettings;
   /**
    * The values the project's own file declares.
    *
@@ -637,8 +637,8 @@ export interface LoadedSettings {
    * operator's data into the project's file, where it would outlive a later
    * change to the operator's own settings.
    */
-  readonly projectSettings: SubagentsSettings;
-}
+  projectSettings: SubagentsSettings;
+}>;
 
 /** Read both scopes once, and report what each of them held. */
 export function loadSettingsLayers(

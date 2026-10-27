@@ -118,31 +118,31 @@ export interface SessionNavigatorUI {
 }
 
 /** How `ui.custom` mounts a component: Pi's options, narrowed to what the navigator sets. */
-export interface ViewerMountOptions {
+export type ViewerMountOptions = Readonly<{
   overlay: boolean;
   overlayOptions?: OverlayOptions;
-}
+}>;
 
 /** Parameters for one `/subagents:sessions` invocation. */
-export interface SessionNavigatorParams {
+export type SessionNavigatorParams = {
   ui: SessionNavigatorUI;
-  agents: readonly NavigableSubagent[];
+  agents: ReadonlyArray<NavigableSubagent>;
   registry: AgentDefinitionLookup;
   /** Working directory for tool-call rendering (relative path display). */
   cwd: string;
   /** Reads a persisted session file for the file-snapshot source. */
   readFile: (path: string) => string | Promise<string>;
   /** Validated past-run projections supplied by the runtime. */
-  persisted: readonly PersistedNavigationRun[];
-}
+  persisted: ReadonlyArray<PersistedNavigationRun>;
+};
 
 /** How a scroll move treats following new output; by default it follows when it lands on the bottom. */
-interface ScrollOptions {
+type ScrollOptions = {
   follow?: boolean;
-}
+};
 
 /** Options for the read-only transcript pane. */
-export interface TranscriptPaneOptions {
+export type TranscriptPaneOptions = {
   tui: TUI;
   theme: TranscriptTheme;
   /** Paging and top/bottom follow Pi's viewport bindings (`tui.altScreen.*`). */
@@ -153,7 +153,7 @@ export interface TranscriptPaneOptions {
   done: (result: undefined) => void;
   cwd: string;
   markdownTheme: MarkdownTheme;
-}
+};
 
 /**
  * Handler for the `/subagents:sessions` slash command.

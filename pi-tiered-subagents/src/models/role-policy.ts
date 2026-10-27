@@ -1,10 +1,10 @@
 /** The shipped specialist-to-target policy; unknown identifiers use worker. */
 import type { ModelClass, ModelSize } from "#src/models/profile";
 
-export interface RolePolicy {
-  readonly size: ModelSize | "equal" | "one-below";
-  readonly class: ModelClass;
-}
+export type RolePolicy = Readonly<{
+  size: ModelSize | "equal" | "one-below";
+  class: ModelClass;
+}>;
 
 export const ROLE_POLICY = {
   worker: { size: "one-below", class: "worker" },

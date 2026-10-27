@@ -15,23 +15,23 @@ import type { SubagentStatus } from "#src/lifecycle/subagent";
 import type { SubagentType } from "#src/types";
 
 /** Context the core hands a provider when a child run starts. */
-export interface WorkspacePrepareContext {
+export type WorkspacePrepareContext = {
   agentId: string;
   agentType: SubagentType;
   baseCwd: string;
-}
+};
 
 /** Outcome the core reports to a workspace when the run ends. */
-export interface WorkspaceDisposeOutcome {
+export type WorkspaceDisposeOutcome = {
   status: SubagentStatus;
   description: string;
-}
+};
 
 /** What dispose may hand back for the core to fold into the child result. */
-export interface WorkspaceDisposeResult {
+export type WorkspaceDisposeResult = {
   /** Appended verbatim to the child's result text — the provider owns the wording. */
   resultAddendum?: string;
-}
+};
 
 /** A prepared working directory plus its bracketed teardown. Born complete. */
 export interface Workspace {

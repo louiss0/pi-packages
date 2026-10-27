@@ -63,7 +63,7 @@ export interface AssemblerIO {
  * The assembler never inspects model internals beyond the provider, only
  * passes them through; the launch's model was already resolved by the door.
  */
-export interface AssemblerContext {
+export type AssemblerContext = {
   /** Parent working directory (overridable via options.cwd). */
   cwd: string;
   /** Parent's effective system prompt (for append-mode agents). */
@@ -96,7 +96,7 @@ export interface AssemblerContext {
    * behind another one runs with the tools the parent had when it was asked
    * for — not the ones it has now.
    */
-  activeToolNames: readonly string[];
+  activeToolNames: ReadonlyArray<string>;
   /**
    * The tools the child was given, resolved when the request was made.
    *
@@ -106,14 +106,14 @@ export interface AssemblerContext {
    * it by. A definition edited while the child waited cannot hand it a
    * capability it was never cleared for.
    */
-  toolNames?: readonly string[];
-}
+  toolNames?: ReadonlyArray<string>;
+};
 
 /**
  * Narrow slice of per-spawn execution fields consumed by the assembler.
  * All fields are optional — callers pass only what they have.
  */
-export interface AssemblerOptions {
+export type AssemblerOptions = {
   /** Override working directory (e.g. for worktree isolation). */
   cwd?: string;
   /** Legacy direct model override for internal callers. */
@@ -122,14 +122,14 @@ export interface AssemblerOptions {
   modelIdentity?: ExactModelIdentity;
   /** Explicit thinking level — wins over agentConfig.thinking. */
   thinkingLevel?: ThinkingLevel;
-}
+};
 
 /**
  * Assembled configuration returned to `createSubagentSession()`.
  * Contains everything needed to create the SDK session and filter tools —
  * with no SDK object references.
  */
-export interface SessionConfig {
+export type SessionConfig = {
   /** Resolved working directory (`options.cwd ?? ctx.cwd`). */
   effectiveCwd: string;
   /** Fully-assembled system prompt string (ready for `systemPromptOverride`). */
@@ -143,7 +143,7 @@ export interface SessionConfig {
   model: Model<any> | undefined;
   /** Resolved thinking level (undefined → inherit from session). */
   thinkingLevel: ThinkingLevel | undefined;
-}
+};
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 

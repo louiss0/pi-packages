@@ -29,24 +29,28 @@ import type { AgentStatus } from "./view-types";
 export type SessionMessage = SessionContext["messages"][number];
 
 /** Only the session-event fields the transcript renderer observes. */
-export interface TranscriptEvent {
-  readonly type: string;
-  readonly message?: SessionMessage;
-}
+export type TranscriptEvent = Readonly<{
+  type: string;
+  message?: SessionMessage;
+}>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Label and transcript pointer for a past run; persistence parsing stays in the runtime. */
-export interface PersistedNavigationRun extends LabelFields {
-  readonly id: string;
-  readonly outputFile: string | undefined;
-}
+export type PersistedNavigationRun = Readonly<
+  LabelFields & {
+    id: string;
+    outputFile: string | undefined;
+  }
+>;
 
 /** A UI projection, never a live child session or runtime record. */
-export interface NavigableSubagent extends PersistedNavigationRun {
-  /** Narrow reader supplied by the runtime while a live session is retained. */
-  readonly transcript: TranscriptSource | undefined;
-}
+export type NavigableSubagent = Readonly<
+  PersistedNavigationRun & {
+    /** Narrow reader supplied by the runtime while a live session is retained. */
+    transcript: TranscriptSource | undefined;
+  }
+>;
 
 /**
  * A navigable entry plus the label shown in the picker.
@@ -70,37 +74,37 @@ export type NavigationEntry =
     };
 
 /** Who produced a transcript, for the pane's header. Fixed for the life of the entry. */
-export interface EntryHeading {
-  readonly name: string;
-  readonly description: string;
-}
+export type EntryHeading = Readonly<{
+  name: string;
+  description: string;
+}>;
 
 /** The fields `buildLabel` reads — shared by the live and snapshot (released-session) label paths. */
-interface LabelFields {
-  readonly type: string;
-  readonly description: string;
-  readonly status: AgentStatus;
-  readonly startedAt: number;
-  readonly completedAt: number | undefined;
-  readonly toolUses: number;
-}
+type LabelFields = Readonly<{
+  type: string;
+  description: string;
+  status: AgentStatus;
+  startedAt: number;
+  completedAt: number | undefined;
+  toolUses: number;
+}>;
 
 /** The model and thinking level a transcript's session runs at. */
-export interface SessionModel {
-  readonly model: ModelIdentity | undefined;
-  readonly thinkingLevel: string | undefined;
-}
+export type SessionModel = Readonly<{
+  model: ModelIdentity | undefined;
+  thinkingLevel: string | undefined;
+}>;
 
 /** Running-agent streaming state, surfaced by a live source. */
-export interface StreamingState {
-  readonly activeTools: ReadonlyMap<string, string>;
-  readonly responseText: string;
-}
+export type StreamingState = Readonly<{
+  activeTools: ReadonlyMap<string, string>;
+  responseText: string;
+}>;
 
 /** Liveness-agnostic transcript source consumed by the renderer. */
 export interface TranscriptSource {
   /** Current message history. */
-  getMessages(): readonly SessionMessage[];
+  getMessages(): ReadonlyArray<SessionMessage>;
   /**
    * Subscribe to changes; returns an unsubscribe, or undefined for a static
    * snapshot. The session event is forwarded so a consumer can route on it —
@@ -129,9 +133,9 @@ export interface TranscriptSource {
  * record wins for any run it still holds.
  */
 export function listNavigableAgents(
-  agents: readonly NavigableSubagent[],
+  agents: ReadonlyArray<NavigableSubagent>,
   registry: AgentDefinitionLookup,
-  persisted: readonly PersistedNavigationRun[],
+  persisted: ReadonlyArray<PersistedNavigationRun>,
 ): NavigationEntry[] {
   const live: NavigationEntry[] = [];
   const snapshots: NavigationEntry[] = [];

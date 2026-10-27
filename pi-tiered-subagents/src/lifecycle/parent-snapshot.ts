@@ -22,12 +22,12 @@ import type { SessionContext } from "#src/types";
  * the `<sub_agent_context>` block. `selectedTools` and `toolSnippets` are
  * excluded because the tool surface is node-local prose.
  */
-export interface ParentPromptOptions {
+export type ParentPromptOptions = {
   /** Custom system prompt (`--system-prompt`), when the parent runs one. */
   customPrompt?: string;
   /** Appended system prompt text (`--append-system-prompt`). */
   appendSystemPrompt?: string;
-}
+};
 
 /**
  * Plain data snapshot of the parent session state captured at spawn time.
@@ -37,7 +37,7 @@ export interface ParentPromptOptions {
  * collaborators stay at the child-session creation boundary rather than
  * travelling with accepted or queued work.
  */
-export interface ParentSnapshot {
+export type ParentSnapshot = {
   /** Parent working directory. */
   cwd: string;
   /** Parent's effective system prompt (for append-mode agents). */
@@ -60,13 +60,13 @@ export interface ParentSnapshot {
    * for a concurrency slot runs with the parent's selection as it was when
    * the child was asked for — not as it is when the slot opens.
    */
-  activeToolNames: readonly string[];
+  activeToolNames: ReadonlyArray<string>;
   /**
    * Every tool name registered in the parent when the request was made.
    * MCP wildcard declarations expand against this copy before acceptance, so
    * a server connecting later cannot widen queued work.
    */
-  registeredToolNames: readonly string[];
+  registeredToolNames: ReadonlyArray<string>;
   /** Pre-built parent conversation text (when inheritContext was requested). */
   parentContext?: string;
   /**
@@ -78,7 +78,7 @@ export interface ParentSnapshot {
    * such parts.
    */
   portablePrompt?: string;
-}
+};
 
 /**
  * Build an immutable snapshot of the parent session state.
@@ -90,8 +90,8 @@ export function buildParentSnapshot(
   ctx: SessionContext,
   inheritContext?: boolean,
   promptOptions?: ParentPromptOptions,
-  activeToolNames: readonly string[] = [],
-  registeredToolNames: readonly string[] = [],
+  activeToolNames: ReadonlyArray<string> = [],
+  registeredToolNames: ReadonlyArray<string> = [],
 ): ParentSnapshot {
   const parentContext = inheritContext ? buildParentContext(ctx) : undefined;
   return {

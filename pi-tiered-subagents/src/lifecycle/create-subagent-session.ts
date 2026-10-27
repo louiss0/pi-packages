@@ -91,7 +91,7 @@ export interface SessionManagerLike {
 }
 
 /** Options passed to EnvironmentIO/SessionFactoryIO methods. */
-export interface ResourceLoaderOptions {
+export type ResourceLoaderOptions = {
   cwd: string;
   agentDir: string;
   /** Settings the loader resolves packages from; defaults to the ambient ones when absent. */
@@ -104,10 +104,10 @@ export interface ResourceLoaderOptions {
   appendSystemPromptOverride?: (base: string[]) => string[];
   /** Extensions supplied as code; `builtin` entries are Pi's built-ins, resolved as `builtin:<name>`. */
   extensionFactories?: InlineExtension[];
-}
+};
 
 /** Options passed to SessionFactoryIO.createSession. */
-export interface CreateSessionOptions {
+export type CreateSessionOptions = {
   cwd: string;
   agentDir: string;
   sessionManager: SessionManagerLike;
@@ -126,7 +126,7 @@ export interface CreateSessionOptions {
   excludeTools?: string[];
   resourceLoader: ResourceLoaderLike;
   thinkingLevel?: ThinkingLevel;
-}
+};
 
 /**
  * Environment discovery - detect runtime context and resolve directories.
@@ -160,7 +160,7 @@ export interface SessionFactoryIO {
    */
   createLoaderSettingsManager: (
     parent: SettingsManager,
-    excludedExtensionPackages?: readonly string[],
+    excludedExtensionPackages?: ReadonlyArray<string>,
   ) => SettingsManager;
   createSession: (
     opts: CreateSessionOptions,
@@ -203,7 +203,7 @@ export interface SubagentSessionDeps {
 }
 
 /** Per-spawn parameters — the fields that vary per child session. */
-export interface CreateSubagentSessionParams {
+export type CreateSubagentSessionParams = {
   snapshot: ParentSnapshot;
   type: SubagentType;
   /** Resolved workspace cwd; undefined → parent cwd. */
@@ -239,8 +239,8 @@ export interface CreateSubagentSessionParams {
    * exactly the tools the runtime classified it by. Absent, the assembler
    * resolves the definition's selection itself.
    */
-  toolNames?: readonly string[];
-}
+  toolNames?: ReadonlyArray<string>;
+};
 
 /**
  * The package-owned child-session contract: the execution substitution point
@@ -277,9 +277,9 @@ export interface ChildSession {
   /** Session token statistics. */
   getSessionStats(): SessionStatsLike;
   /** The session's message history. */
-  readonly messages: readonly unknown[];
+  readonly messages: ReadonlyArray<unknown>;
   /** The message history, typed for Pi's session-rendering machinery. */
-  readonly agentMessages: readonly SessionMessage[];
+  readonly agentMessages: ReadonlyArray<SessionMessage>;
   /** Resolve a registered tool definition by name. */
   getToolDefinition(name: string): ToolDefinition | undefined;
   /**

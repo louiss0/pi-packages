@@ -21,7 +21,7 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 
 /** Renders pre-themed lines one-to-one onto terminal rows, clipped to the viewport. */
 export class BoundedLines implements Component {
-  constructor(private readonly lines: readonly string[]) {}
+  constructor(private readonly lines: ReadonlyArray<string>) {}
 
   render(width: number): string[] {
     return this.lines.map((line) => truncateToWidth(firstLineOf(line), width));

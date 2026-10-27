@@ -54,52 +54,52 @@ import { debugLog } from "#src/debug";
 import { defined } from "#src/optional";
 
 /** One definition file, as read from disk. */
-export interface LoadedDefinition {
+export type LoadedDefinition = Readonly<{
   /** The normalized identifier — the file's name, lowercased. */
-  readonly id: string;
+  id: string;
   /** What the file contributes. */
-  readonly patch: AgentDefinitionPatch;
+  patch: AgentDefinitionPatch;
   /** Where the file was read from, for error messages. */
-  readonly path: string;
-}
+  path: string;
+}>;
 
 /** One file's name and content, as the collector sees it. */
-export interface DefinitionFile {
+export type DefinitionFile = Readonly<{
   /** The file's name, with its extension. */
-  readonly name: string;
+  name: string;
   /** The file's content. */
-  readonly content: string;
+  content: string;
   /** Where the file was read from, for error messages. */
-  readonly path: string;
-}
+  path: string;
+}>;
 
 /** The definitions one scope holds, and what went wrong while reading them. */
-export interface LoadedScope {
+export type LoadedScope = Readonly<{
   /** Scope contents are unknown, so no lower-layer fallback is safe. */
-  readonly scopeError?: string;
+  scopeError?: string;
   /** Identifier-specific failures that must not fall back to a lower layer. */
-  readonly invalidDefinitions?: Readonly<Record<string, readonly string[]>>;
+  invalidDefinitions?: Readonly<Record<string, ReadonlyArray<string>>>;
   /** The definitions, in file-name order. */
-  readonly definitions: readonly LoadedDefinition[];
+  definitions: ReadonlyArray<LoadedDefinition>;
   /** Human-readable problems: a duplicate identifier, an unreadable file. */
-  readonly errors: readonly string[];
-}
+  errors: ReadonlyArray<string>;
+}>;
 
 /** The two file scopes a registry merges. Both are always read. */
-export interface LoadedScopes {
+export type LoadedScopes = Readonly<{
   /** The operator's global definitions. */
-  readonly global: LoadedScope;
+  global: LoadedScope;
   /** The project's definitions. */
-  readonly project: LoadedScope;
-}
+  project: LoadedScope;
+}>;
 
 /** Where the two file scopes are read from. */
-export interface DefinitionSources {
+export type DefinitionSources = Readonly<{
   /** Pi's agent directory; the global definitions live in `<agentDir>/agents`. */
-  readonly globalDir: string;
+  globalDir: string;
   /** The project root; the project definitions live in `<cwd>/.pi/agents`. */
-  readonly cwd: string;
-}
+  cwd: string;
+}>;
 
 /** Read both file scopes through the legacy synchronous registry path. */
 export function loadDefinitionScopes(sources: DefinitionSources): LoadedScopes {
@@ -278,7 +278,7 @@ function isMissingPathError(error: unknown): boolean {
  * the answer depend on which file the filesystem listed first.
  */
 export function collectDefinitions(
-  files: readonly DefinitionFile[],
+  files: ReadonlyArray<DefinitionFile>,
 ): LoadedScope {
   const definitions: LoadedDefinition[] = [];
   const errors: string[] = [];
@@ -343,7 +343,7 @@ type ParsedDefinitionFile =
   | {
       readonly ok: true;
       readonly patch: AgentDefinitionPatch;
-      readonly problems: readonly string[];
+      readonly problems: ReadonlyArray<string>;
     }
   | { readonly ok: false; readonly error: string };
 

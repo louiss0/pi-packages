@@ -96,17 +96,14 @@ describe("the tool door", () => {
       deps.subagents,
       deps.settings,
       deps.registry,
-      deps.agentDir,
     );
-    const outcome = await tool
-      .toToolDefinition()
-      .execute(
-        "tool-call-1",
-        { prompt: "do it", description: "d", subagent_type: "no-such-agent" },
-        undefined,
-        undefined,
-        {} as never,
-      );
+    const outcome = await tool.execute(
+      "tool-call-1",
+      { prompt: "do it", description: "d", subagent_type: "no-such-agent" },
+      undefined,
+      undefined,
+      {} as never,
+    );
     expect(JSON.stringify(outcome)).toContain("Unknown agent type");
   });
 
@@ -119,17 +116,14 @@ describe("the tool door", () => {
       deps.subagents,
       deps.settings,
       deps.registry,
-      deps.agentDir,
     );
-    const outcome = await tool
-      .toToolDefinition()
-      .execute(
-        "tool-call-1",
-        { prompt: "do it", description: "d", subagent_type: "worker" },
-        undefined,
-        undefined,
-        {} as never,
-      );
+    const outcome = await tool.execute(
+      "tool-call-1",
+      { prompt: "do it", description: "d", subagent_type: "worker" },
+      undefined,
+      undefined,
+      {} as never,
+    );
     expect(JSON.stringify(outcome)).toContain("is disabled");
   });
 });

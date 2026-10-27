@@ -2,8 +2,6 @@ import type {
   AgentToolResult,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { defineTool } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { defined } from "#src/optional";
 import type { AgentRegistry } from "#src/agents/registry";
 import type { TurnSettings } from "#src/agents/resolver";
@@ -23,22 +21,15 @@ import {
   spawnBackground,
 } from "#src/tools/background-spawner";
 import { runForeground } from "#src/tools/foreground-runner";
-import {
-  buildAgentGuidelines,
-  buildDetails,
-  buildTypeListText,
-  textResult,
-} from "#src/tools/helpers";
+import { buildDetails, textResult } from "#src/tools/helpers";
 import { startProgressStream } from "#src/tools/progress-stream";
 import {
   type SubagentToolOutput,
-  subagentOutputSchema,
   withStructured,
 } from "#src/tools/structured-output";
-import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
 import type { SpawnPresentation } from "#src/tools/spawn-config";
 import type { Subagent } from "#src/types";
-import { type AgentDetails, getDisplayName } from "#src/ui/display";
+import type { AgentDetails } from "#src/ui/display";
 
 // ---- Deps interfaces ----
 
@@ -60,21 +51,12 @@ export type AgentToolSettings = TurnSettings & {
 // ---- Class ----
 
 export class AgentTool {
-  private readonly typeListText: string;
-  private readonly availableTypesText: string;
-  private readonly agentGuidelines: string[];
-
   constructor(
     private readonly manager: AgentToolManager,
     private readonly subagents: Subagents,
     private readonly settings: AgentToolSettings,
     private readonly registry: AgentRegistry,
-    private readonly agentDir: string,
-  ) {
-    this.typeListText = buildTypeListText(registry, agentDir);
-    this.availableTypesText = registry.enabledIds().join(", ");
-    this.agentGuidelines = buildAgentGuidelines(registry);
-  }
+  ) {}
 
   async execute(
     toolCallId: string,
@@ -298,103 +280,6 @@ export class AgentTool {
       ),
       output,
     );
-  }
-
-  toToolDefinition() {
-    const typeListText = this.typeListText;
-    const availableTypesText = this.availableTypesText;
-    const agentDir = this.agentDir;
-    const registry = this.registry;
-
-    const guidelines = [
-      "- For parallel work, use run_in_background: true on each agent. Foreground calls run sequentially — only one executes at a time.",
-      ...this.agentGuidelines,
-      "- Provide clear, detailed prompts so the agent can work autonomously.",
-      "- Subagent results are returned as text — summarize them for the user.",
-      "- Use run_in_background for work you don't need immediately. You will be notified when it completes.",
-      "- Use resume with an agent ID to continue a previous agent's work, or to answer an agent that ended its turn with a question.",
-      "- Use steer_subagent to send mid-run messages to a running background agent.",
-      '- Use model to specify a different model, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5").',
-      "- Use thinking to control extended thinking level.",
-      "- Use inherit_context if the agent needs the parent conversation history.",
-    ].join("\n");
-
-    return defineTool({
-      name: "subagent" as const,
-      label: "Subagent",
-      promptSnippet:
-        "Launch a specialized agent for complex, multi-step tasks.",
-      description: `Launch a new agent to handle complex, multi-step tasks autonomously.
-
-The subagent tool launches specialized agents that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
-
-Available agent types:
-${typeListText}
-
-Guidelines:
-${guidelines}
-`,
-      parameters: Type.Object({
-        prompt: Type.String({
-          description: "The task for the agent to perform.",
-        }),
-        description: Type.String({
-          description:
-            "A short (3-5 word) description of the task (shown in UI).",
-        }),
-        subagent_type: Type.String({
-          description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) are also available. An unknown or disabled type is rejected, not replaced.`,
-        }),
-        model: Type.Optional(
-          Type.String({
-            description:
-              'Optional model override, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5"). Omit to use the agent definition\'s own model, or the one this call inherits.',
-          }),
-        ),
-        thinking: Type.Optional(
-          Type.String({
-            description:
-              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level. A level the chosen model does not support is clamped to one it does, and the result says so.",
-          }),
-        ),
-        max_turns: Type.Optional(
-          Type.Number({
-            description:
-              "Maximum number of agentic turns before stopping. Omit to use the agent's own limit, or unlimited when it declares none.",
-            minimum: 1,
-          }),
-        ),
-        run_in_background: Type.Optional(
-          Type.Boolean({
-            description:
-              "Set to true to run in background. Returns agent ID immediately. You will be notified when it completes. Omit to use the agent's own default.",
-          }),
-        ),
-        resume: Type.Optional(
-          Type.String({
-            description:
-              "Optional agent ID to resume from. Continues from previous context. Combine with run_in_background: true to resume without waiting.",
-          }),
-        ),
-        inherit_context: Type.Optional(
-          Type.Boolean({
-            description:
-              "If true, fork parent conversation into the agent. Omit to use the agent's own default, which is fresh context unless it declares otherwise.",
-          }),
-        ),
-      }),
-      outputSchema: subagentOutputSchema,
-
-      ...createAgentToolRenderer((type) => getDisplayName(type, registry)),
-
-      execute: (
-        toolCallId: string,
-        params: Record<string, unknown>,
-        signal: AbortSignal | undefined,
-        onUpdate: ((update: AgentToolResult<AgentDetails>) => void) | undefined,
-        ctx: ExtensionContext,
-      ) => this.execute(toolCallId, params, signal, onUpdate, ctx),
-    });
   }
 }
 

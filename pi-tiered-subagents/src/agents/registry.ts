@@ -52,7 +52,7 @@ export interface AgentDefinitionLookup {
   /** The definition for an identifier, or undefined when there is none. */
   find(id: string): AgentDefinition | undefined;
   /** Every definition, in identifier order. */
-  list(): readonly AgentDefinition[];
+  list(): ReadonlyArray<AgentDefinition>;
 }
 
 /**
@@ -106,7 +106,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
   }
 
   /** Every definition, in identifier order. */
-  list(): readonly AgentDefinition[] {
+  list(): ReadonlyArray<AgentDefinition> {
     return [...this.definitions.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     );
@@ -140,7 +140,7 @@ export class AgentRegistry implements AgentDefinitionLookup {
   }
 
   /** The problems found while reading the file layers, if any. */
-  errors(): readonly string[] {
+  errors(): ReadonlyArray<string> {
     return this.loadErrors;
   }
 }
@@ -161,7 +161,7 @@ class Catalog implements AgentDefinitionLookup {
   constructor(private readonly definitions: Map<string, AgentDefinition>) {}
 
   /** Every definition, in identifier order. */
-  list(): readonly AgentDefinition[] {
+  list(): ReadonlyArray<AgentDefinition> {
     return [...this.definitions.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     );

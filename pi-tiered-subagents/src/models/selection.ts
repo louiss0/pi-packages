@@ -25,33 +25,33 @@ import {
 import { type RoutingContext, routeModel } from "#src/models/router";
 
 /** What the launch asked for, and what the definition asked for. */
-export interface ModelSelectionRequest {
+export type ModelSelectionRequest = Readonly<{
   /** The resolved definition's identifier; omitted callers use worker behavior. */
-  readonly agentId?: string;
+  agentId?: string;
   /** The model the request names, if any. */
-  readonly requestedModel?: string;
+  requestedModel?: string;
   /** The model the definition names, if any. */
-  readonly definitionModel?: string;
+  definitionModel?: string;
   /** The parent's model, which automatic routing steps down from. */
-  readonly parentModel?: Model<any>;
-}
+  parentModel?: Model<any>;
+}>;
 
 /** Where the winning model came from. */
 export type ModelSource = "request" | "definition" | "routed" | "inherited";
 
 /** The resolved model, and the facts about how it was chosen. */
-export interface ModelSelection {
+export type ModelSelection = Readonly<{
   /** The exact model the child runs on, captured as owned data. */
-  readonly identity?: ExactModelIdentity;
+  identity?: ExactModelIdentity;
   /** Where the choice came from. */
-  readonly source: ModelSource;
+  source: ModelSource;
   /** The provider that serves the model, when there is one. */
-  readonly provider?: string;
+  provider?: string;
   /** The model's id, when there is one. */
-  readonly modelId?: string;
+  modelId?: string;
   /** A sentence for the launch note. */
-  readonly reason: string;
-}
+  reason: string;
+}>;
 
 /** The outcome of the selection: a model, or the reason there is none. */
 export type ModelSelectionResult =

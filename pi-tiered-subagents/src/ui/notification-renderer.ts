@@ -7,28 +7,28 @@ import { GLYPHS } from "./glyphs.js";
 import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
 /** The completion facts this renderer reads; structurally supplied by the runtime. */
-export interface NotificationDetails {
-  readonly description: string;
-  readonly status: AgentStatus;
-  readonly toolUses: number;
-  readonly totalTokens: number;
-  readonly durationMs: number;
-  readonly outputFile?: string;
-  readonly resultPreview: string;
-  readonly turnBudget?: TurnBudget;
-}
+export type NotificationDetails = Readonly<{
+  description: string;
+  status: AgentStatus;
+  toolUses: number;
+  totalTokens: number;
+  durationMs: number;
+  outputFile?: string;
+  resultPreview: string;
+  turnBudget?: TurnBudget;
+}>;
 
 /** A still-running child's message, independent of runtime notification delivery. */
-export interface UpdateDetails {
-  readonly description: string;
-  readonly message: string;
-}
+export type UpdateDetails = Readonly<{
+  description: string;
+  message: string;
+}>;
 
 /** What a workspace teardown left behind, not a new outcome. */
-export interface WorkspaceNoticeDetails {
-  readonly description: string;
-  readonly notice: string;
-}
+export type WorkspaceNoticeDetails = Readonly<{
+  description: string;
+  notice: string;
+}>;
 
 /** Narrow theme interface — only the methods the renderer actually calls. */
 interface RendererTheme {
@@ -37,33 +37,33 @@ interface RendererTheme {
 }
 
 /** Narrow message interface — only the fields the renderer reads. */
-interface RendererMessage {
-  readonly details?: NotificationDetails;
-}
+type RendererMessage = Readonly<{
+  details?: NotificationDetails;
+}>;
 
 /** Narrow message interface for the update renderer. */
-interface UpdateMessage {
-  readonly details?: UpdateDetails;
-}
+type UpdateMessage = Readonly<{
+  details?: UpdateDetails;
+}>;
 
 /** Narrow message interface for the workspace-notice renderer. */
-interface WorkspaceNoticeMessage {
-  readonly details?: WorkspaceNoticeDetails;
-}
+type WorkspaceNoticeMessage = Readonly<{
+  details?: WorkspaceNoticeDetails;
+}>;
 
 /** Narrow render options — only the fields the renderer reads. */
-interface RenderOptions {
-  readonly expanded: boolean;
-}
+type RenderOptions = Readonly<{
+  expanded: boolean;
+}>;
 
 // ---- Pure helpers (exported for unit testing) ----
 
 /** Resolved status→presentation product: icon glyph/style and status label. */
-export interface StatusPresentation {
-  readonly iconGlyph: string;
-  readonly iconStyle: ThemeColor;
-  readonly statusText: string;
-}
+export type StatusPresentation = Readonly<{
+  iconGlyph: string;
+  iconStyle: ThemeColor;
+  statusText: string;
+}>;
 
 /** Decide the icon and status label for a notification's status, once. */
 export function resolveStatusPresentation(

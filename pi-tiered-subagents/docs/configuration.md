@@ -57,11 +57,15 @@ selection.
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
 planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Upgrade existing whole
+labels are reported when read, not silently inferred. Version names, tier names,
+provider names, and model ids are trimmed; a name that becomes blank is rejected,
+while an empty tier name remains the version's default model. Unknown profile
+fields are rejected with path-aware diagnostics so a misspelled key cannot be
+silently ignored. The one exception is an obsolete tier-level `fallbacks` field,
+which is accepted and discarded along with its contents. Upgrade existing whole
 replacements by adding these labels. Version/tier/model shape and whole-family
 replacement semantics stay the same; version fallback links are removed from
-the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
-the same unknown-field rule as any other unrecognized field. Examples are representative
+the schema, shipped data, and runtime. Examples are representative
 profile data, not provider-access guarantees.
 
 Set `familyProfiles` through the existing shared settings store. Its value is

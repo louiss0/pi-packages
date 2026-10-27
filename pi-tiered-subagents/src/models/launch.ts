@@ -22,42 +22,42 @@ import { type ModelSelection, selectModel } from "#src/models/selection";
 import { type ThinkingDecision, resolveThinking } from "#src/thinking/resolve";
 
 /** The session facts the resolver reads. */
-export interface LaunchModelContext {
+export type LaunchModelContext = Readonly<{
   /** The session's model resolution, when there is one. */
-  readonly registry: ModelRegistry | undefined;
+  registry: ModelRegistry | undefined;
   /** The routing ladders. */
-  readonly ladders: RoutingLadders;
+  ladders: RoutingLadders;
   /** The parent's model, which the automatic routing steps down from. */
-  readonly parentModel?: Model<any>;
+  parentModel?: Model<any>;
   /** The effort the parent is running at. */
-  readonly parentThinkingLevel?: SubagentThinkingLevel;
-}
+  parentThinkingLevel?: SubagentThinkingLevel;
+}>;
 
 /** What the request and the definition asked for. */
-export interface LaunchModelRequest {
+export type LaunchModelRequest = Readonly<{
   /** The resolved definition's identifier. */
-  readonly agentId?: string;
+  agentId?: string;
   /** The model the request named, when it named one. */
-  readonly requestedModel?: string;
+  requestedModel?: string;
   /** The model the definition named, when it named one. */
-  readonly definitionModel?: string;
+  definitionModel?: string;
   /** The level the request named, when it named one. */
-  readonly requestedThinking?: SubagentThinkingLevel;
+  requestedThinking?: SubagentThinkingLevel;
   /** The level the definition named, when it named one. */
-  readonly definitionThinking?: SubagentThinkingLevel;
-}
+  definitionThinking?: SubagentThinkingLevel;
+}>;
 
 /** The resolved model and level. */
-export interface ResolvedLaunchModel {
+export type ResolvedLaunchModel = Readonly<{
   /** The exact model the child runs on, captured as owned data. */
-  readonly modelIdentity?: ExactModelIdentity;
+  modelIdentity?: ExactModelIdentity;
   /** How the model was chosen, and why. */
-  readonly modelSelection: ModelSelection;
+  modelSelection: ModelSelection;
   /** The level the child reasons at, when it reasons at all. */
-  readonly thinking?: SubagentThinkingLevel;
+  thinking?: SubagentThinkingLevel;
   /** What was decided about the level. */
-  readonly thinkingDecision: ThinkingDecision;
-}
+  thinkingDecision: ThinkingDecision;
+}>;
 
 /** The outcome: the resolved model, or the reason there is none. */
 export type LaunchModelResult =

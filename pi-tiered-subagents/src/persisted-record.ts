@@ -6,30 +6,75 @@
  * the extension; a `/resume` reopens the file). This module owns the entry's
  * shape on both sides: the writer (`SubagentEventsObserver`) builds it here,
  * and readers parse it here.
+ *
+ * The payload is validated completely before it is accepted: a malformed field
+ * that summary-only parsing used to ignore makes the entry unusable, while the
+ * rest of the history still loads. Pi's session-entry envelope is deliberately
+ * not strict — only the payload this package wrote is.
  */
 
-import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
-import type { SubagentType } from "#src/types";
+import * as v from "valibot";
+import { SUBAGENT_STATUSES } from "#src/lifecycle/subagent-state";
+import { TURN_BUDGET_PHASES } from "#src/lifecycle/turn-limits";
 
 /** The `customType` every persisted run record is appended under. */
 export const SUBAGENT_RECORD_ENTRY = "subagents:record";
 
+/** The budget shape the writer persists; reuses the runtime phase vocabulary. */
+const turnBudgetSchema = v.strictObject({
+  maxTurns: v.optional(
+    v.pipe(v.number(), v.integer(), v.safeInteger(), v.minValue(1)),
+  ),
+  used: v.pipe(v.number(), v.integer(), v.safeInteger(), v.minValue(0)),
+  phase: v.picklist(TURN_BUDGET_PHASES),
+});
+
+const timestampSchema = v.pipe(v.number(), v.finite());
+
+/** The complete persisted run payload: every known field, no unknown ones. */
+const persistedPayloadSchema = v.pipe(
+  v.strictObject({
+    id: v.string(),
+    type: v.string(),
+    description: v.string(),
+    status: v.picklist(SUBAGENT_STATUSES),
+    result: v.optional(v.string()),
+    error: v.optional(v.string()),
+    turnBudget: v.optional(turnBudgetSchema),
+    startedAt: timestampSchema,
+    completedAt: v.optional(timestampSchema),
+    /** The run's session JSONL, which a reader can open after the live session is gone. */
+    outputFile: v.optional(v.string()),
+    toolUses: v.pipe(v.number(), v.integer(), v.safeInteger(), v.minValue(0)),
+  }),
+  v.check(
+    (record) =>
+      record.completedAt === undefined ||
+      record.completedAt >= record.startedAt,
+    "a completion time cannot be earlier than its start time",
+  ),
+);
+
+type PersistedPayload = v.InferOutput<typeof persistedPayloadSchema>;
+
+/**
+ * Make serialization-optional keys required in memory.
+ *
+ * JSON omits an `undefined` value, so a payload that round-trips through the
+ * session file may omit these keys. The writer's record keeps them present as
+ * `undefined`, which is the contract the observer and its consumers use.
+ */
+type RequiredUndefined<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]-?: T[P] | undefined;
+};
+
 /** What is appended for each terminal run. */
-export interface PersistedSubagentRecord {
-  readonly id: string;
-  readonly type: SubagentType;
-  readonly description: string;
-  readonly status: SubagentStatus;
-  readonly result: string | undefined;
-  readonly error: string | undefined;
-  readonly turnBudget: TurnBudget | undefined;
-  readonly startedAt: number;
-  readonly completedAt: number | undefined;
-  /** The run's session JSONL, which a reader can open after the live session is gone. */
-  readonly outputFile: string | undefined;
-  readonly toolUses: number;
-}
+export type PersistedSubagentRecord = Readonly<
+  RequiredUndefined<
+    PersistedPayload,
+    "result" | "error" | "turnBudget" | "completedAt" | "outputFile"
+  >
+>;
 
 /** The fields a reader validates and returns: what labels a past run and opens its transcript. */
 export type PersistedRunSummary = Pick<
@@ -45,11 +90,11 @@ export type PersistedRunSummary = Pick<
 >;
 
 /** The session-entry fields the reader inspects; Pi's `SessionEntry` satisfies it. */
-export interface SessionEntryLike {
-  readonly type: string;
-  readonly customType?: string;
-  readonly data?: unknown;
-}
+export type SessionEntryLike = Readonly<{
+  type: string;
+  customType?: string;
+  data?: unknown;
+}>;
 
 /**
  * Build the entry for one terminal run. A `Subagent` satisfies the parameter
@@ -77,11 +122,11 @@ export function toPersistedRecord(
  * Read every persisted run out of a session's entries, newest first.
  *
  * A resumed run appends a second entry under the same id, so the last one wins.
- * Entries that do not validate are skipped, including those written before the
- * entry recorded `toolUses`.
+ * Entries that do not validate are skipped independently, including those
+ * written before the entry recorded `toolUses`.
  */
 export function readPersistedRuns(
-  entries: readonly SessionEntryLike[],
+  entries: ReadonlyArray<SessionEntryLike>,
 ): PersistedRunSummary[] {
   const runs = new Map<string, PersistedRunSummary>();
   for (const entry of entries) {
@@ -93,49 +138,18 @@ export function readPersistedRuns(
   return [...runs.values()].sort((a, b) => b.startedAt - a.startedAt);
 }
 
-const SUBAGENT_STATUSES: ReadonlySet<string> = new Set<SubagentStatus>([
-  "queued",
-  "running",
-  "completed",
-  "aborted",
-  "stopped",
-  "error",
-]);
-
 function asRunSummary(data: unknown): PersistedRunSummary | undefined {
-  if (typeof data !== "object" || data === null) return undefined;
-  const {
-    id,
-    type,
-    description,
-    status,
-    startedAt,
-    completedAt,
-    toolUses,
-    outputFile,
-  } = data as Record<string, unknown>;
-  if (
-    typeof id !== "string" ||
-    typeof type !== "string" ||
-    typeof description !== "string"
-  )
-    return undefined;
-  if (typeof status !== "string" || !SUBAGENT_STATUSES.has(status))
-    return undefined;
-  if (typeof startedAt !== "number" || typeof toolUses !== "number")
-    return undefined;
-  if (completedAt !== undefined && typeof completedAt !== "number")
-    return undefined;
-  if (outputFile !== undefined && typeof outputFile !== "string")
-    return undefined;
+  const parsed = v.safeParse(persistedPayloadSchema, data);
+  if (!parsed.success) return undefined;
+  const record = parsed.output;
   return {
-    id,
-    type,
-    description,
-    status: status as SubagentStatus,
-    startedAt,
-    completedAt,
-    toolUses,
-    outputFile,
+    id: record.id,
+    type: record.type,
+    description: record.description,
+    status: record.status,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+    toolUses: record.toolUses,
+    outputFile: record.outputFile,
   };
 }

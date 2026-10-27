@@ -5,12 +5,12 @@
 import { debugNote } from "#src/debug";
 
 /** A context file (`AGENTS.md` and kin) as Pi's loader reports it. */
-export interface ContextFile {
+export type ContextFile = {
   /** Absolute path the block attributes the instructions to. */
   path: string;
   /** The file's text. */
   content: string;
-}
+};
 
 /**
  * Render context files as the `<project_context>` section pi 0.86 and later
@@ -30,7 +30,7 @@ export interface ContextFile {
  * directory carries no project instructions" from "here they are".
  */
 export function renderProjectContext(
-  contextFiles: readonly ContextFile[] | undefined,
+  contextFiles: ReadonlyArray<ContextFile> | undefined,
 ): string | undefined {
   if (!contextFiles || contextFiles.length === 0) return undefined;
   const body = [

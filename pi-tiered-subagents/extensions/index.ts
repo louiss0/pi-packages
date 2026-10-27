@@ -14,6 +14,7 @@ import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
+  defineTool,
   type ExtensionAPI,
   getAgentDir,
   loadProjectContextFiles,
@@ -23,6 +24,7 @@ import {
   SettingsManager as SdkSettingsManager,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import {
   loadDefinitionScopes,
   loadDefinitionScopesAsync,
@@ -76,8 +78,23 @@ import { inheritRegisteredProviders } from "#src/session/provider-inheritance";
 import { deriveSubagentSessionDir } from "#src/session/session-dir";
 import { SettingsManager } from "#src/settings";
 import { AgentTool } from "#src/tools/agent-tool";
-import { GetResultTool } from "#src/tools/get-result-tool";
+import {
+  GetResultTool,
+  type GetResultParams,
+} from "#src/tools/get-result-tool";
 import { SteerTool } from "#src/tools/steer-tool";
+import { buildAgentGuidelines, buildTypeListText } from "#src/tools/helpers";
+import {
+  getResultOutputSchema,
+  steerOutputSchema,
+  subagentOutputSchema,
+} from "#src/tools/structured-output";
+import { createAgentToolRenderer } from "#src/ui/agent-tool-renderer";
+import { getDisplayName } from "#src/ui/display";
+import {
+  renderGetResultCall,
+  renderGetResultResult,
+} from "#src/ui/get-result-tool-renderer";
 import { createWidgetSource } from "#src/presentation/widget-adapter";
 import {
   readPersistedNavigationRuns,
@@ -467,23 +484,178 @@ export default function (pi: ExtensionAPI) {
 
   // ---- Agent tool ----
 
+  // The parent-tool contracts live here, at the registration site: names,
+  // descriptions, schemas, render hooks, and execution adapters are read
+  // together, while execution and rendering stay in their own modules.
+  const typeListText = buildTypeListText(registry, getAgentDir());
+  const availableTypesText = registry.enabledIds().join(", ");
+  const agentGuidelines = [
+    "- For parallel work, use run_in_background: true on each agent. Foreground calls run sequentially — only one executes at a time.",
+    ...buildAgentGuidelines(registry),
+    "- Provide clear, detailed prompts so the agent can work autonomously.",
+    "- Subagent results are returned as text — summarize them for the user.",
+    "- Use run_in_background for work you don't need immediately. You will be notified when it completes.",
+    "- Use resume with an agent ID to continue a previous agent's work, or to answer an agent that ended its turn with a question.",
+    "- Use steer_subagent to send mid-run messages to a running background agent.",
+    '- Use model to specify a different model, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5").',
+    "- Use thinking to control extended thinking level.",
+    "- Use inherit_context if the agent needs the parent conversation history.",
+  ].join("\n");
+
+  const agentTool = new AgentTool(manager, subagents, settings, registry);
   pi.registerTool(
-    new AgentTool(
-      manager,
-      subagents,
-      settings,
-      registry,
-      getAgentDir(),
-    ).toToolDefinition(),
+    defineTool({
+      name: "subagent" as const,
+      label: "Subagent",
+      promptSnippet:
+        "Launch a specialized agent for complex, multi-step tasks.",
+      description: `Launch a new agent to handle complex, multi-step tasks autonomously.
+
+The subagent tool launches specialized agents that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+
+Available agent types:
+${typeListText}
+
+Guidelines:
+${agentGuidelines}
+`,
+      parameters: Type.Object({
+        prompt: Type.String({
+          description: "The task for the agent to perform.",
+        }),
+        description: Type.String({
+          description:
+            "A short (3-5 word) description of the task (shown in UI).",
+        }),
+        subagent_type: Type.String({
+          description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${getAgentDir()}/agents/<name>.md (global) are also available. An unknown or disabled type is rejected, not replaced.`,
+        }),
+        model: Type.Optional(
+          Type.String({
+            description:
+              'Optional model override, named exactly as "provider/modelId" (for example "anthropic/claude-sonnet-5"). Omit to use the agent definition\'s own model, or the one this call inherits.',
+          }),
+        ),
+        thinking: Type.Optional(
+          Type.String({
+            description:
+              "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level. A level the chosen model does not support is clamped to one it does, and the result says so.",
+          }),
+        ),
+        max_turns: Type.Optional(
+          Type.Number({
+            description:
+              "Maximum number of agentic turns before stopping. Omit to use the agent's own limit, or unlimited when it declares none.",
+            minimum: 1,
+          }),
+        ),
+        run_in_background: Type.Optional(
+          Type.Boolean({
+            description:
+              "Set to true to run in background. Returns agent ID immediately. You will be notified when it completes. Omit to use the agent's own default.",
+          }),
+        ),
+        resume: Type.Optional(
+          Type.String({
+            description:
+              "Optional agent ID to resume from. Continues from previous context. Combine with run_in_background: true to resume without waiting.",
+          }),
+        ),
+        inherit_context: Type.Optional(
+          Type.Boolean({
+            description:
+              "If true, fork parent conversation into the agent. Omit to use the agent's own default, which is fresh context unless it declares otherwise.",
+          }),
+        ),
+      }),
+      outputSchema: subagentOutputSchema,
+      ...createAgentToolRenderer((type) => getDisplayName(type, registry)),
+      execute: (toolCallId, params, signal, onUpdate, ctx) =>
+        agentTool.execute(toolCallId, params, signal, onUpdate, ctx),
+    }),
   );
 
   // ---- get_subagent_result tool ----
 
-  pi.registerTool(new GetResultTool(manager, registry).toToolDefinition());
+  const getResultTool = new GetResultTool(manager, registry);
+  pi.registerTool(
+    defineTool({
+      name: "get_subagent_result" as const,
+      label: "Get Agent Result",
+      promptSnippet:
+        "Check status and retrieve results from a background agent.",
+      description:
+        "Check status and retrieve results from a background agent. Use the agent ID returned by Agent with run_in_background. " +
+        "With wait: true and a timeout, the wait ends at the timeout and returns the agent's current progress; " +
+        "this does not stop or abort the agent, unlike bash's timeout.",
+      parameters: Type.Object({
+        agent_id: Type.String({
+          description: "The agent ID to check.",
+        }),
+        wait: Type.Optional(
+          Type.Boolean({
+            description:
+              "If true, wait for the agent to complete before returning. Default: false.",
+          }),
+        ),
+        verbose: Type.Optional(
+          Type.Boolean({
+            description:
+              "If true, include the agent's full conversation (messages + tool calls). Default: false.",
+          }),
+        ),
+        timeout: Type.Optional(
+          Type.Number({
+            description:
+              "Seconds to wait when wait is true (optional, no default: wait until the agent finishes). " +
+              "An expired wait does not stop the agent; if its progress is unchanged since your last check, do not simply wait again.",
+          }),
+        ),
+      }),
+      outputSchema: getResultOutputSchema,
+      renderCall: renderGetResultCall,
+      renderResult: renderGetResultResult,
+      execute: (
+        toolCallId: string,
+        params: GetResultParams,
+        signal: AbortSignal,
+        onUpdate: unknown,
+        ctx: unknown,
+      ) => getResultTool.execute(toolCallId, params, signal, onUpdate, ctx),
+    }),
+  );
 
   // ---- steer_subagent tool ----
 
-  pi.registerTool(new SteerTool(manager, pi.events).toToolDefinition());
+  const steerTool = new SteerTool(manager, pi.events);
+  pi.registerTool(
+    defineTool({
+      name: "steer_subagent" as const,
+      label: "Steer Agent",
+      promptSnippet:
+        "Send a mid-run message to redirect a running background agent.",
+      description:
+        "Send a steering message to a running agent. The message will interrupt the agent after its current tool execution " +
+        "and be injected into its conversation, allowing you to redirect its work mid-run. Only works on running agents.",
+      parameters: Type.Object({
+        agent_id: Type.String({
+          description: "The agent ID to steer (must be currently running).",
+        }),
+        message: Type.String({
+          description:
+            "The steering message to send. This will appear as a user message in the agent's conversation.",
+        }),
+      }),
+      outputSchema: steerOutputSchema,
+      execute: (
+        toolCallId: string,
+        params: { agent_id: string; message: string },
+        signal: AbortSignal,
+        onUpdate: unknown,
+        ctx: unknown,
+      ) => steerTool.execute(toolCallId, params, signal, onUpdate, ctx),
+    }),
+  );
 
   // ---- /subagents:settings command ----
 

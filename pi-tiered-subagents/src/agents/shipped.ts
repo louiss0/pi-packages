@@ -29,7 +29,7 @@ const RESEARCH_TOOLS = ["read", "grep", "find", "ls", "web_search"] as const;
  *
  * Ordered by how often a parent is likely to reach for them.
  */
-export const SHIPPED_DEFINITIONS: readonly AgentDefinition[] = [
+export const SHIPPED_DEFINITIONS: ReadonlyArray<AgentDefinition> = [
   {
     id: "explore",
     displayName: "Explore",
@@ -126,7 +126,7 @@ export const SHIPPED_DEFINITIONS: readonly AgentDefinition[] = [
  * A definition file may refine a shipped specialist; the specialist is still a
  * specialist, so the tool's list and its guidelines keep saying so.
  */
-export const SHIPPED_SPECIALIST_IDS: readonly string[] =
+export const SHIPPED_SPECIALIST_IDS: ReadonlyArray<string> =
   SHIPPED_DEFINITIONS.map((definition) => definition.id);
 
 /** Whether an identifier names one of the shipped specialists. */

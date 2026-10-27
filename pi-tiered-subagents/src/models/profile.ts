@@ -10,21 +10,35 @@
  * The rules a profile must satisfy are checked when it is read, not when it is
  * used: a malformed profile is reported, rather than quietly creating a
  * routing relationship nobody wrote down.
+ *
+ * The shapes are derived from the Valibot schema that reads them. Structural
+ * parsing and normalization happen in `user-profiles.ts`; this module keeps
+ * the routing-domain rules (naming structure, placement, cardinality).
  */
 
+import * as v from "valibot";
 import type { FamilyStrategy } from "#src/models/strategy";
 import { matchesTier, tierNameList } from "#src/models/strategy";
 
 /** Capability labels used by role-aware routing. */
-export type ModelSize = "S" | "M" | "L";
-export type ModelClass = "planner" | "worker";
-export type FamilyGroup = "size" | "planner-worker";
+const MODEL_SIZES = ["S", "M", "L"] as const;
+const MODEL_CLASSES = ["planner", "worker"] as const;
+const FAMILY_GROUPS = ["size", "planner-worker"] as const;
+
+export type ModelSize = (typeof MODEL_SIZES)[number];
+export type ModelClass = (typeof MODEL_CLASSES)[number];
+export type FamilyGroup = (typeof FAMILY_GROUPS)[number];
+
+/** A provider and model id, both trimmed and non-empty. */
+const modelCandidateSchema = v.strictObject({
+  provider: v.pipe(v.string(), v.trim(), v.minLength(1)),
+  id: v.pipe(v.string(), v.trim(), v.minLength(1)),
+});
 
 /** A concrete model: the provider that serves it and its id there. */
-export interface ModelCandidate {
-  readonly provider: string;
-  readonly id: string;
-}
+export type ModelCandidate = Readonly<
+  v.InferOutput<typeof modelCandidateSchema>
+>;
 
 /**
  * One rung of a version's ladder.
@@ -32,68 +46,156 @@ export interface ModelCandidate {
  * The tier's name is how the parent's model is located on the ladder. The
  * empty name is the version's default model — the one whose id names no tier
  * of its own.
+ *
+ * Obsolete tier-level `fallbacks` are accepted and discarded: they predate
+ * version-local routing, and rejecting them would strand profiles written for
+ * an older release.
  */
-export interface TierProfile {
-  readonly tier: string;
-  /** Required for a size-group family. */
-  readonly size?: ModelSize;
-  /** Required for a planner-worker family. */
-  readonly class?: ModelClass;
-  /** The concrete models of this tier, most preferred first. */
-  readonly models: readonly ModelCandidate[];
-}
+const tierProfileSchema = v.pipe(
+  v.strictObject({
+    tier: v.pipe(v.string(), v.trim()),
+    /** Required for a size-group family. */
+    size: v.exactOptional(v.picklist(MODEL_SIZES)),
+    /** Required for a planner-worker family. */
+    class: v.exactOptional(v.picklist(MODEL_CLASSES)),
+    /** The concrete models of this tier, most preferred first. */
+    models: v.array(modelCandidateSchema),
+    /** Obsolete; accepted and discarded. Contents are never read. */
+    fallbacks: v.optional(v.unknown()),
+  }),
+  v.transform(({ fallbacks: _fallbacks, ...tier }) => tier),
+);
+
+type TierProfileOutput = v.InferOutput<typeof tierProfileSchema>;
+
+type TierProfileLabels = {
+  size?: Exclude<TierProfileOutput["size"], undefined>;
+  class?: Exclude<TierProfileOutput["class"], undefined>;
+};
+
+export type TierProfile = Readonly<
+  Omit<TierProfileOutput, "size" | "class" | "models"> &
+    TierProfileLabels & {
+      readonly models: ReadonlyArray<ModelCandidate>;
+    }
+>;
 
 /** One version of a family. */
-export interface VersionProfile {
-  readonly version: string;
+const versionProfileSchema = v.strictObject({
+  version: v.pipe(v.string(), v.trim(), v.minLength(1)),
   /** The tiers, most capable first. */
-  readonly tiers: readonly TierProfile[];
-}
+  tiers: v.array(tierProfileSchema),
+});
 
-/** One family's ladder. */
-export interface FamilyProfile {
-  /** The family this profile describes, e.g. "gpt". */
-  readonly family: string;
+export type VersionProfile = Readonly<
+  Omit<v.InferOutput<typeof versionProfileSchema>, "tiers">
+> & {
+  readonly tiers: ReadonlyArray<TierProfile>;
+};
+
+const profileBodySchema = v.strictObject({
   /** Which capability labels govern this family. */
-  readonly group: FamilyGroup;
+  group: v.picklist(FAMILY_GROUPS),
   /** The versions, most recent first. */
-  readonly versions: readonly VersionProfile[];
-}
+  versions: v.array(versionProfileSchema),
+});
+
+type ProfileBodyOutput = v.InferOutput<typeof profileBodySchema>;
+
+export type FamilyProfile = Readonly<
+  Omit<ProfileBodyOutput, "versions"> & {
+    /** The family this profile describes, e.g. "gpt". */
+    family: string;
+    versions: ReadonlyArray<VersionProfile>;
+  }
+>;
 
 /** A profile that failed to read, and why. */
-export interface ProfileProblem {
+export type ProfileProblem = Readonly<{
   /** Where the problem is, e.g. `gpt 6.1 tier "sol"`. */
-  readonly where: string;
+  where: string;
   /** What is wrong. */
-  readonly problem: string;
-}
+  problem: string;
+}>;
 
 /** Untrusted labels read from a tier before its profile is accepted. */
-interface TierLabels {
-  readonly size?: unknown;
-  readonly class?: unknown;
+type TierLabels = Readonly<{
+  size?: unknown;
+  class?: unknown;
+}>;
+
+/**
+ * One structural problem in untrusted profile data.
+ *
+ * Paths are rendered the same way in every diagnostic, so an operator can find
+ * the field in the settings file without counting array entries.
+ */
+export type ProfileIssue = Readonly<{
+  path: ReadonlyArray<string | number>;
+  message: string;
+}>;
+
+/** Parse one profile body, adding the operator's family key from its position. */
+export function parseProfileData(
+  family: string,
+  value: unknown,
+):
+  | { readonly ok: true; readonly profile: FamilyProfile }
+  | { readonly ok: false; readonly issues: ReadonlyArray<ProfileIssue> } {
+  const parsed = v.safeParse(profileBodySchema, value);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.issues.map((issue) => ({
+        path: (issue.path ?? [])
+          .map((item) => item.key)
+          .filter(
+            (key): key is string | number =>
+              typeof key === "string" || typeof key === "number",
+          ),
+        message: issue.message,
+      })),
+    };
+  }
+  const profile: FamilyProfile = { family, ...parsed.output };
+  return {
+    ok: true,
+    profile,
+  };
 }
 
 /** Shared label rules for settings parsing and complete-profile validation. */
+/** A missing or invalid group label, and the field it belongs to. */
+type TierLabelProblem = Readonly<{
+  field: "size" | "class";
+  problem: string;
+}>;
+
 export function tierLabelProblems(
   group: FamilyGroup,
   labels: TierLabels,
-): string[] {
-  const problems: string[] = [];
+): TierLabelProblem[] {
+  const problems: TierLabelProblem[] = [];
   if (
     (group === "size" || labels.size !== undefined) &&
     labels.size !== "S" &&
     labels.size !== "M" &&
     labels.size !== "L"
   ) {
-    problems.push('a size-group tier needs a size: "S", "M", or "L"');
+    problems.push({
+      field: "size",
+      problem: 'a size-group tier needs a size: "S", "M", or "L"',
+    });
   }
   if (
     (group === "planner-worker" || labels.class !== undefined) &&
     labels.class !== "planner" &&
     labels.class !== "worker"
   ) {
-    problems.push('a planner-worker tier needs a class: "planner" or "worker"');
+    problems.push({
+      field: "class",
+      problem: 'a planner-worker tier needs a class: "planner" or "worker"',
+    });
   }
   return problems;
 }
@@ -160,7 +262,7 @@ export function validateProfile(
     for (const tier of version.tiers) {
       const tierWhere = `${where} tier "${tier.tier}"`;
       problems.push(
-        ...tierLabelProblems(profile.group, tier).map((problem) => ({
+        ...tierLabelProblems(profile.group, tier).map(({ problem }) => ({
           where: tierWhere,
           problem,
         })),
@@ -219,7 +321,7 @@ export function validateProfile(
 }
 
 /** The tier names a model's id carries, for a problem message. */
-function describeCandidates(candidates: readonly string[]): string {
+function describeCandidates(candidates: ReadonlyArray<string>): string {
   const names = tierNameList(candidates);
   return names.length > 0 ? names.join(", ") : "no tier";
 }

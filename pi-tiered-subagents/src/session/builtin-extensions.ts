@@ -31,7 +31,7 @@ export type BuiltinExtension = Exclude<InlineExtension, ExtensionFactory>;
  * order, each at most once.
  */
 export function builtinExtensionsFor(
-  toolNames: readonly string[],
+  toolNames: ReadonlyArray<string>,
 ): BuiltinExtension[] {
   return BUILTINS.filter((builtin) => toolNames.some(builtin.supplies)).map(
     ({ name, factory }) => ({

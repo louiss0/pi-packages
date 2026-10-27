@@ -70,7 +70,7 @@ export const SPINNER = [
   "⠧",
   "⠇",
   "⠏",
-] as const satisfies readonly string[];
+] as const satisfies ReadonlyArray<string>;
 
 /** Advance presentation metadata without exposing the terminal's frame vocabulary. */
 export function nextSpinnerFrame(index: number): number {

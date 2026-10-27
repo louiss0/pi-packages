@@ -91,14 +91,14 @@ export type ShellExec = (
 ) => Promise<{ stdout: string; stderr: string; code: number }>;
 
 /** Parent session identity — grouped fields that travel together from the tool boundary. */
-export interface ParentSessionInfo {
+export type ParentSessionInfo = Readonly<{
   /** Path to the parent session's JSONL file (for deriving the subagent session directory). */
   parentSessionFile?: string;
   /** Session ID of the parent agent (stored in the child session's parentSession header). */
   parentSessionId?: string;
   /** Tool call ID for background notification wiring. Exposed on the record via Subagent.toolCallId. */
   toolCallId?: string;
-}
+}>;
 
 /** Compaction event info passed through lifecycle observers. */
 export type CompactionInfo = {

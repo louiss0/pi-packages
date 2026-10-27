@@ -31,31 +31,31 @@ export const PREVIEW_CHARS = 200;
  * renderer reads the report text from the result's own content instead, and
  * `preview` is bounded at `PREVIEW_CHARS` by its producer.
  */
-export interface GetResultDetails {
+export type GetResultDetails = Readonly<{
   // A read view over a live record: every optional also takes an explicit
   // `undefined`, so a fixture can clear a defaulted field in one call.
-  readonly agentId: string;
-  readonly displayName: string;
-  readonly status: SubagentStatus;
-  readonly description: string;
-  readonly toolUses: number;
+  agentId: string;
+  displayName: string;
+  status: SubagentStatus;
+  description: string;
+  toolUses: number;
   /** Pre-formatted lifetime token total; "" when zero. */
-  readonly tokens: string;
-  readonly contextPercent: number | null;
-  readonly compactionCount: number;
+  tokens: string;
+  contextPercent: number | null;
+  compactionCount: number;
   /** Pre-formatted duration string. */
-  readonly duration: string;
+  duration: string;
   /** First non-empty line of the result body, clipped. Never the whole result. */
-  readonly preview?: string | undefined;
-  readonly error?: string | undefined;
+  preview?: string | undefined;
+  error?: string | undefined;
   /** The run's turn limit and its use; absent when no limit applied. */
-  readonly turnBudget?: TurnBudget | undefined;
+  turnBudget?: TurnBudget | undefined;
   /** Whether the conversation was requested, so the expanded view can say where it went. */
-  readonly verbose: boolean;
-  readonly transcriptPath?: string | undefined;
+  verbose: boolean;
+  transcriptPath?: string | undefined;
   /** The model's `provider/id`; optional because details persisted by older versions lack it. */
-  readonly modelName?: string;
-}
+  modelName?: string;
+}>;
 
 /**
  * The lines for one get_subagent_result row, in its current expansion state.

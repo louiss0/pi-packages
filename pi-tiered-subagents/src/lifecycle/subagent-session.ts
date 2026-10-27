@@ -34,21 +34,21 @@ import { getAgentConversation } from "#src/session/conversation";
 import type { SessionMessage, ThinkingLevel } from "#src/types";
 
 /** Outcome of one turn loop. */
-export interface TurnLoopResult {
+export type TurnLoopResult = {
   responseText: string;
   /** The run's turn budget as the loop ended. */
   turnBudget: TurnBudget;
-}
+};
 
 /** Per-call options for one run's turn loop. */
-export interface TurnLoopOptions {
+export type TurnLoopOptions = {
   signal?: AbortSignal;
   /** Receives the run's budget at the start and after every turn boundary that changes it. */
   onTurnBudget?: (budget: TurnBudget) => void;
-}
+};
 
 /** Session-level facts known at creation, supplied by the factory. */
-export interface SubagentSessionMeta {
+export type SubagentSessionMeta = {
   /** Path to the persisted session JSONL file, absent for a headless session. */
   outputFile?: string;
   /** Child session id — the registry key carried on session-created/disposed events. */
@@ -64,7 +64,7 @@ export interface SubagentSessionMeta {
   /** Parent context prepended to the first run's prompt, absent when none was inherited. */
   parentContext?: string;
   lifecycle: ChildLifecyclePublisher;
-}
+};
 
 /**
  * One child AgentSession plus its turn-driving and teardown — born complete.
@@ -267,12 +267,12 @@ export class SubagentSession {
   }
 
   /** The session's message history. */
-  get messages(): readonly unknown[] {
+  get messages(): ReadonlyArray<unknown> {
     return this._session.messages;
   }
 
   /** The session's message history, typed for Pi's session-rendering machinery. */
-  get agentMessages(): readonly SessionMessage[] {
+  get agentMessages(): ReadonlyArray<SessionMessage> {
     return this._session.messages;
   }
 

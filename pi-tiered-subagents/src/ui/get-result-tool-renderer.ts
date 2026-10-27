@@ -12,12 +12,12 @@ import { renderGetResultLines } from "./get-result-renderer.js";
 import { GLYPHS } from "./glyphs.js";
 
 /** Only the call arguments this renderer reads; structurally satisfied by the runtime. */
-export interface GetResultParamsView {
-  readonly agent_id: string;
-  readonly wait?: boolean;
-  readonly verbose?: boolean;
-  readonly timeout?: number;
-}
+export type GetResultParamsView = Readonly<{
+  agent_id: string;
+  wait?: boolean;
+  verbose?: boolean;
+  timeout?: number;
+}>;
 
 export function renderGetResultCall(
   args: GetResultParamsView,

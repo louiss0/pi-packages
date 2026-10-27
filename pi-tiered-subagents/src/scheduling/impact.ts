@@ -46,7 +46,7 @@ const KNOWN_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
  * tool this package cannot vouch for takes the exclusive slot.
  */
 export function classifyWorkspaceImpact(
-  toolNames: readonly string[],
+  toolNames: ReadonlyArray<string>,
 ): WorkspaceImpact {
   for (const name of toolNames) {
     if (!KNOWN_READ_ONLY_TOOLS.has(name)) return "file-changing";

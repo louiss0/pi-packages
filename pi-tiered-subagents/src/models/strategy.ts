@@ -17,11 +17,11 @@
  */
 
 /** The parts of a model id, as the family's naming structure reads them. */
-export interface ParsedModelId {
+export type ParsedModelId = Readonly<{
   /** The family the id belongs to, e.g. "gpt". */
-  readonly family: string;
+  family: string;
   /** The version, when the naming structure carries one, e.g. "6.1". */
-  readonly version?: string;
+  version?: string;
   /**
    * The segments that could name a tier, in order.
    *
@@ -29,8 +29,8 @@ export interface ParsedModelId {
    * so the profile's tier names are matched against the contiguous joins of
    * this list.
    */
-  readonly tierCandidates: readonly string[];
-}
+  tierCandidates: ReadonlyArray<string>;
+}>;
 
 /** Reads one family's model ids. */
 export interface FamilyStrategy {
@@ -66,7 +66,7 @@ const DATE_QUALIFIER = /^\d{8}$/;
  * `["flash", "lite"]` yields "flash", "lite" and "flash-lite"; an empty list
  * yields the empty string, which is how a version's default model is named.
  */
-export function candidateJoins(candidates: readonly string[]): string[] {
+export function candidateJoins(candidates: ReadonlyArray<string>): string[] {
   const joins: string[] = [];
   for (let start = 0; start < candidates.length; start++) {
     // The suffix from each position is the set of joins that start there, so
@@ -99,7 +99,7 @@ export function tierSegments(tier: string): string[] {
  * snapshot — and still belong to the tier.
  */
 export function matchesTier(
-  candidates: readonly string[],
+  candidates: ReadonlyArray<string>,
   tier: string,
 ): boolean {
   const segments = tierSegments(tier);
@@ -114,7 +114,7 @@ export function matchesTier(
  * A tier name may be one segment ("sol") or several joined ("flash-lite"),
  * and a model may qualify a tier further ("code-highspeed").
  */
-export function tierNameList(candidates: readonly string[]): string[] {
+export function tierNameList(candidates: ReadonlyArray<string>): string[] {
   return candidateJoins(candidates).filter((join) => join !== "");
 }
 
@@ -125,8 +125,8 @@ export function tierNameList(candidates: readonly string[]): string[] {
  * the parent's rung is located on the tier it really belongs to.
  */
 export function mostSpecificTier(
-  candidates: readonly string[],
-  tiers: readonly string[],
+  candidates: ReadonlyArray<string>,
+  tiers: ReadonlyArray<string>,
 ): string | undefined {
   let best: string | undefined;
   for (const tier of tiers) {
@@ -278,7 +278,7 @@ function readVariants(text: string): string[] {
  * any of them; a family outside this set has no structure to read, so a
  * profile for one cannot be used.
  */
-export const SHIPPED_STRATEGIES: readonly FamilyStrategy[] = [
+export const SHIPPED_STRATEGIES: ReadonlyArray<FamilyStrategy> = [
   gluedVersionFamily("gpt", "gpt-"),
   gluedVersionFamily("gemini", "gemini-"),
   gluedVersionFamily("qwen", "qwen"),
@@ -291,7 +291,7 @@ export const SHIPPED_STRATEGIES: readonly FamilyStrategy[] = [
 
 /** The strategies, by family. */
 export function strategiesByFamily(
-  strategies: readonly FamilyStrategy[],
+  strategies: ReadonlyArray<FamilyStrategy>,
 ): Map<string, FamilyStrategy> {
   return new Map(strategies.map((strategy) => [strategy.family, strategy]));
 }

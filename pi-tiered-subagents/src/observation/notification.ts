@@ -12,7 +12,7 @@ import {
 import type { Subagent } from "#src/types";
 
 /** Details attached to custom notification messages for visual rendering. */
-export interface NotificationDetails {
+export type NotificationDetails = {
   id: string;
   description: string;
   status: SubagentStatus;
@@ -24,7 +24,7 @@ export interface NotificationDetails {
   resultPreview: string;
   /** The run's turn budget; absent until its turn loop starts. */
   turnBudget?: TurnBudget;
-}
+};
 
 // ---- Pure helpers (exported for unit testing) ----
 
@@ -213,18 +213,18 @@ export interface NotificationSystem {
 }
 
 /** Details the update renderer reads. */
-export interface UpdateDetails {
+export type UpdateDetails = {
   id: string;
   description: string;
   message: string;
-}
+};
 
 /** Details the workspace-notice renderer reads. */
-export interface WorkspaceNoticeDetails {
+export type WorkspaceNoticeDetails = {
   id: string;
   description: string;
   notice: string;
-}
+};
 
 /**
  * One announcement withheld for the parent's current run.

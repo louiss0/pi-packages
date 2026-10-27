@@ -17,7 +17,7 @@
 
 /** Enumerates the providers registered on a session at runtime. */
 export interface RegisteredProviderSource<TNative, TConfig> {
-  getRegisteredProviderIds(): readonly string[];
+  getRegisteredProviderIds(): ReadonlyArray<string>;
   getRegisteredNativeProvider(id: string): TNative | undefined;
   getRegisteredProviderConfig(id: string): TConfig | undefined;
 }

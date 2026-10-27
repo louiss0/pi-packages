@@ -30,27 +30,27 @@ export interface Theme {
 }
 
 /** Metadata attached to Agent tool results for custom rendering. */
-export interface AgentDetails {
-  readonly displayName: string;
-  readonly description: string;
-  readonly subagentType: string;
-  readonly toolUses: number;
-  readonly tokens: string;
-  readonly durationMs: number;
-  readonly status: AgentStatus | "background";
+export type AgentDetails = Readonly<{
+  displayName: string;
+  description: string;
+  subagentType: string;
+  toolUses: number;
+  tokens: string;
+  durationMs: number;
+  status: AgentStatus | "background";
   /** Human-readable description of what the agent is currently doing. */
-  readonly activity?: string;
+  activity?: string;
   /** Current spinner frame index (for animated running indicator). */
-  readonly spinnerFrame?: number;
+  spinnerFrame?: number;
   /** The `provider/id` of the model the agent runs (e.g. "anthropic/claude-haiku-4-5"). */
-  readonly modelName?: string;
+  modelName?: string;
   /** Notable config tags (e.g. ["thinking: high", "inherit context"]). */
-  readonly tags?: readonly string[];
-  readonly agentId?: string;
-  readonly error?: string;
+  tags?: ReadonlyArray<string>;
+  agentId?: string;
+  error?: string;
   /** The run's turn budget; absent until its turn loop starts. */
-  readonly turnBudget?: TurnBudget;
-}
+  turnBudget?: TurnBudget;
+}>;
 
 // ---- Constants ----
 

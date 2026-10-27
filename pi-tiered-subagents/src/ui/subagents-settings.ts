@@ -1,10 +1,10 @@
 // ---- Narrow interfaces ----
 
 /** The toast a settings mutation returns for the UI to display. */
-export interface SettingsToast {
+export type SettingsToast = {
   message: string;
   level: "info" | "warning";
-}
+};
 
 /** Narrow settings interface required by the subagents:settings command. */
 export interface SubagentsSettingsManager {
@@ -34,15 +34,15 @@ export interface SubagentsSettingsUI {
 // ---- Descriptor table ----
 
 /** Fields every setting needs to render its line in the select list. */
-interface SettingDescriptorBase {
+type SettingDescriptorBase = {
   /** Prefix used both to build the select option and to match the user's choice. */
   label: string;
   /** Current value rendered in the select option (e.g. "unlimited" for an unset default). */
   currentDisplay: (settings: SubagentsSettingsManager) => string | number;
-}
+};
 
 /** Describes one numeric setting's prompt, validation, and apply behavior. */
-interface NumericSettingDescriptor extends SettingDescriptorBase {
+type NumericSettingDescriptor = SettingDescriptorBase & {
   kind: "numeric";
   /** Title shown on the input prompt. */
   inputTitle: string;
@@ -54,18 +54,18 @@ interface NumericSettingDescriptor extends SettingDescriptorBase {
   validationMessage: string;
   /** Applies the validated value and returns the toast to display. */
   apply: (settings: SubagentsSettingsManager, n: number) => SettingsToast;
-}
+};
 
 /** Describes one boolean setting, flipped directly from the select list. */
-interface ToggleSettingDescriptor extends SettingDescriptorBase {
+type ToggleSettingDescriptor = SettingDescriptorBase & {
   kind: "toggle";
   /** Flips the setting and returns the toast to display. */
   toggle: (settings: SubagentsSettingsManager) => SettingsToast;
-}
+};
 
 type SettingDescriptor = NumericSettingDescriptor | ToggleSettingDescriptor;
 
-const SETTINGS: readonly SettingDescriptor[] = [
+const SETTINGS: ReadonlyArray<SettingDescriptor> = [
   {
     kind: "numeric",
     label: "Max concurrency",

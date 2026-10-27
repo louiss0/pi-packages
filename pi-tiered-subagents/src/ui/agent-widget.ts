@@ -20,29 +20,29 @@ export type { WidgetSource } from "./view-types.js";
 // ---- Types ----
 
 /** Minimal agent shape needed for widget lifecycle decisions. */
-interface AgentSummary {
-  readonly id: string;
-  readonly status: string;
+type AgentSummary = Readonly<{
+  id: string;
+  status: string;
   // Structural snapshots may omit the timestamp or explicitly report that
   // the agent has not finished.
-  readonly completedAt?: number | undefined;
-}
+  completedAt?: number | undefined;
+}>;
 
 /** Lightweight state snapshot used by AgentWidget.update() to decide what to show. */
-export interface WidgetState {
-  readonly runningCount: number;
-  readonly queuedCount: number;
-  readonly hasFinished: boolean;
+export type WidgetState = Readonly<{
+  runningCount: number;
+  queuedCount: number;
+  hasFinished: boolean;
   /** True when runningCount > 0 || queuedCount > 0. Included for call-site readability. */
-  readonly hasActive: boolean;
-}
+  hasActive: boolean;
+}>;
 
 /**
  * Count agents by status and return a lightweight state snapshot.
  * Pure function — no IO, no side effects. Exported for direct unit testing.
  */
 export function assembleWidgetState(
-  agents: readonly AgentSummary[],
+  agents: ReadonlyArray<AgentSummary>,
   shouldShowFinished: (agentId: string, status: string) => boolean,
 ): WidgetState {
   let runningCount = 0;
@@ -213,7 +213,7 @@ export class AgentWidget {
   }
 
   /** Background filtering and live-record projection belong to the source adapter. */
-  private listBackgroundAgents(): readonly WidgetAgent[] {
+  private listBackgroundAgents(): ReadonlyArray<WidgetAgent> {
     return this.source.listAgents();
   }
 
@@ -235,7 +235,7 @@ export class AgentWidget {
    * purge stale `finishedTurnAge` entries for agents no longer in `backgroundAgents`.
    * Called only from `update`'s idle path — not from `dispose`.
    */
-  private clearWidget(backgroundAgents: readonly AgentSummary[]): void {
+  private clearWidget(backgroundAgents: ReadonlyArray<AgentSummary>): void {
     if (this.widgetRegistered) {
       this.uiCtx!.setWidget("agents", undefined);
       this.widgetRegistered = false;
@@ -280,7 +280,7 @@ export class AgentWidget {
    * Idempotent — only seeds when an entry is absent, so repeated updates within
    * a turn neither reset nor advance the age.
    */
-  private seedFinishedAgents(agents: readonly AgentSummary[]): void {
+  private seedFinishedAgents(agents: ReadonlyArray<AgentSummary>): void {
     for (const a of agents) {
       if (a.completedAt && !this.finishedTurnAge.has(a.id)) {
         this.finishedTurnAge.set(a.id, 0);
