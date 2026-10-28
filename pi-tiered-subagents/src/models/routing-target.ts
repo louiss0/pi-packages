@@ -5,7 +5,7 @@
  */
 import type {
   FamilyGroup,
-  ModelClass,
+  TierRole,
   ModelSize,
   TierProfile,
   FamilyProfile,
@@ -62,18 +62,18 @@ class PlannerWorkerRoutingTarget implements RoutingTarget {
   private static readonly rank = {
     worker: 0,
     planner: 1,
-  } as const satisfies Record<ModelClass, number>;
+  } as const satisfies Record<TierRole, number>;
 
-  constructor(readonly label: ModelClass) {}
+  constructor(readonly label: TierRole) {}
 
   startingTier(version: FamilyProfile): TierProfile | undefined {
-    return version.tiers.find((tier) => tier.class === this.label);
+    return version.tiers.find((tier) => tier.role === this.label);
   }
 
   allowsFallback(tier: TierProfile): boolean {
     return (
-      tier.class !== undefined &&
-      PlannerWorkerRoutingTarget.rank[tier.class] <=
+      tier.role !== undefined &&
+      PlannerWorkerRoutingTarget.rank[tier.role] <=
         PlannerWorkerRoutingTarget.rank[this.label]
     );
   }
@@ -86,7 +86,7 @@ export function createRoutingTarget(
   parentTier: TierProfile,
 ): RoutingTarget | undefined {
   if (group === "planner-worker")
-    return new PlannerWorkerRoutingTarget(policy.class);
+    return new PlannerWorkerRoutingTarget(policy.role);
   return parentTier.size === undefined
     ? undefined
     : new SizeRoutingTarget(policy.size, parentTier.size);

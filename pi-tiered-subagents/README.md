@@ -115,7 +115,7 @@ sonnet = M, haiku = S; GPT sol and astra = L, pro/terra = M, luna/mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
 Automatic model routing stays within the parent's exact family and version.
-A size or class target starts at the top matching rung in that version; Equal
+A size or role target starts at the top matching rung in that version; Equal
 starts at the parent's own rung, not the top of its size. Try concrete IDs in
 preference order, then eligible cheaper rungs in the same version, skipping
 anything the session cannot run. No version fallback links are supported or
@@ -160,8 +160,8 @@ settings file, under `familyProfiles`:
     "minimax": {
       "group": "planner-worker",
       "tiers": [
-        { "tier": "", "class": "planner" },
-        { "tier": "flash", "class": "worker" }
+        { "tier": "", "role": "planner" },
+        { "tier": "flash", "role": "worker" }
       ]
     }
   }
@@ -170,7 +170,7 @@ settings file, under `familyProfiles`:
 
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
-planner/worker profile requires `class: "planner" | "worker"`. Tiers are
+planner/worker profile requires `role: "planner" | "worker"`. Tiers are
 version-independent: the router reads the parent's version, targets a rung, and
 constructs the exact model ID with the family's naming structure. Tier names are
 trimmed, and the empty name remains the family's unnamed default line. Unknown

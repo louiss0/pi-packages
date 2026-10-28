@@ -20,11 +20,11 @@ import type { FamilyStrategy } from "#src/models/strategy";
 
 /** Capability labels used by role-aware routing. */
 const MODEL_SIZES = ["S", "M", "L"] as const;
-const MODEL_CLASSES = ["planner", "worker"] as const;
+const TIER_ROLES = ["planner", "worker"] as const;
 const FAMILY_GROUPS = ["size", "planner-worker"] as const;
 
 export type ModelSize = (typeof MODEL_SIZES)[number];
-export type ModelClass = (typeof MODEL_CLASSES)[number];
+export type TierRole = (typeof TIER_ROLES)[number];
 export type FamilyGroup = (typeof FAMILY_GROUPS)[number];
 
 /** An exact candidate identity for documentation fixtures, not profile data. */
@@ -39,7 +39,7 @@ const tierProfileSchema = v.pipe(
     /** Required for a size-group family. */
     size: v.exactOptional(v.picklist(MODEL_SIZES)),
     /** Required for a planner-worker family. */
-    class: v.exactOptional(v.picklist(MODEL_CLASSES)),
+    role: v.exactOptional(v.picklist(TIER_ROLES)),
     /** Obsolete; accepted and discarded. Contents are never read. */
     fallbacks: v.optional(v.unknown()),
   }),
@@ -50,11 +50,11 @@ type TierProfileOutput = v.InferOutput<typeof tierProfileSchema>;
 
 type TierProfileLabels = {
   size?: Exclude<TierProfileOutput["size"], undefined>;
-  class?: Exclude<TierProfileOutput["class"], undefined>;
+  role?: Exclude<TierProfileOutput["role"], undefined>;
 };
 
 export type TierProfile = Readonly<
-  Omit<TierProfileOutput, "size" | "class"> & TierProfileLabels
+  Omit<TierProfileOutput, "size" | "role"> & TierProfileLabels
 >;
 
 const profileBodySchema = v.strictObject({
@@ -80,7 +80,7 @@ export type ProfileProblem = Readonly<{
 /** Untrusted labels read from a tier before its profile is accepted. */
 type TierLabels = Readonly<{
   size?: unknown;
-  class?: unknown;
+  role?: unknown;
 }>;
 
 /**
@@ -125,7 +125,7 @@ export function parseProfileData(
 
 /** A missing or invalid group label, and the field it belongs to. */
 type TierLabelProblem = Readonly<{
-  field: "size" | "class";
+  field: "size" | "role";
   problem: string;
 }>;
 
@@ -146,13 +146,13 @@ export function tierLabelProblems(
     });
   }
   if (
-    (group === "planner-worker" || labels.class !== undefined) &&
-    labels.class !== "planner" &&
-    labels.class !== "worker"
+    (group === "planner-worker" || labels.role !== undefined) &&
+    labels.role !== "planner" &&
+    labels.role !== "worker"
   ) {
     problems.push({
-      field: "class",
-      problem: 'a planner-worker tier needs a class: "planner" or "worker"',
+      field: "role",
+      problem: 'a planner-worker tier needs a role: "planner" or "worker"',
     });
   }
   return problems;
@@ -260,28 +260,28 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
     family: "gemini",
     group: "planner-worker",
     tiers: [
-      { tier: "argon", class: "planner" },
-      { tier: "pro-preview", class: "planner" },
-      { tier: "pro", class: "planner" },
-      { tier: "flash", class: "worker" },
-      { tier: "flash-lite", class: "worker" },
+      { tier: "argon", role: "planner" },
+      { tier: "pro-preview", role: "planner" },
+      { tier: "pro", role: "planner" },
+      { tier: "flash", role: "worker" },
+      { tier: "flash-lite", role: "worker" },
     ],
   },
   {
     family: "glm",
     group: "planner-worker",
     tiers: [
-      { tier: "", class: "planner" },
-      { tier: "flash", class: "worker" },
+      { tier: "", role: "planner" },
+      { tier: "flash", role: "worker" },
     ],
   },
   {
     family: "minimax",
     group: "planner-worker",
     tiers: [
-      { tier: "highspeed", class: "planner" },
-      { tier: "", class: "planner" },
-      { tier: "flash", class: "worker" },
+      { tier: "highspeed", role: "planner" },
+      { tier: "", role: "planner" },
+      { tier: "flash", role: "worker" },
     ],
   },
   {
@@ -296,16 +296,16 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
   {
     family: "deepseek",
     group: "planner-worker",
-    tiers: [{ tier: "pro", class: "planner" }],
+    tiers: [{ tier: "pro", role: "planner" }],
   },
   {
     family: "mimo",
     group: "planner-worker",
     tiers: [
-      { tier: "pro-ultraspeed", class: "planner" },
-      { tier: "pro", class: "planner" },
-      { tier: "", class: "planner" },
-      { tier: "flash", class: "worker" },
+      { tier: "pro-ultraspeed", role: "planner" },
+      { tier: "pro", role: "planner" },
+      { tier: "", role: "planner" },
+      { tier: "flash", role: "worker" },
     ],
   },
 ];

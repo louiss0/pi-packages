@@ -1,17 +1,17 @@
 /** The shipped specialist-to-target policy; unknown identifiers use worker. */
-import type { ModelClass, ModelSize } from "#src/models/profiles";
+import type { TierRole, ModelSize } from "#src/models/profiles";
 
 export type RolePolicy = Readonly<{
   size: ModelSize | "equal" | "one-below";
-  class: ModelClass;
+  role: TierRole;
 }>;
 
 export const ROLE_POLICY = {
-  worker: { size: "one-below", class: "worker" },
-  researcher: { size: "S", class: "worker" },
-  debug: { size: "M", class: "worker" },
-  reviewer: { size: "equal", class: "planner" },
-  explore: { size: "S", class: "worker" },
+  worker: { size: "one-below", role: "worker" },
+  researcher: { size: "S", role: "worker" },
+  debug: { size: "M", role: "worker" },
+  reviewer: { size: "equal", role: "planner" },
+  explore: { size: "S", role: "worker" },
 } as const satisfies Record<string, RolePolicy>;
 
 export function policyFor(agentId: string): RolePolicy {

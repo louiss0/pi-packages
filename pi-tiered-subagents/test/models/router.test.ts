@@ -175,7 +175,7 @@ describe("routeModel", () => {
     "explore",
     "researcher",
     "debug",
-  ])("retains DeepSeek when %s has no worker class", (role) => {
+  ])("retains DeepSeek when %s has no worker role", (role) => {
     const parent = model("deepseek", "deepseek-v4-pro");
     const outcome = routeModel(parent, context([parent]), role);
     expect(outcome.kind).toBe("retained");
@@ -331,7 +331,7 @@ describe("routeModel", () => {
     "researcher",
     "debug",
     "custom-role",
-  ])("%s uses the worker class even from a worker parent", (role) => {
+  ])("%s uses the worker role even from a worker parent", (role) => {
     const parent = model("google", "gemini-2.5-flash-lite");
     const outcome = routeModel(
       parent,
@@ -348,7 +348,7 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain(`${role} targets worker`);
   });
 
-  it("steps a worker parent up to the planner class for review", () => {
+  it("steps a worker parent up to the planner role for review", () => {
     const parent = model("google", "gemini-2.5-flash");
     const outcome = routeModel(
       parent,

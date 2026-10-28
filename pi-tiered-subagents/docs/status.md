@@ -135,8 +135,8 @@ runtime uses:
     "minimax": {
       "group": "planner-worker",
       "tiers": [
-        { "tier": "", "class": "planner" },
-        { "tier": "flash", "class": "worker" }
+        { "tier": "", "role": "planner" },
+        { "tier": "flash", "role": "worker" }
       ]
     }
   }
@@ -183,7 +183,7 @@ sonnet = M, haiku = S; GPT sol and astra = L, pro/terra = M, luna/mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
 Automatic model routing stays within the parent's exact family and version.
-A size or class target starts at the top matching rung in that version; Equal
+A size or role target starts at the top matching rung in that version; Equal
 starts at the parent's own rung, not the top of its size. Construct each
 rung's exact model ID from the parent's version and tier, then look it up among
 the models the session can run, continuing through eligible cheaper rungs in the
@@ -214,7 +214,7 @@ selection.
 
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
-planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
+planner/worker profile requires `role: "planner" | "worker"`. Invalid or missing
 labels are reported when read, not silently inferred. Version names, tier names,
 provider names, and model ids are trimmed; a name that becomes blank is rejected,
 while an empty tier name remains the version's default model. Unknown profile
@@ -245,7 +245,7 @@ is generated through the implementation. Verification for this increment:
 
 [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
 only version links, unknown-family errors, and the old retained-effort
-medium/low preference. The five-role mapping and size/class labels stay intact;
+medium/low preference. The five-role mapping and size/role labels stay intact;
 no new families or versions are added. The verification counts immediately
 above describe the earlier issue-#10 increment, not evidence for this change.
 `SizeRoutingTarget` and `PlannerWorkerRoutingTarget` separately own label
@@ -576,7 +576,7 @@ The recovered suite pins the behaviour this derivative must preserve:
    resolved a model name by scoring every model in the registry, so a typo
    could run a different model than the one asked for. A model is now named
    `provider/modelId` and resolved exactly or the launch fails, and a child
-   that names no model now uses role-aware size/class targets. ADR 0014
+   that names no model now uses role-aware size/role targets. ADR 0014
    supersedes the uniform model step-down rule only; see
    [adr/0014](adr/0014-role-aware-model-routing.md) and
    [adr/0007](adr/0007-the-childs-model-is-one-tier-down.md).

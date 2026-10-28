@@ -1,9 +1,9 @@
 /**
  * Role-aware model selection on data-only family ladders.
  *
- * Resolve the role's size/class target first, then try that rung and cheaper
+ * Resolve the role's size/role target first, then try that rung and cheaper
  * rungs within the parent's exact family and version. Names only locate a
- * parent; group/size/class come from profile data, never name heuristics.
+ * parent; group/size/role come from profile data, never name heuristics.
  * Versions are never crossed. Only models the session can run may win; an
  * unknown family or exhausted version ladder retains the parent.
  */
@@ -88,7 +88,7 @@ export function routeModel(
   agentId = "worker",
 ): RoutingOutcome {
   const policy = policyFor(agentId);
-  const intent = `${agentId} targets ${policy.size} size / ${policy.class} class`;
+  const intent = `${agentId} targets ${policy.size} size / ${policy.role} class`;
   if (!parent) {
     return {
       kind: "retained",

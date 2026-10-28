@@ -32,14 +32,14 @@ describe("parseProfile", () => {
     expect(
       parseProfile("glm", {
         group: "planner-worker",
-        tiers: [{ tier: "", class: "planner" }],
+        tiers: [{ tier: "", role: "planner" }],
       }),
     ).toEqual({
       ok: true,
       profile: {
         family: "glm",
         group: "planner-worker",
-        tiers: [{ tier: "", class: "planner" }],
+        tiers: [{ tier: "", role: "planner" }],
       },
     });
     expect(
@@ -49,7 +49,7 @@ describe("parseProfile", () => {
       }),
     ).toMatchObject({
       ok: false,
-      problem: expect.stringContaining("tiers[0].class"),
+      problem: expect.stringContaining("tiers[0].role"),
     });
   });
   it.each([
@@ -101,7 +101,7 @@ describe("parseProfile", () => {
     expect(
       parseProfile("gpt", {
         group: "size",
-        tiers: [{ tier: "sol", size: "L", class: undefined }],
+        tiers: [{ tier: "sol", size: "L", role: undefined }],
       }).ok,
     ).toBe(false);
   });
@@ -219,7 +219,7 @@ describe("shipped ladders", () => {
       expect(validateProfile(entry, strategies.get(entry.family))).toEqual([]);
       for (const tier of entry.tiers)
         expect(Object.keys(tier).sort()).toEqual(
-          [entry.group === "size" ? "size" : "class", "tier"].sort(),
+          [entry.group === "size" ? "size" : "role", "tier"].sort(),
         );
     }
   });

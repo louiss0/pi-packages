@@ -11,10 +11,10 @@ The maintainer explicitly corrected the catalogue-shaped profile architecture:
 profiles must not enumerate releases or concrete model IDs. This supersedes the
 version → tiers → models shape and conflicting scope in issue #11, as well as
 those catalogue assumptions in ADRs 0014/0015. Exact-version isolation, five-role
-size/class targets, reasoning, explicit-pin precedence, and session availability
+size/role targets, reasoning, explicit-pin precedence, and session availability
 authority remain unchanged.
 
-A profile contains a family, group, and ordered tier ladder with size/class
+A profile contains a family, group, and ordered tier ladder with size/role
 labels. GPT Luna is S across versions, preserving the operator's correction.
 Strategies extract the parent's version and tier and construct an exact candidate
 ID for each target or eligible cheaper tier. GPT places version before tier;

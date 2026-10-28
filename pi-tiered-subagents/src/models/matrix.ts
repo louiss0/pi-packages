@@ -98,7 +98,7 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
       const rows = parents.flatMap(({ tier, candidate: parent }) =>
         roles.map((role) => [
           code(key(parent)),
-          `97.2 / ${tier.tier || "(default)"} (${tier.size ?? tier.class})`,
+          `97.2 / ${tier.tier || "(default)"} (${tier.size ?? tier.role})`,
           code(role),
           outcome(parent, role, all),
           outcome(parent, role, otherVersions),
@@ -108,7 +108,7 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
       return `### ${profile.family} — ${profile.group}\n\n${table(
         [
           "Parent model",
-          "Version / rung (size or class)",
+          "Version / rung (size or role)",
           "Agent",
           "All available",
           "Other versions only",

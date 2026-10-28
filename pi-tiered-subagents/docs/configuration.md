@@ -27,7 +27,7 @@ luna/mini/nano = S. Dated parents use the labels of their tier.
 
 Profiles describe **version-independent family ladders**, not a release or model
 catalogue. A strategy extracts the parent's version and tier; the role selects a
-size/class target on that family's ordered ladder. Equal starts at the parent's
+size/role target on that family's ordered ladder. Equal starts at the parent's
 own rung. For each target or permitted cheaper rung, the strategy constructs one
 exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
 `claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
@@ -51,7 +51,7 @@ profile has no worker rung, so its non-review roles retain the parent.
 Profiles are data only. Each replacement declares `group: "size"` or
 `group: "planner-worker"` and `tiers`, most capable first. Size tiers require
 `size: "S" | "M" | "L"`; planner/worker tiers require
-`class: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
+`role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
 the empty tier denotes the unnamed default line where the strategy supports it.
 Invalid labels, unsupported naming structures, empty ladders, and invalid tier
 names are reported. Unknown fields are rejected with deterministic field paths;
@@ -80,8 +80,8 @@ Set `familyProfiles` through the shared settings store: JSON encoded as text und
     "minimax": {
       "group": "planner-worker",
       "tiers": [
-        { "tier": "", "class": "planner" },
-        { "tier": "flash", "class": "worker" }
+        { "tier": "", "role": "planner" },
+        { "tier": "flash", "role": "worker" }
       ]
     }
   }

@@ -112,13 +112,13 @@ routing policy. Availability is an explicit input:
   identity equal to the parent is printed explicitly instead; intentional
   reviewer equality is not mislabeled as a failed walk.
 
-The version, rung, and size/class columns come from the profile. The selected
+The version, rung, and size/role columns come from the profile. The selected
 identities and retain outcomes come only from the router.
 
 <!-- model-matrix:full:start -->
 ### gpt — size
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/gpt-97.2-astra` | 97.2 / astra (L) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
 | `example/gpt-97.2-astra` | 97.2 / astra (L) | `worker` | `example/gpt-97.2-terra` | **retain** | **retain** |
@@ -163,7 +163,7 @@ identities and retain outcomes come only from the router.
 
 ### claude — size
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/claude-fable-97-2` | 97.2 / fable (L) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
 | `example/claude-fable-97-2` | 97.2 / fable (L) | `worker` | `example/claude-sonnet-97-2` | **retain** | **retain** |
@@ -188,7 +188,7 @@ identities and retain outcomes come only from the router.
 
 ### gemini — planner-worker
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/gemini-97.2-argon` | 97.2 / argon (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
 | `example/gemini-97.2-argon` | 97.2 / argon (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
@@ -218,7 +218,7 @@ identities and retain outcomes come only from the router.
 
 ### glm — planner-worker
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/glm-97.2` | 97.2 / (default) (planner) | `explore` | `example/glm-97.2-flash` | **retain** | **retain** |
 | `example/glm-97.2` | 97.2 / (default) (planner) | `worker` | `example/glm-97.2-flash` | **retain** | **retain** |
@@ -233,7 +233,7 @@ identities and retain outcomes come only from the router.
 
 ### minimax — planner-worker
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `explore` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
 | `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `worker` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
@@ -253,7 +253,7 @@ identities and retain outcomes come only from the router.
 
 ### qwen — size
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/qwen97.2-max` | 97.2 / max (L) | `explore` | `example/qwen97.2-flash` | **retain** | **retain** |
 | `example/qwen97.2-max` | 97.2 / max (L) | `worker` | `example/qwen97.2-plus` | **retain** | **retain** |
@@ -273,7 +273,7 @@ identities and retain outcomes come only from the router.
 
 ### deepseek — planner-worker
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `explore` | **retain** | **retain** | **retain** |
 | `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `worker` | **retain** | **retain** | **retain** |
@@ -283,7 +283,7 @@ identities and retain outcomes come only from the router.
 
 ### mimo — planner-worker
 
-| Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
 | `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `explore` | `example/mimo-v97.2-flash` | **retain** | **retain** |
 | `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `worker` | `example/mimo-v97.2-flash` | **retain** | **retain** |
@@ -345,7 +345,7 @@ route(parent, context, agentId = "worker"):
 A **group** is the family's routing policy shape. A **size** (S, M, L) labels a
 size-family tier; a **class** (planner, worker) labels a planner/worker-family
 tier. Runtime routing reads those declarations; it does not infer class from
-price or a model-name substring. The top rung of the target size/class is the
+price or a model-name substring. The top rung of the target size/role is the
 starting point (reviewer equality uses the parent's own rung). Versions are
 never crossed to find a target, even when other versions are runnable.
 
@@ -394,7 +394,7 @@ Consequences worth naming:
   family replaces that family's version-independent tiers entirely;
   other families are untouched. Legacy `fallbacks` settings are ignored; the
   field is accepted only to discard its obsolete contents. Replacement profiles must declare
-  the group and the corresponding size/class labels. A new *naming* family
+  the group and the corresponding size/role labels. A new *naming* family
   still needs code support in `strategy.ts`.
 - **Pinning a model in an agent file bypasses this whole table** for that agent.
 

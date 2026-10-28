@@ -20,7 +20,7 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 > medium/low preference. Automatic routing is confined to the exact parent
 > family/version; unknown families retain the parent. With known parent effort,
 > automatic reasoning takes the next supported non-off rung below it, including
-> on retained models. The five-role mapping and size/class labels are unchanged.
+> on retained models. The five-role mapping and size/role labels are unchanged.
 
 ## Problem Statement
 
@@ -344,7 +344,7 @@ luna/mini/nano = S. Dated parents use the labels of their tier.
 
 Profiles describe **version-independent family ladders**, not a release or model
 catalogue. A strategy extracts the parent's version and tier; the role selects a
-size/class target on that family's ordered ladder. Equal starts at the parent's
+size/role target on that family's ordered ladder. Equal starts at the parent's
 own rung. For each target or permitted cheaper rung, the strategy constructs one
 exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
 `claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
@@ -368,7 +368,7 @@ profile has no worker rung, so its non-review roles retain the parent.
 Profiles are data only. Each replacement declares `group: "size"` or
 `group: "planner-worker"` and `tiers`, most capable first. Size tiers require
 `size: "S" | "M" | "L"`; planner/worker tiers require
-`class: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
+`role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
 the empty tier denotes the unnamed default line where the strategy supports it.
 Invalid labels, unsupported naming structures, empty ladders, and invalid tier
 names are reported. Unknown fields are rejected with deterministic field paths;
