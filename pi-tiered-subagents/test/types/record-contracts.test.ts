@@ -3,8 +3,7 @@ import type {
   FamilyProfile,
   ModelCandidate,
   TierProfile,
-  VersionProfile,
-} from "#src/models/profile";
+} from "#src/models/profiles";
 import type {
   PersistedRunSummary,
   PersistedSubagentRecord,
@@ -28,21 +27,18 @@ describe("record type contracts", () => {
     const profile: FamilyProfile = {
       family: "gpt",
       group: "size",
-      versions: [],
+      tiers: [],
     };
     // @ts-expect-error a profile is data with a protected family key
     profile.family = "claude";
     // @ts-expect-error its version collection is read-only
-    profile.versions.push({
-      version: "6.1",
-      tiers: [],
-    });
+    profile.tiers.push({ tier: "sol", size: "L" });
 
     const candidate: ModelCandidate = { provider: "openai", id: "gpt-6.1-sol" };
     // @ts-expect-error a model identity keeps its provider fixed
     candidate.provider = "anthropic";
 
-    const tier: TierProfile = { tier: "", models: [] };
+    const tier: TierProfile = { tier: "" };
     // @ts-expect-error an absent optional stays absent, not set to undefined
     const explicitUndefined: TierProfile = { ...tier, size: undefined };
     void explicitUndefined;
@@ -73,11 +69,8 @@ describe("record type contracts", () => {
   });
 
   it("derives validated profile records from the schema shapes", () => {
-    expectTypeOf<FamilyProfile["versions"]>().toEqualTypeOf<
-      ReadonlyArray<VersionProfile>
-    >();
-    expectTypeOf<TierProfile["models"]>().toEqualTypeOf<
-      ReadonlyArray<ModelCandidate>
+    expectTypeOf<FamilyProfile["tiers"]>().toEqualTypeOf<
+      ReadonlyArray<TierProfile>
     >();
     expectTypeOf<FamilyProfile["group"]>().toEqualTypeOf<
       "size" | "planner-worker"

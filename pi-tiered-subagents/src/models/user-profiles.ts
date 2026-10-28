@@ -22,12 +22,12 @@
  * touches a file of its own.
  */
 
-import type { FamilyProfile, ProfileIssue } from "#src/models/profile";
+import type { FamilyProfile, ProfileIssue } from "#src/models/profiles";
 import {
   parseProfileData,
   tierLabelProblems,
   validateProfile,
-} from "#src/models/profile";
+} from "#src/models/profiles";
 import type { FamilyStrategy } from "#src/models/strategy";
 
 /** The profiles in effect, and what was wrong with the ones that were not. */
@@ -134,22 +134,16 @@ function untrustedTierLabelIssues(value: unknown): ProfileIssue[] {
   const raw = value as Record<string, unknown>;
   const group = raw.group;
   if (group !== "size" && group !== "planner-worker") return [];
-  if (!Array.isArray(raw.versions)) return [];
-
+  if (!Array.isArray(raw.tiers)) return [];
   const issues: ProfileIssue[] = [];
-  raw.versions.forEach((version, versionIndex) => {
-    if (!version || typeof version !== "object") return;
-    const tiers = (version as Record<string, unknown>).tiers;
-    if (!Array.isArray(tiers)) return;
-    tiers.forEach((tier, tierIndex) => {
-      if (!tier || typeof tier !== "object") return;
-      for (const label of tierLabelProblems(group, tier)) {
-        issues.push({
-          path: ["versions", versionIndex, "tiers", tierIndex, label.field],
-          message: label.problem,
-        });
-      }
-    });
+  raw.tiers.forEach((tier, tierIndex) => {
+    if (!tier || typeof tier !== "object") return;
+    for (const label of tierLabelProblems(group, tier)) {
+      issues.push({
+        path: ["tiers", tierIndex, label.field],
+        message: label.problem,
+      });
+    }
   });
   return issues;
 }
@@ -165,7 +159,7 @@ function formatIssues(issues: ReadonlyArray<ProfileIssue>): string {
     .join("; ");
 }
 
-/** Render a path, e.g. `versions[0].tiers[1].models[0].id`. */
+/** Render a path, e.g. `tiers[1].size`. */
 function formatProfilePath(path: ReadonlyArray<string | number>): string {
   return path.reduce<string>(
     (rendered, segment) =>

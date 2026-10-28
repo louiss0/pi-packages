@@ -1,7 +1,7 @@
 /** Pure documentation generation through the public router, never a second policy. */
 import type { Model } from "@earendil-works/pi-ai";
 import { SHIPPED_DEFINITIONS } from "#src/agents/shipped";
-import type { ModelCandidate } from "#src/models/profile";
+import type { ModelCandidate } from "#src/models/profiles";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { routeModel } from "#src/models/router";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
@@ -37,10 +37,23 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
     SHIPPED_PROFILES.map((profile) => [profile.family, profile]),
   );
   const strategies = strategiesByFamily(SHIPPED_STRATEGIES);
-  const all = SHIPPED_PROFILES.flatMap((profile) =>
-    profile.versions.flatMap((version) =>
-      version.tiers.flatMap((tier) => tier.models.map(identity)),
-    ),
+  // Synthetic future versions exercise the same ladder without a release catalogue.
+  const samples = SHIPPED_PROFILES.map((profile) => {
+    const strategy = strategies.get(profile.family);
+    if (!strategy) throw new Error(`No strategy for ${profile.family}`);
+    return {
+      profile,
+      parents: profile.tiers.map((tier) => ({
+        tier,
+        candidate: {
+          provider: "example",
+          id: strategy.construct("97.2", tier.tier),
+        },
+      })),
+    };
+  });
+  const all = samples.flatMap(({ parents }) =>
+    parents.map(({ candidate }) => identity(candidate)),
   );
 
   function outcome(
@@ -58,8 +71,8 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
       : code(`${result.provider}/${result.modelId}`);
   }
 
-  const representatives = SHIPPED_PROFILES.map((profile) => {
-    const parent = profile.versions[0]?.tiers[0]?.models[0];
+  const representatives = samples.map(({ profile, parents }) => {
+    const parent = parents[0]?.candidate;
     if (!parent)
       throw new Error(`No representative parent for ${profile.family}`);
     return { family: profile.family, parent };
@@ -76,39 +89,35 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
     representatives.map(({ family, parent }) => [family, code(key(parent))]),
   );
 
-  const full = SHIPPED_PROFILES.map((profile) => {
-    const rows = profile.versions.flatMap((version) => {
-      // Remove ALL candidates in the parent's version, including its target
-      // and peers: other versions and families must never supply a target.
-      const sameVersion = new Set(
-        version.tiers.flatMap((tier) => tier.models.map(key)),
+  const full = samples
+    .map(({ profile, parents }) => {
+      const otherVersions = all.map((model) => ({
+        ...model,
+        id: model.id.replace("97.2", "96.2").replace("97-2", "96-2"),
+      }));
+      const rows = parents.flatMap(({ tier, candidate: parent }) =>
+        roles.map((role) => [
+          code(key(parent)),
+          `97.2 / ${tier.tier || "(default)"} (${tier.size ?? tier.class})`,
+          code(role),
+          outcome(parent, role, all),
+          outcome(parent, role, otherVersions),
+          outcome(parent, role, []),
+        ]),
       );
-      const otherVersions = all.filter((model) => !sameVersion.has(key(model)));
-      return version.tiers.flatMap((tier) =>
-        tier.models.flatMap((parent) =>
-          roles.map((role) => [
-            code(key(parent)),
-            `${version.version} / ${tier.tier || "(default)"} (${tier.size ?? tier.class})`,
-            code(role),
-            outcome(parent, role, all),
-            outcome(parent, role, otherVersions),
-            outcome(parent, role, []),
-          ]),
-        ),
-      );
-    });
-    return `### ${profile.family} — ${profile.group}\n\n${table(
-      [
-        "Parent model",
-        "Version / rung (size or class)",
-        "Agent",
-        "All available",
-        "Other versions only",
-        "None available",
-      ],
-      rows,
-    )}`;
-  }).join("\n\n");
+      return `### ${profile.family} — ${profile.group}\n\n${table(
+        [
+          "Parent model",
+          "Version / rung (size or class)",
+          "Agent",
+          "All available",
+          "Other versions only",
+          "None available",
+        ],
+        rows,
+      )}`;
+    })
+    .join("\n\n");
 
   return [
     { name: "grid", markdown: `${grid}\n\n${gridParents}` },

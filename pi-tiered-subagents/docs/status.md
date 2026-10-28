@@ -107,9 +107,8 @@ protected by an equivalent host gate.
 | Module | What it owns |
 | --- | --- |
 | `src/models/identity.ts` | Naming a model exactly: `provider/modelId`, resolved or failed. |
-| `src/models/strategy.ts` | How one family's ids are read: the version and the tier. |
-| `src/models/profile.ts` | What a profile says, and how a malformed one is refused. |
-| `src/models/profiles.ts` | The ladders this package ships. |
+| `src/models/strategy.ts` | How one family's ids are read and constructed from a version and tier. |
+| `src/models/profiles.ts` | Schema-derived profile types, validation, and shipped version-independent ladders. |
 | `src/models/routing-target.ts` | `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`: label matching, starting rung, and fallback rank behind a small common interface. |
 | `src/models/router.ts` | The common downward walk within the exact parent family/version. |
 | `src/models/selection.ts` | The precedence: the request, then the definition, then the routing. |
@@ -127,47 +126,29 @@ runtime uses:
   "familyProfiles": {
     "gpt": {
       "group": "size",
-      "versions": [
-        {
-          "version": "5.6",
-          "tiers": [
-            {
-              "tier": "sol",
-              "size": "L",
-              "models": [{ "provider": "openai", "id": "gpt-5.6-sol" }]
-            },
-            {
-              "tier": "terra",
-              "size": "M",
-              "models": [{ "provider": "openai", "id": "gpt-5.6-terra" }]
-            }
-          ]
-        }
+      "tiers": [
+        { "tier": "sol", "size": "L" },
+        { "tier": "terra", "size": "M" },
+        { "tier": "luna", "size": "S" }
       ]
     },
     "minimax": {
       "group": "planner-worker",
-      "versions": [
-        {
-          "version": "3.1",
-          "tiers": [
-            {
-              "tier": "",
-              "class": "planner",
-              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1" }]
-            },
-            {
-              "tier": "flash",
-              "class": "worker",
-              "models": [{ "provider": "minimax", "id": "MiniMax-M3.1-flash" }]
-            }
-          ]
-        }
+      "tiers": [
+        { "tier": "", "class": "planner" },
+        { "tier": "flash", "class": "worker" }
       ]
     }
   }
 }
 ```
+
+A replacement declares `group` and an ordered tier ladder. Tiers are
+version-independent; the router reads the parent's version and constructs the
+exact target model ID using the family's naming structure. Profiles no longer
+declare `versions` or concrete `models`; those fields are rejected. Tier names
+are trimmed, labels are validated, and the empty tier is the family's unnamed
+default line.
 
 Only declared data is read: a field the schema does not name is rejected, never
 evaluated. A replacement profile with an unsupported naming structure is
@@ -198,14 +179,15 @@ Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
 Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
-sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
+sonnet = M, haiku = S; GPT sol and astra = L, pro/terra = M, luna/mini/nano = S.
 Dated snapshots use the size of the tier they belong to.
 
 Automatic model routing stays within the parent's exact family and version.
 A size or class target starts at the top matching rung in that version; Equal
-starts at the parent's own rung, not the top of its size. Try concrete IDs in
-preference order, then eligible cheaper rungs in the same version, skipping
-anything the session cannot run. No version fallback links are supported or
+starts at the parent's own rung, not the top of its size. Construct each
+rung's exact model ID from the parent's version and tier, then look it up among
+the models the session can run, continuing through eligible cheaper rungs in the
+same version. No version fallback links are supported or
 inferred. If no role target or cheaper rung is runnable, keep the parent's
 model and report why. An unknown family also retains the parent, without
 price-based or name-based guessing. A reviewer retaining its own rung by Equal

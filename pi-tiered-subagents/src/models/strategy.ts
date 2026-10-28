@@ -7,13 +7,9 @@
  * `MiniMax-M2.7` capitalizes. A strategy knows one family's structure and
  * reports the parts a profile's ladder is written in.
  *
- * What a strategy does *not* know is the ladder: which tiers exist, which is
- * below which, and which concrete model ids to prefer. That is profile data,
- * so an operator can correct it without touching code.
- *
- * The strategy is deliberately the only place a naming structure is read. A
- * profile that names a model from another family, or a version the id does not
- * carry, is rejected rather than routed to.
+ * A strategy also constructs the exact candidate ID from a version and tier.
+ * It does not know capability labels, ladder order, or session availability.
+ * Those remain profile data and session facts, respectively.
  */
 
 /** The parts of a model id, as the family's naming structure reads them. */
@@ -52,6 +48,8 @@ export interface FamilyStrategy {
    * structure — an id this family cannot place is not one of its models.
    */
   parse(id: string): ParsedModelId | undefined;
+  /** Construct the exact unqualified identity at one version and tier. */
+  construct(version: string, tier: string): string;
 }
 
 /** A version segment: digits, optionally dotted. */
@@ -150,6 +148,8 @@ export function mostSpecificTier(
 function gluedVersionFamily(family: string, prefix: string): FamilyStrategy {
   return {
     family,
+    construct: (version, tier) =>
+      `${prefix}${version}${tier ? `-${tier}` : ""}`,
     belongs: (id) => id.toLowerCase().startsWith(prefix.toLowerCase()),
     parse(id) {
       if (!id.toLowerCase().startsWith(prefix.toLowerCase())) return undefined;
@@ -179,6 +179,8 @@ function taggedVersionFamily(
 ): FamilyStrategy {
   return {
     family,
+    construct: (version, tier) =>
+      `${prefix}${tag}${version}${tier ? `-${tier}` : ""}`,
     belongs: (id) => id.toLowerCase().startsWith(prefix.toLowerCase()),
     parse(id) {
       if (!id.toLowerCase().startsWith(prefix.toLowerCase())) return undefined;
@@ -204,6 +206,8 @@ function taggedVersionFamily(
 function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
   return {
     family,
+    construct: (version, tier) =>
+      `${prefix}${tier}-${version.replaceAll(".", "-")}`,
     belongs: (id) => id.toLowerCase().startsWith(prefix.toLowerCase()),
     parse(id) {
       if (!id.toLowerCase().startsWith(prefix.toLowerCase())) return undefined;
@@ -215,22 +219,18 @@ function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
       // snapshot's date is a qualifier, not a version.
       const versionParts: string[] = [];
       const variants: string[] = [];
-      let seenVersion = false;
+      let seenQualifier = false;
       for (const segment of segments.slice(1)) {
         // A dated snapshot's date is a qualifier, not a version part.
         if (DATE_QUALIFIER.test(segment)) {
-          seenVersion = true;
+          seenQualifier = true;
           continue;
         }
-        if (!seenVersion && VERSION.test(segment)) {
+        if (!seenQualifier && VERSION.test(segment)) {
           versionParts.push(segment);
           continue;
         }
-        if (seenVersion && VERSION.test(segment) && versionParts.length > 0) {
-          versionParts.push(segment);
-          continue;
-        }
-        seenVersion = true;
+        seenQualifier = true;
         variants.push(segment);
       }
       if (versionParts.length === 0) return undefined;
@@ -285,7 +285,7 @@ export const SHIPPED_STRATEGIES: ReadonlyArray<FamilyStrategy> = [
   gluedVersionFamily("glm", "glm-"),
   taggedVersionFamily("mimo", "mimo-", "v"),
   taggedVersionFamily("deepseek", "deepseek-", "v"),
-  taggedVersionFamily("minimax", "minimax-", "m"),
+  taggedVersionFamily("minimax", "MiniMax-", "M"),
   lineThenVersionFamily("claude", "claude-"),
 ];
 

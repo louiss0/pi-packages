@@ -188,12 +188,12 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 - Explicit model selections require exact provider/model identity. Parse the provider separately while preserving the remaining model ID, which may itself contain a namespace separator. Resolve exactly or fail. Do not use fuzzy matching, provider assumptions, or cross-provider fallback.
 - Explicit selection bypasses family recognition, including for new families the router does not know. Apply thinking handling independently after the explicit model resolves.
 - Model identity, display name, series, version, variant/tier, and qualifiers are separate concepts. Do not assume the last number is always a version, all pro or fast suffixes mean the same thing, or hyphen position is uniform across series.
-- Initially provide strategy classes for GPT, Claude, Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Keep model releases, per-version tier ladders, and target preferences as profile data rather than subclasses per release. Version fallback links are not supported.
+- Initially provide strategy classes for GPT, Claude, Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Keep version-independent tier ladders and target labels as profile data rather than subclasses per release. Never enumerate releases or concrete IDs in profiles. Version fallback links are not supported.
 - User-defined profiles follow the same schema and already-supported naming structures. They must be consumable without authoring a strategy class. Genuinely new naming structures require runtime code support. Do not accept user regexes, wildcard targets, matcher callbacks, parser functions, or executable settings.
-- Profiles explicitly enumerate concrete model IDs and their series/version and tier relationships, with no cross-version transitions. Do not synthesize nonexistent variants. Preserve meaningful snapshot, specialization, serving, and other qualifiers unless the applicable strategy/profile explicitly defines their relationship.
+- Profiles declare ordered family tiers and labels, never versions or concrete identities. Strategies extract the parent version and construct exact candidate IDs. An ID is usable only if the session can run it exactly; do not fuzzy-match snapshots or serving variants.
 - Resolve the role target within the exact parent family and version (Equal anchors at the parent rung). For example, GPT 5.6 Sol may target GPT 5.6 Terra, while GPT 6.1 Sol cannot borrow GPT 6 Luna. These are representative profile examples, not vendor-availability claims. No version fallback links exist; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
-- Walk downward from the resolved role target through permitted cheaper tiers rather than requiring the immediate rung or jumping straight to the cheapest model. Within a target tier/version, try concrete IDs in profile preference order. Continue downward if none are available.
-- Family routing is not a provider-routing policy. Use the session's model resolution, credentials, availability, and restrictions to materialize family candidates. Do not independently impose same-provider-only selection, invent credentials, or select an arbitrary provider through fuzzy matching or registry order.
+- Walk downward from the resolved role target through permitted cheaper tiers rather than requiring the immediate rung or jumping straight to the cheapest model. Construct one exact ID per eligible tier at the parent version. Continue downward if unavailable or provider-ambiguous.
+- Use session runnable models and restrictions. Prefer the parent provider for an exact ID; otherwise accept a unique matching provider. Multiple alternate providers make that rung unusable: walk cheaper tiers, then retain. Never impose same-provider-only selection, invent credentials, or choose by registry order.
 - Unknown parent families retain the captured parent model with an explanation. There is no output-cost ranking fallback. A known family with no runnable role target or eligible cheaper rung in the exact parent version also retains the captured parent model and applies automatic reasoning.
 - Validate profile data and supported naming structures explicitly. The exact settings encoding and profile schema must express the agreed semantics without becoming an executable configuration language. Malformed data must not silently create unrelated routing relationships.
 
@@ -213,48 +213,47 @@ required `group`:
 Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
-sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
-Dated snapshots use the size of the tier they belong to.
+Size assignments are Qwen max = L, plus = M, flash = S; Claude fable/opus = L,
+sonnet = M, haiku = S; GPT astra/sol = L, terra/pro/default = M,
+luna/mini/nano = S. Dated parents use the labels of their tier.
 
-Automatic model routing stays within the parent's exact family and version.
-A size or class target starts at the top matching rung in that version; Equal
-starts at the parent's own rung, not the top of its size. Try concrete IDs in
-preference order, then eligible cheaper rungs in the same version, skipping
-anything the session cannot run. No version fallback links are supported or
-inferred. If no role target or cheaper rung is runnable, keep the parent's
-model and report why. An unknown family also retains the parent, without
-price-based or name-based guessing. A reviewer retaining its own rung by Equal
-is a designed choice, not an exhaustion fallback. The launch reason names the
-role and target as well as the chosen model, including retained outcomes.
+Profiles describe **version-independent family ladders**, not a release or model
+catalogue. A strategy extracts the parent's version and tier; the role selects a
+size/class target on that family's ordered ladder. Equal starts at the parent's
+own rung. For each target or permitted cheaper rung, the strategy constructs one
+exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
+`claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
+releases. Construction is not an availability claim: only an exact ID in the
+session's runnable models can win. Dated or specialized IDs are not fuzzy
+substitutes for the constructed identity; an explicit pin still resolves exactly.
 
-Flash-named tiers, including the separate flash-lite rung, are worker class;
-pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the worker rung
-below its planner flagship, available only to routing within version 3.1.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
-cannot reach it; flash-only Gemini versions cannot reach a different version's
-planner, and Qwen cannot reach another version's S tier. Missing targets retain
-the parent. DeepSeek has planner but no worker class: reviewer targets pro,
-and the other roles retain the parent.
+Provider selection is deterministic for each exact candidate ID:
+1. Prefer the parent's provider if runnable there.
+2. Otherwise accept a unique matching provider.
+3. Multiple other matching providers make the rung ambiguous/unusable. Continue
+   to eligible cheaper tiers, then retain the parent if none can be selected.
 
-GLM uses a glued-version naming strategy (version adjoining the prefix,
-variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: an unpinned Kimi parent is retained.
-The shipped catalogue is representative of the installed SDK, not a promise of
-vendor availability. Profiles enumerate candidates; session access decides
-which can run. Model routing changes neither exact-pin resolution nor reasoning
-selection.
+This is not same-provider-only routing, and registry order never chooses a
+provider. Session credentials, availability, and restrictions remain authoritative.
+No cross-version fallback is allowed. Unknown families, unparseable versions,
+unknown parent tiers, or exhausted ladders retain the captured parent and explain
+why. Planner review may degrade to a worker in the same version. DeepSeek's
+profile has no worker rung, so its non-review roles retain the parent.
 
-A replacement must declare `group: "size"` or `group: "planner-worker"`.
-Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
-planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Upgrade existing whole
-replacements by adding these labels. Version/tier/model shape and whole-family
-replacement semantics stay the same; version fallback links are removed from
-the schema, shipped data, and runtime. An old `fallbacks` field is ignored by
-the same unknown-field rule as any other unrecognized field. Examples are representative
-profile data, not provider-access guarantees.
+Profiles are data only. Each replacement declares `group: "size"` or
+`group: "planner-worker"` and `tiers`, most capable first. Size tiers require
+`size: "S" | "M" | "L"`; planner/worker tiers require
+`class: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
+the empty tier denotes the unnamed default line where the strategy supports it.
+Invalid labels, unsupported naming structures, empty ladders, and invalid tier
+names are reported. Unknown fields are rejected with deterministic field paths;
+obsolete tier-level `fallbacks` alone is accepted and discarded.
+
+**Migration:** replace old `versions` arrays and per-tier `models` arrays with one
+family `tiers` array. Do not declare releases, concrete IDs, or provider priorities.
+Old catalogue-shaped replacements are diagnosed rather than silently migrated.
+GPT Luna is S throughout the ladder. GLM is supported; Kimi remains an unknown
+family for automatic routing. Model pins and reasoning policies are unchanged.
 
 The routing-target policy has two implementations behind a small shared
 interface: `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`. Each owns

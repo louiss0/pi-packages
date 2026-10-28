@@ -13,37 +13,8 @@ import { SETTINGS_EXTENSION_NAME } from "#src/shared-settings";
 import { toSharedStore } from "#test/helpers/tmp-settings-dirs";
 
 /** A profile as the settings store holds it. */
-const GPT_PROFILE = {
-  group: "size",
-  versions: [
-    {
-      version: "6.1",
-      tiers: [
-        {
-          tier: "sol",
-          size: "L",
-          models: [{ provider: "openai", id: "gpt-6.1-sol" }],
-        },
-      ],
-    },
-  ],
-};
-
-const CLAUDE_PROFILE = {
-  group: "size",
-  versions: [
-    {
-      version: "5.5",
-      tiers: [
-        {
-          tier: "opus",
-          size: "L",
-          models: [{ provider: "anthropic", id: "claude-opus-5-5" }],
-        },
-      ],
-    },
-  ],
-};
+const GPT_PROFILE = { group: "size", tiers: [{ tier: "sol", size: "L" }] };
+const CLAUDE_PROFILE = { group: "size", tiers: [{ tier: "opus", size: "L" }] };
 
 describe("the family profiles in the settings", () => {
   let root: string;

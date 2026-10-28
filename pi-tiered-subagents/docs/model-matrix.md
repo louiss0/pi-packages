@@ -63,29 +63,30 @@ uses worker routing behavior; this is not an alias in the agent registry.
 ## 3. Agent × family: all combinations are valid
 
 Each cell below is an **actual router outcome**, not a policy label: it uses
-the representative parent listed beneath the grid with all profile candidates
-available. The complete parent-by-role matrix follows in section 4. A request
+the synthetic future-release parent listed beneath the grid with all constructed
+ladder candidates available. `example` is a fixture provider, not vendor access.
+Version 97.2 is illustrative, not a supported-release catalogue. The complete parent-by-role matrix follows in section 4. A request
 or definition model pin bypasses this grid.
 
 <!-- model-matrix:grid:start -->
 | Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `explore` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** | `xiaomi/mimo-v2.6-flash` |
-| `worker` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
-| `reviewer` | `openai/gpt-6.1-sol` | `anthropic/claude-opus-5-5` | `google/gemini-4-argon` | `zai/glm-5.3` | `minimax/MiniMax-M3.1` | `qwen-token-plan/qwen3.7-max` | `deepseek/deepseek-v4-pro` | `xiaomi/mimo-v2.6-pro-ultraspeed` |
-| `debug` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |
-| `researcher` | **retain** | `anthropic/claude-haiku-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** | `xiaomi/mimo-v2.6-flash` |
+| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `worker` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
+| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
 
 | Family | Representative parent (all candidates available) |
 | --- | --- |
-| gpt | `openai/gpt-6.1-sol` |
-| claude | `anthropic/claude-opus-5-5` |
-| gemini | `google/gemini-4-argon` |
-| glm | `zai/glm-5.3` |
-| minimax | `minimax/MiniMax-M3.1` |
-| qwen | `qwen-token-plan/qwen3.7-max` |
-| deepseek | `deepseek/deepseek-v4-pro` |
-| mimo | `xiaomi/mimo-v2.6-pro-ultraspeed` |
+| gpt | `example/gpt-97.2-astra` |
+| claude | `example/claude-fable-97-2` |
+| gemini | `example/gemini-97.2-argon` |
+| glm | `example/glm-97.2` |
+| minimax | `example/MiniMax-M97.2-highspeed` |
+| qwen | `example/qwen97.2-max` |
+| deepseek | `example/deepseek-v97.2-pro` |
+| mimo | `example/mimo-v97.2-pro-ultraspeed` |
 <!-- model-matrix:grid:end -->
 
 Two additional per-agent differences are not about families: `worker` and
@@ -119,351 +120,191 @@ identities and retain outcomes come only from the router.
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `reviewer` | `openai/gpt-6.1-sol` | **retain** | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `debug` | **retain** | **retain** | **retain** |
-| `openai/gpt-6.1-sol` | 6.1 / sol (L) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `worker` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `reviewer` | `openai/gpt-6-astra` | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-astra` | 6 / astra (L) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `worker` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `reviewer` | `openai/gpt-6-sol` | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-sol` | 6 / sol (L) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `reviewer` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `debug` | `openai/gpt-6-luna` | **retain** | **retain** |
-| `openai/gpt-6-luna` | 6 / luna (M) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-sol` | 5.6 / sol (L) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-sol` | 5.6 / sol (L) | `worker` | `openai/gpt-5.6-terra` | **retain** | **retain** |
-| `openai/gpt-5.6-sol` | 5.6 / sol (L) | `reviewer` | `openai/gpt-5.6-sol` | **retain** | **retain** |
-| `openai/gpt-5.6-sol` | 5.6 / sol (L) | `debug` | `openai/gpt-5.6-terra` | **retain** | **retain** |
-| `openai/gpt-5.6-sol` | 5.6 / sol (L) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-terra` | 5.6 / terra (M) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-terra` | 5.6 / terra (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-terra` | 5.6 / terra (M) | `reviewer` | `openai/gpt-5.6-terra` | **retain** | **retain** |
-| `openai/gpt-5.6-terra` | 5.6 / terra (M) | `debug` | `openai/gpt-5.6-terra` | **retain** | **retain** |
-| `openai/gpt-5.6-terra` | 5.6 / terra (M) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-luna` | 5.6 / luna (M) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-luna` | 5.6 / luna (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.6-luna` | 5.6 / luna (M) | `reviewer` | `openai/gpt-5.6-luna` | **retain** | **retain** |
-| `openai/gpt-5.6-luna` | 5.6 / luna (M) | `debug` | `openai/gpt-5.6-terra` | **retain** | **retain** |
-| `openai/gpt-5.6-luna` | 5.6 / luna (M) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5-pro` | 5.5 / pro (M) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5-pro` | 5.5 / pro (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5-pro` | 5.5 / pro (M) | `reviewer` | `openai/gpt-5.5-pro` | **retain** | **retain** |
-| `openai/gpt-5.5-pro` | 5.5 / pro (M) | `debug` | `openai/gpt-5.5-pro` | **retain** | **retain** |
-| `openai/gpt-5.5-pro` | 5.5 / pro (M) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5` | 5.5 / (default) (M) | `explore` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5` | 5.5 / (default) (M) | `worker` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.5` | 5.5 / (default) (M) | `reviewer` | `openai/gpt-5.5` | **retain** | **retain** |
-| `openai/gpt-5.5` | 5.5 / (default) (M) | `debug` | `openai/gpt-5.5-pro` | **retain** | **retain** |
-| `openai/gpt-5.5` | 5.5 / (default) (M) | `researcher` | **retain** | **retain** | **retain** |
-| `openai/gpt-5.4-pro` | 5.4 / pro (M) | `explore` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-pro` | 5.4 / pro (M) | `worker` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-pro` | 5.4 / pro (M) | `reviewer` | `openai/gpt-5.4-pro` | **retain** | **retain** |
-| `openai/gpt-5.4-pro` | 5.4 / pro (M) | `debug` | `openai/gpt-5.4-pro` | **retain** | **retain** |
-| `openai/gpt-5.4-pro` | 5.4 / pro (M) | `researcher` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4` | 5.4 / (default) (M) | `explore` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4` | 5.4 / (default) (M) | `worker` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4` | 5.4 / (default) (M) | `reviewer` | `openai/gpt-5.4` | **retain** | **retain** |
-| `openai/gpt-5.4` | 5.4 / (default) (M) | `debug` | `openai/gpt-5.4-pro` | **retain** | **retain** |
-| `openai/gpt-5.4` | 5.4 / (default) (M) | `researcher` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-mini` | 5.4 / mini (S) | `explore` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-mini` | 5.4 / mini (S) | `worker` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-mini` | 5.4 / mini (S) | `reviewer` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-mini` | 5.4 / mini (S) | `debug` | `openai/gpt-5.4-pro` | **retain** | **retain** |
-| `openai/gpt-5.4-mini` | 5.4 / mini (S) | `researcher` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-nano` | 5.4 / nano (S) | `explore` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-nano` | 5.4 / nano (S) | `worker` | `openai/gpt-5.4-mini` | **retain** | **retain** |
-| `openai/gpt-5.4-nano` | 5.4 / nano (S) | `reviewer` | `openai/gpt-5.4-nano` | **retain** | **retain** |
-| `openai/gpt-5.4-nano` | 5.4 / nano (S) | `debug` | `openai/gpt-5.4-pro` | **retain** | **retain** |
-| `openai/gpt-5.4-nano` | 5.4 / nano (S) | `researcher` | `openai/gpt-5.4-mini` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (L) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (L) | `worker` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (L) | `reviewer` | `example/gpt-97.2-astra` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (L) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (L) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-sol` | 97.2 / sol (L) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-sol` | 97.2 / sol (L) | `worker` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-sol` | 97.2 / sol (L) | `reviewer` | `example/gpt-97.2-sol` | **retain** | **retain** |
+| `example/gpt-97.2-sol` | 97.2 / sol (L) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-sol` | 97.2 / sol (L) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-terra` | 97.2 / terra (M) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-terra` | 97.2 / terra (M) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-terra` | 97.2 / terra (M) | `reviewer` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-terra` | 97.2 / terra (M) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-terra` | 97.2 / terra (M) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-pro` | 97.2 / pro (M) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-pro` | 97.2 / pro (M) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-pro` | 97.2 / pro (M) | `reviewer` | `example/gpt-97.2-pro` | **retain** | **retain** |
+| `example/gpt-97.2-pro` | 97.2 / pro (M) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-pro` | 97.2 / pro (M) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2` | 97.2 / (default) (M) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2` | 97.2 / (default) (M) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2` | 97.2 / (default) (M) | `reviewer` | `example/gpt-97.2` | **retain** | **retain** |
+| `example/gpt-97.2` | 97.2 / (default) (M) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2` | 97.2 / (default) (M) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-luna` | 97.2 / luna (S) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-luna` | 97.2 / luna (S) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-luna` | 97.2 / luna (S) | `reviewer` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-luna` | 97.2 / luna (S) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-luna` | 97.2 / luna (S) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-mini` | 97.2 / mini (S) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-mini` | 97.2 / mini (S) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-mini` | 97.2 / mini (S) | `reviewer` | `example/gpt-97.2-mini` | **retain** | **retain** |
+| `example/gpt-97.2-mini` | 97.2 / mini (S) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-mini` | 97.2 / mini (S) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-nano` | 97.2 / nano (S) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-nano` | 97.2 / nano (S) | `worker` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-nano` | 97.2 / nano (S) | `reviewer` | `example/gpt-97.2-nano` | **retain** | **retain** |
+| `example/gpt-97.2-nano` | 97.2 / nano (S) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-nano` | 97.2 / nano (S) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
 
 ### claude — size
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `anthropic/claude-opus-5-5` | 5.5 / opus (L) | `explore` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5-5` | 5.5 / opus (L) | `worker` | `anthropic/claude-sonnet-5-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5-5` | 5.5 / opus (L) | `reviewer` | `anthropic/claude-opus-5-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5-5` | 5.5 / opus (L) | `debug` | `anthropic/claude-sonnet-5-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5-5` | 5.5 / opus (L) | `researcher` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5-5` | 5.5 / sonnet (M) | `explore` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5-5` | 5.5 / sonnet (M) | `worker` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5-5` | 5.5 / sonnet (M) | `reviewer` | `anthropic/claude-sonnet-5-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5-5` | 5.5 / sonnet (M) | `debug` | `anthropic/claude-sonnet-5-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5-5` | 5.5 / sonnet (M) | `researcher` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-5-5` | 5.5 / haiku (S) | `explore` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-5-5` | 5.5 / haiku (S) | `worker` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-5-5` | 5.5 / haiku (S) | `reviewer` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-5-5` | 5.5 / haiku (S) | `debug` | `anthropic/claude-sonnet-5-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-5-5` | 5.5 / haiku (S) | `researcher` | `anthropic/claude-haiku-5-5` | **retain** | **retain** |
-| `anthropic/claude-fable-5` | 5 / fable (L) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-fable-5` | 5 / fable (L) | `worker` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-fable-5` | 5 / fable (L) | `reviewer` | `anthropic/claude-fable-5` | **retain** | **retain** |
-| `anthropic/claude-fable-5` | 5 / fable (L) | `debug` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-fable-5` | 5 / fable (L) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-5` | 5 / opus (L) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-5` | 5 / opus (L) | `worker` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5` | 5 / opus (L) | `reviewer` | `anthropic/claude-opus-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5` | 5 / opus (L) | `debug` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-opus-5` | 5 / opus (L) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-5` | 5 / sonnet (M) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-5` | 5 / sonnet (M) | `worker` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-5` | 5 / sonnet (M) | `reviewer` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5` | 5 / sonnet (M) | `debug` | `anthropic/claude-sonnet-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-5` | 5 / sonnet (M) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-8` | 4.8 / opus (L) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-8` | 4.8 / opus (L) | `worker` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-8` | 4.8 / opus (L) | `reviewer` | `anthropic/claude-opus-4-8` | **retain** | **retain** |
-| `anthropic/claude-opus-4-8` | 4.8 / opus (L) | `debug` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-8` | 4.8 / opus (L) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-7` | 4.7 / opus (L) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-7` | 4.7 / opus (L) | `worker` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-7` | 4.7 / opus (L) | `reviewer` | `anthropic/claude-opus-4-7` | **retain** | **retain** |
-| `anthropic/claude-opus-4-7` | 4.7 / opus (L) | `debug` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-7` | 4.7 / opus (L) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-6` | 4.6 / opus (L) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-6` | 4.6 / opus (L) | `worker` | `anthropic/claude-sonnet-4-6` | **retain** | **retain** |
-| `anthropic/claude-opus-4-6` | 4.6 / opus (L) | `reviewer` | `anthropic/claude-opus-4-6` | **retain** | **retain** |
-| `anthropic/claude-opus-4-6` | 4.6 / opus (L) | `debug` | `anthropic/claude-sonnet-4-6` | **retain** | **retain** |
-| `anthropic/claude-opus-4-6` | 4.6 / opus (L) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-6` | 4.6 / sonnet (M) | `explore` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-6` | 4.6 / sonnet (M) | `worker` | **retain** | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-6` | 4.6 / sonnet (M) | `reviewer` | `anthropic/claude-sonnet-4-6` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-6` | 4.6 / sonnet (M) | `debug` | `anthropic/claude-sonnet-4-6` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-6` | 4.6 / sonnet (M) | `researcher` | **retain** | **retain** | **retain** |
-| `anthropic/claude-opus-4-5` | 4.5 / opus (L) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5` | 4.5 / opus (L) | `worker` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5` | 4.5 / opus (L) | `reviewer` | `anthropic/claude-opus-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5` | 4.5 / opus (L) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5` | 4.5 / opus (L) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5-20251101` | 4.5 / opus (L) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5-20251101` | 4.5 / opus (L) | `worker` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5-20251101` | 4.5 / opus (L) | `reviewer` | `anthropic/claude-opus-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5-20251101` | 4.5 / opus (L) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-opus-4-5-20251101` | 4.5 / opus (L) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5` | 4.5 / sonnet (M) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5` | 4.5 / sonnet (M) | `worker` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5` | 4.5 / sonnet (M) | `reviewer` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5` | 4.5 / sonnet (M) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5` | 4.5 / sonnet (M) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5-20250929` | 4.5 / sonnet (M) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5-20250929` | 4.5 / sonnet (M) | `worker` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5-20250929` | 4.5 / sonnet (M) | `reviewer` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5-20250929` | 4.5 / sonnet (M) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-sonnet-4-5-20250929` | 4.5 / sonnet (M) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5` | 4.5 / haiku (S) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5` | 4.5 / haiku (S) | `worker` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5` | 4.5 / haiku (S) | `reviewer` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5` | 4.5 / haiku (S) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5` | 4.5 / haiku (S) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5-20251001` | 4.5 / haiku (S) | `explore` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5-20251001` | 4.5 / haiku (S) | `worker` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5-20251001` | 4.5 / haiku (S) | `reviewer` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5-20251001` | 4.5 / haiku (S) | `debug` | `anthropic/claude-sonnet-4-5` | **retain** | **retain** |
-| `anthropic/claude-haiku-4-5-20251001` | 4.5 / haiku (S) | `researcher` | `anthropic/claude-haiku-4-5` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (L) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (L) | `worker` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (L) | `reviewer` | `example/claude-fable-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (L) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (L) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-opus-97-2` | 97.2 / opus (L) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-opus-97-2` | 97.2 / opus (L) | `worker` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-opus-97-2` | 97.2 / opus (L) | `reviewer` | `example/claude-opus-97-2` | **retain** | **retain** |
+| `example/claude-opus-97-2` | 97.2 / opus (L) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-opus-97-2` | 97.2 / opus (L) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-sonnet-97-2` | 97.2 / sonnet (M) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-sonnet-97-2` | 97.2 / sonnet (M) | `worker` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-sonnet-97-2` | 97.2 / sonnet (M) | `reviewer` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-sonnet-97-2` | 97.2 / sonnet (M) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-sonnet-97-2` | 97.2 / sonnet (M) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-haiku-97-2` | 97.2 / haiku (S) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-haiku-97-2` | 97.2 / haiku (S) | `worker` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-haiku-97-2` | 97.2 / haiku (S) | `reviewer` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-haiku-97-2` | 97.2 / haiku (S) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-haiku-97-2` | 97.2 / haiku (S) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
 
 ### gemini — planner-worker
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `google/gemini-4-argon` | 4 / argon (planner) | `explore` | **retain** | **retain** | **retain** |
-| `google/gemini-4-argon` | 4 / argon (planner) | `worker` | **retain** | **retain** | **retain** |
-| `google/gemini-4-argon` | 4 / argon (planner) | `reviewer` | `google/gemini-4-argon` | **retain** | **retain** |
-| `google/gemini-4-argon` | 4 / argon (planner) | `debug` | **retain** | **retain** | **retain** |
-| `google/gemini-4-argon` | 4 / argon (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `explore` | `google/gemini-3.8-flash` | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `worker` | `google/gemini-3.8-flash` | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `debug` | `google/gemini-3.8-flash` | **retain** | **retain** |
-| `google/gemini-3.8-flash` | 3.8 / flash (worker) | `researcher` | `google/gemini-3.8-flash` | **retain** | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `explore` | `google/gemini-3.7-flash` | **retain** | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `worker` | `google/gemini-3.7-flash` | **retain** | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `debug` | `google/gemini-3.7-flash` | **retain** | **retain** |
-| `google/gemini-3.7-flash` | 3.7 / flash (worker) | `researcher` | `google/gemini-3.7-flash` | **retain** | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `explore` | `google/gemini-3.6-flash` | **retain** | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `worker` | `google/gemini-3.6-flash` | **retain** | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `debug` | `google/gemini-3.6-flash` | **retain** | **retain** |
-| `google/gemini-3.6-flash` | 3.6 / flash (worker) | `researcher` | `google/gemini-3.6-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `explore` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `worker` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `reviewer` | **retain** | **retain** | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `debug` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash` | 3.5 / flash (worker) | `researcher` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `explore` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `worker` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `reviewer` | **retain** | **retain** | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `debug` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.5-flash-lite` | 3.5 / flash-lite (worker) | `researcher` | `google/gemini-3.5-flash` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `explore` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `worker` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `reviewer` | `google/gemini-3.1-pro-preview` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `debug` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-pro-preview` | 3.1 / pro-preview (planner) | `researcher` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `explore` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `worker` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `reviewer` | `google/gemini-3.1-pro-preview` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `debug` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-3.1-flash-lite` | 3.1 / flash-lite (worker) | `researcher` | `google/gemini-3.1-flash-lite` | **retain** | **retain** |
-| `google/gemini-2.5-pro` | 2.5 / pro (planner) | `explore` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-pro` | 2.5 / pro (planner) | `worker` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-pro` | 2.5 / pro (planner) | `reviewer` | `google/gemini-2.5-pro` | **retain** | **retain** |
-| `google/gemini-2.5-pro` | 2.5 / pro (planner) | `debug` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-pro` | 2.5 / pro (planner) | `researcher` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash` | 2.5 / flash (worker) | `explore` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash` | 2.5 / flash (worker) | `worker` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash` | 2.5 / flash (worker) | `reviewer` | `google/gemini-2.5-pro` | **retain** | **retain** |
-| `google/gemini-2.5-flash` | 2.5 / flash (worker) | `debug` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash` | 2.5 / flash (worker) | `researcher` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash-lite` | 2.5 / flash-lite (worker) | `explore` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash-lite` | 2.5 / flash-lite (worker) | `worker` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash-lite` | 2.5 / flash-lite (worker) | `reviewer` | `google/gemini-2.5-pro` | **retain** | **retain** |
-| `google/gemini-2.5-flash-lite` | 2.5 / flash-lite (worker) | `debug` | `google/gemini-2.5-flash` | **retain** | **retain** |
-| `google/gemini-2.5-flash-lite` | 2.5 / flash-lite (worker) | `researcher` | `google/gemini-2.5-flash` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
 
 ### glm — planner-worker
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `zai/glm-5.3` | 5.3 / (default) (planner) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3` | 5.3 / (default) (planner) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3` | 5.3 / (default) (planner) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `zai/glm-5.3` | 5.3 / (default) (planner) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3` | 5.3 / (default) (planner) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3` | 5.3 / (default) (planner) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3` | 5.3 / (default) (planner) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3` | 5.3 / (default) (planner) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `opencode/glm-5.3` | 5.3 / (default) (planner) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3` | 5.3 / (default) (planner) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3` | 5.3 / (default) (planner) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3` | 5.3 / (default) (planner) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3` | 5.3 / (default) (planner) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `radius/glm-5.3` | 5.3 / (default) (planner) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3` | 5.3 / (default) (planner) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3-flash` | 5.3 / flash (worker) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3-flash` | 5.3 / flash (worker) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3-flash` | 5.3 / flash (worker) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `zai/glm-5.3-flash` | 5.3 / flash (worker) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `zai/glm-5.3-flash` | 5.3 / flash (worker) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3-flash` | 5.3 / flash (worker) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3-flash` | 5.3 / flash (worker) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3-flash` | 5.3 / flash (worker) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `opencode/glm-5.3-flash` | 5.3 / flash (worker) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `opencode/glm-5.3-flash` | 5.3 / flash (worker) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3-flash` | 5.3 / flash (worker) | `explore` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3-flash` | 5.3 / flash (worker) | `worker` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3-flash` | 5.3 / flash (worker) | `reviewer` | `zai/glm-5.3` | **retain** | **retain** |
-| `radius/glm-5.3-flash` | 5.3 / flash (worker) | `debug` | `zai/glm-5.3-flash` | **retain** | **retain** |
-| `radius/glm-5.3-flash` | 5.3 / flash (worker) | `researcher` | `zai/glm-5.3-flash` | **retain** | **retain** |
+| `example/glm-97.2` | 97.2 / (default) (planner) | `explore` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2` | 97.2 / (default) (planner) | `worker` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2` | 97.2 / (default) (planner) | `reviewer` | `example/glm-97.2` | **retain** | **retain** |
+| `example/glm-97.2` | 97.2 / (default) (planner) | `debug` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2` | 97.2 / (default) (planner) | `researcher` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2-flash` | 97.2 / flash (worker) | `explore` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2-flash` | 97.2 / flash (worker) | `worker` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/glm-97.2` | **retain** | **retain** |
+| `example/glm-97.2-flash` | 97.2 / flash (worker) | `debug` | `example/glm-97.2-flash` | **retain** | **retain** |
+| `example/glm-97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/glm-97.2-flash` | **retain** | **retain** |
 
 ### minimax — planner-worker
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `minimax/MiniMax-M3.1` | 3.1 / (default) (planner) | `explore` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1` | 3.1 / (default) (planner) | `worker` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1` | 3.1 / (default) (planner) | `reviewer` | `minimax/MiniMax-M3.1` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1` | 3.1 / (default) (planner) | `debug` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1` | 3.1 / (default) (planner) | `researcher` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `explore` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `worker` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `reviewer` | `minimax/MiniMax-M3.1` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `debug` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3.1-flash` | 3.1 / flash (worker) | `researcher` | `minimax/MiniMax-M3.1-flash` | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `explore` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `worker` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `reviewer` | `minimax/MiniMax-M3` | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `debug` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M3` | 3 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `explore` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `worker` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | **retain** | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `debug` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7-highspeed` | 2.7 / highspeed (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `explore` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `worker` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `reviewer` | `minimax/MiniMax-M2.7-highspeed` | **retain** | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `debug` | **retain** | **retain** | **retain** |
-| `minimax/MiniMax-M2.7` | 2.7 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
+| `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `explore` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `worker` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `reviewer` | `example/MiniMax-M97.2-highspeed` | **retain** | **retain** |
+| `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `debug` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-highspeed` | 97.2 / highspeed (planner) | `researcher` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2` | 97.2 / (default) (planner) | `explore` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2` | 97.2 / (default) (planner) | `worker` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2` | 97.2 / (default) (planner) | `reviewer` | `example/MiniMax-M97.2-highspeed` | **retain** | **retain** |
+| `example/MiniMax-M97.2` | 97.2 / (default) (planner) | `debug` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2` | 97.2 / (default) (planner) | `researcher` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-flash` | 97.2 / flash (worker) | `explore` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-flash` | 97.2 / flash (worker) | `worker` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/MiniMax-M97.2-highspeed` | **retain** | **retain** |
+| `example/MiniMax-M97.2-flash` | 97.2 / flash (worker) | `debug` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
+| `example/MiniMax-M97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/MiniMax-M97.2-flash` | **retain** | **retain** |
 
 ### qwen — size
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `explore` | **retain** | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `worker` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `reviewer` | `qwen-token-plan/qwen3.7-max` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `debug` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-max` | 3.7 / max (L) | `researcher` | **retain** | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `explore` | **retain** | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `worker` | **retain** | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `reviewer` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `debug` | `qwen-token-plan/qwen3.7-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.7-plus` | 3.7 / plus (M) | `researcher` | **retain** | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `explore` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `worker` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `reviewer` | `qwen-token-plan/qwen3.6-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `debug` | `qwen-token-plan/qwen3.6-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-plus` | 3.6 / plus (M) | `researcher` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-flash` | 3.6 / flash (S) | `explore` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-flash` | 3.6 / flash (S) | `worker` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-flash` | 3.6 / flash (S) | `reviewer` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-flash` | 3.6 / flash (S) | `debug` | `qwen-token-plan/qwen3.6-plus` | **retain** | **retain** |
-| `qwen-token-plan/qwen3.6-flash` | 3.6 / flash (S) | `researcher` | `qwen-token-plan/qwen3.6-flash` | **retain** | **retain** |
+| `example/qwen97.2-max` | 97.2 / max (L) | `explore` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-max` | 97.2 / max (L) | `worker` | `example/qwen97.2-plus` | **retain** | **retain** |
+| `example/qwen97.2-max` | 97.2 / max (L) | `reviewer` | `example/qwen97.2-max` | **retain** | **retain** |
+| `example/qwen97.2-max` | 97.2 / max (L) | `debug` | `example/qwen97.2-plus` | **retain** | **retain** |
+| `example/qwen97.2-max` | 97.2 / max (L) | `researcher` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-plus` | 97.2 / plus (M) | `explore` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-plus` | 97.2 / plus (M) | `worker` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-plus` | 97.2 / plus (M) | `reviewer` | `example/qwen97.2-plus` | **retain** | **retain** |
+| `example/qwen97.2-plus` | 97.2 / plus (M) | `debug` | `example/qwen97.2-plus` | **retain** | **retain** |
+| `example/qwen97.2-plus` | 97.2 / plus (M) | `researcher` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-flash` | 97.2 / flash (S) | `explore` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-flash` | 97.2 / flash (S) | `worker` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-flash` | 97.2 / flash (S) | `reviewer` | `example/qwen97.2-flash` | **retain** | **retain** |
+| `example/qwen97.2-flash` | 97.2 / flash (S) | `debug` | `example/qwen97.2-plus` | **retain** | **retain** |
+| `example/qwen97.2-flash` | 97.2 / flash (S) | `researcher` | `example/qwen97.2-flash` | **retain** | **retain** |
 
 ### deepseek — planner-worker
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `deepseek/deepseek-v4-pro` | 4 / pro (planner) | `explore` | **retain** | **retain** | **retain** |
-| `deepseek/deepseek-v4-pro` | 4 / pro (planner) | `worker` | **retain** | **retain** | **retain** |
-| `deepseek/deepseek-v4-pro` | 4 / pro (planner) | `reviewer` | `deepseek/deepseek-v4-pro` | **retain** | **retain** |
-| `deepseek/deepseek-v4-pro` | 4 / pro (planner) | `debug` | **retain** | **retain** | **retain** |
-| `deepseek/deepseek-v4-pro` | 4 / pro (planner) | `researcher` | **retain** | **retain** | **retain** |
+| `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `explore` | **retain** | **retain** | **retain** |
+| `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `worker` | **retain** | **retain** | **retain** |
+| `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `reviewer` | `example/deepseek-v97.2-pro` | **retain** | **retain** |
+| `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `debug` | **retain** | **retain** | **retain** |
+| `example/deepseek-v97.2-pro` | 97.2 / pro (planner) | `researcher` | **retain** | **retain** | **retain** |
 
 ### mimo — planner-worker
 
 | Parent model | Version / rung (size or class) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro-ultraspeed` | 2.6 / pro-ultraspeed (planner) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-pro` | 2.6 / pro (planner) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `explore` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `worker` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `reviewer` | `xiaomi/mimo-v2.6-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `debug` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.6-flash` | 2.6 / flash (worker) | `researcher` | `xiaomi/mimo-v2.6-flash` | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `explore` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `worker` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `reviewer` | `xiaomi/mimo-v2.5-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `debug` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro-ultraspeed` | 2.5 / pro-ultraspeed (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro` | 2.5 / pro (planner) | `explore` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro` | 2.5 / pro (planner) | `worker` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro` | 2.5 / pro (planner) | `reviewer` | `xiaomi/mimo-v2.5-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro` | 2.5 / pro (planner) | `debug` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5-pro` | 2.5 / pro (planner) | `researcher` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `explore` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `worker` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `reviewer` | `xiaomi/mimo-v2.5-pro-ultraspeed` | **retain** | **retain** |
-| `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `debug` | **retain** | **retain** | **retain** |
-| `xiaomi/mimo-v2.5` | 2.5 / (default) (planner) | `researcher` | **retain** | **retain** | **retain** |
+| `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `explore` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `worker` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `reviewer` | `example/mimo-v97.2-pro-ultraspeed` | **retain** | **retain** |
+| `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `debug` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro-ultraspeed` | 97.2 / pro-ultraspeed (planner) | `researcher` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro` | 97.2 / pro (planner) | `explore` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro` | 97.2 / pro (planner) | `worker` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro` | 97.2 / pro (planner) | `reviewer` | `example/mimo-v97.2-pro-ultraspeed` | **retain** | **retain** |
+| `example/mimo-v97.2-pro` | 97.2 / pro (planner) | `debug` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-pro` | 97.2 / pro (planner) | `researcher` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2` | 97.2 / (default) (planner) | `explore` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2` | 97.2 / (default) (planner) | `worker` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2` | 97.2 / (default) (planner) | `reviewer` | `example/mimo-v97.2-pro-ultraspeed` | **retain** | **retain** |
+| `example/mimo-v97.2` | 97.2 / (default) (planner) | `debug` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2` | 97.2 / (default) (planner) | `researcher` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-flash` | 97.2 / flash (worker) | `explore` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-flash` | 97.2 / flash (worker) | `worker` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/mimo-v97.2-pro-ultraspeed` | **retain** | **retain** |
+| `example/mimo-v97.2-flash` | 97.2 / flash (worker) | `debug` | `example/mimo-v97.2-flash` | **retain** | **retain** |
+| `example/mimo-v97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/mimo-v97.2-flash` | **retain** | **retain** |
 <!-- model-matrix:full:end -->
 
 ## 5. The rules, in order
@@ -517,7 +358,11 @@ Consequences worth naming:
 - **Fallback goes downward from the target.** An unavailable target can lead to
   cheaper rungs in the same version, then retention. A version with no target
   for the role retains the parent, even when another version has that target.
-  For example, GPT 6.1 has no M rung, so its worker retains the parent.
+  For example, if no GPT 7 M or S candidate is runnable, its worker retains
+  the parent. Abstract rungs are not evidence of released models.
+- **Providers are deterministic.** Prefer the parent provider for the exact ID;
+  otherwise require a unique matching provider. Multiple alternate providers
+  make a tier unusable, so cheaper eligible tiers are tried before retention.
 - **Tier matching is specific.** `flash-lite` is its own worker rung, not
   `flash`; dated Claude snapshots use the size of their matched tier.
 - **Explicit beats routing, always.** A request or definition model is resolved
@@ -535,19 +380,20 @@ Consequences worth naming:
 
 ## 6. What this matrix does not promise
 
-- **The IDs are representative profile data, not a vendor release list.** A tier
+- **The IDs are synthetic examples, not profile data or vendor releases.** A tier
   the session cannot run is skipped, so your effective child may differ from
   the all-available column.
 - **Family support does not guarantee a cheaper child.** DeepSeek has no worker
   class, so non-review roles retain the parent. Review uses its planner class.
-  MiniMax does have a worker: M3.1 flash (not a Gemini 3.1 flash release).
+  MiniMax has an abstract flash worker rung; its exact same-version ID must
+  still be runnable.
 - **An unknown family retains the parent**, without guessing a replacement. A
-  known family whose rung or exact version is missing also retains the parent.
+  known family whose rung is unknown or whose exact-version candidates are unavailable also retains the parent.
   Kimi has no shipped profile; GLM does.
 - **Operators replace profiles whole.** A project `familyProfiles` entry for one
-  family replaces that family's versions, tiers, and candidates entirely;
+  family replaces that family's version-independent tiers entirely;
   other families are untouched. Legacy `fallbacks` settings are ignored; the
-  schema no longer exposes that field. Replacement profiles must declare
+  field is accepted only to discard its obsolete contents. Replacement profiles must declare
   the group and the corresponding size/class labels. A new *naming* family
   still needs code support in `strategy.ts`.
 - **Pinning a model in an agent file bypasses this whole table** for that agent.
@@ -560,7 +406,7 @@ profiles, strategies, or routing:
 
 ```bash
 pnpm nx run pi-tiered-subagents:regenerate-model-matrix
-pnpm nx run pi-tiered-subagents:test -- test/models/routing-matrix.test.ts
+pnpm nx run pi-tiered-subagents:test --args="test/models/routing-matrix.test.ts"
 ```
 
 The async writer is [`scripts/regenerate-model-matrix.ts`](../scripts/regenerate-model-matrix.ts);

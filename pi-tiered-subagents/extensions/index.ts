@@ -81,7 +81,7 @@ import {
 } from "#src/shared-settings";
 import { detectEnv } from "#src/session/env";
 import { isChildExtensionLoading } from "#src/session/child-extension-scope";
-import type { FamilyProfile } from "#src/models/profile";
+import type { FamilyProfile } from "#src/models/profiles";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import type { RoutingLadders } from "#src/models/router";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";

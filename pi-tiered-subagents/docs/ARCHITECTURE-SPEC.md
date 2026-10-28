@@ -338,52 +338,47 @@ required `group`:
 Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
-sonnet = M, haiku = S; GPT sol and astra = L, pro/luna/terra = M, mini/nano = S.
-Dated snapshots use the size of the tier they belong to.
+Size assignments are Qwen max = L, plus = M, flash = S; Claude fable/opus = L,
+sonnet = M, haiku = S; GPT astra/sol = L, terra/pro/default = M,
+luna/mini/nano = S. Dated parents use the labels of their tier.
 
-Automatic model routing stays within the parent's exact family and version.
-A size or class target starts at the top matching rung in that version; Equal
-starts at the parent's own rung, not the top of its size. Try concrete IDs in
-preference order, then eligible cheaper rungs in the same version, skipping
-anything the session cannot run. No version fallback links are supported or
-inferred. If no role target or cheaper rung is runnable, keep the parent's
-model and report why. An unknown family also retains the parent, without
-price-based or name-based guessing. A reviewer retaining its own rung by Equal
-is a designed choice, not an exhaustion fallback. The launch reason names the
-role and target as well as the chosen model, including retained outcomes.
+Profiles describe **version-independent family ladders**, not a release or model
+catalogue. A strategy extracts the parent's version and tier; the role selects a
+size/class target on that family's ordered ladder. Equal starts at the parent's
+own rung. For each target or permitted cheaper rung, the strategy constructs one
+exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
+`claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
+releases. Construction is not an availability claim: only an exact ID in the
+session's runnable models can win. Dated or specialized IDs are not fuzzy
+substitutes for the constructed identity; an explicit pin still resolves exactly.
 
-Flash-named tiers, including the separate flash-lite rung, are worker class;
-pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the worker rung
-below its planner flagship, available only to routing within version 3.1.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
-cannot reach it; flash-only Gemini versions cannot reach a different version's
-planner, and Qwen cannot reach another version's S tier. Missing targets retain
-the parent. DeepSeek has planner but no worker class: reviewer targets pro,
-and the other roles retain the parent.
+Provider selection is deterministic for each exact candidate ID:
+1. Prefer the parent's provider if runnable there.
+2. Otherwise accept a unique matching provider.
+3. Multiple other matching providers make the rung ambiguous/unusable. Continue
+   to eligible cheaper tiers, then retain the parent if none can be selected.
 
-GLM uses a glued-version naming strategy (version adjoining the prefix,
-variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: an unpinned Kimi parent is retained.
-The shipped catalogue is representative of the installed SDK, not a promise of
-vendor availability. Profiles enumerate candidates; session access decides
-which can run. Model routing changes neither exact-pin resolution nor reasoning
-selection.
+This is not same-provider-only routing, and registry order never chooses a
+provider. Session credentials, availability, and restrictions remain authoritative.
+No cross-version fallback is allowed. Unknown families, unparseable versions,
+unknown parent tiers, or exhausted ladders retain the captured parent and explain
+why. Planner review may degrade to a worker in the same version. DeepSeek's
+profile has no worker rung, so its non-review roles retain the parent.
 
-A replacement must declare `group: "size"` or `group: "planner-worker"`.
-Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
-planner/worker profile requires `class: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Version names, tier names,
-provider names, and model ids are trimmed; a name that becomes blank is rejected,
-while an empty tier name remains the version's default model. Unknown profile
-fields are rejected with path-aware diagnostics so a misspelled key cannot be
-silently ignored. The one exception is an obsolete tier-level `fallbacks` field,
-which is accepted and discarded along with its contents. Upgrade existing whole
-replacements by adding these labels. Version/tier/model shape and whole-family
-replacement semantics stay the same; version fallback links are removed from
-the schema, shipped data, and runtime. Examples are representative
-profile data, not provider-access guarantees.
+Profiles are data only. Each replacement declares `group: "size"` or
+`group: "planner-worker"` and `tiers`, most capable first. Size tiers require
+`size: "S" | "M" | "L"`; planner/worker tiers require
+`class: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
+the empty tier denotes the unnamed default line where the strategy supports it.
+Invalid labels, unsupported naming structures, empty ladders, and invalid tier
+names are reported. Unknown fields are rejected with deterministic field paths;
+obsolete tier-level `fallbacks` alone is accepted and discarded.
+
+**Migration:** replace old `versions` arrays and per-tier `models` arrays with one
+family `tiers` array. Do not declare releases, concrete IDs, or provider priorities.
+Old catalogue-shaped replacements are diagnosed rather than silently migrated.
+GPT Luna is S throughout the ladder. GLM is supported; Kimi remains an unknown
+family for automatic routing. Model pins and reasoning policies are unchanged.
 
 ### Routing-target ownership
 
@@ -393,8 +388,7 @@ label matching, starting rung, and fallback rank. The router owns the common
 walk over the exact parent version and session availability; it does not
 reimplement group-specific matching or cross versions. Keep behavioral coverage
 at the routing/resolution seams; no new class-internal tests are required.
-This changes neither the five-role mapping nor the shipped family/version
-catalogue, and adds no launch authority.
+The version-independent ladders preserve the five-role mapping and add no launch authority.
 
 ### 6. Turn policy and captured versus live settings
 

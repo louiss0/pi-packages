@@ -1,5 +1,5 @@
 /** The shipped specialist-to-target policy; unknown identifiers use worker. */
-import type { ModelClass, ModelSize } from "#src/models/profile";
+import type { ModelClass, ModelSize } from "#src/models/profiles";
 
 export type RolePolicy = Readonly<{
   size: ModelSize | "equal" | "one-below";

@@ -3,7 +3,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import { parseModelIdentity, resolveExactModel } from "#src/models/identity";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { makeModel } from "#test/helpers/make-model";
-import type { FamilyProfile } from "#src/models/profile";
+import type { FamilyProfile } from "#src/models/profiles";
 import type { ModelRegistry } from "#src/models/registry";
 import { type RoutingContext, routingContext } from "#src/models/router";
 import { selectModel } from "#src/models/selection";
@@ -222,16 +222,16 @@ describe("selectModel", () => {
 
   it("keeps the parent's model when the ladder has nothing to offer", () => {
     const result = selectModel(
-      { parentModel: LUNA },
-      registry([LUNA]),
-      routing([LUNA]),
+      { parentModel: SOL },
+      registry([SOL]),
+      routing([SOL]),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.selection.source).toBe("inherited");
     expect(result.selection.identity).toEqual({
-      provider: LUNA.provider,
-      id: LUNA.id,
+      provider: SOL.provider,
+      id: SOL.id,
     });
   });
 });

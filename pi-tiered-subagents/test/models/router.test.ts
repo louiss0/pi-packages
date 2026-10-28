@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Model } from "@earendil-works/pi-ai";
-import { type FamilyProfile, validateProfile } from "#src/models/profile";
+import { type FamilyProfile, validateProfile } from "#src/models/profiles";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { type RoutingContext, routeModel } from "#src/models/router";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
@@ -59,94 +59,23 @@ describe("the shipped profiles", () => {
 });
 
 describe("validateProfile", () => {
-  const strategy = strategies.get("gpt");
-
-  it("rejects a model from another family", () => {
-    const problems = validateProfile(
-      {
-        family: "gpt",
-        group: "size",
-        versions: [
-          {
-            version: "6.1",
-            tiers: [
-              {
-                tier: "sol",
-                size: "L",
-                models: [model("openai", "claude-opus-5")],
-              },
-            ],
-          },
-        ],
-      },
-      strategy,
-    );
-    expect(problems.length).toBeGreaterThan(0);
-  });
-
-  it("rejects a model of another version", () => {
-    const problems = validateProfile(
-      {
-        family: "gpt",
-        group: "size",
-        versions: [
-          {
-            version: "6.1",
-            tiers: [
-              {
-                tier: "sol",
-                size: "L",
-                models: [model("openai", "gpt-6-sol")],
-              },
-            ],
-          },
-        ],
-      },
-      strategy,
-    );
-    expect(problems[0]?.problem).toContain("is version 6, not 6.1");
-  });
-
-  it("rejects a model that is not in the tier it is listed under", () => {
-    const problems = validateProfile(
-      {
-        family: "gpt",
-        group: "size",
-        versions: [
-          {
-            version: "6.1",
-            tiers: [
-              {
-                tier: "luna",
-                size: "M",
-                models: [model("openai", "gpt-6.1-sol")],
-              },
-            ],
-          },
-        ],
-      },
-      strategy,
-    );
-    expect(problems[0]?.problem).toContain("is not in the tier");
-  });
-
-  it("rejects a family with no naming structure", () => {
-    const problems = validateProfile(
-      {
-        family: "llama",
-        group: "size",
-        versions: [
-          {
-            version: "1",
-            tiers: [{ tier: "", size: "M", models: [model("x", "y")] }],
-          },
-        ],
-      },
-      undefined,
-    );
+  it.each([
+    { family: "gpt", group: "size", tiers: [] },
+    { family: "gpt", group: "size", tiers: [{ tier: "sol" }] },
+    {
+      family: "gpt",
+      group: "size",
+      tiers: [
+        { tier: "sol", size: "L" },
+        { tier: "sol", size: "M" },
+      ],
+    },
+    { family: "gpt", group: "size", tiers: [{ tier: "gpt-7-sol", size: "L" }] },
+    { family: "gpt", group: "size", tiers: [{ tier: "7", size: "L" }] },
+  ] as FamilyProfile[])("rejects unusable family ladders: %j", (profile) => {
     expect(
-      problems.some((problem) => problem.problem.includes("naming structure")),
-    ).toBe(true);
+      validateProfile(profile, strategies.get(profile.family)).length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -194,15 +123,21 @@ describe("routeModel", () => {
   });
 
   it.each([
-    ["openai", "gpt-6-astra", "worker", "gpt-6-luna", "M"],
+    ["openai", "gpt-6-astra", "worker", "gpt-6-terra", "M"],
     ["openai", "gpt-6-sol", "reviewer", "gpt-6-sol", "L"],
     ["openai", "gpt-5.6-luna", "debug", "gpt-5.6-terra", "M"],
     ["openai", "gpt-5.6-terra", "debug", "gpt-5.6-terra", "M"],
-    ["openai", "gpt-5.4", "researcher", "gpt-5.4-mini", "S"],
-    ["openai", "gpt-5.4-nano", "worker", "gpt-5.4-mini", "S"],
+    ["openai", "gpt-5.4", "researcher", "gpt-5.4-luna", "S"],
+    ["openai", "gpt-5.4-nano", "worker", "gpt-5.4-luna", "S"],
     ["qwen-token-plan", "qwen3.7-max", "worker", "qwen3.7-plus", "M"],
     ["minimax", "MiniMax-M3.1", "debug", "MiniMax-M3.1-flash", "worker"],
-    ["minimax", "MiniMax-M3.1-flash", "reviewer", "MiniMax-M3.1", "planner"],
+    [
+      "minimax",
+      "MiniMax-M3.1-flash",
+      "reviewer",
+      "MiniMax-M3.1-highspeed",
+      "planner",
+    ],
     ["xiaomi", "mimo-v2.6-pro", "worker", "mimo-v2.6-flash", "worker"],
     [
       "xiaomi",
@@ -215,14 +150,14 @@ describe("routeModel", () => {
     ["zai", "glm-5.3-flash", "reviewer", "glm-5.3", "planner"],
     ["deepseek", "deepseek-v4-pro", "reviewer", "deepseek-v4-pro", "planner"],
   ])("%s/%s routes %s to %s (%s)", (provider, parentId, role, expected, target) => {
-    const available = SHIPPED_PROFILES.flatMap((profile) =>
-      profile.versions.flatMap((version) =>
-        version.tiers.flatMap((tier) =>
-          tier.models.map((candidate) =>
-            model(candidate.provider, candidate.id),
-          ),
-        ),
-      ),
+    // Materialize this test's exact release, not a runtime release catalogue.
+    const strategy = [...strategies.values()].find((candidate) =>
+      candidate.belongs(parentId),
+    );
+    const version = strategy?.parse(parentId)?.version;
+    if (!strategy || !version) throw new Error("Unparseable fixture");
+    const available = (shippedProfiles().get(strategy.family)?.tiers ?? []).map(
+      (tier) => model(provider, strategy.construct(version, tier.tier)),
     );
     const outcome = routeModel(
       model(provider, parentId),
@@ -263,7 +198,7 @@ describe("routeModel", () => {
     expect(outcome.tier).toBe("gpt 5.6 tier terra");
   });
 
-  it("takes the first model of a tier in the profile's preference order", () => {
+  it("constructs the exact base identity rather than a dated snapshot", () => {
     const outcome = routeModel(
       model("anthropic", "claude-opus-4-5"),
       context([
@@ -297,15 +232,9 @@ describe("routeModel", () => {
     const profile: FamilyProfile = {
       family: "gpt",
       group: "size",
-      versions: [
-        {
-          version: "6.1",
-          tiers: [{ tier: "sol", size: "L", models: [parent], ...legacyLinks }],
-        },
-        {
-          version: "6",
-          tiers: [{ tier: "luna", size: "M", models: [otherVersion] }],
-        },
+      tiers: [
+        { tier: "sol", size: "L", ...legacyLinks },
+        { tier: "luna", size: "S" },
       ],
     };
     const outcome = routeModel(
@@ -323,28 +252,9 @@ describe("routeModel", () => {
     const profile: FamilyProfile = {
       family: "gpt",
       group: "size",
-      versions: [
-        {
-          version: "6.1",
-          tiers: [
-            {
-              tier: "sol",
-              size: "L",
-              models: [model("openai", "gpt-6.1-sol")],
-            },
-          ],
-        },
-        {
-          version: "6",
-          tiers: [
-            { tier: "sol", size: "L", models: [model("openai", "gpt-6-sol")] },
-            {
-              tier: "luna",
-              size: "M",
-              models: [model("openai", "gpt-6-luna")],
-            },
-          ],
-        },
+      tiers: [
+        { tier: "sol", size: "L" },
+        { tier: "luna", size: "S" },
       ],
     };
     const outcome = routeModel(
@@ -375,12 +285,14 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("no profile");
   });
 
-  it("keeps the parent's model when its version is not on the ladder", () => {
+  it("retains when a new version has no runnable target", () => {
     const parent = model("openai", "gpt-4.1");
     const outcome = routeModel(parent, context([parent]));
     expect(outcome.kind).toBe("retained");
     if (outcome.kind !== "retained") return;
-    expect(outcome.reason).toContain("no profile for version 4.1");
+    expect(outcome.reason).toContain(
+      "no runnable target or cheaper tier in gpt 4.1",
+    );
   });
 
   it("keeps a parent it cannot place in a family", () => {
@@ -466,8 +378,6 @@ describe("routeModel", () => {
   });
 
   it.each([
-    ["google", "gemini-3.7-flash", "reviewer", "gemini-2.5-pro", "planner"],
-    ["google", "gemini-3.5-flash", "reviewer", "gemini-2.5-pro", "planner"],
     ["minimax", "MiniMax-M3", "worker", "MiniMax-M3.1-flash", "worker"],
     ["minimax", "MiniMax-M2.7", "explore", "MiniMax-M3.1-flash", "worker"],
     ["qwen-token-plan", "qwen3.7-max", "researcher", "qwen3.6-flash", "S"],
@@ -483,6 +393,19 @@ describe("routeModel", () => {
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
     expect(outcome.reason).toContain(`${role} targets ${target}`);
+  });
+
+  it.each([
+    "3.7",
+    "3.5",
+  ])("review degrades to the parent's worker in %s, never another release's planner", (version) => {
+    const parent = model("google", `gemini-${version}-flash`);
+    const outcome = routeModel(
+      parent,
+      context([parent, model("google", "gemini-2.5-pro")]),
+      "reviewer",
+    );
+    expect(outcome).toMatchObject({ kind: "routed", model: parent });
   });
 
   it("degrades review downward when its planner target is unavailable", () => {

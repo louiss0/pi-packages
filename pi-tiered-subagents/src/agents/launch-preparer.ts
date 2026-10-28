@@ -280,13 +280,7 @@ function copyRoutingLadders(ladders: RoutingLadders): RoutingLadders {
         family,
         {
           ...profile,
-          versions: profile.versions.map((version) => ({
-            ...version,
-            tiers: version.tiers.map((tier) => ({
-              ...tier,
-              models: tier.models.map((model) => ({ ...model })),
-            })),
-          })),
+          tiers: profile.tiers.map((tier) => ({ ...tier })),
         },
       ]),
     ),

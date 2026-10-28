@@ -9,11 +9,7 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import type {
-  FamilyProfile,
-  ModelCandidate,
-  TierProfile,
-} from "#src/models/profile";
+import type { FamilyProfile, TierProfile } from "#src/models/profiles";
 import { policyFor } from "#src/models/role-policy";
 import {
   createRoutingTarget,
@@ -120,29 +116,27 @@ export function routeModel(
   }
 
   const parts = strategy.parse(parent.id);
-  const version = parts?.version
-    ? profile.versions.find((candidate) => candidate.version === parts.version)
-    : undefined;
+  const version = parts?.version;
   if (!version) {
     return {
       kind: "retained",
       model: parent,
-      reason: `${intent}: the ${strategy.family} family has no profile for version ${parts?.version ?? "the model's"}; keeping ${parent.id}`,
+      reason: `${intent}: ${parent.id} has no extractable version; keeping the parent`,
     };
   }
 
   const parentTierName = mostSpecificTier(
     parts?.tierCandidates ?? [],
-    version.tiers.map((candidate) => candidate.tier),
+    profile.tiers.map((candidate) => candidate.tier),
   );
-  const parentTier = version.tiers.find(
+  const parentTier = profile.tiers.find(
     (candidate) => candidate.tier === parentTierName,
   );
   if (!parentTier) {
     return {
       kind: "retained",
       model: parent,
-      reason: `${intent}: the ${strategy.family} ${version.version} ladder does not name the tier of "${parent.id}"; keeping the parent`,
+      reason: `${intent}: the ${strategy.family} ${version} ladder does not name the tier of "${parent.id}"; keeping the parent`,
     };
   }
 
@@ -154,66 +148,55 @@ export function routeModel(
       reason: `${intent}: the parent tier has no size label; keeping ${parent.id}`,
     };
   }
-  const startingTier = routingTarget.startingTier(version, parentTier);
+  const startingTier = routingTarget.startingTier(profile, parentTier);
   const candidateTiers = startingTier
-    ? version.tiers.slice(version.tiers.indexOf(startingTier))
+    ? profile.tiers.slice(profile.tiers.indexOf(startingTier))
     : [];
   const found = pickRunnableTier(
     candidateTiers,
     routingTarget,
-    indexAvailable(context.available),
+    context.available,
+    strategy,
+    version,
+    parent.provider,
   );
   if (!found) {
     return {
       kind: "retained",
       model: parent,
-      reason: `${agentId} targets ${routingTarget.label}: no runnable target or cheaper tier in ${strategy.family} ${version.version}; keeping ${parent.id}`,
+      reason: `${agentId} targets ${routingTarget.label}: no runnable target or cheaper tier in ${strategy.family} ${version} (unavailable or provider-ambiguous); keeping ${parent.id}`,
     };
   }
 
   return {
     kind: "routed",
     model: found.model,
-    provider: found.candidate.provider,
-    modelId: found.candidate.id,
-    tier: `${strategy.family} ${version.version} tier ${found.tierName || "default"}`,
-    reason: `${agentId} targets ${routingTarget.label}: ${parent.id} → ${found.candidate.id} (${strategy.family} ${version.version} tier ${found.tierName || "default"})`,
+    provider: found.model.provider,
+    modelId: found.model.id,
+    tier: `${strategy.family} ${version} tier ${found.tierName || "default"}`,
+    reason: `${agentId} targets ${routingTarget.label}: ${parent.id} → ${found.model.id} (${strategy.family} ${version} tier ${found.tierName || "default"})`,
   };
 }
 
-/** The first runnable target/cheaper rung within the one selected version. */
+/** Try exact constructed IDs only; provider ambiguity makes a rung unusable. */
 function pickRunnableTier(
   tiers: ReadonlyArray<TierProfile>,
   target: RoutingTarget,
-  available: ReadonlyMap<string, Model<any>>,
+  available: ReadonlyArray<Model<any>>,
+  strategy: FamilyStrategy,
+  version: string,
+  parentProvider: string,
 ) {
   for (const tier of tiers) {
     if (!target.allowsFallback(tier)) continue;
-    const selected = pickAvailable(tier.models, available);
-    if (selected) return { ...selected, tierName: tier.tier };
-  }
-  return undefined;
-}
-
-/** The available models, by provider and id. */
-function indexAvailable(
-  available: ReadonlyArray<Model<any>>,
-): Map<string, Model<any>> {
-  const index = new Map<string, Model<any>>();
-  for (const model of available) {
-    index.set(`${model.provider}/${model.id}`, model);
-  }
-  return index;
-}
-
-/** The first candidate of a tier the session can run. */
-function pickAvailable(
-  candidates: ReadonlyArray<ModelCandidate>,
-  available: ReadonlyMap<string, Model<any>>,
-): { candidate: ModelCandidate; model: Model<any> } | undefined {
-  for (const candidate of candidates) {
-    const model = available.get(`${candidate.provider}/${candidate.id}`);
-    if (model) return { candidate, model };
+    const id = strategy.construct(version, tier.tier);
+    const matches = available.filter((model) => model.id === id);
+    const preferred = matches.find(
+      (model) => model.provider === parentProvider,
+    );
+    const providers = new Set(matches.map((model) => model.provider));
+    const model = preferred ?? (providers.size === 1 ? matches[0] : undefined);
+    if (model) return { model, tierName: tier.tier };
   }
   return undefined;
 }

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { SHIPPED_DEFINITIONS } from "#src/agents/shipped";
 import { generateModelMatrix } from "#src/models/matrix";
+import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 
 const DOC = new URL("../../docs/model-matrix.md", import.meta.url);
@@ -51,15 +52,10 @@ describe("the routing matrix in docs/model-matrix.md", () => {
     ]);
   });
 
-  it("shows retention when the exact version lacks the role target despite all candidates being available", () => {
+  it("demonstrates unseen releases rather than enumerating a version catalogue", () => {
     const grid = generateModelMatrix().find((region) => region.name === "grid");
-    const worker = grid?.markdown
-      .split("\n")
-      .find((line) => line.startsWith("| `worker` |"));
-    // GPT 6.1 has no M rung; Gemini 4 and DeepSeek 4 have no worker class.
-    expect(worker).toBe(
-      "| `worker` | **retain** | `anthropic/claude-sonnet-5-5` | **retain** | `zai/glm-5.3-flash` | `minimax/MiniMax-M3.1-flash` | `qwen-token-plan/qwen3.7-plus` | **retain** | `xiaomi/mimo-v2.6-flash` |",
-    );
+    expect(grid?.markdown).toContain("example/gpt-97.2-terra");
+    expect(grid?.markdown).toContain("example/claude-sonnet-97-2");
   });
 
   it("documents every concrete parent for every role with all three availability outcomes", () => {
@@ -67,12 +63,12 @@ describe("the routing matrix in docs/model-matrix.md", () => {
     const rows =
       full?.markdown.split("\n").filter((line) => line.startsWith("| `")) ?? [];
     const roles = ["explore", "worker", "reviewer", "debug", "researcher"];
+    const strategies = strategiesByFamily(SHIPPED_STRATEGIES);
     const expected = SHIPPED_PROFILES.flatMap((profile) =>
-      profile.versions.flatMap((version) =>
-        version.tiers.flatMap((tier) =>
-          tier.models.flatMap((parent) =>
-            roles.map((role) => `${parent.provider}/${parent.id}\t${role}`),
-          ),
+      profile.tiers.flatMap((tier) =>
+        roles.map(
+          (role) =>
+            `example/${strategies.get(profile.family)?.construct("97.2", tier.tier)}\t${role}`,
         ),
       ),
     ).sort();

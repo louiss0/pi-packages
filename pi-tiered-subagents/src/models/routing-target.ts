@@ -8,14 +8,14 @@ import type {
   ModelClass,
   ModelSize,
   TierProfile,
-  VersionProfile,
-} from "#src/models/profile";
+  FamilyProfile,
+} from "#src/models/profiles";
 import type { RolePolicy } from "#src/models/role-policy";
 
 export interface RoutingTarget {
   readonly label: string;
   startingTier(
-    version: VersionProfile,
+    version: FamilyProfile,
     parentTier: TierProfile,
   ): TierProfile | undefined;
   allowsFallback(tier: TierProfile): boolean;
@@ -42,7 +42,7 @@ class SizeRoutingTarget implements RoutingTarget {
   }
 
   startingTier(
-    version: VersionProfile,
+    version: FamilyProfile,
     parentTier: TierProfile,
   ): TierProfile | undefined {
     return this.keepParentRung
@@ -66,7 +66,7 @@ class PlannerWorkerRoutingTarget implements RoutingTarget {
 
   constructor(readonly label: ModelClass) {}
 
-  startingTier(version: VersionProfile): TierProfile | undefined {
+  startingTier(version: FamilyProfile): TierProfile | undefined {
     return version.tiers.find((tier) => tier.class === this.label);
   }
 
