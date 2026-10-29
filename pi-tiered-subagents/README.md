@@ -87,6 +87,9 @@ v25.0.1, which is itself a friendly fork of
 
 ## Models
 
+See the [configuration guide](docs/configuration.md) for role/family routing,
+exact model overrides, agent files, and copyable shared-settings examples.
+
 A model is named exactly, as `provider/modelId`:
 
 ```json
@@ -110,8 +113,11 @@ required `group`:
 Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
-sonnet = M, haiku = S; GPT sol and astra = L, pro/terra = M, luna/mini/nano = S.
+The size ladder is XL → L → M → S, with S as the floor. Size assignments
+are Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L,
+sonnet = M, haiku = S; GPT astra = XL, sol = L, pro/terra/default = M,
+luna/mini/nano = S. A Worker from Fable targets Opus; a Worker from Astra
+targets Sol. Reviewers start at their parent's own rung, including XL.
 Dated snapshots use the size of the tier they belong to.
 
 Automatic model routing stays within the parent's exact family and version.
@@ -169,7 +175,7 @@ settings file, under `familyProfiles`:
 ```
 
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
-Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
+Every tier in a size profile requires `size: "S" | "M" | "L" | "XL"`; every tier in a
 planner/worker profile requires `role: "planner" | "worker"`. Tiers are
 version-independent: the router reads the parent's version, targets a rung, and
 constructs the exact model ID with the family's naming structure. Tier names are
@@ -249,6 +255,8 @@ pnpm nx run pi-tiered-subagents:metadata     # package metadata
 
 ## Documentation
 
+- [Configuration guide](docs/configuration.md) — model selection by role and
+  family, user-selected models, specialist overrides, and runtime settings.
 - [Original product specification](docs/SPEC.md), also published as
   [GitHub issue #8](https://github.com/louiss0/pi-packages/issues/8).
 - [Approved architecture and modernization specification](docs/ARCHITECTURE-SPEC.md),
@@ -272,11 +280,8 @@ itself as a friendly fork of
 [@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents).
 
 The following retain upstream reference snapshots, not newly accepted
-architecture decisions or configuration instructions for this derivative
-(except the explicitly labeled current model-profile section in configuration):
+architecture decisions or configuration instructions for this derivative:
 
-- [Configuration reference](docs/configuration.md) — current role-aware profile
-  guidance followed by the preserved upstream reference.
 - [Comparison with upstream](docs/comparison-with-upstream.md).
 - [Architecture](docs/architecture/architecture.md) and its linked history.
 - [Decision records](docs/decisions/).

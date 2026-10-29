@@ -1,80 +1,272 @@
-# Configuration
+# Configuring Pi Tiered Subagents
 
-## Current version-local, role-aware model profiles
+Pi Tiered Subagents chooses a child's model using **the specialist's role and
+its parent's model family**. The built-in ladders cover common families; you
+can customize those ladders or bypass them with a model of your own.
 
-This section describes this derivative; the upstream reference below is historical.
-Request `model` overrides definition `model`; both are exact `provider/modelId`
-choices and fail if unavailable or misspelled, without any automatic reroute.
-An unpinned custom definition uses worker routing behavior.
+**No configuration is required.** Start with the shipped specialists, then add
+only the overrides you need. This guide describes this package's current
+configuration, not the historical upstream `subagents.json` format.
 
-Automatic routing uses the resolved agent identifier and the family profile's
-required `group`:
+## Choose the right configuration surface
 
-| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| You want to… | Configure… |
+| --- | --- |
+| Let the runtime choose a model for the task | Nothing: request a shipped specialist without a model pin |
+| Use a particular model for one task | `model` in the `subagent` request |
+| Always use your preferred model for one specialist | `model` in `.pi/agents/<name>.md` or your global agent file |
+| Change the tiers used by automatic family routing | `familyProfiles` in the shared settings store |
+| Change concurrency, turn limits, or retention | `/subagents:settings` or the shared settings file |
+
+- [How automatic selection works](#how-automatic-selection-works)
+- [Pick your own model](#pick-your-own-model)
+- [Customize a specialist](#customize-a-specialist)
+- [Settings files and precedence](#settings-files-and-precedence)
+- [Customize family ladders](#customize-family-ladders)
+- [Reasoning levels](#reasoning-levels)
+- [Runtime settings reference](#runtime-settings-reference)
+- [Troubleshooting](#troubleshooting)
+
+## How automatic selection works
+
+Model selection follows this precedence:
+
+1. An exact model in the request.
+2. An exact model in the effective agent definition.
+3. Automatic routing from the parent's model, using the resolved agent identifier
+   and its family's profile.
+
+Automatic routing combines two inputs, rather than treating role and family as
+unrelated modes:
+
+- **The role says what kind of model is wanted.** Exploration targets a small
+  model; review targets the parent's size or a planner model.
+- **The family says how to find that target.** Size families use S/M/L/XL labels;
+  planner/worker families use task-class labels on an ordered ladder.
+
+### Role targets
+
+| Specialist identifier | Size-family target | Planner/worker-family target |
 | --- | --- | --- |
-| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
+| `worker` | One size below the parent, with S as the floor | worker |
+| `explore` | S | worker |
 | `researcher` | S | worker |
 | `debug` | M | worker |
-| `reviewer` | Equal: the parent's own size | planner |
-| `explore` | S | worker |
+| `reviewer` | Equal: start at the parent's own rung | planner |
 
-Custom identifiers use worker behavior; this does not add a sixth shipped role.
-The mapping is shipped policy, not operator-configurable settings.
+This mapping is shipped policy, not a configurable role-to-model map. A custom
+identifier such as `auditor` uses **worker routing**, even if its description says
+"reviewer". To use reviewer routing, override `reviewer.md`; to give `auditor` a
+specific model, pin it in its definition.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude fable/opus = L,
-sonnet = M, haiku = S; GPT astra/sol = L, terra/pro/default = M,
-luna/mini/nano = S. Dated parents use the labels of their tier.
+A target is not always a downgrade: Debug targets M even from an S parent, and
+review on a planner/worker family targets a planner even from a worker parent.
+Equal starts at the parent's particular rung, not the first rung with its size.
+The size ladder is XL → L → M → S, with S as the floor: an XL parent's
+Worker targets L, while its Reviewer starts at the parent's own XL rung.
 
-Profiles describe **version-independent family ladders**, not a release or model
-catalogue. A strategy extracts the parent's version and tier; the role selects a
-size/role target on that family's ordered ladder. Equal starts at the parent's
-own rung. For each target or permitted cheaper rung, the strategy constructs one
-exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
-`claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
-releases. Construction is not an availability claim: only an exact ID in the
-session's runnable models can win. Dated or specialized IDs are not fuzzy
-substitutes for the constructed identity; an explicit pin still resolves exactly.
+### Built-in families
 
-Provider selection is deterministic for each exact candidate ID:
-1. Prefer the parent's provider if runnable there.
-2. Otherwise accept a unique matching provider.
-3. Multiple other matching providers make the rung ambiguous/unusable. Continue
-   to eligible cheaper tiers, then retain the parent if none can be selected.
+| Family key | Group | Shipped tier relationships |
+| --- | --- | --- |
+| `gpt` | `size` | Astra = XL → Sol = L → Terra, Pro, unnamed default = M → Luna, Mini, Nano = S |
+| `claude` | `size` | Fable = XL → Opus = L → Sonnet = M → Haiku = S |
+| `qwen` | `size` | Max = L → Plus = M → Flash = S |
+| `gemini` | `planner-worker` | Argon, Pro Preview, Pro = planner → Flash, Flash Lite = worker |
+| `minimax` | `planner-worker` | Highspeed, unnamed default = planner → Flash = worker |
+| `glm` | `planner-worker` | Unnamed default = planner → Flash = worker |
+| `mimo` | `planner-worker` | Pro Ultraspeed, Pro, unnamed default = planner → Flash = worker |
+| `deepseek` | `planner-worker` | Pro = planner; no worker rung |
 
-This is not same-provider-only routing, and registry order never chooses a
-provider. Session credentials, availability, and restrictions remain authoritative.
-No cross-version fallback is allowed. Unknown families, unparseable versions,
-unknown parent tiers, or exhausted ladders retain the captured parent and explain
-why. Planner review may degrade to a worker in the same version. DeepSeek's
-profile has no worker rung, so its non-review roles retain the parent.
+These are routing relationships, **not a vendor release list or an availability
+promise**. The authoritative data is in
+[`src/models/profiles.ts`](../src/models/profiles.ts). Kimi is not currently an
+automatic-routing family; an unpinned Kimi parent is retained. A user-selected
+exact model does not need to belong to a supported automatic-routing family.
 
-Profiles are data only. Each replacement declares `group: "size"` or
-`group: "planner-worker"` and `tiers`, most capable first. Size tiers require
-`size: "S" | "M" | "L"`; planner/worker tiers require
-`role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
-the empty tier denotes the unnamed default line where the strategy supports it.
-Invalid labels, unsupported naming structures, empty ladders, and invalid tier
-names are reported. Unknown fields are rejected with deterministic field paths;
-obsolete tier-level `fallbacks` alone is accepted and discarded.
+### Same family, same version, runnable models only
 
-**Migration:** replace old `versions` arrays and per-tier `models` arrays with one
-family `tiers` array. Do not declare releases, concrete IDs, or provider priorities.
-Old catalogue-shaped replacements are diagnosed rather than silently migrated.
-GPT Luna is S throughout the ladder. GLM is supported; Kimi remains an unknown
-family for automatic routing. Model pins and reasoning policies are unchanged.
+The router extracts the parent's version and tier, selects the role's target,
+and constructs exact candidate IDs using that family's naming strategy.
+It tries the target and eligible lower rungs in profile order. It never searches
+another version or guesses equivalent models by price.
 
-Set `familyProfiles` through the shared settings store: JSON encoded as text under
-`pi-tiered-subagents` in `settings-extensions.json`. The decoded example is:
+For example, **if those exact IDs are runnable**:
+
+- `claude-fable-7` + `worker` targets L: `claude-opus-7`.
+- The same Fable parent + `reviewer` starts at its own XL rung.
+- `gpt-7-astra` + `worker` targets L: `gpt-7-sol`.
+- `claude-opus-4-5` + `worker` targets M: `claude-sonnet-4-5`.
+- The same parent + `explore` targets S: `claude-haiku-4-5`.
+- The same parent + `reviewer` starts at its own Opus rung.
+- `gemini-2.5-pro` + `worker` targets `gemini-2.5-flash`, then
+  `gemini-2.5-flash-lite` if necessary.
+- A DeepSeek parent with no worker rung is retained for non-review roles.
+
+A dated parent can supply its tier and version, but automatic candidates are
+still the exact IDs constructed by the strategy. A dated or specialized variant
+is not a fuzzy substitute for an unavailable constructed ID.
+
+For each candidate ID, provider selection is deterministic:
+
+1. Prefer the parent's provider if it can run that exact ID.
+2. Otherwise, use a unique runnable provider for that ID.
+3. If multiple other providers match, skip that ambiguous rung.
+
+If no eligible rung wins, the runtime retains the captured parent model and
+reports why. Unknown families, unextractable versions, and unknown parent tiers
+also retain the parent. Planner targets may fall back to worker rungs; worker
+targets do not fall back upward to planners.
+
+## Pick your own model
+
+You are not limited to the built-in families. An explicit model bypasses family
+routing and must use **`provider/modelId`**, as registered in your Pi session.
+The model ID can itself contain slashes. Provider matching is case-insensitive;
+the model ID is exact. A fuzzy name such as `sonnet` is not supported.
+
+Example model-facing tool call:
+
+```text
+subagent({
+  subagent_type: "worker",
+  description: "Update parser tests",
+  prompt: "Add coverage for empty input in the parser tests.",
+  model: "anthropic/claude-sonnet-4-5"
+})
+```
+
+Replace the example with a model your session can actually run. Credentials,
+provider registration, and session restrictions remain Pi's responsibility:
+putting an ID in this configuration does not install or authenticate a provider.
+
+An unavailable or misspelled explicit model **fails the launch**. It does not
+silently switch models, providers, or return to automatic routing. A request pin
+wins over a definition pin, but does not change that file for future calls.
+
+## Customize a specialist
+
+Definitions are Markdown files with YAML frontmatter. The filename, lowercased,
+is the specialist identifier.
+
+| Priority | Location |
+| --- | --- |
+| Highest | `<cwd>/.pi/agents/<name>.md` |
+| Next | `<agentDir>/agents/<name>.md` |
+| Lowest | Shipped definition, if that identifier exists |
+
+The default agent directory is `~/.pi/agent`; `PI_CODING_AGENT_DIR` relocates it.
+Project paths are relative to the parent session's working directory.
+
+To pin every review in this project, create `.pi/agents/reviewer.md`:
+
+```markdown
+---
+model: anthropic/claude-sonnet-4-5
+thinking: high
+---
+```
+
+This small override preserves the shipped Reviewer's instructions, tools, and
+other defaults. To return a globally pinned Reviewer to automatic selection in
+one project, use:
+
+```markdown
+---
+model: null
+thinking: null
+---
+```
+
+Removing a project key alone does not clear a global value; `null` explicitly
+clears an inherited optional choice.
+
+### Definition fields
+
+| Frontmatter field | Meaning |
+| --- | --- |
+| `display_name` | Human-readable label; does not change routing identity |
+| `description` | Short description used in the specialist catalogue |
+| `model` | Exact `provider/modelId`; unset means automatic routing |
+| `thinking` | Explicit reasoning level; unset means automatic reasoning |
+| `tools` | Complete allowlist, `inherit`, `none`, or `[]` |
+| `max_turns` | Turn ceiling; `0` means unlimited, positive limits have a minimum of 2 |
+| `inherit_context` | Whether to inherit the parent's conversation |
+| `run_in_background` | Default execution mode |
+| `enabled` | `false` prevents this specialist from being requested |
+
+Overrides merge **field by field**, not by concatenating lists. An omitted field
+keeps the lower layer. An empty Markdown body keeps the inherited instructions;
+a nonempty body replaces them. `tools: []` means no capability tools, not inherit.
+`tools: inherit` takes the parent's active tools at request time.
+
+### Tool selection
+
+Explicit `tools` entries can name built-in or installed extension tools; naming
+one does not install it. The runtime strips `subagent`, `get_subagent_result`, and
+`steer_subagent` from child capabilities, so children cannot delegate recursively.
+Communication tools such as `ask_parent` are handled separately.
+
+A new custom specialist defaults to inherited tools, fresh conversation, and
+background execution. Treat tool overrides as a permission decision: broadening
+a read-only specialist's tools changes what it can do. Scheduling follows the
+effective tools, not the specialist's name; shell/editor/unknown tools count as
+potential writers. This is not a filesystem sandbox.
+
+## Settings files and precedence
+
+Operational settings and family profiles use the shared store provided by
+`@juanibiapina/pi-extension-settings`:
+
+| Scope | File |
+| --- | --- |
+| Global | `<agentDir>/settings-extensions.json` |
+| Project | `<cwd>/.pi/settings-extensions.json` |
+
+Both files are optional. Project settings override global settings; absent values
+use the shipped defaults. The package writes **only the project file** when you
+save through `/subagents:settings`. Keep other extensions' entries when editing
+this shared file.
+
+**Every stored value is a string**, including numbers, booleans, and JSON data.
+The extension key is `pi-tiered-subagents`, without the npm scope.
+
+A complete example of the on-disk shape:
+
+```json
+{
+  "pi-tiered-subagents": {
+    "maxConcurrent": "4",
+    "defaultMaxTurns": "30",
+    "abortAllOnInterrupt": "true",
+    "familyProfiles": "{\"claude\":{\"group\":\"size\",\"tiers\":[{\"tier\":\"opus\",\"size\":\"L\"},{\"tier\":\"sonnet\",\"size\":\"M\"},{\"tier\":\"haiku\",\"size\":\"S\"}]}}"
+  }
+}
+```
+
+Do not paste the decoded object below directly as `familyProfiles` in this file:
+serialize it to JSON text first. Plain objects, numeric values, and booleans are
+not the shared store's value format. After hand-editing settings, start a new Pi
+session to ensure they are loaded. A resumed child continues its captured
+configuration; it does not reselect its model from changed settings.
+
+## Customize family ladders
+
+Use `familyProfiles` when you want automatic selection to keep working but want
+to change a family's tier order or labels. To always use one arbitrary model,
+use a definition pin instead.
+
+Here is a **decoded settings object** for readability, not the on-disk wrapper:
 
 ```json
 {
   "familyProfiles": {
-    "gpt": {
+    "claude": {
       "group": "size",
       "tiers": [
-        { "tier": "sol", "size": "L" },
-        { "tier": "terra", "size": "M" },
-        { "tier": "luna", "size": "S" }
+        { "tier": "opus", "size": "L" },
+        { "tier": "sonnet", "size": "M" },
+        { "tier": "haiku", "size": "S" }
       ]
     },
     "minimax": {
@@ -88,468 +280,115 @@ Set `familyProfiles` through the shared settings store: JSON encoded as text und
 }
 ```
 
-Project entries replace a named family whole; no tier fragments are merged and
-other families remain intact.
-
-## Current reasoning selection
-
-When parent effort is known, automatic reasoning takes the next supported
-non-off rung below it in the chosen model's level array (the highest supported
-level strictly below the parent). Gaps are skipped; at the floor, effort stays.
-This includes retained models: on `[low, high, max]`, `max` becomes `high`,
-not `low`. There is no fixed medium/low preference with known parent effort.
-With no parent effort, the default remains medium, then low, then the lowest
-supported non-off level. Request reasoning, then definition reasoning, still
-wins, with Pi-compatible clamping; non-reasoning models report *not applicable*.
-
-See [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md).
-
-## Historical upstream configuration reference
-
-The remainder preserves upstream configuration history, not current model-routing
-instructions. In particular its fuzzy model names, defaults, locks, and runtime
-settings-file description are not the current derivative contract. Consult the
-[README](../README.md) and [status](status.md) for current behavior. Automatic
-routing never crosses the exact parent family/version, unknown families retain
-the parent, and legacy `fallbacks` fields have no routing effect. The historical
-reasoning inheritance/default descriptions below do not override the current
-next-supported-rung rule above.
-
-`@gotgenes/pi-subagents` has two configuration surfaces: **agent definition files** that describe an agent type, and a **`subagents.json`** settings file that tunes the runtime.
-Neither is required — every field has a default.
-
-For the tools, commands, events, and service API, see the [README](../README.md).
-
-## Default Agent Types
-
-| Type              | Tools                      | Model                         | Prompt Mode            | Description                                                                                      |
-| ----------------- | -------------------------- | ----------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `general-purpose` | all 7                      | inherit                       | `append` (parent twin) | Inherits the parent's prompt identity — same rules, CLAUDE.md, project conventions               |
-| `Explore`         | read, bash, grep, find, ls | haiku (falls back to inherit) | `replace`              | Fast codebase exploration (read-only); inherits the parent prompt as a base                      |
-| `Plan`            | read, bash, grep, find, ls | inherit                       | `replace`              | Software architect for implementation planning (read-only); inherits the parent prompt as a base |
-
-The `general-purpose` agent is a **parent twin** — it receives the parent's inherited identity and nothing of its own, so it follows the same rules the parent does.
-Explore and Plan use `replace` mode: the parent prompt is the cacheable base and their specialist read-only instructions are appended last, giving them the final say.
-
-Default agents can be **overridden** by creating a `.md` file with the same name (e.g. `.pi/agents/general-purpose.md`), or **disabled** per-project with `enabled: false` frontmatter.
-
-## What a child inherits from the parent's prompt
-
-Pi assembles a system prompt in layers.
-Its own preamble and tool guidelines come first, then your `AGENTS.md` or `CLAUDE.md` project context, then the catalogue of available skills, then a `Current working directory:` footer — and finally whatever extensions append each turn.
-
-A child inherits only the **stable identity** layers: everything up to, but not including, the skills catalogue.
-The layers after it are resolved against one session, so Pi and the child's own extensions rebuild them for the child rather than the child borrowing the parent's:
-
-| Layer                        | Where a child's copy comes from                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Pi's base identity           | not inherited; it describes the harness, not the child. The package's own base stands in its place            |
-| `<docs>` pointer             | not inherited; it points at Pi's own documentation, in a session that is not about Pi                        |
-| Your own prompt              | inherited byte for byte — a custom prompt or an appended prompt is yours, and it stays                       |
-| `<project_context>`          | inherited byte for byte, unless the child runs in its own directory — then resolved from that directory      |
-| `<tools>` / `<rules>`        | never inherited; stated by the child's own `@gotgenes/pi-permission-system` when installed, otherwise absent |
-| Skills catalogue             | rebuilt by Pi for the child's own directory and tool set                                                     |
-| `Current working directory:` | rebuilt by Pi for the child's own directory                                                                  |
-| Extension-appended blocks    | rebuilt by the child's own extensions                                                                        |
-
-Pi's base identity is the sentence it writes when no custom prompt is set: "You are an expert coding assistant operating inside pi, a coding agent harness."
-It claims a shell and an editor and a role helping a user, and a read-only child has neither tool, so the claim is dropped rather than inherited.
-The same holds for the pointer to Pi's documentation, and for the tool surface below.
-
-This matters most for a child that runs somewhere other than the parent — one given an isolated workspace by a `WorkspaceProvider`.
-Its skills resolve from its own workspace, and its working-directory claim names that workspace.
-Inheriting the parent's copies instead would give such a child a catalogue of skills it may not have and a directory claim that walks it back out of its workspace.
-
-Project context is the same kind of claim, which is why such a child resolves it too: `<project_context>` names each context file by absolute path, and the parent's paths point into the parent's checkout ([#918]).
-A relocated child's block is built from its own directory — the same discovery Pi runs for a session, so an `AGENTS.md` in the workspace, in any ancestor of it, or in `~/.pi/agent/` is found.
-If **none** of those carries one, the child receives no project instructions at all rather than the parent's; run with `PI_SUBAGENTS_DEBUG=1` to see that reported.
-A `WorkspaceProvider` whose workspace is not a checkout — a bare sandbox directory — should place the instructions it wants its children to follow inside that workspace.
-
-Inheriting the identity rather than the whole prompt also gives the child a leading prefix it shares with the parent, which local inference engines reuse instead of reprocessing.
-That holds when the parent runs a custom prompt, because the child's copy of it is byte for byte; a parent running Pi's own prompt leaves the child its own base, so there is no shared prefix to reuse.
-How much that is worth depends on the host: a provider whose cache prefix covers the tool definitions ahead of the system prompt — Anthropic's does — reuses nothing for a child, because a child's tool set always differs from its parent's.
-
-Pi renders the `<tools>` and `<rules>` sections from one session's tool set, and writes neither for a child, so a child drops its parent's copies rather than presenting the parent's tools as its own.
-With `@gotgenes/pi-permission-system` installed, the child states its own after its working directory.
-Without it, a child carries no tool list or guidelines in its prompt; its tool definitions still name exactly the tools it holds ([#901]).
-On Pi releases before 0.86, which render the tool surface as untagged `Available tools:` prose, the child inherits the parent's listing unchanged.
-
-If you write extensions that add to the system prompt, see [Extensions that append to the system prompt](../README.md#extensions-that-append-to-the-system-prompt).
-The reasoning behind the boundary is recorded in [ADR 0006](decisions/0006-inherited-prompt-is-identity-only.md), what the inherited region guarantees in [ADR 0008](decisions/0008-inherited-region-is-shared-parts.md), and why the tool sections are dropped in [ADR 0011](decisions/0011-tool-surface-sections-are-session-resolved.md).
-
-### Portable inheritance (opt-in)
-
-The inherited identity is your own text: your custom prompt, your appended prompt, and your project context.
-That is correct when the child talks to the same API as its parent, and wrong when the child's provider **re-homes** the prompt into another harness — `pi-claude-bridge`, for example, projects it onto Claude Code's preset as an append.
-There, the text reaches an API that already has a base prompt of its own, and Anthropic's subscription gate scores a documentation-routing line as a third-party app ([#883]).
-
-Opt such a provider into `portable`, which replaces the inherited identity with the parent's operator-authored parts only:
-
-```json
-{
-  "promptInheritance": { "claude-bridge": "portable" }
-}
-```
-
-| Strategy         | The child's identity                                           | Shares a prefix with the parent |
-| ---------------- | -------------------------------------------------------------- | ------------------------------- |
-| `full` (default) | your own text, byte for byte                                  | yes, when you wrote a prompt    |
-| `portable`       | your custom prompt, append prompt, and project context         | no                              |
-
-The map keys on the **provider id of the child's resolved model**, so only children whose requests actually travel through that provider change strategy.
-That is also why the key is the provider rather than the agent: a `subagent` call may override an agent's model, which moves the child to a different transport, and the strategy follows it.
-
-Skills stay un-inherited either way — the child builds its own catalogue — and the parent's tool guidelines are never inherited under `portable`, because Pi derives them from the tools a session actually holds.
-Project context files ride along, and must: the child's loader is built with context files suppressed, so this is the only way a portable child sees your `AGENTS.md` at all.
-
-**Use `portable` only for a provider that re-homes the prompt into a harness supplying its own base.**
-It is not enforced, because Pi exposes no way to identify such a provider — but pointing it at an ordinary provider is worse than leaving the default.
-`@gotgenes/pi-anthropic-auth`, for instance, finds Pi's role line in order to shape the OAuth system prompt; a portable child has no such line, so shaping returns it unchanged and the child never receives the neutral role prompt that shaping would have substituted.
-
-If the parent has no context files, custom prompt, or append prompt, a portable child falls back to a short generic base rather than to the full parent prompt — opting in never silently re-embeds text it exists to avoid.
-
-The reasoning is recorded in [ADR 0009](decisions/0009-portable-inheritance-is-provider-scoped.md).
-
-[#883]: https://github.com/gotgenes/pi-packages/issues/883
-[#901]: https://github.com/gotgenes/pi-packages/issues/901
-[#918]: https://github.com/gotgenes/pi-packages/issues/918
-
-## Custom Agents
-
-Define custom agent types by creating `.md` files.
-The filename becomes the agent type name.
-Any name is allowed — using a default agent's name overrides it.
-
-Agents are discovered from two locations (higher priority wins):
-
-| Priority    | Location                                                                         | Scope                         |
-| ----------- | -------------------------------------------------------------------------------- | ----------------------------- |
-| 1 (highest) | `.pi/agents/<name>.md`                                                           | Project — per-repo agents     |
-| 2           | `$PI_CODING_AGENT_DIR/agents/<name>.md` (default `~/.pi/agent/agents/<name>.md`) | Global — available everywhere |
-
-Project-level agents override global ones with the same name, so you can customize a global agent for a specific project.
-The global location follows the upstream `PI_CODING_AGENT_DIR` env var — set it to relocate all pi-coding-agent state (agents, skills, settings) to a custom directory.
-
-### Example: `.pi/agents/auditor.md`
-
-```markdown
----
-description: Security Code Reviewer
-tools: read, grep, find, bash
-model: anthropic/claude-opus-4-6
-thinking: high
-max_turns: 30
----
-
-You are a security auditor.
-Review code for vulnerabilities including:
-
-- Injection flaws (SQL, command, XSS)
-- Authentication and authorization issues
-- Sensitive data exposure
-- Insecure configurations
-
-Report findings with file paths, line numbers, severity, and remediation advice.
-```
-
-Then spawn it like any built-in type:
-
-```text
-subagent({ subagent_type: "auditor", prompt: "Review the auth module", description: "Security audit" })
-```
-
-### Frontmatter Fields
-
-All fields are optional — sensible defaults for everything.
-
-| Field               | Default        | Description                                                                                                                                                                                                                                   |
-| ------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description`       | filename       | Agent description shown in tool listings                                                                                                                                                                                                      |
-| `display_name`      | —              | Display name for UI (e.g. widget, agent list)                                                                                                                                                                                                 |
-| `tools`             | all 7          | The agent's complete tool allowlist — built-in or extension-registered names. `none` for no tools. See [Tool selection](#tool-selection)                                                                                                      |
-| `model`             | inherit parent | Model — `provider/modelId` or fuzzy name (`"haiku"`, `"sonnet"`)                                                                                                                                                                              |
-| `thinking`          | inherit        | off, minimal, low, medium, high, xhigh, max. An unrecognized value is dropped, and the agent inherits the parent's level                                                                                                                      |
-| `max_turns`         | unlimited      | Turn ceiling: the harness stops the agent after this many turns (minimum 2). `0` or omit for unlimited                                                                                                                                        |
-| `prompt_mode`       | `append`       | `replace`: parent prompt is the cacheable base; body is appended last with full control and no `<agent_instructions>` wrapper. `append`: parent prompt is the base; body is wrapped in `<agent_instructions>` (agent acts as a "parent twin") |
-| `inherit_context`   | `false`        | Fork parent conversation into agent                                                                                                                                                                                                           |
-| `run_in_background` | `false`        | Run in background by default                                                                                                                                                                                                                  |
-| `enabled`           | `true`         | Set to `false` to disable an agent (useful for hiding a default agent per-project)                                                                                                                                                            |
-| `locked`            | —              | Fields a `subagent` tool caller may not override. `true` or a list of field names. See [Locking fields against callers](#locking-fields-against-callers)                                                                                      |
-
-The caller decides, and the agent file fills the gaps.
-A `subagent` tool parameter wins over the agent file's value for `model`, `thinking`, `max_turns`, `inherit_context`, and `run_in_background`; the agent file supplies whichever of those the caller left unset.
-
-### Locking fields against callers
-
-An agent whose model, thinking level, or turn limit is a correctness requirement rather than a default can withhold it from callers with `locked`.
-
-```yaml
----
-model: anthropic/claude-haiku-4-5
-max_turns: 10
-locked: true
----
-```
-
-`locked: true` withholds every field this file sets — here `model` and `max_turns`, while `thinking`, `inherit_context`, and `run_in_background` stay open because the file names no value for them.
-This is the behavior every agent file had before locking became opt-in, so it is the one-line way to keep an existing file working unchanged.
-
-A list withholds exactly the fields it names, in either YAML spelling:
-
-```yaml
-locked: model, thinking            # comma-separated
-locked: [model, max_turns]         # flow sequence
-```
-
-The list form also withholds a field this file leaves unset — `locked: [model]` with no `model:` denies the caller a model override and lets the child inherit the parent's.
-An entry naming anything other than `model`, `thinking`, `max_turns`, `inherit_context`, or `run_in_background` is ignored.
-
-A lock is never silent: when a caller passes a value for a locked field, the tool result says which agent locked which parameters.
-
-A lock binds the `subagent` tool only.
-[`SubagentsService`](../README.md#for-extension-authors) `launch`/`run` are programmatic callers rather than a model guessing at harness settings, so their options win regardless.
-
-### Tool selection
-
-`tools` is the agent's **complete allowlist** of capability tools, not a filter over the built-ins.
-No tool that touches the filesystem, the shell, or the network reaches a child unless the agent names it — whoever registered it.
-
-Entries may name built-in tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`) or tools registered by any extension:
-
-```yaml
----
-description: Browser-driving researcher
-tools: read, grep, find, agent_browser
----
-```
-
-Naming an extension's tool is the supported way to give a child access to it.
-This matters because a child loads the parent's extensions and runs their setup functions, so an extension **does** call `registerTool` inside the child — and Pi then drops that tool, because the allowlist is applied before the child's tool registry is built.
-The registration reports no error; the tool simply is not there.
-List the tool by name and it is admitted the moment its extension registers it.
-
-Three names are always removed from a child, even when an agent lists them: `subagent`, `get_subagent_result`, and `steer_subagent`.
-This is the recursion guard — without it, an agent could spawn agents of its own without bound.
-
-Two names are always **added**, whatever an agent lists: `ask_parent` and `notify_parent`.
-These are the child's channel back to the agent that delegated to it — protocol the core installs in every child, like the `<active_agent>` tag and the parent-context prefix.
-Neither reaches the filesystem, the shell, or the network, so a read-only agent stays read-only.
-`ask_parent` records a question and tells the child to end its turn, so the delegating agent can answer by resuming it; `notify_parent` sends a one-way update and returns at once.
-A question outlives the window in which it can be answered — the session is released after its retention window, and a workspace is torn down at run end unless the child completed — so once a resume would be refused, the result reports the question and the reason rather than the `resume` call.
-Both go to every agent, `notify_parent` only while [`midRunUpdates`](#persistent-settings) is on.
-Where an update lands depends on whether an announcement can still reach you in time to act on it.
-It arrives as its own message when you are idle and the agent is still running — the one case where steering it is still possible.
-Otherwise it rides that agent's outcome, under "Updates this agent sent while it worked": the foreground call, the resume, the `get_subagent_result` report, or the completion notice, whichever delivers that run.
-Either way you see it once.
-
-Accepted forms, all equivalent:
-
-```yaml
-tools: read, grep, find      # comma-separated
-tools: [read, grep, find]    # YAML flow sequence
-tools:                       # YAML block sequence
-  - read
-  - grep
-  - find
-tools: none                  # no tools at all
-```
-
-Omitting `tools` entirely gives the agent all seven built-ins and no extension tools.
-
-Two other settings interact with this list:
-
-- [`excludedExtensionPackages`](#excluding-package-extensions-from-children) stops an extension from loading in children at all, so naming one of its tools has no effect there.
-- When [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) is installed, its `permission:` frontmatter narrows the set further, per turn.
-  Use it to deny a tool; use `tools` to decide what the agent has in the first place.
-
-#### Codemode, `tool_search`, and MCP tools
-
-Pi supplies `codemode`, `tool_search`, and MCP tools through built-in extensions.
-A child loads one only when its `tools` list names a tool that extension supplies:
-
-| Name in `tools`                                                                                          | Built-in the child loads |
-| -------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `codemode`                                                                                               | codemode                 |
-| `tool_search`                                                                                            | tool-search              |
-| any `mcp__<server>__<tool>`, `list_mcp_resources`, `list_mcp_resource_templates`, or `read_mcp_resource` | MCP                      |
-
-A child that names none of them loads none of them.
-That matters for MCP, which starts every enabled server in your `mcp.json` when it loads, whether or not the child can reach that server's tools.
-A built-in you disabled in your Pi settings (for example `"extensions": ["-builtin:mcp"]`) stays disabled in children, and an extension that replaces a built-in in your session replaces it in children too.
-
-Pi names each MCP tool `mcp__<server>__<tool>`, where `<server>` is the server's key in `mcp.json`.
-Characters other than letters, digits, and `_` become `_`, and a name longer than 64 characters, or one that collides with another tool's, gets a hash suffix; a pattern saves you writing those by hand.
-An MCP server's tools are exposed `codemode` by default: the model calls them from a `codemode` script, so the agent must name `codemode` as well.
-A server configured with `deferred` exposure needs `tool_search` instead; a `direct` one needs neither.
-The child does not add these for you.
-
-You can name each MCP tool:
-
-```yaml
----
-description: Triage GitHub issues
-tools: read, codemode, mcp__github__get_issue, mcp__github__list_issues, mcp__github__search_issues
----
-```
-
-Or name a whole server, or a prefix of its tools, with `*`:
-
-```yaml
-tools: read, codemode, mcp__github__*                            # every github tool
-tools: read, codemode, mcp__github__get_*, mcp__github__list_*   # a read-shaped subset
-tools: read, codemode, mcp__*                                    # every MCP tool
-```
-
-A pattern is any entry that starts with `mcp__` and contains `*`, which matches any run of characters.
-`*` in any other entry is not special.
-The pattern expands when the agent spawns, to the matching tools **your session** has registered at that moment:
-
-- A server that has not connected yet (still starting, signed out, or disabled) contributes no tools, so the pattern matches nothing and is dropped.
-  Set `PI_SUBAGENTS_DEBUG=1` to see which patterns matched nothing.
-- A child running in another directory (a worktree) expands against your session's servers, even when that directory's `.pi/mcp.json` configures different ones.
-- Tools a server adds after the child started do not reach that child.
-
-## Persistent Settings
-
-Runtime tuning values set via `/subagents:settings` (max concurrency, default max turns, wrap-up turns, the two session-retention windows, the abort-on-interrupt policy, and the mid-run update channel) persist across pi restarts.
-A completed subagent's record is kept for the whole parent session (so `get_subagent_result` never misses); only its heavy in-memory session is released — after `consumedSessionRetentionMinutes` once the result has been collected, or after the `unconsumedSessionRetentionMinutes` safety cap if it never was.
-An agent that asked a question and has not been answered holds the safety cap rather than the consumed window, because reading a question is not finishing with the agent — the answer is delivered by resuming the very session the short window would release.
-
-Set `midRunUpdates` to `false` to withhold `notify_parent` from every agent, leaving them no way to tell you anything before they finish.
-`ask_parent` is unaffected: a blocked agent can still end its turn with a question.
-Two scopes, merged on load:
-
-- **Global:** `~/.pi/agent/settings-extensions.json` — your machine-wide defaults,
-  under this package's name (`pi-tiered-subagents`).
-  Edit by hand; the `/subagents:settings` command never writes here.
-- **Project:** `<cwd>/.pi/settings-extensions.json` — per-project overrides, under
-  the same name.
-  Written by `/subagents:settings`.
-
-The files belong to `@juanibiapina/pi-extension-settings`, the store every
-extension can share: one file holds the settings of every extension that uses
-it. The values are text — a number is written as its text, and a value that
-carries structure (the family profiles, `excludedExtensionPackages`,
-`promptInheritance`) is JSON.
-
-**Precedence:** project overrides global on any field present in both.
-Missing fields fall back to the hardcoded defaults (max concurrency `4`, default max turns unlimited, wrap-up turns `2`, consumed-session retention `10` minutes, unconsumed-session retention `720` minutes, abort-all-on-interrupt `true`, mid-run updates `true`).
-The project's file is read only when Pi has granted the project trust, so an untrusted repository cannot change how the extension behaves.
-`/subagents:settings` writes the project's file only, and it writes the values you chose there: what the operator's file holds for the hand-edited keys stays in the operator's file, so a later change to it still reaches the project.
-
-**Example — global defaults for a beefy machine:**
-
-```bash
-mkdir -p ~/.pi/agent
-cat > ~/.pi/agent/settings-extensions.json <<'EOF'
-{
-  "pi-tiered-subagents": {
-    "maxConcurrent": "16",
-    "wrapUpTurns": "3",
-    "unconsumedSessionRetentionMinutes": "1440",
-    "abortAllOnInterrupt": "false",
-    "midRunUpdates": "true"
-  }
-}
-EOF
-```
-
-Every project now starts with concurrency 16, a three-turn wrap-up warning, and ESC left to the parent, without ever touching the command.
-Individual projects can still override via `/subagents:settings`.
-
-The same values are editable in the shared `/extension-settings` menu, when
-that extension is installed and loaded before this one.
-
-`wrapUpTurns` is how many turns an agent has left when it is warned about its budget; see [Turn Budget](../README.md#turn-budget).
-It replaced `graceTurns`, which allowed extra turns past `max_turns`: a setting that still sets `graceTurns` logs a `[pi-subagents] graceTurns was removed…` warning and the value is ignored, so replace it with `wrapUpTurns`.
-A `defaultMaxTurns` of `1` runs with `2`, the minimum, and logs a warning.
-
-**Failure behavior:** a missing file is silent; a malformed file is ignored by the store, quietly; invalid/out-of-range field values are dropped per-field; write failures downgrade the `/subagents:settings` toast to a warning with `(session only; failed to persist)`.
-
-### Excluding package extensions from children
-
-Some package extensions are parent-scoped or expensive to initialize per session.
-Because children run in the parent's process, such an extension initializing once per child multiplies its cost in a single heap — enough, in the case that motivated this feature, to exhaust the V8 heap with four concurrent children.
-
-List the offending packages under `excludedExtensionPackages` to keep their extensions out of child sessions:
-
-```json
-{
-  "excludedExtensionPackages": ["npm:@cortexkit/pi-magic-context"]
-}
-```
-
-Entries must match Pi's configured package source string exactly, as it appears in your Pi `settings.json` `packages` array — there is no glob or prefix matching.
-
-What this does and does not do:
-
-- Only the matched packages' **extensions** are disabled, and only in children.
-  Their skills, prompts, and themes stay available to children.
-- The parent session is unaffected, as is the child's own settings — only the child's resource loading is filtered.
-- The exclusion happens during package resolution, so the extension's module is never imported and its factory never runs in the child.
-- Excluding a package keeps the **tools** that extension registers out of child sessions too: its factory never runs there, so an agent that names one of those tools in [`tools`](#tool-selection) gets nothing.
-  If you need the tools but want the extension's resources released when the child is disposed, exclusion is the wrong lever — see [Child session lifecycle](../README.md#child-session-lifecycle).
-
-This key is hand-edited in the global or project `settings-extensions.json`; `/subagents:settings` does not expose it, but it is preserved when you change other settings there.
-An absent list means the operator's list is in force; an empty list in the project's file clears what the operator declared, and stays empty.
-
-The same is true of [`promptInheritance`](#portable-inheritance-opt-in): hand-edited only, preserved across other settings changes, and absent means every child inherits the full parent identity.
-
-#### Excluding a permission extension
-
-When [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) is installed, it rides into children harmlessly by construction, so exclusion is an optimization and never a correctness requirement.
-Excluding an extension that only registers an authorizer chain link costs nothing but saves its load time: the node that adjudicates an ask still judges every descendant's request.
-
-One case used to weaken a child, and recent versions of that extension close it.
-An extension can declare the filesystem path *another* package's tool accesses, so that the permission system's `path` and `external_directory` gates can see it.
-Excluding such a declaring package left the tool present in the child with its path undeclared, and the child's own gates stopped seeing it — silently, because the parent's gating is unaffected and still looks correct.
-
-The condition needed both halves, so most exclusions could never hit it:
-
-- Package **A** registers a tool whose path lives under a non-standard input key.
-- Package **B** registers the path extractor for A's tool.
-- You exclude **B** but not **A**.
-
-If one package supplies both the tool and its extractor, excluding it removes both together and no gap opens.
-
-Since the version of `@gotgenes/pi-permission-system` that closed this, a child session that has no extractor of its own for a tool borrows one from the session that spawned it, so the split above no longer leaves a path ungated.
-Preview formatters resolve the same way, so an approval prompt for such a tool still shows its registered preview rather than raw JSON.
-The borrowed declaration is recorded: the child's review-log entry carries `extractorSource: "inherited"`.
-Nothing is borrowed across a process boundary — children here run in the parent's process, which is what makes it possible.
-
-One thing exclusion still does **not** weaken, by design: an authorizer chain link is never borrowed from another session, because a link decides rather than describes.
-
-Excluding `@gotgenes/pi-permission-system` itself is a different matter: a child then loads no permission node at all, so nothing gates its tool calls, no `permission:` frontmatter applies, and no `ask` is forwarded.
-See [Subagent Integration](https://github.com/gotgenes/pi-packages/blob/main/packages/pi-permission-system/docs/subagent-integration.md#loading-asymmetry) for the full rule.
-
-This one does not pass silently.
-This extension announces each child once its extensions have bound, and a recent `@gotgenes/pi-permission-system` uses that announcement to notice a child with no node of its own: it records the child in its permission review log and warns once per session that the child's tool calls are ungated.
-The warning names this setting as the likeliest cause, because a failure to load that extension in the child leaves the same absence and the parent cannot tell the two apart.
-Remove the entry to restore gating in child sessions; keep it, knowing the children it spawns are unguarded.
-
-### Abort on interrupt
-
-By default, pressing ESC to interrupt the parent agent also aborts every subagent.
-Set `abortAllOnInterrupt` to `false` (or flip it from `/subagents:settings`) to keep background and queued subagents running when you interrupt the parent — useful when you spawn long background work and then want to steer the parent without losing it.
-
-A foreground agent aborts on ESC regardless of this setting.
-It holds the parent's own run signal for the duration of its blocking tool call, so the interrupt reaches it directly; the policy governs background and queued agents.
-
-The policy is read at the moment ESC fires, so flipping it mid-session applies to the very next interrupt.
-
-## Model providers in child sessions
-
-A subagent inherits every model provider the parent can reach, including providers an extension registered at runtime with `pi.registerProvider` rather than through `models.json` or `auth.json`.
-This is what lets a child run under a dynamically registered provider such as `pi-claude-bridge`.
-
-The child does not share the parent's provider pool — it gets its own, with the parent's registrations copied onto it.
-An extension loaded in a child can therefore register or unregister providers without disturbing the parent or any sibling agent.
-
-Inheritance is a **snapshot taken when the agent spawns**.
-A provider registered in the parent after a child has started does not appear in that running child; agents spawned afterwards pick it up.
-This matches the rest of the parent state a child captures at spawn — working directory, model, and system prompt are all frozen the same way.
-
-Provider inheritance needs no configuration, and every Pi release this package supports (1.0.0 or newer) exposes the runtime registrations it replays.
-
-One thing the child does still share with the parent: when a provider's API key is a shell command (`"apiKey": "!my-command"`), Pi caches the command's resolved output process-wide, so parent and children reuse one result rather than re-running it per agent.
-That cache is Pi's, not this extension's, and it predates provider inheritance.
+Rules:
+
+- A named family is replaced **whole**, not merged tier by tier. Shipped profiles
+  provide defaults; global replacements override them; project replacements
+  override the global family. Other families remain intact.
+- Declare `group: "size"` with a `size` on every tier, or
+  `group: "planner-worker"` with a `role` on every tier. The operational size
+  ladder is S → M → L → XL; roles are `planner` and `worker`.
+- Put tiers in descending capability/preference order. Fallback walks forward
+  through the array, subject to the target's size/class restrictions.
+- Tier names must be unique lowercase names after trimming. `""` denotes the
+  unnamed default line where that family's naming strategy supports it.
+- Profiles contain **no releases, provider priorities, or concrete model IDs**.
+  The naming strategy extracts a version from the parent and constructs an exact
+  candidate ID at that same version.
+- You can customize only families whose naming structure the runtime supports.
+  An arbitrary new family key does not teach the router to parse its model IDs.
+- Invalid profiles are reported and not applied; unrelated families still load.
+  Unknown fields are rejected with paths such as `tiers[1].size`.
+
+Removing a project family replacement exposes the global one again, or the
+shipped profile when no global replacement exists. Remove the global replacement
+as well to restore shipped behavior everywhere.
+
+**Migration from earlier formats:** replace `versions` and per-tier `models`
+arrays with one version-independent `tiers` array. Those old fields are rejected.
+Obsolete tier-level `fallbacks` is accepted but discarded; it cannot enable
+cross-version routing. The historical `subagents.json` file is not this
+package's runtime settings backend.
+
+## Reasoning levels
+
+The model is chosen first. Its supported reasoning levels then determine effort:
+
+1. Request `thinking` wins.
+2. Otherwise, definition `thinking` wins.
+3. Otherwise, use the next supported non-off level below the parent's effort.
+
+Gaps are skipped: with supported levels `[low, high, max]`, parent `max` becomes
+`high`, not `low`. At the floor, effort stays at the supported non-off floor.
+This step-down also applies when the **model itself was retained**.
+
+With no parent effort, automatic selection prefers medium, then low, then the
+lowest supported non-off level. Explicit levels are clamped to what the model
+supports. A non-reasoning model reports *not applicable*. Explicit `off` is not
+allowed for a reasoning model.
+
+Thinking choices are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`,
+subject to those model-specific rules. In model-facing calls the field is
+`thinking`; service callers use `thinkingLevel` instead.
+
+## Runtime settings reference
+
+Use `/subagents:settings` for the ordinary runtime controls. These do not change
+the role policy or pin models.
+
+| Setting | Default | Meaning / accepted on-disk range |
+| --- | --- | --- |
+| `maxConcurrent` | `4` | 1–1024 concurrent children; workspace writer scheduling still applies |
+| `defaultMaxTurns` | `0` | Unlimited at 0; positive ceilings normalize to at least 2; maximum 10,000 |
+| `wrapUpTurns` | `2` | Warn with this many turns remaining; 1–1000 |
+| `consumedSessionRetentionMinutes` | `10` | Retain a collected child's session; 1–20,160 minutes |
+| `unconsumedSessionRetentionMinutes` | `720` | Safety retention for an uncollected child's session; 1–20,160 minutes |
+| `abortAllOnInterrupt` | `true` | ESC stops background/queued children too; foreground work aborts on ESC either way |
+| `midRunUpdates` | `true` | Give background children `notify_parent`; disabling it does not disable ask-back |
+
+Turn ceilings resolve request `max_turns` → definition `max_turns` →
+`defaultMaxTurns`. A request or definition value of 0 explicitly selects
+unlimited execution. `graceTurns` is retired; use `wrapUpTurns`.
+
+The following structured settings are hand-edited, JSON-encoded strings rather
+than settings-menu controls:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `familyProfiles` | Shipped profiles | Automatic-routing family replacements |
+| `excludedExtensionPackages` | `[]` | Exact configured package source strings whose extensions children must not load; skills, prompts, and themes stay available |
+| `promptInheritance` | `{}` | Provider-to-strategy map: `full` by default, optionally `portable` |
+
+Project `excludedExtensionPackages` replaces the global list. Project
+`promptInheritance` replaces the global map as a whole. Only `familyProfiles`
+merges by family key, with whole-family replacement. An empty
+`promptInheritance` map (or one with no valid entries) is treated as absent, so
+`"{}"` does not clear global portable rules. To restore a globally portable
+provider to full inheritance, explicitly set it to `full` in the project map,
+for example the decoded value `{"claude-bridge":"full"}`. Menu saves preserve
+the project's own structured settings rather than copying global structured
+settings into the project.
+
+Use `portable` only for a provider that re-homes prompts into another harness
+with its own base prompt. For example, the decoded value
+`{"claude-bridge":"portable"}` affects children whose **resolved model provider**
+is `claude-bridge`, not every child of a particular role. Ordinary providers
+should keep the default `full` behavior.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| The child kept the parent's model | Inspect the launch reason: unknown family/tier/version, absent role target, unavailable same-version IDs, or provider ambiguity can cause retention. Reviewer Equal may intentionally keep its rung. |
+| My model choice was ignored | A request pin wins over a definition pin. Check project overrides and the resolved identifier. Changing a display name does not change routing policy. |
+| My custom reviewer steps down like a Worker | Custom identifiers use worker policy; override `reviewer.md` or pin the custom specialist's model. |
+| A configured model fails | Verify the full exact `provider/modelId` and session access. Explicit choices never silently reroute. |
+| My profile does not load | Check the string-valued store wrapper, then diagnostics for `group`, required labels, unknown fields, duplicate tiers, and unsupported naming structures. |
+| A smaller model exists but was skipped | It must have the exact same-version constructed ID and meet target/provider rules. A different version or dated alias is not a substitute. |
+| Removing a project setting did not restore defaults | A global override may still apply. Clear an inherited model/thinking pin with `null` in the project definition. |
+| A changed setting did not affect a resumed child | Resume keeps the captured configuration; launch a new child for new model selection. |
+
+For implementation details, see [model selection](../src/models/selection.ts),
+[role policy](../src/models/role-policy.ts), [routing](../src/models/router.ts),
+[profile validation](../src/models/user-profiles.ts), and
+[shared settings persistence](../src/shared-settings.ts).
