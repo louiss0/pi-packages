@@ -37,6 +37,9 @@ export function extractText(content: unknown[]): string {
 /** Format a message entry (user/assistant); returns undefined for roles to skip. */
 function formatMessageEntry(entry: MessageEntry): string | undefined {
   const msg = entry.message;
+  // SDK messages such as bashExecution have command/output, not content.
+  // Exclude non-conversation roles before attempting text extraction.
+  if (msg.role !== "user" && msg.role !== "assistant") return undefined;
   const text =
     typeof msg.content === "string" ? msg.content : extractText(msg.content);
   if (!text.trim()) return undefined;

@@ -130,6 +130,33 @@ describe("buildParentContext", () => {
     expect(result).toBe("");
   });
 
+  it("skips bash execution messages without content before formatting conversation", () => {
+    const result = buildParentContext(
+      makeCtx([
+        {
+          type: "message",
+          message: { role: "user", content: "Delegate this task" },
+        },
+        {
+          type: "message",
+          message: {
+            role: "bashExecution",
+            command: "echo probe",
+            output: "probe",
+            exitCode: 0,
+            cancelled: false,
+            truncated: false,
+            timestamp: 0,
+          },
+        },
+        { type: "message", message: { role: "assistant", content: "Ready" } },
+      ]),
+    );
+    expect(result).toContain("[User]: Delegate this task");
+    expect(result).toContain("[Assistant]: Ready");
+    expect(result).not.toContain("echo probe");
+  });
+
   it("formats a compaction entry with a summary", () => {
     const result = buildParentContext(
       makeCtx([{ type: "compaction", summary: "Work done so far" }]),
