@@ -71,8 +71,10 @@ belongs to exactly one group.
 
 ## Size
 
-A capability label on a size-group tier: **S**, **M**, or **L**. Several tiers
-may share a size; size is not a version or the tier's position in the ladder.
+A capability label on a size-group tier: **S**, **M**, **L**, or **XL**.
+Several tiers may share a size; size is not a version, parameter count, or the
+tier's position in the ladder. One size below follows XL → L → M → S, with S
+as the floor.
 **Equal** means the parent's own size, anchored at its own rung.
 
 ## Class
@@ -83,20 +85,22 @@ execution roles target worker class. A family need not offer both classes.
 
 ## Tier
 
-One rung of a family's ladder: a version's line of models, such as GPT's
-`sol` or Claude's `haiku`. A tier has concrete model ids, most preferred
-first. The version's default model — the one whose id names no tier — is the
-tier with the empty name.
+One version-independent rung of a family's ladder, such as GPT's `sol` or
+Claude's `haiku`, with a size or class label. A tier does not enumerate
+releases, providers, or concrete model ids. The family's naming structure
+combines a tier with the parent's version to identify a candidate. The unnamed
+default line is the tier with the empty name.
 
 ## Profile
 
-The data that describes a family's group and ladder: its versions, each version's
-tiers with their size or class labels and concrete ids. A profile is
-read, never executed: it holds no matcher, no pattern and no parser.
+The data that describes a family's group and ordered, version-independent
+tiers with their size or class labels. A profile contains no version
+catalogue, concrete model ids, provider priorities, or version fallback links.
+It is read, never executed: it holds no matcher, no pattern and no parser.
 
 ## Ladder
 
-A family's versions and tiers in capability order. A role selects a target
+A family's version-independent tiers in capability order. A role selects a target
 size or class within the parent's exact family and version, starting at the
 top matching rung (the parent's own rung for Equal) and walking through
 eligible cheaper rungs. Versions are never crossed; an exhausted or absent
@@ -127,6 +131,16 @@ request loads a fresh catalog, so concurrent requests cannot change each
 other's selection. Selecting an identifier produces an available definition or
 an unknown, disabled, or invalid outcome; an invalid identifier never falls
 back to a shipped definition.
+
+## Definition diagnostic
+
+A classified explanation of a problem reading or validating agent definitions.
+It identifies the kind of problem, the affected agent when known, and the source
+layer and file or directory, alongside a human-readable explanation. A diagnostic
+about an unreadable scope prevents pretending that the scope is empty; one about
+an individual definition invalidates that identifier without disabling unrelated
+valid agents. Its category and source remain facts, not information a caller
+must recover by parsing prose.
 
 ## Prepared launch
 

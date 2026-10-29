@@ -213,9 +213,11 @@ required `group`:
 Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude fable/opus = L,
-sonnet = M, haiku = S; GPT astra/sol = L, terra/pro/default = M,
-luna/mini/nano = S. Dated parents use the labels of their tier.
+The size ladder is XL → L → M → S, with S as the floor. Size assignments are
+Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L, sonnet = M,
+haiku = S; GPT astra = XL, sol = L, terra/pro/default = M, luna/mini/nano = S.
+Dated parents use the labels of their tier. Worker from XL targets L; Equal
+review starts at the parent's own rung, including XL.
 
 Profiles describe **version-independent family ladders**, not a release or model
 catalogue. A strategy extracts the parent's version and tier; the role selects a
@@ -242,7 +244,7 @@ profile has no worker rung, so its non-review roles retain the parent.
 
 Profiles are data only. Each replacement declares `group: "size"` or
 `group: "planner-worker"` and `tiers`, most capable first. Size tiers require
-`size: "S" | "M" | "L"`; planner/worker tiers require
+`size: "S" | "M" | "L" | "XL"`; planner/worker tiers require
 `role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
 the empty tier denotes the unnamed default line where the strategy supports it.
 Invalid labels, unsupported naming structures, empty ladders, and invalid tier

@@ -40,6 +40,32 @@ rerun for this change. Real SDK regressions now drive the registered tools to
 check vetoed switching, active-child preservation, session replacement, and
 follow-up execution without the retired service.
 
+## Issue closure follow-up
+
+Definition loading now retains structured diagnostics with owned categories,
+normalized agent identifiers when applicable, source paths and global/project
+scope, and readable explanations. Registry/catalog selection and preparation
+preserve those facts on configuration rejection; manager-side rejection does
+not allocate a child. Existing readable error messages remain available without
+requiring callers to parse them for control flow.
+
+The remaining data-only `RunUpdate` and `SessionOwner` declarations now use type
+aliases; session-owner fields remain read-only, with compile-time mutation
+checks. Routing vocabulary and specifications include XL and version-independent
+profiles rather than the retired release/model catalogue shape. The upstream
+MIT copyright notice is consolidated into `LICENSE`, and the deleted separate
+license file is no longer listed in package metadata.
+
+Verification: the complete package suite passed **2,563 tests with one
+platform-specific skip across 136 files**. Nx `typecheck`, `lint`, `check`, and
+`metadata` passed, with the existing third-party settings diagnostics reported
+separately. Review identified a legacy injected-loader compatibility gap; both
+scope-wide and identifier-specific regression cases reproduced red and passed
+after the fix. Independent re-review found no remaining actionable findings.
+A parallel packaging/full-suite run hit two SDK fixture timeouts; their focused
+rerun and the subsequent complete sequential suite passed without raising those
+timeouts. Packed-install checks also verify the consolidated MIT notice.
+
 ## Historical stabilization baseline
 
 | | |
@@ -205,9 +231,11 @@ required `group`:
 Custom identifiers use worker behavior; this does not add a sixth shipped role.
 The mapping is shipped policy, not operator-configurable settings.
 
-Size assignments are Qwen max = L, plus = M, flash = S; Claude opus = L,
-sonnet = M, haiku = S; GPT sol and astra = L, pro/terra = M, luna/mini/nano = S.
-Dated snapshots use the size of the tier they belong to.
+The size ladder is XL → L → M → S, with S as the floor. Size assignments are
+Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L, sonnet = M,
+haiku = S; GPT astra = XL, sol = L, pro/terra/default = M, luna/mini/nano = S.
+Dated snapshots use the size of their tier. Worker from XL targets L; Equal
+review starts at the parent's own rung, including XL.
 
 Automatic model routing stays within the parent's exact family and version.
 A size or role target starts at the top matching rung in that version; Equal
@@ -234,23 +262,23 @@ and the other roles retain the parent.
 GLM uses a glued-version naming strategy (version adjoining the prefix,
 variants following it) and a planner/worker profile. Kimi is no longer a
 supported automatic-routing family: an unpinned Kimi parent is retained.
-The shipped catalogue is representative of the installed SDK, not a promise of
-vendor availability. Profiles enumerate candidates; session access decides
-which can run. Model routing changes neither exact-pin resolution nor reasoning
+The shipped tier relationships are not a promise of vendor availability.
+Profiles label and order version-independent tiers; naming strategies construct
+exact same-version candidates, and session access decides which can run. Model routing changes neither exact-pin resolution nor reasoning
 selection.
 
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
-Every tier in a size profile requires `size: "S" | "M" | "L"`; every tier in a
-planner/worker profile requires `role: "planner" | "worker"`. Invalid or missing
-labels are reported when read, not silently inferred. Version names, tier names,
-provider names, and model ids are trimmed; a name that becomes blank is rejected,
-while an empty tier name remains the version's default model. Unknown profile
-fields are rejected with path-aware diagnostics, except an obsolete tier-level
+Every tier in a size profile requires `size: "S" | "M" | "L" | "XL"`; every tier
+in a planner/worker profile requires `role: "planner" | "worker"`. Invalid or
+missing labels are reported when read, not silently inferred. Tier names are
+trimmed and must be unique lowercase names; an empty tier name denotes the
+unnamed default line where the strategy supports it. Unknown profile fields
+are rejected with path-aware diagnostics, except an obsolete tier-level
 `fallbacks` field, which is accepted and discarded along with its contents.
-Upgrade existing whole replacements by adding these labels. Version/tier/model
-shape and whole-family replacement semantics stay the same; version fallback links
-are removed from the schema, shipped data, and runtime. Examples are representative
-profile data, not provider-access guarantees.
+Upgrade catalogue-shaped replacements by replacing `versions` and per-tier
+`models` with a single `tiers` array. Whole-family replacement semantics stay
+the same; version fallback links are absent from schema, data, and runtime.
+Profile examples describe tier relationships, not provider-access guarantees.
 
 [ADR 0014](adr/0014-role-aware-model-routing.md) supersedes only ADR 0007's
 uniform automatic step-down rule. The role-aware [model matrix](model-matrix.md)
