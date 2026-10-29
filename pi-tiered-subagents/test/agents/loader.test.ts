@@ -183,3 +183,74 @@ describe("loadDefinitionScope", () => {
     expect(scope.definitions[0]?.patch.description).toBeUndefined();
   });
 });
+
+describe("structured definition diagnostics", () => {
+  it("identifies directory and file read failures", () => {
+    const root = mkdtempSync(join(tmpdir(), "diagnostics-"));
+    try {
+      const notDirectory = join(root, "not-directory");
+      writeFileSync(notDirectory, "x");
+      expect(loadDefinitionScope(notDirectory).diagnostics).toEqual([
+        expect.objectContaining({
+          category: "directory-read",
+          source: { path: notDirectory },
+          message: expect.any(String),
+        }),
+      ]);
+      const unreadable = join(root, "worker.md");
+      mkdirSync(unreadable);
+      expect(loadDefinitionScope(root).diagnostics).toEqual([
+        expect.objectContaining({
+          category: "file-read",
+          id: "worker",
+          source: { path: unreadable },
+          message: expect.any(String),
+        }),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("identifies malformed, invalid and duplicate files without parsing messages", () => {
+    const result = collectDefinitions([
+      {
+        name: "bad.md",
+        path: "/agents/bad.md",
+        content: "---\nmodel: [\n---\n",
+      },
+      {
+        name: "worker.md",
+        path: "/agents/worker.md",
+        content: "---\nenabled: nope\n---\n",
+      },
+      { name: "reviewer.md", path: "/agents/reviewer.md", content: "" },
+      { name: "Reviewer.md", path: "/agents/Reviewer.md", content: "" },
+    ]);
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "malformed-frontmatter",
+          id: "bad",
+          source: { path: "/agents/bad.md" },
+          message: expect.any(String),
+        }),
+        expect.objectContaining({
+          category: "invalid-value",
+          id: "worker",
+          source: { path: "/agents/worker.md" },
+          message: expect.stringContaining("enabled"),
+        }),
+        expect.objectContaining({
+          category: "duplicate-id",
+          id: "reviewer",
+          source: {
+            path: "/agents/reviewer.md",
+            relatedPaths: ["/agents/Reviewer.md"],
+          },
+          message: expect.any(String),
+        }),
+      ]),
+    );
+  });
+});

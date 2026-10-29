@@ -119,8 +119,8 @@ export function spawnBackground(
 /**
  * The operator-facing sentence for a launch refused before a child was created.
  *
- * Exhausts the four reasons: a launch can be refused for the agent type, the
- * session, or both. Adding a new reason fails to compile here rather than
+ * Exhausts the launch reasons: agent type, configuration, or session ownership.
+ * Adding a new reason fails to compile here rather than
  * falling through to an unhelpful answer.
  */
 function launchRefusedMessage(
@@ -128,7 +128,8 @@ function launchRefusedMessage(
     | "no-active-session"
     | "session-ended"
     | "unknown-agent"
-    | "disabled-agent",
+    | "disabled-agent"
+    | "configuration",
   displayName: string,
 ): string {
   switch (reason) {
@@ -140,6 +141,8 @@ function launchRefusedMessage(
       return `Unknown agent type "${displayName}".`;
     case "disabled-agent":
       return `Agent "${displayName}" is disabled.`;
+    case "configuration":
+      return `Agent "${displayName}" has invalid definition configuration.`;
   }
 }
 

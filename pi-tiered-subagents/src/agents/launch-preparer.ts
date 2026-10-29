@@ -2,16 +2,16 @@
  * launch-preparer.ts — The one authority that turns a caller request into a
  * complete launch decision.
  *
- * Both the model-facing tool and programmatic service submit the same owned
- * request here. This module selects the definition, validates the caller's
+ * The model-facing tool submits an owned request here. This module selects
+ * the definition, validates the caller's
  * thinking level, captures the current routing/turn inputs, and delegates the
  * existing resolution policy. It does not allocate a child session or accept
  * work into the manager.
  */
 
-import { type AgentDefinition, normalizeAgentId } from "#src/agents/definition";
+import { type AgentDefinition } from "#src/agents/definition";
 import type { Model } from "@earendil-works/pi-ai";
-import type { LoadedScopes } from "#src/agents/loader";
+import type { DefinitionDiagnostic, LoadedScopes } from "#src/agents/loader";
 import { buildCatalog } from "#src/agents/registry";
 import type {
   ModelInfo,
@@ -95,6 +95,7 @@ export type LaunchPreparationOutcome =
       readonly kind: "rejected";
       readonly reason: LaunchPreparationRejection;
       readonly message: string;
+      readonly diagnostics?: ReadonlyArray<DefinitionDiagnostic>;
     };
 
 /** Dependencies are the small live reads preparation needs at invocation. */
@@ -152,31 +153,6 @@ export class LaunchPreparer {
     }
     if (signal?.aborted) return cancelledRejection();
 
-    const scopeErrors = [
-      scopes.global.scopeError,
-      scopes.project.scopeError,
-    ].filter((problem) => problem !== undefined);
-    if (scopeErrors.length > 0) {
-      return {
-        kind: "rejected",
-        reason: "configuration",
-        message: scopeErrors.join("; "),
-      };
-    }
-
-    const id = normalizeAgentId(request.type);
-    const problems = [
-      ...(scopes.global.invalidDefinitions?.[id] ?? []),
-      ...(scopes.project.invalidDefinitions?.[id] ?? []),
-    ];
-    if (problems.length > 0) {
-      return {
-        kind: "rejected",
-        reason: "configuration",
-        message: `Invalid agent "${id}": ${problems.join("; ")}`,
-      };
-    }
-
     const registry = buildCatalog(scopes);
     const selection = registry.select(request.type);
     if (!selection.ok) {
@@ -184,6 +160,9 @@ export class LaunchPreparer {
         kind: "rejected",
         reason: selection.reason,
         message: selection.error,
+        ...(selection.reason === "configuration"
+          ? { diagnostics: selection.diagnostics }
+          : {}),
       };
     }
 

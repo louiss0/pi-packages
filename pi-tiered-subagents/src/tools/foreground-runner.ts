@@ -38,7 +38,7 @@ export type ForegroundParams = {
 /**
  * The operator-facing sentence for a launch refused before a child was created.
  *
- * Exhaustive over the four reasons, so one added later fails to compile here
+ * Exhaustive over the launch reasons, so one added later fails to compile here
  * rather than falling through to an answer that says nothing. Mirrors the
  * background door's wording: the two differ in how they deliver a result, not
  * in what they can refuse.
@@ -48,7 +48,8 @@ function launchRefusedMessage(
     | "no-active-session"
     | "session-ended"
     | "unknown-agent"
-    | "disabled-agent",
+    | "disabled-agent"
+    | "configuration",
   displayName: string,
 ): string {
   switch (reason) {
@@ -60,6 +61,8 @@ function launchRefusedMessage(
       return `Unknown agent type "${displayName}".`;
     case "disabled-agent":
       return `Agent "${displayName}" is disabled.`;
+    case "configuration":
+      return `Agent "${displayName}" has invalid definition configuration.`;
   }
 }
 

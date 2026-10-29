@@ -48,6 +48,16 @@ it.each([
       throw new Error("invalid definition was accepted");
     expect(rejected.message).toContain("explore");
     expect(rejected.message).toContain("/agents/");
+    expect(rejected.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: expect.any(String),
+          id: "explore",
+          source: expect.objectContaining({ path: "/agents/explore.md" }),
+          message: expect.any(String),
+        }),
+      ]),
+    );
     expect(h.service.listAgents()).toEqual([]);
     expect(h.children.children).toHaveLength(0);
     const valid = await h.service.launch("reviewer", "valid unrelated role");

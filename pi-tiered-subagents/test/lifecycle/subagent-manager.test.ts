@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { defined, type Patch } from "#src/optional";
 import { AgentRegistry } from "#src/agents/registry";
+import { collectDefinitions } from "#src/agents/loader";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { AgentSpawnConfig } from "#src/lifecycle/subagent-manager";
@@ -309,6 +310,41 @@ describe("SubagentManager", () => {
             owner: TEST_OWNER,
           }),
         ).toEqual({ kind: "rejected", reason: "unknown-agent" });
+      });
+
+      it("preserves configuration diagnostics without allocating an invalid child", () => {
+        const registry = new AgentRegistry(() => ({
+          global: collectDefinitions([
+            {
+              name: "worker.md",
+              path: "/agents/worker.md",
+              content: "---\nenabled: invalid\n---\n",
+            },
+          ]),
+          project: { definitions: [], errors: [] },
+        }));
+        const fixture = createManager({ registry });
+        manager = fixture.manager;
+        expect(
+          manager.spawn(STUB_SNAPSHOT, "worker", "must not run", {
+            description: "invalid configuration",
+            turnPolicy: UNLIMITED_TURNS,
+            background: { kind: "explicit", isBackground: true },
+            owner: TEST_OWNER,
+          }),
+        ).toMatchObject({
+          kind: "rejected",
+          reason: "configuration",
+          diagnostics: [
+            {
+              category: "invalid-value",
+              id: "worker",
+              source: { path: "/agents/worker.md" },
+            },
+          ],
+        });
+        expect(manager.listAgents()).toEqual([]);
+        expect(fixture.createSubagentSession).not.toHaveBeenCalled();
       });
 
       it("refuses a known-but-disabled type", () => {

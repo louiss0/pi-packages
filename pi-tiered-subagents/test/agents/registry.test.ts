@@ -45,6 +45,28 @@ describe("AgentRegistry", () => {
       }),
     );
 
+  it("retains structured diagnostics in registry selection", () => {
+    tree.writeProject("worker.md", "---\nenabled: nope\n---\n");
+    const reg = registry();
+    expect(reg.diagnostics()).toEqual([
+      expect.objectContaining({
+        category: "invalid-value",
+        id: "worker",
+        source: {
+          scope: "project",
+          path: join(tree.cwd, ".pi", "agents", "worker.md"),
+        },
+        message: expect.stringContaining("enabled"),
+      }),
+    ]);
+    expect(reg.select("worker")).toMatchObject({
+      ok: false,
+      reason: "configuration",
+      diagnostics: reg.diagnostics(),
+    });
+    expect(reg.select("reviewer").ok).toBe(true);
+  });
+
   it("ships exactly the five agreed specialists", () => {
     expect(registry().ids()).toEqual([
       "debug",

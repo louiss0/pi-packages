@@ -7,6 +7,7 @@
  * capture parent slices, or assemble manager options independently.
  */
 
+import type { DefinitionDiagnostic } from "#src/agents/loader";
 import type {
   ChildShapingSettings,
   LaunchPreparer,
@@ -103,6 +104,7 @@ export type SubagentsPreparationOutcome =
         | "configuration"
         | "cancelled";
       readonly message: string;
+      readonly diagnostics?: ReadonlyArray<DefinitionDiagnostic>;
     };
 
 export type ForegroundLaunchOptions = Readonly<{

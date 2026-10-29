@@ -23,7 +23,11 @@
 
 import type { AgentDefinition, DefinitionOrigin } from "#src/agents/definition";
 import { defaultDefinition, mergeDefinition } from "#src/agents/definition";
-import { type LoadedScope, type LoadedScopes } from "#src/agents/loader";
+import {
+  type DefinitionDiagnostic,
+  type LoadedScope,
+  type LoadedScopes,
+} from "#src/agents/loader";
 import { SHIPPED_DEFINITIONS } from "#src/agents/shipped";
 import { normalizeAgentId } from "#src/agents/definition";
 
@@ -32,6 +36,12 @@ import { normalizeAgentId } from "#src/agents/definition";
  */
 export type AgentSelection =
   | { readonly ok: true; readonly definition: AgentDefinition }
+  | {
+      readonly ok: false;
+      readonly reason: "configuration";
+      readonly error: string;
+      readonly diagnostics: ReadonlyArray<DefinitionDiagnostic>;
+    }
   | {
       readonly ok: false;
       /** Which kind of failure it is, for a caller that must branch. */
@@ -136,7 +146,20 @@ export class AgentRegistry implements AgentDefinitionLookup {
    * are failures: neither is answered with another agent.
    */
   select(id: string): AgentSelection {
-    return selectFrom(this.definitions, id);
+    return selectWithDiagnostics(
+      this.definitions,
+      this.diagnostics(),
+      id,
+      legacyFailures(this.scopes),
+    );
+  }
+
+  /** Structured problems from both definition layers. */
+  diagnostics(): ReadonlyArray<DefinitionDiagnostic> {
+    return [
+      ...(this.scopes.global.diagnostics ?? []),
+      ...(this.scopes.project.diagnostics ?? []),
+    ];
   }
 
   /** The problems found while reading the file layers, if any. */
@@ -153,12 +176,23 @@ export class AgentRegistry implements AgentDefinitionLookup {
  * request's half-refreshed definitions.
  */
 export function buildCatalog(scopes: LoadedScopes): AgentDefinitionLookup {
-  return new Catalog(buildDefinitions(scopes.global, scopes.project));
+  return new Catalog(
+    buildDefinitions(scopes.global, scopes.project),
+    [
+      ...(scopes.global.diagnostics ?? []),
+      ...(scopes.project.diagnostics ?? []),
+    ],
+    legacyFailures(scopes),
+  );
 }
 
 /** An immutable lookup over one preparation's merged definitions. */
 class Catalog implements AgentDefinitionLookup {
-  constructor(private readonly definitions: Map<string, AgentDefinition>) {}
+  constructor(
+    private readonly definitions: Map<string, AgentDefinition>,
+    private readonly diagnostics: ReadonlyArray<DefinitionDiagnostic>,
+    private readonly legacy: LegacyDefinitionFailures,
+  ) {}
 
   /** Every definition, in identifier order. */
   list(): ReadonlyArray<AgentDefinition> {
@@ -174,7 +208,12 @@ class Catalog implements AgentDefinitionLookup {
 
   /** The definition for an identifier, or the reason there is none. */
   select(id: string): AgentSelection {
-    return selectFrom(this.definitions, id);
+    return selectWithDiagnostics(
+      this.definitions,
+      this.diagnostics,
+      id,
+      this.legacy,
+    );
   }
 }
 
@@ -199,6 +238,58 @@ function buildDefinitions(
   applyScope(definitions, project, "project");
 
   return definitions;
+}
+
+/** Capture legacy injected failure fields without parsing or inventing provenance. */
+type LegacyDefinitionFailures = Readonly<{
+  scopeErrors: ReadonlyArray<string>;
+  invalidDefinitions: Readonly<Record<string, ReadonlyArray<string>>>;
+}>;
+
+function legacyFailures(scopes: LoadedScopes): LegacyDefinitionFailures {
+  const scopeErrors: string[] = [];
+  const invalidDefinitions: Record<string, string[]> = {};
+  for (const scope of [scopes.global, scopes.project]) {
+    if (scope.scopeError !== undefined) scopeErrors.push(scope.scopeError);
+    for (const [id, errors] of Object.entries(scope.invalidDefinitions ?? {})) {
+      invalidDefinitions[id] = [...(invalidDefinitions[id] ?? []), ...errors];
+    }
+  }
+  return { scopeErrors, invalidDefinitions };
+}
+
+function selectWithDiagnostics(
+  definitions: Map<string, AgentDefinition>,
+  diagnostics: ReadonlyArray<DefinitionDiagnostic>,
+  id: string,
+  legacy: LegacyDefinitionFailures,
+): AgentSelection {
+  const normalized = normalizeAgentId(id);
+  const scopeProblems = diagnostics.filter(
+    (problem) => problem.category === "directory-read",
+  );
+  const scopeFailed = scopeProblems.length > 0 || legacy.scopeErrors.length > 0;
+  const problems = scopeFailed
+    ? scopeProblems
+    : diagnostics.filter((problem) => problem.id === normalized);
+  const messages = [
+    ...new Set([
+      ...problems.map((problem) => problem.message),
+      ...(scopeFailed
+        ? legacy.scopeErrors
+        : (legacy.invalidDefinitions[normalized] ?? [])),
+    ]),
+  ];
+  if (messages.length)
+    return {
+      ok: false,
+      reason: "configuration",
+      diagnostics: problems,
+      error: scopeFailed
+        ? messages.join("; ")
+        : `Invalid agent "${normalized}": ${messages.join("; ")}`,
+    };
+  return selectFrom(definitions, id);
 }
 
 /**

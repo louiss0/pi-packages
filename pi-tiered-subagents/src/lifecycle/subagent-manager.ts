@@ -697,12 +697,18 @@ export class SubagentManager {
     let definition = preparedDefinition;
     if (!definition) {
       // Internal callers that have not moved to LaunchPreparer still use the
-      // manager's checked path. The extension's two launch doors always pass
-      // the definition selected by the shared preparer.
+      // manager's checked path. The extension tool always passes the
+      // definition selected by the shared preparer.
       this.reloadDefinitions?.();
       const selection = this.registry.select(type);
       if (!selection.ok) {
-        return { kind: "rejected", reason: selection.reason };
+        return selection.reason === "configuration"
+          ? {
+              kind: "rejected",
+              reason: selection.reason,
+              diagnostics: selection.diagnostics,
+            }
+          : { kind: "rejected", reason: selection.reason };
       }
       definition = selection.definition;
     }

@@ -13,6 +13,8 @@
  * it accepts, and checks it at the moment of acceptance.
  */
 
+import type { DefinitionDiagnostic } from "#src/agents/loader";
+
 /**
  * The session a request was made under, and the only one allowed to accept it.
  *
@@ -43,7 +45,9 @@ export type LaunchRejection =
   /** The named agent type is not in the catalog. */
   | "unknown-agent"
   /** The named agent type is present but switched off. */
-  | "disabled-agent";
+  | "disabled-agent"
+  /** The requested definition or its enclosing scope could not be validated. */
+  | "configuration";
 
 /**
  * A launch's verdict.
@@ -54,7 +58,11 @@ export type LaunchRejection =
  */
 export type LaunchOutcome<T> =
   | { kind: "accepted"; value: T }
-  | { kind: "rejected"; reason: LaunchRejection };
+  | {
+      kind: "rejected";
+      reason: LaunchRejection;
+      diagnostics?: ReadonlyArray<DefinitionDiagnostic>;
+    };
 
 /** Whether `owner` may still accept work: it must be the live, ending-free owner. */
 export function ownerCanAccept(

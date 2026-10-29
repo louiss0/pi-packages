@@ -73,8 +73,27 @@ export type DefinitionFile = Readonly<{
   path: string;
 }>;
 
+/** A loader-owned, machine-readable problem and its source. */
+export type DefinitionDiagnostic = Readonly<{
+  category:
+    | "directory-read"
+    | "file-read"
+    | "malformed-frontmatter"
+    | "invalid-value"
+    | "duplicate-id";
+  id?: string;
+  source: Readonly<{
+    path: string;
+    scope?: "global" | "project";
+    relatedPaths?: ReadonlyArray<string>;
+  }>;
+  message: string;
+}>;
+
 /** The definitions one scope holds, and what went wrong while reading them. */
 export type LoadedScope = Readonly<{
+  /** Canonical structured loading problems. */
+  diagnostics?: ReadonlyArray<DefinitionDiagnostic>;
   /** Scope contents are unknown, so no lower-layer fallback is safe. */
   scopeError?: string;
   /** Identifier-specific failures that must not fall back to a lower layer. */
@@ -104,8 +123,14 @@ export type DefinitionSources = Readonly<{
 /** Read both file scopes through the legacy synchronous registry path. */
 export function loadDefinitionScopes(sources: DefinitionSources): LoadedScopes {
   return {
-    global: loadDefinitionScope(join(sources.globalDir, "agents")),
-    project: loadDefinitionScope(join(sources.cwd, ".pi", "agents")),
+    global: withScope(
+      loadDefinitionScope(join(sources.globalDir, "agents")),
+      "global",
+    ),
+    project: withScope(
+      loadDefinitionScope(join(sources.cwd, ".pi", "agents")),
+      "project",
+    ),
   };
 }
 
@@ -125,7 +150,23 @@ export async function loadDefinitionScopesAsync(
     loadDefinitionScopeAsync(join(sources.cwd, ".pi", "agents"), signal),
   ]);
   throwIfAborted(signal);
-  return { global, project };
+  return {
+    global: withScope(global, "global"),
+    project: withScope(project, "project"),
+  };
+}
+
+function withScope(
+  loaded: LoadedScope,
+  scope: "global" | "project",
+): LoadedScope {
+  return {
+    ...loaded,
+    diagnostics: (loaded.diagnostics ?? []).map((diagnostic) => ({
+      ...diagnostic,
+      source: { ...diagnostic.source, scope },
+    })),
+  };
 }
 
 /**
@@ -166,6 +207,7 @@ export function loadDefinitionScope(dir: string): LoadedScope {
   const files: DefinitionFile[] = [];
   const errors: string[] = [];
   const unreadable: Record<string, string[]> = {};
+  const diagnostics: DefinitionDiagnostic[] = [];
 
   for (const name of names) {
     const path = join(dir, name);
@@ -175,7 +217,14 @@ export function loadDefinitionScope(dir: string): LoadedScope {
       debugLog("readFileSync agent file", err);
       const problem = `Could not read the agent definition at ${path}.`;
       errors.push(problem);
-      unreadable[normalizeAgentId(basename(name, ".md"))] = [problem];
+      const id = normalizeAgentId(basename(name, ".md"));
+      unreadable[id] = [problem];
+      diagnostics.push({
+        category: "file-read",
+        id,
+        source: { path },
+        message: problem,
+      });
     }
   }
 
@@ -186,6 +235,7 @@ export function loadDefinitionScope(dir: string): LoadedScope {
       ? { invalidDefinitions: { ...scope.invalidDefinitions, ...unreadable } }
       : {}),
     definitions: scope.definitions,
+    diagnostics: [...diagnostics, ...(scope.diagnostics ?? [])],
     errors: [...errors, ...scope.errors],
   };
 }
@@ -217,6 +267,7 @@ export async function loadDefinitionScopeAsync(
   const files: DefinitionFile[] = [];
   const errors: string[] = [];
   const unreadable: Record<string, string[]> = {};
+  const diagnostics: DefinitionDiagnostic[] = [];
   for (const name of names) {
     throwIfAborted(signal);
     const path = join(dir, name);
@@ -231,7 +282,14 @@ export async function loadDefinitionScopeAsync(
       debugLog("readFile agent file", err);
       const problem = `Could not read the agent definition at ${path}.`;
       errors.push(problem);
-      unreadable[normalizeAgentId(basename(name, ".md"))] = [problem];
+      const id = normalizeAgentId(basename(name, ".md"));
+      unreadable[id] = [problem];
+      diagnostics.push({
+        category: "file-read",
+        id,
+        source: { path },
+        message: problem,
+      });
     }
   }
 
@@ -243,13 +301,25 @@ export async function loadDefinitionScopeAsync(
       ? { invalidDefinitions: { ...scope.invalidDefinitions, ...unreadable } }
       : {}),
     definitions: scope.definitions,
+    diagnostics: [...diagnostics, ...(scope.diagnostics ?? [])],
     errors: [...errors, ...scope.errors],
   };
 }
 
 function failedScope(dir: string): LoadedScope {
   const scopeError = `Could not read the agent definitions directory at ${dir}.`;
-  return { definitions: [], errors: [scopeError], scopeError };
+  return {
+    definitions: [],
+    errors: [scopeError],
+    scopeError,
+    diagnostics: [
+      {
+        category: "directory-read",
+        source: { path: dir },
+        message: scopeError,
+      },
+    ],
+  };
 }
 
 /** Stop before starting another filesystem operation after caller cancellation. */
@@ -282,6 +352,7 @@ export function collectDefinitions(
 ): LoadedScope {
   const definitions: LoadedDefinition[] = [];
   const errors: string[] = [];
+  const diagnostics: DefinitionDiagnostic[] = [];
   const byId = new Map<string, LoadedDefinition>();
   const duplicated = new Set<string>();
   const invalidDefinitions: Record<string, string[]> = {};
@@ -297,6 +368,12 @@ export function collectDefinitions(
           `Two agent definitions normalize to the identifier "${id}": ` +
           `${existing.path} and ${file.path}. Rename one of them; neither is used.`;
         errors.push(problem);
+        diagnostics.push({
+          category: "duplicate-id",
+          id,
+          source: { path: existing.path, relatedPaths: [file.path] },
+          message: problem,
+        });
         invalidDefinitions[id] = [problem];
         duplicated.add(id);
         definitions.splice(definitions.indexOf(existing), 1);
@@ -312,9 +389,25 @@ export function collectDefinitions(
         parsed.error,
       ];
       errors.push(parsed.error);
+      diagnostics.push({
+        category: "malformed-frontmatter",
+        id,
+        source: { path: file.path },
+        message: parsed.error,
+      });
       continue;
     }
     errors.push(...parsed.problems);
+    diagnostics.push(
+      ...parsed.problems.map(
+        (message): DefinitionDiagnostic => ({
+          category: "invalid-value",
+          id,
+          source: { path: file.path },
+          message,
+        }),
+      ),
+    );
     if (parsed.problems.length > 0) {
       invalidDefinitions[id] = [
         ...(invalidDefinitions[id] ?? []),
@@ -334,6 +427,7 @@ export function collectDefinitions(
   return {
     definitions,
     errors,
+    diagnostics,
     ...(Object.keys(invalidDefinitions).length ? { invalidDefinitions } : {}),
   };
 }

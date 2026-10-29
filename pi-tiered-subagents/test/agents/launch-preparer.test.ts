@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LoadedScopes } from "#src/agents/loader";
+import { collectDefinitions, type LoadedScopes } from "#src/agents/loader";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { ModelInfo, TurnSettings } from "#src/agents/resolver";
@@ -68,6 +68,49 @@ function request(
 }
 
 describe("LaunchPreparer", () => {
+  it.each([
+    { scopeError: "directory unavailable", errors: ["directory unavailable"] },
+    {
+      invalidDefinitions: { worker: ["invalid worker settings"] },
+      errors: ["invalid worker settings"],
+    },
+  ])("fails closed for legacy injected scope failures without diagnostics: %j", async (failure) => {
+    const outcome = await makePreparer({
+      global: { definitions: [], ...failure },
+      project: { definitions: [], errors: [] },
+    }).prepare(request());
+    expect(outcome).toMatchObject({
+      kind: "rejected",
+      reason: "configuration",
+    });
+  });
+
+  it("preserves typed diagnostics when rejecting an invalid definition", async () => {
+    const global = collectDefinitions([
+      {
+        name: "worker.md",
+        path: "/global/worker.md",
+        content: "---\nenabled: nope\n---\n",
+      },
+    ]);
+    const outcome = await makePreparer({
+      global,
+      project: { definitions: [], errors: [] },
+    }).prepare(request());
+    expect(outcome).toMatchObject({
+      kind: "rejected",
+      reason: "configuration",
+      diagnostics: [
+        {
+          category: "invalid-value",
+          id: "worker",
+          source: { path: "/global/worker.md" },
+          message: expect.stringContaining("enabled"),
+        },
+      ],
+    });
+  });
+
   it("rejects an unknown requested agent instead of synthesizing a definition", async () => {
     const outcome = await makePreparer().prepare(request({ type: "missing" }));
 
