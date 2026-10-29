@@ -1,301 +1,272 @@
-# pi-tiered-subagents
+# Pi Tiered Subagents
 
-A family-aware subagent runtime for [pi](https://github.com/earendil-works/pi-coding-agent):
-scoped specialists, layered agent definitions, and inspectable model selection.
+Pi Tiered Subagents gives [Pi](https://github.com/earendil-works/pi-coding-agent) focused child agents for exploration, implementation, review, debugging, and research. It helps the parent agent delegate scoped work without blocking the conversation, chooses models according to each specialist's role and the parent's model family, and coordinates access to a shared workspace. A single Pi extension supplies agent-facing tools, progress notifications, a transcript viewer, and a typed service for other extensions—so users can follow delegated work while developers can integrate it into larger workflows.
 
-> **Status: stabilization complete; release approval is a separate decision.**
-> The package passes 2,466 tests (one skipped) against Pi 1.3.0, plus packed
-> install, declared Node floor, and live stdio MCP checks. It is loaded from
-> TypeScript source, with no build step, so Pi compiles the extension itself.
-> The implementation includes authoritative launch preparation, explicit session
-> ownership and cleanup, extracted presentation, typed tool outputs, and offline
-> SDK checks; the reviewed SDK and lifecycle gaps were reproduced, fixed, and
-> re-verified. See [docs/stabilization.md](docs/stabilization.md) for the evidence
-> and known limitations, and [docs/status.md](docs/status.md) for history.
+[![npm version](https://img.shields.io/npm/v/@code-fixer-23/pi-tiered-subagents)](https://www.npmjs.com/package/@code-fixer-23/pi-tiered-subagents)
+[![npm downloads](https://img.shields.io/npm/dm/@code-fixer-23/pi-tiered-subagents)](https://www.npmjs.com/package/@code-fixer-23/pi-tiered-subagents)
+[![License: MIT](https://img.shields.io/npm/l/@code-fixer-23/pi-tiered-subagents)](LICENSE)
+[![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
 ## Install
+
+Requires Node.js **22.19.0 or later** and Pi with the package's declared peer dependencies available.
 
 ```bash
 pi install npm:@code-fixer-23/pi-tiered-subagents
 ```
 
-The package is a **replacement runtime**, not a second orchestrator: enabling it
-alongside another subagent runtime in the same session is not supported.
+This package is a **replacement subagent runtime**, not a second orchestrator. Do not enable it alongside another subagent runtime in the same session. Pi loads its TypeScript source directly; there is no separate build step.
 
-## What it does today
+No configuration is required to use the shipped specialists. For example, ask Pi:
 
-The runtime is a credited derivative of
-[`@gotgenes/pi-subagents`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents)
-v25.0.1, which is itself a friendly fork of
-[`@tintinweb/pi-subagents`](https://github.com/tintinweb/pi-subagents). It provides:
+> Have Explore trace how configuration is loaded, then have Worker implement the scoped change. Give Reviewer the requirements and diff for an independent review.
 
-- **Spawning** — a `subagent` tool that starts a child agent in the background by
-  default, with an explicit foreground mode.
-- **Workspace scheduling** — one child at a time may change the files in a
-  workspace. The rule follows the child's effective tools, not its role: a
-  child that only reads runs alongside the one that writes, and a shell or an
-  unknown tool counts as a writer.
-- **Result retrieval** — `get_subagent_result` polls or awaits a child's status
-  and result.
-- **Steering** — `steer_subagent` sends a message to a running child.
-- **Resume** — a settled agent can be resumed with a new prompt, continuing its
-  session.
-- **A published service** — other extensions can spawn and observe agents through
-  the typed API:
+Background work returns an agent ID so the parent can continue. Completion is announced automatically unless the outcome has already been collected; the parent can retrieve details, steer work in progress, or resume a settled child for follow-up.
 
-  ```ts
-  const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
-  const svc = getSubagentsService();
-  const result = await svc?.launch("Explore", "Check for stale TODOs");
-  if (result?.kind === "accepted") console.log(result.id);
-  else if (result) console.warn(result.reason, result.message);
-  ```
+## Pi Tiered Subagents
 
-  The launch surface is a deliberate breaking replacement for a synchronous
-  `spawn(): string`: `launch()` accepts into background handoff,
-  `run()` prepares, accepts, and awaits one foreground run to its settled
-  record, and expected failures resolve as `{ kind: "rejected", reason, message }`
-  rather than throwing. A `launch` signal cancels preparation only and detaches
-  after acceptance; a `run` signal stops the queued or running work it owns.
+The package ships one extension, loaded through `extensions/index.ts`. Its five specialist definitions are part of the runtime—not separate extensions or installable skills.
 
-  The service is published on `globalThis` under this package's own symbol key,
-  `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`.
+| Specialist | When to use it | Default capabilities and context |
+| --- | --- | --- |
+| `explore` | Find files and trace existing behavior | Read-only file tools; fresh conversation; no shell |
+| `worker` | Implement and validate a scoped change | Inherits the parent's active capability tools; fresh conversation |
+| `reviewer` | Independently assess a supplied change | Read-only tools; fresh conversation; needs the requirements and diff or readable diff artifact |
+| `debug` | Reproduce a failure and recommend a repair | Inherits active capability tools and the parent's conversation; instructed not to implement the production repair |
+| `researcher` | Investigate external facts | Read-only file tools plus `web_search`, when available; fresh conversation |
 
-- **Shared settings** — the settings live in the shared store
-  (`@juanibiapina/pi-extension-settings`), in the operator's file and the
-  project's file, so one place holds the settings of every extension that
-  uses it. The inherited generic loader is still exported for other packages:
+All five start in the background by default. Tool availability still depends on the host session: naming an extension tool does not install it. Child capabilities exclude the three subagent-management tools, so children cannot recursively delegate.
 
-  ```ts
-  import { loadLayeredSettings } from "@code-fixer-23/pi-tiered-subagents/settings";
-  ```
+### Commands
 
-  It is no longer this package's own backend; see
-  [docs/status.md](docs/status.md).
+#### `/subagents:settings`
 
-- **A live widget** and a `/subagents:sessions` transcript viewer, mounted on Pi's
-  own components. All terminal presentation lives in the internal `src/ui/`
-  module, including settings, tool-result, and notification renderers. It is
-  part of this project, not a separate package or extension to enable.
+Opens an interactive menu for runtime controls. It takes no command arguments; choose the setting in the menu, then enter a value or toggle it.
 
-## Commands
-
-| Command | Purpose |
+| Choice | Workflow impact |
 | --- | --- |
-| `/subagents:settings` | Concurrency, turn limits, retention, interrupt policy |
-| `/subagents:sessions` | Browse a subagent's transcript (read-only) |
+| Max concurrency | Controls how many children can execute at once; default **4**. Workspace writer scheduling still applies. |
+| Default max turns | Sets the fallback work budget; **0** means unlimited. Positive ceilings normalize to at least two turns. Request and definition limits take precedence. |
+| Wrap-up turns | Warns a child as it approaches its ceiling so it can finish and report; default **2**. |
+| Consumed-session retention | Keeps a collected child's session available for follow-up; default **10 minutes**. |
+| Unconsumed-session retention | Caps how long an uncollected child's session is retained; default **720 minutes**. |
+| Abort all subagents on ESC | When enabled, interrupting the parent also stops queued and background children; enabled by default. Foreground work is interrupted either way. |
+| Mid-run updates | Allows background children to send material updates through `notify_parent`; enabled by default. Disabling it does not disable ask-back. |
 
-## Models
+Menu changes are saved to the project's shared settings file, not the global file. Family routing profiles and other structured settings are configured in the [configuration guide](docs/configuration.md), rather than through this menu.
 
-See the [configuration guide](docs/configuration.md) for role/family routing,
-exact model overrides, agent files, and copyable shared-settings examples.
+#### `/subagents:sessions`
 
-A model is named exactly, as `provider/modelId`:
+Opens a picker of subagent sessions, then a **read-only transcript viewer**. It takes no command arguments and does not switch the parent into the child's session. Live transcripts follow new output; retained transcript files can be opened as snapshots.
 
-```json
-{ "model": "anthropic/claude-sonnet-5" }
+The viewer shows the agent, task, model, and reasoning level. It uses a regular custom component in normal terminal mode and an overlay in fullscreen mode. If no sessions are available, or a transcript cannot be read, Pi displays a notification instead.
+
+### Tools
+
+These tools are called by the parent agent. Required and optional arguments below use `type:name` notation.
+
+#### `subagent`
+
+Launches a specialist for scoped work, or resumes an existing child for a follow-up. Use it when work benefits from a separate conversation, restricted capabilities, or independent assessment.
+
+| Argument | Required | Behavior |
+| --- | --- | --- |
+| `string:prompt` | Yes | Task instructions, or the follow-up message when resuming. |
+| `string:description` | Yes | Short task label, typically 3–5 words, shown in the UI. |
+| `string:subagent_type` | Yes | Shipped or custom agent identifier. Unknown and disabled identifiers are rejected, not replaced. |
+| `string:model` | No | Exact `provider/modelId` for a new launch; overrides the definition and automatic routing. Unavailable pins fail rather than silently rerouting. |
+| `string:thinking` | No | Reasoning request: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`, subject to model support and the reasoning rules below. |
+| `number:max_turns` | No | Positive turn ceiling for a new launch; otherwise the definition or runtime default applies. The tool schema requires at least 1, and execution normalizes positive ceilings to at least 2. |
+| `boolean:run_in_background` | No | `true` returns after acceptance; `false` awaits the outcome. New launches inherit the definition's default when omitted. Resumes default to foreground unless explicitly set to `true`. |
+| `string:resume` | No | Existing agent ID whose conversation should continue. Uses the captured session configuration rather than preparing a new model or capability set. |
+| `boolean:inherit_context` | No | For a new launch, overrides whether the child receives the parent's conversation. Otherwise the definition decides. |
+
+For example, a model-facing call can delegate exploration without waiting:
+
+```text
+subagent({
+  subagent_type: "explore",
+  description: "Trace configuration loading",
+  prompt: "Find the configuration entry points and explain precedence. Report file paths.",
+  run_in_background: true
+})
 ```
 
-A name that the session cannot run fails the launch; it never falls back to
-another model.
+Background acceptance does not mean execution has started: the child may queue for a concurrency slot or workspace access. Foreground calls return the settled outcome directly and suppress a duplicate completion announcement. Resume can be refused when the child is still running, its retained session is gone, or it belongs to a different parent-session owner.
 
-Automatic routing uses the resolved agent identifier and the family profile's
-required `group`:
+#### `get_subagent_result`
 
-| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+Checks a child's progress or collects its outcome. Use it when the parent needs a result before deciding what to do next, or needs more detail than a completion notification provides.
+
+| Argument | Required | Behavior |
 | --- | --- | --- |
-| `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
-| `researcher` | S | worker |
-| `debug` | M | worker |
-| `reviewer` | Equal: the parent's own size | planner |
-| `explore` | S | worker |
+| `string:agent_id` | Yes | ID returned by a launch. |
+| `boolean:wait` | No | Wait for completion instead of immediately reporting progress; defaults to `false`. |
+| `boolean:verbose` | No | Include the full conversation rather than only the report; defaults to `false`. |
+| `number:timeout` | No | Maximum wait in **seconds**, when waiting. Omit to wait without a timeout. Expiry returns current progress and does not stop the child. |
 
-Custom identifiers use worker behavior; this does not add a sixth shipped role.
-The mapping is shipped policy, not operator-configurable settings.
+Reports include status, available results or errors, and execution details. A child's pending question can be returned with its outcome so the parent can answer through a resume.
 
-The size ladder is XL → L → M → S, with S as the floor. Size assignments
-are Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L,
-sonnet = M, haiku = S; GPT astra = XL, sol = L, pro/terra/default = M,
-luna/mini/nano = S. A Worker from Fable targets Opus; a Worker from Astra
-targets Sol. Reviewers start at their parent's own rung, including XL.
-Dated snapshots use the size of the tier they belong to.
+#### `steer_subagent`
 
-Automatic model routing stays within the parent's exact family and version.
-A size or role target starts at the top matching rung in that version; Equal
-starts at the parent's own rung, not the top of its size. Try concrete IDs in
-preference order, then eligible cheaper rungs in the same version, skipping
-anything the session cannot run. No version fallback links are supported or
-inferred. If no role target or cheaper rung is runnable, keep the parent's
-model and report why. An unknown family also retains the parent, without
-price-based or name-based guessing. A reviewer retaining its own rung by Equal
-is a designed choice, not an exhaustion fallback. The launch reason names the
-role and target as well as the chosen model, including retained outcomes.
+Redirects a running child without discarding its conversation. Use it to narrow scope, supply new evidence, or correct an assumption while work continues.
 
-Flash-named tiers, including the separate flash-lite rung, are worker class;
-pro/non-flash flagship tiers are planner class. These are profile labels, not
-runtime name-based classification. MiniMax M3.1-flash is the worker rung
-below its planner flagship, available only to routing within version 3.1.
-This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
-cannot reach it; flash-only Gemini versions cannot reach a different version's
-planner, and Qwen cannot reach another version's S tier. Missing targets retain
-the parent. DeepSeek has planner but no worker class: reviewer targets pro,
-and the other roles retain the parent.
+- Required: `string:agent_id` — the running child.
+- Required: `string:message` — guidance to inject after its current tool execution.
 
-GLM uses a glued-version naming strategy (version adjoining the prefix,
-variants following it) and a planner/worker profile. Kimi is no longer a
-supported automatic-routing family: an unpinned Kimi parent is retained.
-The shipped catalogue is representative of the installed SDK, not a promise of
-vendor availability. Profiles enumerate candidates; session access decides
-which can run. Model routing changes neither exact-pin resolution nor reasoning
-selection.
+Steering can be buffered while the child session initializes. It is not a way to restart settled work; use `subagent` with `resume` for that.
 
-The ladders are data. An operator can replace a family whole in the runtime's
-settings file, under `familyProfiles`:
+#### Communication from child to parent
 
-```json
-{
-  "familyProfiles": {
-    "gpt": {
-      "group": "size",
-      "tiers": [
-        { "tier": "sol", "size": "L" },
-        { "tier": "terra", "size": "M" },
-        { "tier": "luna", "size": "S" }
-      ]
-    },
-    "minimax": {
-      "group": "planner-worker",
-      "tiers": [
-        { "tier": "", "role": "planner" },
-        { "tier": "flash", "role": "worker" }
-      ]
-    }
+Children receive `ask_parent` with required `string:question` when they need a decision or missing input. The child records the question and ends its turn; the normal outcome delivery carries it back. The parent then resumes that child with the answer. This is a handoff, not a blocking interactive user dialog.
+
+Background children can also receive `notify_parent` with required `string:message` when `midRunUpdates` is enabled. It sends a one-way material update and lets the child continue immediately; the parent can respond by steering. Messages are capped at 2,000 characters, with truncation disclosed to the child.
+
+### Shortcuts
+
+The extension registers no global keyboard shortcuts. The transcript viewer provides these local controls:
+
+| Keys | Interaction |
+| --- | --- |
+| <kbd>Esc</kbd> or <kbd>q</kbd> | Close the viewer and return to the parent conversation. |
+| <kbd>↑</kbd> / <kbd>k</kbd>, <kbd>↓</kbd> / <kbd>j</kbd> | Scroll one line up or down to inspect nearby transcript content. |
+| <kbd>Shift</kbd> + <kbd>↑</kbd>, <kbd>Shift</kbd> + <kbd>↓</kbd> | Page through earlier or later output. Pi's configured alternate-screen page-up/down bindings also work. |
+
+Pi's configured alternate-screen top/bottom bindings jump to the beginning or end; the viewer footer displays the actual bindings. Mouse-wheel scrolling is also supported. Paging up or jumping to the top pauses live following, even when the content fits; returning to the bottom normally resumes following.
+
+Outside the viewer, Pi's ordinary <kbd>Esc</kbd> interruption follows the interrupt policy described under `/subagents:settings`.
+
+### Features
+
+#### Workspace scheduling and execution budgets
+
+Only one child with potentially writing capabilities can operate in a workspace at a time. Read-only children can run alongside that writer. Scheduling follows the **effective tools**, not the role name: shells, editors, and unknown tools count as potential writers. This coordinates child access; it is not a filesystem sandbox or a lock on the parent agent's own edits.
+
+Concurrency admission applies to foreground and background work. Near a configured turn ceiling, the runtime warns the child to wrap up, then stops the run at the limit. Retained sessions allow later follow-up without rebuilding the child's conversation; retention expiry can make a child non-resumable.
+
+#### Role-aware model and reasoning selection
+
+A request model pin wins over a definition pin; otherwise the runtime routes from the parent's model using the resolved specialist identifier.
+
+| Specialist | Size families: GPT, Claude, Qwen | Planner/worker families: Gemini, MiniMax, GLM, MiMo, DeepSeek |
+| --- | --- | --- |
+| `worker` | One size below the parent, clamped at S | Worker |
+| `explore`, `researcher` | S | Worker |
+| `debug` | M | Worker |
+| `reviewer` | Start at the parent's own rung | Planner |
+
+Custom identifiers use worker routing. Changing a display label does not change this policy. Routing is not always a downgrade: debugging can target M from an S parent, and reviewing can target a planner from a worker parent.
+
+Automatic candidates stay within the parent's **family and version**. The router tries eligible rungs in preference order, preferring the parent's provider, then a unique runnable alternative provider. It skips unavailable or provider-ambiguous candidates. If none qualify—or the family, tier, or version is unknown—it retains the parent model and explains why. It never guesses by price or crosses versions. Exact user pins bypass this routing and never silently fall back.
+
+Reasoning is selected after the model. Request `thinking` wins over definition `thinking`; otherwise the child takes the next supported non-off level below the parent's effort, staying at the floor when necessary. With no known parent effort, it prefers medium, then low, then the lowest supported non-off level. Explicit levels are clamped to model support; explicit `off` is not allowed on a reasoning model. Non-reasoning models report reasoning as not applicable.
+
+Launch reports expose the selected model, reasoning, and reasons for retention or clamping. See the [configuration guide](docs/configuration.md) for family profiles, exact pins, and troubleshooting.
+
+#### Context and extension inheritance
+
+Conversation inheritance is separate from the child's specialist instructions and project context. Debug inherits the parent conversation by default; the other shipped specialists start fresh. Child sessions resolve project context for their working directory and rebuild tool-surface instructions for their own capabilities.
+
+Structured settings can exclude configured packages' **extensions** from children while keeping their other resources available. Provider-scoped `promptInheritance` can select `portable` inheritance for providers that re-home prompts into another harness; ordinary providers should keep `full`. These controls are explained in the [configuration guide](docs/configuration.md#runtime-settings-reference).
+
+#### Progress, results, and parent-session ownership
+
+As children work, the live widget and notifications make delegated activity visible without requiring repeated polling. Mid-run updates and completion nudges are coordinated with the parent's execution: `agent_start` holds notifications during a parent run, and `agent_settled` releases eligible notifications after that run settles. Outcomes already delivered through foreground execution or collected by a consumer do not produce duplicate completion nudges.
+
+At `session_start`, the extension loads configuration and definitions, publishes its service, and attaches the UI to the parent session. Launches belong to that session owner; a tentative session switch does not cancel its children. Shutdown withdraws the owning service, stops queued and active work, and disposes child resources so results cannot leak into another parent session.
+
+## Custom agents and settings
+
+Definitions are Markdown files in `<agentDir>/agents/*.md` (normally `~/.pi/agent/agents/`) or `<cwd>/.pi/agents/*.md`. `PI_CODING_AGENT_DIR` relocates the global agent directory. The lowercased filename is the identifier; project definitions refine global definitions, which refine shipped defaults **field by field**.
+
+For example, `.pi/agents/reviewer.md` can change only a reviewer's reasoning while keeping its shipped instructions and tools:
+
+```markdown
+---
+thinking: high
+---
+```
+
+A nonempty Markdown body replaces inherited standing instructions. Omitted fields inherit, `null` clears inherited model or thinking choices, `tools: inherit` uses the parent's active capability tools, and `tools: []` grants no capability tools. Broadening a specialist's tools changes its permissions and workspace scheduling; definitions are not merely labels.
+
+Runtime settings use `@juanibiapina/pi-extension-settings`:
+
+- Global: `<agentDir>/settings-extensions.json`.
+- Project: `<cwd>/.pi/settings-extensions.json`.
+- Extension key: `pi-tiered-subagents`.
+
+Stored values are **strings**, including booleans, numbers, and JSON-encoded structured settings. Project values override global values, and menu saves write only project settings. The optional shared settings UI must load before this extension to receive its settings registration; this package's own settings command and storage do not require that UI.
+
+See [Configuration](docs/configuration.md) for all definition fields, copyable on-disk examples, precedence, and migration notes. The historical upstream `subagents.json` format is not this runtime's settings backend.
+
+## Integrating with other extensions
+
+Declare this package as an optional peer dependency and dynamically import its service accessor. The accessor returns `undefined` when the runtime is not published; integrations should handle that case.
+
+```ts
+const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
+const service = getSubagentsService();
+
+if (service) {
+  const result = await service.launch("explore", "Locate configuration entry points", {
+    description: "Trace configuration loading",
+  });
+
+  if (result.kind === "accepted") {
+    console.log(result.id); // Accepted, possibly still queued—not yet successful.
+  } else {
+    console.warn(result.reason, result.message);
   }
 }
 ```
 
-A replacement must declare `group: "size"` or `group: "planner-worker"`.
-Every tier in a size profile requires `size: "S" | "M" | "L" | "XL"`; every tier in a
-planner/worker profile requires `role: "planner" | "worker"`. Tiers are
-version-independent: the router reads the parent's version, targets a rung, and
-constructs the exact model ID with the family's naming structure. Tier names are
-trimmed, and the empty name remains the family's unnamed default line. Unknown
-profile fields are rejected with path-aware diagnostics; the one exception is an
-obsolete tier-level `fallbacks` field, which is accepted and discarded. Profiles
-no longer declare `versions` or concrete `models`; those fields are rejected.
-Whole-family replacement semantics stay the same.
+Use `launch()` for background acceptance and `run()` to await a foreground terminal record. Expected launch failures return `{ kind: "rejected", reason, message }`; successful `run()` calls return `{ kind: "settled", record }`, whose status distinguishes completion, stopping, and errors. The service uses camelCase options such as `maxTurns`, `thinkingLevel`, and `inheritContext`, rather than the model-facing tool's argument names.
 
-Only declared data is read: a field the schema does not name is rejected, never
-evaluated. A replacement profile with an unsupported naming structure is
-refused; an unknown parent family instead retains the parent model.
+A `launch()` abort signal cancels preparation only and detaches after acceptance; call `abort(id)` to stop accepted work. A `run()` signal remains connected to the queued or running child. Service `resume()` continues a retained session in the background and resolves at settlement, or promptly returns a refusal. `claimOutcome` lets an integration take responsibility for delivering a resumed outcome without a duplicate nudge.
 
-## Reasoning
+Use `getRecord()` and `listAgents()` for by-value snapshots, `steer()` for guidance, and `waitForAll()` or `hasRunning()` to coordinate outstanding work. A single `registerWorkspaceProvider()` integration can supply child working directories and bracketed setup/teardown; registration returns an unregister disposer. See the [public service contract](src/service/service.ts) for the complete type surface.
 
-A child's reasoning level is chosen after its model, from what the model
-actually supports:
+### Observing delegated work
 
-When parent effort is known, automatic reasoning takes the next supported
-non-off rung below it in the chosen model's level array (the highest supported
-level strictly below the parent). Gaps are skipped; at the floor, effort stays.
-This includes retained models: on `[low, high, max]`, `max` becomes `high`,
-not `low`. There is no fixed medium/low preference with known parent effort.
-With no parent effort, the default remains medium, then low, then the lowest
-supported non-off level. Request reasoning, then definition reasoning, still
-wins, with Pi-compatible clamping; non-reasoning models report *not applicable*.
+Subscribe through `pi.events` and import `SUBAGENT_EVENTS` for its exported channel names. Treat events as coordination signals; inspect record status and errors before interpreting termination as success.
 
-Unsupported explicit levels are clamped, never silently to off on a reasoning
-model. The prohibition on explicit off for a reasoning model is unchanged.
+**Initial execution:** background acceptance emits `subagents:created` before concurrency admission. When the initial run starts, `subagents:started` lets integrations begin tracking execution. During work, `subagents:compacted` reports successful context compaction, `subagents:steered` reports successful tool steering, and `subagents:update` carries child progress messages. The initial run ends with `subagents:completed` or `subagents:failed`; consumers should inspect the terminal record rather than assume every non-failure event means successful completion. `subagents:update` currently uses its literal channel name; it is not included in `SUBAGENT_EVENTS`.
 
-[ADR 0015](docs/adr/0015-version-local-routing-and-retained-effort.md) records
-the version boundary, unknown-family retention, and retained-model effort.
-The five-role mapping from ADR 0014 is unchanged.
+**Follow-up execution:** a retained child emits `subagents:resuming` when its resumed run starts and `subagents:resumed` when that run ends. The latter also covers resumed errors, so check its status and error. This separates continued work from the initial run while preserving the child's identity. Terminal outcomes are persisted and considered for notification; consumers that claim delivery must actually deliver the outcome to the parent.
 
-The launch note reports what was decided, so a caller that asked for one thing
-and got another can see it.
+### Preparing and binding child sessions
 
-## Agent definitions
+For integrations that need to coordinate child resources, the lower-level lifecycle starts with `subagents:child:spawning`, then emits `subagents:child:session-created` immediately before extension binding. A consumer that must register something before binding must handle `session-created` **synchronously**. After child `session_start` handlers finish, `subagents:child:bound` signals readiness before the first turn; failed binding skips this event.
 
-Shipped specialists: `explore`, `worker`, `reviewer`, `debug`, and
-`researcher`. Each has an exact tool list; `worker` and `debug` inherit the
-parent's active tools instead, and `debug` starts from the parent's
-conversation.
+After prompt execution resolves, `subagents:child:completed` marks the end of that execution path, and `subagents:child:disposed` accompanies final cleanup. Do not use this lower-level completion signal as a substitute for the public run outcome: it describes session execution, not an independent guarantee of task success.
 
-Operator and project definitions are Markdown files with frontmatter, whose
-body is the agent's standing instructions. They are discovered in the global
-agent directory (`~/.pi/agent/agents/*.md`) and in a project
-(`.pi/agents/*.md`). Pi owns project trust and extension loading; this runtime
-adds no second trust gate to definition or settings reads.
-
-```markdown
----
-display_name: Reviewer
-description: Independent assessment of a scoped change
-tools: read, grep, find
-model: anthropic/claude-sonnet-5
-thinking: medium
----
-
-Assess the change against the stated requirements. Report findings, do not
-claim checks you did not run.
-```
-
-A file refines the layer below it field by field: a setting it does not
-mention is inherited, an explicit value replaces, `null` clears an inherited
-model or thinking choice, and `tools: []` means no tools at all.
-`tools: inherit` takes the parent's active tools.
+The service is published under `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`, separate from upstream runtimes. The package also retains the generic `loadLayeredSettings` export at `@code-fixer-23/pi-tiered-subagents/settings`; that utility is not this runtime's own settings backend.
 
 ## Development
+
+Run tasks from the monorepo root:
 
 ```bash
 pnpm nx run pi-tiered-subagents:typecheck
 pnpm nx run pi-tiered-subagents:test
-pnpm nx run pi-tiered-subagents:check        # formatting
-pnpm nx run pi-tiered-subagents:metadata     # package metadata
+pnpm nx run pi-tiered-subagents:lint
+pnpm nx run pi-tiered-subagents:check         # Formatting check
+pnpm nx run pi-tiered-subagents:metadata      # Package metadata validation
+pnpm nx run pi-tiered-subagents:release-check # Packaging/install checks
 ```
 
-## Documentation
+The entry point composes the implementation in `src/`; terminal presentation lives in the internal `src/ui/` module, not a separate extension. Tests cover launch preparation, scheduling, session ownership, model selection, result delivery, and UI boundaries. See [stabilization evidence and known limitations](docs/stabilization.md) rather than treating a historical test count as a current guarantee.
 
-- [Configuration guide](docs/configuration.md) — model selection by role and
-  family, user-selected models, specialist overrides, and runtime settings.
-- [Original product specification](docs/SPEC.md), also published as
-  [GitHub issue #8](https://github.com/louiss0/pi-packages/issues/8).
-- [Approved architecture and modernization specification](docs/ARCHITECTURE-SPEC.md),
-  published as [GitHub issue #9](https://github.com/louiss0/pi-packages/issues/9),
-  with detailed TypeScript/API diagrams and requirements. Implementation is
-  incremental; the story-92 clarification keeps UI in this project's own module,
-  not a separate package. This follow-up supersedes conflicting portions of the
-  original specification.
-- [Runtime status](docs/status.md) — what is inherited, what changed, what is owed.
-- [Decision records](docs/adr/) — the decisions adopted for this derivative.
-- [Illustrated source guide](docs/how-it-works.html) — open it in a browser.
-- [Architecture](docs/architecture/architecture.md) and
-  [decision records](docs/decisions/) — upstream snapshots, kept for provenance.
+## Further reading
 
-## Source attribution and reference documents
+- [Configuration guide](docs/configuration.md): models, specialist overrides, settings, and troubleshooting.
+- [Runtime status](docs/status.md): implementation history and remaining constraints.
+- [Product specification](docs/SPEC.md) and [approved architecture specification](docs/ARCHITECTURE-SPEC.md).
+- [Local decision records](docs/adr/).
+- [Illustrated source guide](docs/how-it-works.html): open in a browser.
 
-The source material and copied reference documentation come from
-[@gotgenes/pi-subagents](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents)
-version 25.0.1, by Chris Lasher, under the MIT licence. That project describes
-itself as a friendly fork of
-[@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents).
+## License and attribution
 
-The following retain upstream reference snapshots, not newly accepted
-architecture decisions or configuration instructions for this derivative:
+Licensed under [MIT](LICENSE). This runtime derives from [@gotgenes/pi-subagents](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 by Chris Lasher, itself a friendly fork of [@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents). The `inherit` tool-selection convention was informed by [Nico Bailon's pi-subagents](https://github.com/nicobailon/pi-subagents); this package inherits the parent's active tools while excluding subagent-management tools.
 
-- [Comparison with upstream](docs/comparison-with-upstream.md).
-- [Architecture](docs/architecture/architecture.md) and its linked history.
-- [Decision records](docs/decisions/).
-
-Relative source/test links in those snapshots refer to the original project
-layout. Their original context is the upstream project linked above. Where the
-approved specification differs, the difference is intentional; consult the
-current source and [runtime status](docs/status.md), not the snapshots, for
-this implementation's behavior.
-
-The `inherit` tool-selection convention was informed by
-[Nico Bailon's pi-subagents](https://github.com/nicobailon/pi-subagents).
-This project's specified semantics are distinct: the parent's active tools,
-excluding subagent-management tools.
-
-See [LICENSE](LICENSE) for this package and [LICENSE.upstream](LICENSE.upstream)
-for the preserved upstream licence notice.
+The [upstream comparison](docs/comparison-with-upstream.md), [architecture snapshots](docs/architecture/architecture.md), and [inherited decision records](docs/decisions/) preserve reference material and provenance. Their source links and configuration descriptions may reflect the original layout; use this README, the configuration guide, and current source for this derivative's behavior.
