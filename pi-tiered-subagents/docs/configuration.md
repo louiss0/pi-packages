@@ -329,7 +329,7 @@ allowed for a reasoning model.
 
 Thinking choices are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`,
 subject to those model-specific rules. In model-facing calls the field is
-`thinking`; service callers use `thinkingLevel` instead.
+`thinking`. The runtime does not expose a cross-extension service API.
 
 ## Runtime settings reference
 

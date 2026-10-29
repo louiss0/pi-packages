@@ -16,7 +16,6 @@
     "!**/*.test.ts"
   ],
   "exports": {
-    ".": "./src/service/service.ts",
     "./settings": "./src/layered-settings.ts"
   },
   "imports": {

@@ -1,12 +1,4 @@
-/**
- * Parent service identity across a real child's loading and disposal.
- *
- * The parent here is a real Pi session: its resource loader loads this
- * package's source extension, which publishes the service on `session_start`.
- * The child is then built by the production assembly factory with this
- * package's extension in its own load path, which is the case that used to
- * replace the parent's service.
- */
+/** Real parent and child loading must not expose a global runtime or recursive child tools. */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +22,7 @@ import {
   type SubagentSessionDeps,
 } from "#src/lifecycle/create-subagent-session";
 import { buildAgentPrompt } from "#src/session/prompts";
-import { getSubagentsService } from "#src/service/service";
+const serviceKey = Symbol.for("@code-fixer-23/pi-tiered-subagents:service");
 import { makeModel } from "#test/helpers/make-model";
 
 const packageEntry = fileURLToPath(
@@ -134,28 +126,24 @@ async function createInheritingChild(agentDir: string) {
   );
 }
 
-it("keeps the real parent service through a child that inherits this extension", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pi-parent-service-"));
+it("keeps the runtime private when a real child inherits the extension", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pi-parent-privacy-"));
   let parent: Awaited<ReturnType<typeof startParentSession>> | undefined;
   let child: Awaited<ReturnType<typeof createInheritingChild>> | undefined;
+  const published = () => (globalThis as Record<symbol, unknown>)[serviceKey];
   try {
     parent = await startParentSession(directory);
-    const service = getSubagentsService();
-    expect(service).toBeDefined();
-    if (!service) throw new Error("the parent extension did not publish");
-    // The published object is a working service, not a placeholder.
-    expect(service.listAgents()).toEqual([]);
-    expect(service.getRecord("not-an-agent")).toBeUndefined();
-
+    expect(parent.extensionRunner.getToolDefinition("subagent")).toBeDefined();
+    expect(published()).toBeUndefined();
     child = await createInheritingChild(directory);
-    expect(getSubagentsService()).toBe(service);
-
-    // The child's own work never appears in the parent's service.
-    expect(service.listAgents()).toEqual([]);
-
+    for (const name of ["subagent", "get_subagent_result", "steer_subagent"]) {
+      expect(
+        child.session.extensionRunner.getToolDefinition(name),
+      ).toBeUndefined();
+    }
+    expect(published()).toBeUndefined();
     await child.dispose();
-    expect(getSubagentsService()).toBe(service);
-    expect(service.getRecord("not-an-agent")).toBeUndefined();
+    expect(published()).toBeUndefined();
   } finally {
     await child?.dispose();
     parent?.dispose();

@@ -14,7 +14,33 @@ implementation history and verification evidence, not release approval.
 > [stabilization.md](stabilization.md) for the evidence table and the remaining
 > known limitations.
 
-## Baseline
+## Current API boundary
+
+The maintainer has removed the cross-extension runtime API. Delegation is now
+available through the registered `subagent`, `get_subagent_result`, and
+`steer_subagent` tools only. The package no longer exports a root service entry
+or publishes a service on `globalThis`; the independent `/settings` utility
+export remains. Commands, transcript UI, lifecycle notifications, and internal
+session ownership remain part of the extension.
+
+This decision supersedes the service-publication requirement in the earlier
+specifications and ADR 0001. Service API examples, public adapter contracts,
+and publication-verification results below are historical evidence, not a
+current integration contract. Current usage is documented in the
+[README](../README.md#developer-boundaries).
+
+Verification after removal (2026-10-29): the full package suite passed with
+**2,556 tests passed and one platform-specific skip across 136 files**. Nx
+`typecheck`, `lint`, `check`, and `metadata` passed; the typecheck wrapper still
+reports the existing third-party settings-package diagnostics separately.
+`release-check` passed on Node 24.18.0, verifying packed extension loading,
+settings utility types, tool registration, blocked root/deep runtime imports,
+and absence of global service publication. The declared Node floor was not
+rerun for this change. Real SDK regressions now drive the registered tools to
+check vetoed switching, active-child preservation, session replacement, and
+follow-up execution without the retired service.
+
+## Historical stabilization baseline
 
 | | |
 | --- | --- |
@@ -27,7 +53,8 @@ implementation history and verification evidence, not release approval.
 | Test suite | `pnpm nx run pi-tiered-subagents:test` — 2,466 passed, one skipped |
 | Release checks | `pnpm nx run pi-tiered-subagents:release-check` and `mcp-check` — packed install, public types, Pi loader, declared Node floor, live stdio MCP |
 
-Latest verification on the current tree, daemon plugins disabled and uncached:
+Recorded verification before the runtime API removal, daemon plugins disabled
+and uncached:
 `pnpm nx run-many -t test typecheck lint check metadata` passed for all eight
 workspace projects; `release-check` passed on Node 24.18.0 and on the declared
 floor Node 22.19.0; `mcp-check` passed against a live stdio MCP server. See

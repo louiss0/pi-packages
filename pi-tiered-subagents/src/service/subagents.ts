@@ -1,6 +1,5 @@
 /**
- * subagents.ts — Session-scoped caller operations shared by the tool and
- * programmatic doors.
+ * subagents.ts — Internal session-scoped operations for the subagent tool.
  *
  * This is the composition seam between a request, the single LaunchPreparer,
  * the active parent snapshot, and manager acceptance. Door adapters supply

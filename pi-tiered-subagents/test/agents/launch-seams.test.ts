@@ -32,7 +32,7 @@ import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ModelInfo } from "#src/agents/resolver";
 import { SHIPPED_PROFILES } from "#src/models/profiles";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
-import { SubagentsServiceAdapter } from "#src/service/service-adapter";
+import { SubagentsTestDriver } from "#test/helpers/subagents-driver";
 import { Subagents } from "#src/service/subagents";
 import { assembleSessionConfig } from "#src/session/session-config";
 import type { AssemblerIO } from "#src/session/session-config";
@@ -350,7 +350,7 @@ describe("the service door", () => {
     const preparer = createPreparer(registry, () => ({
       ladders: { profiles: new Map(), strategies: new Map() },
     }));
-    const adapter = new SubagentsServiceAdapter(
+    const adapter = new SubagentsTestDriver(
       manager,
       new Subagents(manager, runtime, preparer),
     );
@@ -545,7 +545,7 @@ describe("both doors resolve alike", () => {
       modelRegistry: haikuRegistry,
       ladders,
     }));
-    const adapter = new SubagentsServiceAdapter(
+    const adapter = new SubagentsTestDriver(
       manager,
       new Subagents(manager, runtime, preparer),
     );

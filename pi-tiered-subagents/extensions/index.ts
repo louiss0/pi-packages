@@ -68,11 +68,6 @@ import {
 import { SubagentEventsObserver } from "#src/observation/subagent-events-observer";
 import { defined } from "#src/optional";
 import { createSubagentRuntime } from "#src/runtime";
-import {
-  publishSubagentsService,
-  unpublishSubagentsService,
-} from "#src/service/service";
-import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { Subagents } from "#src/service/subagents";
 import { WorkspaceGateRegistry } from "#src/scheduling/gate";
 import {
@@ -1716,10 +1711,8 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // Typed service published via Symbol.for() for cross-extension access.
-  // Consumers: const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
+  // Session-scoped operations used by the model-facing tools only.
   const subagents = new Subagents(manager, runtime, launchPreparer);
-  const service = new SubagentsServiceAdapter(manager, subagents);
 
   // The manager is told which session owns the work it accepts, so that a
   // replacement can cancel it. Read from the session context, falling back
@@ -1740,7 +1733,6 @@ export default function (pi: ExtensionAPI) {
 
   let shutdownPromise: Promise<void> | undefined;
   const shutdownOnce = async (): Promise<void> => {
-    unpublishSubagentsService(service);
     runtime.clearSessionContext();
     const ownerEnd = manager.endOwner();
     notifications.dispose();
@@ -1759,7 +1751,6 @@ export default function (pi: ExtensionAPI) {
     settings.load();
     refreshProfiles();
     refreshDefinitions();
-    publishSubagentsService(service);
     runtime.setSessionContext(ctx);
     await manager.beginOwner(sessionIdOf(ctx));
     await manager.clearCompleted();

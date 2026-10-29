@@ -28,12 +28,6 @@ import {
 } from "#src/lifecycle/create-subagent-session";
 import { buildAgentPrompt } from "#src/session/prompts";
 import { makeModel } from "#test/helpers/make-model";
-import {
-  getSubagentsService,
-  publishSubagentsService,
-  type SubagentsService,
-  unpublishSubagentsService,
-} from "#src/service/service";
 
 const packageEntry = fileURLToPath(
   new URL("../../extensions/index.ts", import.meta.url),
@@ -70,7 +64,7 @@ async function childFixture(directory: string) {
   await runtime.setRuntimeApiKey("anthropic", "offline-test-key");
   const settings = SettingsManager.inMemory();
   let extension: ExtensionAPI | undefined;
-  const discoveredService = getSubagentsService();
+  const serviceKey = Symbol.for("@code-fixer-23/pi-tiered-subagents:service");
   const publicationChecks: boolean[] = [];
   const executions = new Map<string, number>();
   const deps: SubagentSessionDeps = {
@@ -94,16 +88,19 @@ async function childFixture(directory: string) {
             (pi) => {
               extension = pi;
               publicationChecks.push(
-                getSubagentsService() === discoveredService,
+                (globalThis as Record<symbol, unknown>)[serviceKey] ===
+                  undefined,
               );
               pi.on("session_start", () => {
                 publicationChecks.push(
-                  getSubagentsService() === discoveredService,
+                  (globalThis as Record<symbol, unknown>)[serviceKey] ===
+                    undefined,
                 );
               });
               pi.on("session_shutdown", () => {
                 publicationChecks.push(
-                  getSubagentsService() === discoveredService,
+                  (globalThis as Record<symbol, unknown>)[serviceKey] ===
+                    undefined,
                 );
               });
               pi.registerTool(echoTool("allowed_echo", executions));
@@ -281,28 +278,26 @@ it.each([
   }
 }, 30_000);
 
-it("keeps the parent service through actual child extension loading and disposal", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pi-child-service-"));
-  const parent = {} as SubagentsService;
-  publishSubagentsService(parent);
+it("does not publish a service or register management tools while loading a real child", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pi-child-privacy-"));
   let child: Awaited<ReturnType<typeof createSubagentSession>> | undefined;
   try {
     const fixture = await childFixture(directory);
     child = await fixture.create([]);
-    expect(getSubagentsService()).toBe(parent);
+    for (const name of ["subagent", "get_subagent_result", "steer_subagent"]) {
+      expect(
+        child.session.extensionRunner.getToolDefinition(name),
+      ).toBeUndefined();
+    }
     await child.session.reload();
-    expect(getSubagentsService()).toBe(parent);
     await child.dispose();
-    expect(getSubagentsService()).toBe(parent);
-    // The unrelated inherited factory and both lifecycle handlers ran.
     expect(fixture.publicationChecks.every(Boolean)).toBe(true);
     expect(fixture.publicationChecks.length).toBeGreaterThanOrEqual(5);
   } finally {
     await child?.dispose();
-    unpublishSubagentsService(parent);
     await rm(directory, { recursive: true, force: true });
   }
-}, 30_000);
+}, 90_000);
 
 it.each([
   "*",
@@ -323,56 +318,6 @@ it.each([
     expect(outcome).toContain("concrete tool names");
   } finally {
     await child?.dispose();
-    await rm(directory, { recursive: true, force: true });
-  }
-}, 30_000);
-
-it("publishes a legitimate parent only on session start outside child discovery", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "pi-parent-service-"));
-  let session:
-    | Awaited<ReturnType<typeof createAgentSession>>["session"]
-    | undefined;
-  unpublishSubagentsService();
-  try {
-    const settingsManager = SettingsManager.inMemory();
-    const modelRuntime = await ModelRuntime.create({
-      authPath: join(directory, "auth.json"),
-      modelsPath: null,
-      allowModelNetwork: false,
-      refreshOnCreate: false,
-    });
-    const resourceLoader = new DefaultResourceLoader({
-      cwd: directory,
-      agentDir: directory,
-      settingsManager,
-      additionalExtensionPaths: [packageEntry],
-      noContextFiles: true,
-      noThemes: true,
-      noPromptTemplates: true,
-    });
-    await resourceLoader.reload();
-    expect(resourceLoader.getExtensions().errors).toEqual([]);
-    expect(getSubagentsService()).toBeUndefined();
-    ({ session } = await createAgentSession({
-      cwd: directory,
-      agentDir: directory,
-      settingsManager,
-      modelRuntime,
-      resourceLoader,
-      sessionManager: SessionManager.inMemory(directory),
-    }));
-    await session.bindExtensions({});
-    expect(getSubagentsService()).toBeDefined();
-    const replacement = {} as SubagentsService;
-    publishSubagentsService(replacement);
-    await session.extensionRunner.emit({
-      type: "session_shutdown",
-      reason: "quit",
-    });
-    expect(getSubagentsService()).toBe(replacement);
-  } finally {
-    session?.dispose();
-    unpublishSubagentsService();
     await rm(directory, { recursive: true, force: true });
   }
 }, 30_000);

@@ -10,7 +10,6 @@ import type {
 } from "#src/persisted-record";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
-import type { SubagentRecord } from "#src/service/service";
 import type { SubagentsSettings } from "#src/settings";
 
 /**
@@ -46,21 +45,6 @@ describe("record type contracts", () => {
     const turnBudget: TurnBudget = { used: 1, phase: "within" };
     turnBudget.used = 2;
     turnBudget.maxTurns = 5;
-
-    const snapshot: SubagentRecord = {
-      id: "run-1",
-      type: "worker",
-      description: "work",
-      status: "completed",
-      isBackground: false,
-      toolUses: 1,
-      startedAt: 0,
-      lifetimeUsage: { input: 1, output: 2, cacheWrite: 0 },
-      compactionCount: 0,
-    };
-    // Public snapshots stay mutable by value, including copied usage data.
-    snapshot.lifetimeUsage.input = 3;
-    snapshot.toolUses = 2;
 
     expectTypeOf<SubagentsSettings["maxConcurrent"]>().toEqualTypeOf<
       number | undefined

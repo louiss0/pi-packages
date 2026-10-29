@@ -2,7 +2,7 @@
  * subagents-harness.ts — The behavior-test harness for the Subagents seam (story 112).
  *
  * Wires the real chain both caller doors use — LaunchPreparer, Subagents,
- * SubagentManager, SubagentsServiceAdapter — with the two substitutions the
+ * SubagentManager, SubagentsTestDriver — with the two substitutions the
  * Testing Decisions section of ARCHITECTURE-SPEC names: definition I/O (a
  * pausable scope loader over a real registry) and child execution (the
  * controllable ChildSession factory). A test drives `service.launch/run/
@@ -28,8 +28,8 @@ import {
 } from "#src/lifecycle/subagent-manager";
 import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
-import type { SubagentsService } from "#src/service/service";
-import { SubagentsServiceAdapter } from "#src/service/service-adapter";
+import type { SubagentsDriver } from "#test/helpers/subagents-driver-types";
+import { SubagentsTestDriver } from "#test/helpers/subagents-driver";
 import { Subagents, type SubagentsRuntime } from "#src/service/subagents";
 import type { CompactionInfo } from "#src/types";
 import {
@@ -78,7 +78,7 @@ export interface SubagentsHarnessOptions {
 
 export interface SubagentsHarness {
   /** The public caller interface the tests drive. */
-  readonly service: SubagentsService;
+  readonly service: SubagentsDriver;
   /** The session-scoped seam behind it, for presentation-adapter reads. */
   readonly subagents: Subagents;
   readonly manager: SubagentManager;
@@ -226,7 +226,7 @@ export async function createSubagentsHarness(
   await manager.beginOwner("session-1");
 
   return {
-    service: new SubagentsServiceAdapter(manager, subagents),
+    service: new SubagentsTestDriver(manager, subagents),
     subagents,
     manager,
     children,

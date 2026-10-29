@@ -1,6 +1,6 @@
 # Pi Tiered Subagents
 
-Pi Tiered Subagents gives [Pi](https://github.com/earendil-works/pi-coding-agent) focused child agents for exploration, implementation, review, debugging, and research. It helps the parent agent delegate scoped work without blocking the conversation, chooses models according to each specialist's role and the parent's model family, and coordinates access to a shared workspace. A single Pi extension supplies agent-facing tools, progress notifications, a transcript viewer, and a typed service for other extensions—so users can follow delegated work while developers can integrate it into larger workflows.
+Pi Tiered Subagents gives [Pi](https://github.com/earendil-works/pi-coding-agent) focused child agents for exploration, implementation, review, debugging, and research. It helps the parent agent delegate scoped work without blocking the conversation, chooses models according to each specialist's role and the parent's model family, and coordinates access to a shared workspace. A single Pi extension supplies agent-facing tools, progress notifications, and a transcript viewer—so users can delegate work, follow its progress, and continue a child's conversation without exposing the runtime as a cross-extension service.
 
 [![npm version](https://img.shields.io/npm/v/@code-fixer-23/pi-tiered-subagents)](https://www.npmjs.com/package/@code-fixer-23/pi-tiered-subagents)
 [![npm downloads](https://img.shields.io/npm/dm/@code-fixer-23/pi-tiered-subagents)](https://www.npmjs.com/package/@code-fixer-23/pi-tiered-subagents)
@@ -173,7 +173,7 @@ Structured settings can exclude configured packages' **extensions** from childre
 
 As children work, the live widget and notifications make delegated activity visible without requiring repeated polling. Mid-run updates and completion nudges are coordinated with the parent's execution: `agent_start` holds notifications during a parent run, and `agent_settled` releases eligible notifications after that run settles. Outcomes already delivered through foreground execution or collected by a consumer do not produce duplicate completion nudges.
 
-At `session_start`, the extension loads configuration and definitions, publishes its service, and attaches the UI to the parent session. Launches belong to that session owner; a tentative session switch does not cancel its children. Shutdown withdraws the owning service, stops queued and active work, and disposes child resources so results cannot leak into another parent session.
+At `session_start`, the extension loads configuration and definitions and attaches the UI to the parent session. Launches belong to that session owner; a tentative session switch does not cancel its children. Shutdown stops queued and active work and disposes child resources so results cannot leak into another parent session.
 
 ## Custom agents and settings
 
@@ -199,48 +199,25 @@ Stored values are **strings**, including booleans, numbers, and JSON-encoded str
 
 See [Configuration](docs/configuration.md) for all definition fields, copyable on-disk examples, precedence, and migration notes. The historical upstream `subagents.json` format is not this runtime's settings backend.
 
-## Integrating with other extensions
+## Developer boundaries
 
-Declare this package as an optional peer dependency and dynamically import its service accessor. The accessor returns `undefined` when the runtime is not published; integrations should handle that case.
+The runtime is private to the loaded extension. The package has no root runtime API export, no `getSubagentsService()` accessor, and no globally published service. There is no supported cross-extension runtime handle for launching, aborting, resuming, or provisioning workspaces. Delegation goes through the registered Pi tools described above.
 
-```ts
-const { getSubagentsService } = await import("@code-fixer-23/pi-tiered-subagents");
-const service = getSubagentsService();
-
-if (service) {
-  const result = await service.launch("explore", "Locate configuration entry points", {
-    description: "Trace configuration loading",
-  });
-
-  if (result.kind === "accepted") {
-    console.log(result.id); // Accepted, possibly still queued—not yet successful.
-  } else {
-    console.warn(result.reason, result.message);
-  }
-}
-```
-
-Use `launch()` for background acceptance and `run()` to await a foreground terminal record. Expected launch failures return `{ kind: "rejected", reason, message }`; successful `run()` calls return `{ kind: "settled", record }`, whose status distinguishes completion, stopping, and errors. The service uses camelCase options such as `maxTurns`, `thinkingLevel`, and `inheritContext`, rather than the model-facing tool's argument names.
-
-A `launch()` abort signal cancels preparation only and detaches after acceptance; call `abort(id)` to stop accepted work. A `run()` signal remains connected to the queued or running child. Service `resume()` continues a retained session in the background and resolves at settlement, or promptly returns a refusal. `claimOutcome` lets an integration take responsibility for delivering a resumed outcome without a duplicate nudge.
-
-Use `getRecord()` and `listAgents()` for by-value snapshots, `steer()` for guidance, and `waitForAll()` or `hasRunning()` to coordinate outstanding work. A single `registerWorkspaceProvider()` integration can supply child working directories and bracketed setup/teardown; registration returns an unregister disposer. See the [public service contract](src/service/service.ts) for the complete type surface.
+**Migration:** remove imports of the old package-root service API and any dependency on its global symbol. Lifecycle events remain available as notifications, not as a replacement runtime-control API. The independent `loadLayeredSettings` utility remains exported at `@code-fixer-23/pi-tiered-subagents/settings`; it does not expose runtime state and is not this runtime's own settings backend.
 
 ### Observing delegated work
 
-Subscribe through `pi.events` and import `SUBAGENT_EVENTS` for its exported channel names. Treat events as coordination signals; inspect record status and errors before interpreting termination as success.
+Lifecycle notifications remain on `pi.events` under their existing channel names. There is no exported `SUBAGENT_EVENTS` catalogue. These notifications do not grant access to the runtime; use tool results to collect outcomes, and inspect status and errors before interpreting termination as success.
 
-**Initial execution:** background acceptance emits `subagents:created` before concurrency admission. When the initial run starts, `subagents:started` lets integrations begin tracking execution. During work, `subagents:compacted` reports successful context compaction, `subagents:steered` reports successful tool steering, and `subagents:update` carries child progress messages. The initial run ends with `subagents:completed` or `subagents:failed`; consumers should inspect the terminal record rather than assume every non-failure event means successful completion. `subagents:update` currently uses its literal channel name; it is not included in `SUBAGENT_EVENTS`.
+**Initial execution:** background acceptance emits `subagents:created` before concurrency admission. When the initial run starts, `subagents:started` signals that execution is beginning. During work, `subagents:compacted` reports successful context compaction, `subagents:steered` reports successful tool steering, and `subagents:update` carries child progress messages. The initial run ends with `subagents:completed` or `subagents:failed`; observers should inspect the terminal status rather than assume every non-failure event means successful completion.
 
-**Follow-up execution:** a retained child emits `subagents:resuming` when its resumed run starts and `subagents:resumed` when that run ends. The latter also covers resumed errors, so check its status and error. This separates continued work from the initial run while preserving the child's identity. Terminal outcomes are persisted and considered for notification; consumers that claim delivery must actually deliver the outcome to the parent.
+**Follow-up execution:** a retained child emits `subagents:resuming` when its resumed run starts and `subagents:resumed` when that run ends. The latter also covers resumed errors, so check its status and error. This separates continued work from the initial run while preserving the child's identity. Terminal outcomes are persisted and considered for notification; foreground tool execution and result collection suppress duplicate completion nudges.
 
 ### Preparing and binding child sessions
 
 For integrations that need to coordinate child resources, the lower-level lifecycle starts with `subagents:child:spawning`, then emits `subagents:child:session-created` immediately before extension binding. A consumer that must register something before binding must handle `session-created` **synchronously**. After child `session_start` handlers finish, `subagents:child:bound` signals readiness before the first turn; failed binding skips this event.
 
-After prompt execution resolves, `subagents:child:completed` marks the end of that execution path, and `subagents:child:disposed` accompanies final cleanup. Do not use this lower-level completion signal as a substitute for the public run outcome: it describes session execution, not an independent guarantee of task success.
-
-The service is published under `Symbol.for("@code-fixer-23/pi-tiered-subagents:service")`, separate from upstream runtimes. The package also retains the generic `loadLayeredSettings` export at `@code-fixer-23/pi-tiered-subagents/settings`; that utility is not this runtime's own settings backend.
+After prompt execution resolves, `subagents:child:completed` marks the end of that execution path, and `subagents:child:disposed` accompanies final cleanup. Do not use this lower-level completion signal as a substitute for the tool's run outcome: it describes session execution, not an independent guarantee of task success.
 
 ## Development
 

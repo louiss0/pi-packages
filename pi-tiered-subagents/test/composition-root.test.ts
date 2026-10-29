@@ -80,7 +80,6 @@ vi.mock("#src/lifecycle/create-subagent-session", async () => {
 
 import subagentsExtension from "../extensions/index";
 import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
-import { getSubagentsService } from "#src/service/service";
 import {
   createMockSession,
   createSubagentSessionStub,
@@ -290,7 +289,7 @@ describe("composition root: widget activation", () => {
         createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl"),
       ),
     );
-    const { pi, fire } = makePi();
+    const { pi, tools, fire } = makePi();
     subagentsExtension(pi);
 
     const ui = makeRecordingUI();
@@ -300,11 +299,18 @@ describe("composition root: widget activation", () => {
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
 
-    // The reported path: a command handler spawning through the published
-    // service, so nothing in the parent loop ever emits a tool call.
-    await getSubagentsService()!.launch("worker", "hi", {
-      description: "child",
-    });
+    // The registered tool activates the widget without a tool_execution_start event.
+    await tools.get("subagent").execute(
+      "tool-call-1",
+      {
+        prompt: "hi",
+        description: "child",
+        subagent_type: "worker",
+        run_in_background: true,
+      },
+      undefined,
+      undefined,
+    );
 
     expect(ui.setWidget).toHaveBeenCalled();
 
@@ -317,7 +323,7 @@ describe("composition root: widget activation", () => {
         createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl"),
       ),
     );
-    const { pi, fire } = makePi();
+    const { pi, tools, fire } = makePi();
     subagentsExtension(pi);
 
     const ui = makeRecordingUI();
@@ -327,9 +333,17 @@ describe("composition root: widget activation", () => {
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
 
-    await getSubagentsService()!.launch("worker", "hi", {
-      description: "child",
-    });
+    await tools.get("subagent").execute(
+      "tool-call-1",
+      {
+        prompt: "hi",
+        description: "child",
+        subagent_type: "worker",
+        run_in_background: true,
+      },
+      undefined,
+      undefined,
+    );
     await vi.advanceTimersByTimeAsync(300);
 
     // The run finished within this turn, so the row is seeded at age 0 and still shown.
@@ -382,7 +396,7 @@ describe("composition root: widget teardown", () => {
         createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl"),
       ),
     );
-    const { pi, fire } = makePi();
+    const { pi, tools, fire } = makePi();
     subagentsExtension(pi);
 
     const ui = makeRecordingUI();
@@ -391,9 +405,17 @@ describe("composition root: widget teardown", () => {
       {},
       makeSessionStartCtx(makeParentRegistry().registry, ui, true),
     );
-    await getSubagentsService()!.launch("worker", "hi", {
-      description: "child",
-    });
+    await tools.get("subagent").execute(
+      "tool-call-1",
+      {
+        prompt: "hi",
+        description: "child",
+        subagent_type: "worker",
+        run_in_background: true,
+      },
+      undefined,
+      undefined,
+    );
     await vi.advanceTimersByTimeAsync(300);
 
     // The run finished within this turn, so the row lingers and the widget stays up.

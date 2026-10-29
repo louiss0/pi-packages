@@ -1,5 +1,14 @@
 # SDK integration stabilization
 
+## Current API boundary
+
+The cross-extension runtime API has since been removed by maintainer decision.
+The package no longer exports or globally publishes a runtime service. Service
+publication and public-adapter results in this document record the historical
+stabilization work; they are not current integration instructions. Delegation,
+result collection, and follow-up now use the registered Pi tools. See the
+[current runtime status](status.md#current-api-boundary).
+
 ## Scope and decision
 
 The maintainer approved test-first stabilization against the installed Pi 1.3.0

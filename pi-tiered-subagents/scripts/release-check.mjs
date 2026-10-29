@@ -143,19 +143,10 @@ try {
   await writeFile(
     join(installRoot, "consumer.ts"),
     `import {
-  getSubagentsService,
-  type LaunchResult,
-  type SubagentRecord,
-} from ${JSON.stringify(manifest.name)};
-import {
   loadLayeredSettings,
   type LayeredSettingsSource,
 } from ${JSON.stringify(`${manifest.name}/settings`)};
 
-const record: SubagentRecord | undefined = getSubagentsService()?.getRecord("none");
-const result: LaunchResult | undefined = record
-  ? { kind: "accepted", id: record.id }
-  : undefined;
 const source: LayeredSettingsSource<{ enabled: boolean }> = {
   agentDir: ".",
   cwd: ".",
@@ -163,7 +154,6 @@ const source: LayeredSettingsSource<{ enabled: boolean }> = {
   sanitize: () => ({}),
   warnLabel: "fixture",
 };
-void result;
 void source;
 void loadLayeredSettings;
 `,
@@ -196,30 +186,18 @@ void loadLayeredSettings;
     { cwd: installRoot },
   );
 
-  // The consumer extension imports both public entries from inside Pi's own
-  // loader, which is how a real cross-extension consumer reaches them. Its
-  // `session_start` handler runs after the package's, so it observes the
-  // service that extension actually published.
+  // The settings utility is the only remaining public entry. Loading it must
+  // not expose a runtime handle or require service publication.
   const consumerEntry = join(installRoot, "consumer-extension.ts");
   await writeFile(
     consumerEntry,
     `import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  getSubagentsService,
-  type SubagentsService,
-} from ${JSON.stringify(manifest.name)};
 import { loadLayeredSettings } from ${JSON.stringify(`${manifest.name}/settings`)};
 
-const OBSERVED_KEY = Symbol.for("release-check:observed-service");
-
-export default function packedConsumer(pi: ExtensionAPI): void {
+export default function packedConsumer(_pi: ExtensionAPI): void {
   if (typeof loadLayeredSettings !== "function") {
     throw new Error("packed settings entry did not load");
   }
-  pi.on("session_start", () => {
-    const service: SubagentsService | undefined = getSubagentsService();
-    (globalThis as Record<symbol, unknown>)[OBSERVED_KEY] = service;
-  });
 }
 `,
   );
@@ -229,6 +207,7 @@ export default function packedConsumer(pi: ExtensionAPI): void {
     `import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import {
   createAgentSession,
@@ -241,6 +220,18 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const installed = join(here, "node_modules", ${JSON.stringify(manifest.name)});
 const packageEntry = join(installed, "extensions", "index.ts");
+const require = createRequire(import.meta.url);
+for (const specifier of [
+  ${JSON.stringify(manifest.name)},
+  ${JSON.stringify(`${manifest.name}/src/service/service.ts`)},
+]) {
+  try {
+    require.resolve(specifier);
+    throw new Error("removed runtime entry still resolves: " + specifier);
+  } catch (error) {
+    if (error.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+  }
+}
 const consumerEntry = join(here, "consumer-extension.ts");
 const cwd = await mkdtemp(join(tmpdir(), "pi-tiered-packed-project-"));
 const agentDir = join(cwd, ".agent");
@@ -277,14 +268,17 @@ try {
   });
   try {
     await session.bindExtensions({});
-    const service = globalThis[Symbol.for("release-check:observed-service")];
-    if (!service) {
-      throw new Error("packed extension did not publish a discoverable service");
+    const serviceKey = Symbol.for("@code-fixer-23/pi-tiered-subagents:service");
+    if (Object.hasOwn(globalThis, serviceKey)) {
+      throw new Error("packed extension published a runtime service");
     }
-    if (typeof service.launch !== "function") {
-      throw new Error("packed service has no launch operation");
+    const names = session.getAllTools().map((tool) => tool.name);
+    for (const name of ["subagent", "get_subagent_result", "steer_subagent"]) {
+      if (!names.includes(name)) {
+        throw new Error("packed extension did not register tool: " + name);
+      }
     }
-    console.log("packed extension loaded, bound, and published the service");
+    console.log("packed extension loaded and bound with tools, without a public runtime");
   } finally {
     session.dispose();
   }
@@ -297,7 +291,7 @@ try {
     cwd: installRoot,
   });
   console.log(
-    `release-check: packed install, engine floor, public types, and Pi extension loading passed (node ${process.version})`,
+    `release-check: packed install, engine floor, settings types, private runtime boundary, and Pi extension loading passed (node ${process.version})`,
   );
 } finally {
   await rm(tempRoot, {
