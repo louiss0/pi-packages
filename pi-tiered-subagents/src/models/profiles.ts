@@ -19,7 +19,7 @@ import * as v from "valibot";
 import type { FamilyStrategy } from "#src/models/strategy";
 
 /** Capability labels used by role-aware routing. */
-const MODEL_SIZES = ["S", "M", "L"] as const;
+const MODEL_SIZES = ["S", "M", "L", "XL"] as const;
 const TIER_ROLES = ["planner", "worker"] as const;
 const FAMILY_GROUPS = ["size", "planner-worker"] as const;
 
@@ -136,13 +136,11 @@ export function tierLabelProblems(
   const problems: TierLabelProblem[] = [];
   if (
     (group === "size" || labels.size !== undefined) &&
-    labels.size !== "S" &&
-    labels.size !== "M" &&
-    labels.size !== "L"
+    !MODEL_SIZES.some((size) => size === labels.size)
   ) {
     problems.push({
       field: "size",
-      problem: 'a size-group tier needs a size: "S", "M", or "L"',
+      problem: 'a size-group tier needs a size: "S", "M", "L", or "XL"',
     });
   }
   if (
@@ -236,7 +234,7 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
     family: "gpt",
     group: "size",
     tiers: [
-      { tier: "astra", size: "L" },
+      { tier: "astra", size: "XL" },
       { tier: "sol", size: "L" },
       { tier: "terra", size: "M" },
       { tier: "pro", size: "M" },
@@ -250,7 +248,7 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
     family: "claude",
     group: "size",
     tiers: [
-      { tier: "fable", size: "L" },
+      { tier: "fable", size: "XL" },
       { tier: "opus", size: "L" },
       { tier: "sonnet", size: "M" },
       { tier: "haiku", size: "S" },

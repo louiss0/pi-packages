@@ -22,10 +22,18 @@ export interface RoutingTarget {
 }
 
 class SizeRoutingTarget implements RoutingTarget {
-  private static readonly rank = { S: 0, M: 1, L: 2 } as const satisfies Record<
-    ModelSize,
-    number
-  >;
+  private static readonly rank = {
+    S: 0,
+    M: 1,
+    L: 2,
+    XL: 3,
+  } as const satisfies Record<ModelSize, number>;
+  private static readonly oneBelow = {
+    S: "S",
+    M: "S",
+    L: "M",
+    XL: "L",
+  } as const satisfies Record<ModelSize, ModelSize>;
   readonly label: ModelSize;
   private readonly keepParentRung: boolean;
 
@@ -35,9 +43,7 @@ class SizeRoutingTarget implements RoutingTarget {
       requestedSize === "equal"
         ? parentSize
         : requestedSize === "one-below"
-          ? parentSize === "L"
-            ? "M"
-            : "S"
+          ? SizeRoutingTarget.oneBelow[parentSize]
           : requestedSize;
   }
 

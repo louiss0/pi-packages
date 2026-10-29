@@ -28,6 +28,39 @@ describe("parseProfile", () => {
       profile: { family: "gpt", ...body },
     });
   });
+  it("accepts and applies an operator-defined XL tier", () => {
+    const parsed = parseProfile("claude", {
+      group: "size",
+      tiers: [
+        { tier: "fable", size: "XL" },
+        { tier: "opus", size: "L" },
+      ],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.problem);
+    const loaded = mergeProfiles(
+      SHIPPED_PROFILES,
+      [parsed.profile],
+      [],
+      strategies,
+    );
+    expect(loaded.problems).toEqual([]);
+    expect(loaded.profiles.get("claude")).toEqual(parsed.profile);
+  });
+  it.each([
+    "XS",
+    "XXL",
+    "xl",
+    "",
+    4,
+  ])("rejects an invalid size label: %j", (size) => {
+    expect(
+      parseProfile("gpt", { group: "size", tiers: [{ tier: "astra", size }] }),
+    ).toMatchObject({
+      ok: false,
+      problem: expect.stringContaining("tiers[0].size"),
+    });
+  });
   it("requires and preserves planner-worker labels", () => {
     expect(
       parseProfile("glm", {
@@ -222,6 +255,16 @@ describe("shipped ladders", () => {
           [entry.group === "size" ? "size" : "role", "tier"].sort(),
         );
     }
+  });
+  it.each([
+    ["gpt", "astra"],
+    ["claude", "fable"],
+  ])("labels %s %s as XL", (family, name) => {
+    expect(
+      SHIPPED_PROFILES.find((entry) => entry.family === family)?.tiers.find(
+        (entry) => entry.tier === name,
+      )?.size,
+    ).toBe("XL");
   });
   it("preserves the user's Luna S correction across releases", () => {
     expect(

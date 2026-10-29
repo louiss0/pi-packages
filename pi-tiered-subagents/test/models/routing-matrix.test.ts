@@ -54,8 +54,8 @@ describe("the routing matrix in docs/model-matrix.md", () => {
 
   it("demonstrates unseen releases rather than enumerating a version catalogue", () => {
     const grid = generateModelMatrix().find((region) => region.name === "grid");
-    expect(grid?.markdown).toContain("example/gpt-97.2-terra");
-    expect(grid?.markdown).toContain("example/claude-sonnet-97-2");
+    expect(grid?.markdown).toContain("example/gpt-97.2-sol");
+    expect(grid?.markdown).toContain("example/claude-opus-97-2");
   });
 
   it("documents every concrete parent for every role with all three availability outcomes", () => {

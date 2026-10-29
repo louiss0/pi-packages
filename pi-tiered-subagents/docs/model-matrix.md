@@ -72,7 +72,7 @@ or definition model pin bypasses this grid.
 | Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
-| `worker` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
 | `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
 | `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
 | `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
@@ -120,11 +120,11 @@ identities and retain outcomes come only from the router.
 
 | Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `example/gpt-97.2-astra` | 97.2 / astra (L) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
-| `example/gpt-97.2-astra` | 97.2 / astra (L) | `worker` | `example/gpt-97.2-terra` | **retain** | **retain** |
-| `example/gpt-97.2-astra` | 97.2 / astra (L) | `reviewer` | `example/gpt-97.2-astra` | **retain** | **retain** |
-| `example/gpt-97.2-astra` | 97.2 / astra (L) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
-| `example/gpt-97.2-astra` | 97.2 / astra (L) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (XL) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (XL) | `worker` | `example/gpt-97.2-sol` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (XL) | `reviewer` | `example/gpt-97.2-astra` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (XL) | `debug` | `example/gpt-97.2-terra` | **retain** | **retain** |
+| `example/gpt-97.2-astra` | 97.2 / astra (XL) | `researcher` | `example/gpt-97.2-luna` | **retain** | **retain** |
 | `example/gpt-97.2-sol` | 97.2 / sol (L) | `explore` | `example/gpt-97.2-luna` | **retain** | **retain** |
 | `example/gpt-97.2-sol` | 97.2 / sol (L) | `worker` | `example/gpt-97.2-terra` | **retain** | **retain** |
 | `example/gpt-97.2-sol` | 97.2 / sol (L) | `reviewer` | `example/gpt-97.2-sol` | **retain** | **retain** |
@@ -165,11 +165,11 @@ identities and retain outcomes come only from the router.
 
 | Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `example/claude-fable-97-2` | 97.2 / fable (L) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
-| `example/claude-fable-97-2` | 97.2 / fable (L) | `worker` | `example/claude-sonnet-97-2` | **retain** | **retain** |
-| `example/claude-fable-97-2` | 97.2 / fable (L) | `reviewer` | `example/claude-fable-97-2` | **retain** | **retain** |
-| `example/claude-fable-97-2` | 97.2 / fable (L) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
-| `example/claude-fable-97-2` | 97.2 / fable (L) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (XL) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (XL) | `worker` | `example/claude-opus-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (XL) | `reviewer` | `example/claude-fable-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (XL) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
+| `example/claude-fable-97-2` | 97.2 / fable (XL) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
 | `example/claude-opus-97-2` | 97.2 / opus (L) | `explore` | `example/claude-haiku-97-2` | **retain** | **retain** |
 | `example/claude-opus-97-2` | 97.2 / opus (L) | `worker` | `example/claude-sonnet-97-2` | **retain** | **retain** |
 | `example/claude-opus-97-2` | 97.2 / opus (L) | `reviewer` | `example/claude-opus-97-2` | **retain** | **retain** |

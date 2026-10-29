@@ -123,7 +123,14 @@ describe("routeModel", () => {
   });
 
   it.each([
-    ["openai", "gpt-6-astra", "worker", "gpt-6-terra", "M"],
+    ["openai", "gpt-6-astra", "worker", "gpt-6-sol", "L"],
+    ["openai", "gpt-6-astra", "reviewer", "gpt-6-astra", "XL"],
+    ["anthropic", "claude-fable-7", "worker", "claude-opus-7", "L"],
+    ["anthropic", "claude-fable-7", "reviewer", "claude-fable-7", "XL"],
+    ["anthropic", "claude-fable-7", "debug", "claude-sonnet-7", "M"],
+    ["anthropic", "claude-fable-7", "explore", "claude-haiku-7", "S"],
+    ["anthropic", "claude-fable-7", "researcher", "claude-haiku-7", "S"],
+    ["anthropic", "claude-fable-7", "custom-editor", "claude-opus-7", "L"],
     ["openai", "gpt-6-sol", "reviewer", "gpt-6-sol", "L"],
     ["openai", "gpt-5.6-luna", "debug", "gpt-5.6-terra", "M"],
     ["openai", "gpt-5.6-terra", "debug", "gpt-5.6-terra", "M"],
@@ -182,6 +189,39 @@ describe("routeModel", () => {
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
     expect(outcome.reason).toContain(`${role} targets worker`);
+  });
+
+  it.each([
+    ["worker", ["claude-fable-7", "claude-sonnet-7"], "claude-sonnet-7", "L"],
+    ["reviewer", ["claude-opus-7", "claude-sonnet-7"], "claude-opus-7", "XL"],
+  ])("falls back below an unavailable XL-parent %s target", (role, ids, expected, target) => {
+    const outcome = routeModel(
+      model("anthropic", "claude-fable-7"),
+      context(ids.map((id) => model("anthropic", id))),
+      role,
+    );
+    expect(outcome).toMatchObject({ kind: "routed", modelId: expected });
+    expect(outcome.reason).toContain(`${role} targets ${target}`);
+  });
+
+  it("does not fall back upward to XL for a lower-size target", () => {
+    const parent = model("anthropic", "claude-fable-7");
+    expect(routeModel(parent, context([parent]), "worker")).toMatchObject({
+      kind: "retained",
+      model: parent,
+      reason: expect.stringContaining("worker targets L"),
+    });
+  });
+
+  it("does not cross versions to find an XL parent's target", () => {
+    const parent = model("anthropic", "claude-fable-7");
+    expect(
+      routeModel(
+        parent,
+        context([model("anthropic", "claude-opus-6")]),
+        "worker",
+      ),
+    ).toMatchObject({ kind: "retained", model: parent });
   });
 
   it("steps down one size in the parent's own version", () => {
