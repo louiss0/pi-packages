@@ -7,6 +7,8 @@ Pi Tiered Subagents gives [Pi](https://github.com/earendil-works/pi-coding-agent
 [![License: MIT](https://img.shields.io/npm/l/@code-fixer-23/pi-tiered-subagents)](LICENSE)
 [![CI](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/louiss0/pi-packages/actions/workflows/ci.yml)
 
+![Pi Tiered Subagents](https://raw.githubusercontent.com/louiss0/pi-packages/main/pi-tiered-subagents/assets/Pi-Tiered%20Subagents%20Display.png)
+
 ## Install
 
 Requires Node.js **22.19.0 or later** and Pi with the package's declared peer dependencies available.
