@@ -25,10 +25,10 @@
  * A generation is never reused, so a token from a previous session can never
  * compare equal to a later one even when Pi hands the same id back.
  */
-export interface SessionOwner {
-  readonly generation: number;
-  readonly sessionId: string;
-}
+export type SessionOwner = Readonly<{
+  generation: number;
+  sessionId: string;
+}>;
 
 /** Why a launch was refused before any child existed. */
 export type LaunchRejection =

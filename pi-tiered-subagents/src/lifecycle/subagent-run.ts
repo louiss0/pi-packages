@@ -62,10 +62,10 @@ export interface RunOutcome {
 }
 
 /** One update a child sent during a run, and whether an announcement delivered it. */
-interface RunUpdate {
+type RunUpdate = {
   message: string;
   announced: boolean;
-}
+};
 
 /** Seeds for a run's outcome, for a record built in a known state (test fixtures). */
 export type RunOutcomeInit = {

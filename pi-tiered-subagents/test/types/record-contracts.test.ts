@@ -11,6 +11,7 @@ import type {
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { SubagentsSettings } from "#src/settings";
+import type { SessionOwner } from "#src/lifecycle/session-owner";
 
 /**
  * Compile-time contracts for the record modernization.
@@ -41,6 +42,12 @@ describe("record type contracts", () => {
     // @ts-expect-error an absent optional stays absent, not set to undefined
     const explicitUndefined: TierProfile = { ...tier, size: undefined };
     void explicitUndefined;
+
+    const owner: SessionOwner = { generation: 1, sessionId: "parent" };
+    // @ts-expect-error a captured owner generation cannot change
+    owner.generation = 2;
+    // @ts-expect-error a captured owner session identity cannot change
+    owner.sessionId = "replacement";
 
     const turnBudget: TurnBudget = { used: 1, phase: "within" };
     turnBudget.used = 2;
