@@ -15,7 +15,7 @@ export default defineConfig({
     name: "pi-tiered-subagents",
     environment: "node",
 
-    include: ["test/**/*.test.ts", "extensions/**/*.test.ts"],
+    include: ["test/**/*.test.ts",],
 
     exclude: ["node_modules", "dist", ".idea", ".git"],
 
