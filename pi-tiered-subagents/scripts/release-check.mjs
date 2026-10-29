@@ -7,9 +7,10 @@
  * What this proves, and nothing more:
  * - the packed tarball installs with only its declared dependencies and peers;
  * - its declared engine floor is preserved;
- * - a TypeScript consumer type-checks both public entries from the install;
+ * - a TypeScript consumer type-checks the settings utility from the install;
  * - the installed source extension loads through the real Pi resource loader
- *   (no loader errors), binds, and publishes the public service.
+ *   (no loader errors), binds, and registers tools without a public runtime;
+ * - the installed license retains the consolidated upstream MIT notice.
  */
 
 import { spawn } from "node:child_process";
@@ -138,6 +139,20 @@ try {
     throw new Error(
       `packed package declares engines.node ${String(installedManifest.engines?.node)}, expected ${NODE_FLOOR}`,
     );
+  }
+
+  const installedLicense = await readFile(
+    join(installedRoot, "LICENSE"),
+    "utf8",
+  );
+  for (const notice of [
+    "Copyright (c) 2026 Shelton Louis",
+    "Copyright (c) 2026 tintinweb",
+    "Permission is hereby granted, free of charge",
+  ]) {
+    if (!installedLicense.includes(notice)) {
+      throw new Error(`packed license is missing notice: ${notice}`);
+    }
   }
 
   await writeFile(

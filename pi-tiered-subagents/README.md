@@ -244,6 +244,6 @@ The entry point composes the implementation in `src/`; terminal presentation liv
 
 ## License and attribution
 
-Licensed under [MIT](LICENSE). This runtime derives from [@gotgenes/pi-subagents](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 by Chris Lasher, itself a friendly fork of [@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents). The `inherit` tool-selection convention was informed by [Nico Bailon's pi-subagents](https://github.com/nicobailon/pi-subagents); this package inherits the parent's active tools while excluding subagent-management tools.
+Licensed under [MIT](LICENSE), with the upstream copyright notice consolidated into the same license file. This runtime derives from [@gotgenes/pi-subagents](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents) v25.0.1 by Chris Lasher, itself a friendly fork of [@tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents). The `inherit` tool-selection convention was informed by [Nico Bailon's pi-subagents](https://github.com/nicobailon/pi-subagents); this package inherits the parent's active tools while excluding subagent-management tools.
 
 The [upstream comparison](docs/comparison-with-upstream.md), [architecture snapshots](docs/architecture/architecture.md), and [inherited decision records](docs/decisions/) preserve reference material and provenance. Their source links and configuration descriptions may reflect the original layout; use this README, the configuration guide, and current source for this derivative's behavior.

@@ -12,7 +12,6 @@
     "docs",
     "README.md",
     "LICENSE",
-    "LICENSE.upstream",
     "!**/*.test.ts"
   ],
   "exports": {
