@@ -72,7 +72,7 @@ Worker targets L, while its Reviewer starts at the parent's own XL rung.
 | `gpt` | `size` | Astra = XL → Sol = L → Terra, Pro, unnamed default = M → Luna, Mini, Nano = S |
 | `claude` | `size` | Fable = XL → Opus = L → Sonnet = M → Haiku = S |
 | `qwen` | `size` | Max = L → Plus = M → Flash = S |
-| `gemini` | `planner-worker` | Argon, Pro Preview, Pro = planner → Flash, Flash Lite = worker |
+| `gemini` | `size` | Carbon = XL → Argon, Pro Preview, Pro = L → Hydrogen, Flash = M → Flash Lite = S |
 | `minimax` | `planner-worker` | Highspeed, unnamed default = planner → Flash = worker |
 | `glm` | `planner-worker` | Unnamed default = planner → Flash = worker |
 | `mimo` | `planner-worker` | Pro Ultraspeed, Pro, unnamed default = planner → Flash = worker |

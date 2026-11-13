@@ -71,17 +71,17 @@ or definition model pin bypasses this grid.
 <!-- model-matrix:grid:start -->
 | Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
-| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
-| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash-lite` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-carbon` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
+| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash-lite` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
 
 | Family | Representative parent (all candidates available) |
 | --- | --- |
 | gpt | `example/gpt-97.2-astra` |
 | claude | `example/claude-fable-97-2` |
-| gemini | `example/gemini-97.2-argon` |
+| gemini | `example/gemini-97.2-carbon` |
 | glm | `example/glm-97.2` |
 | minimax | `example/MiniMax-M97.2-highspeed` |
 | qwen | `example/qwen97.2-max` |
@@ -186,35 +186,45 @@ identities and retain outcomes come only from the router.
 | `example/claude-haiku-97-2` | 97.2 / haiku (S) | `debug` | `example/claude-sonnet-97-2` | **retain** | **retain** |
 | `example/claude-haiku-97-2` | 97.2 / haiku (S) | `researcher` | `example/claude-haiku-97-2` | **retain** | **retain** |
 
-### gemini — planner-worker
+### gemini — size
 
 | Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (planner) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `explore` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `worker` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `debug` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (worker) | `researcher` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `worker` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `reviewer` | `example/gemini-97.2-carbon` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (L) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `reviewer` | `example/gemini-97.2-pro-preview` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (L) | `reviewer` | `example/gemini-97.2-pro` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-pro` | 97.2 / pro (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `reviewer` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (M) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (M) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (M) | `reviewer` | `example/gemini-97.2-flash` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (M) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-flash` | 97.2 / flash (M) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `reviewer` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
 
 ### glm — planner-worker
 
@@ -333,7 +343,7 @@ route(parent, context, agentId = "worker"):
 
 ### Role targets
 
-| Agent | Size group: gpt, claude, qwen | Planner/worker group: gemini, minimax, glm, mimo, deepseek |
+| Agent | Size group: gpt, claude, gemini, qwen | Planner/worker group: minimax, glm, mimo, deepseek |
 | --- | --- | --- |
 | `worker` | One size below parent, clamped at S | worker class |
 | `researcher` | S | worker class |
@@ -363,7 +373,7 @@ Consequences worth naming:
 - **Providers are deterministic.** Prefer the parent provider for the exact ID;
   otherwise require a unique matching provider. Multiple alternate providers
   make a tier unusable, so cheaper eligible tiers are tried before retention.
-- **Tier matching is specific.** `flash-lite` is its own worker rung, not
+- **Tier matching is specific.** `flash-lite` is its own S rung, not
   `flash`; dated Claude snapshots use the size of their matched tier.
 - **Explicit beats routing, always.** A request or definition model is resolved
   exactly — no ladder walk, no family check, no provider swap.

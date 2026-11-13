@@ -366,44 +366,27 @@ describe("routeModel", () => {
   });
 
   it.each([
-    "worker",
-    "explore",
-    "researcher",
-    "debug",
-    "custom-role",
-  ])("%s uses the worker role even from a worker parent", (role) => {
+    ["worker", "gemini-2.5-flash-lite", "S"],
+    ["explore", "gemini-2.5-flash-lite", "S"],
+    ["researcher", "gemini-2.5-flash-lite", "S"],
+    ["debug", "gemini-2.5-flash", "M"],
+    ["custom-role", "gemini-2.5-flash-lite", "S"],
+  ])("%s selects the Gemini size target", (role, expected, size) => {
     const parent = model("google", "gemini-2.5-flash-lite");
-    const outcome = routeModel(
+    const outcome = routeModel(parent, context([
       parent,
-      context([
-        parent,
-        model("google", "gemini-2.5-pro"),
-        model("google", "gemini-2.5-flash"),
-      ]),
-      role,
-    );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gemini-2.5-flash");
-    expect(outcome.reason).toContain(`${role} targets worker`);
+      model("google", "gemini-2.5-pro"),
+      model("google", "gemini-2.5-flash"),
+    ]), role);
+    expect(outcome).toMatchObject({ kind: "routed", modelId: expected });
+    expect(outcome.reason).toContain(`${role} targets ${size}`);
   });
 
-  it("steps a worker parent up to the planner role for review", () => {
+  it("keeps a Gemini reviewer's parent rung", () => {
     const parent = model("google", "gemini-2.5-flash");
-    const outcome = routeModel(
-      parent,
-      context([parent, model("google", "gemini-2.5-pro")]),
-      "reviewer",
-    );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect([outcome.provider, outcome.modelId]).toEqual([
-      "google",
-      "gemini-2.5-pro",
-    ]);
-    expect(outcome.reason).toContain("reviewer targets planner");
+    expect(routeModel(parent, context([parent, model("google", "gemini-2.5-pro")]), "reviewer"))
+      .toMatchObject({ kind: "routed", modelId: parent.id });
   });
-
   it("uses a Gemini worker tier within its version", () => {
     const outcome = routeModel(
       model("google", "gemini-2.5-pro"),
@@ -458,7 +441,7 @@ describe("routeModel", () => {
     expect(outcome.kind).toBe("routed");
     if (outcome.kind !== "routed") return;
     expect(outcome.modelId).toBe("gemini-2.5-flash");
-    expect(outcome.reason).toContain("reviewer targets planner");
+    expect(outcome.reason).toContain("reviewer targets L");
   });
 
   it("tries a cheaper rung in the same version when the target is unavailable", () => {
@@ -481,7 +464,7 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("worker targets S");
   });
 
-  it("does not borrow a planner from another version", () => {
+  it("does not borrow a model from another version", () => {
     const parent = model("google", "gemini-3.7-flash");
     const outcome = routeModel(
       parent,
@@ -491,7 +474,7 @@ describe("routeModel", () => {
     expect(outcome.kind).toBe("retained");
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
-    expect(outcome.reason).toContain("worker targets worker");
+    expect(outcome.reason).toContain("worker targets S");
   });
 
   it("never chooses a model the session cannot run", () => {

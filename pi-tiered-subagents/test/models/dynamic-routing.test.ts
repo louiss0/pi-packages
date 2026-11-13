@@ -51,8 +51,8 @@ describe("version-independent family ladders", () => {
 
   it.each([
     ["gpt-77.3-sol-code-2", "gpt-77.3-luna"],
-    ["gemini-77.3-pro-preview", "gemini-77.3-flash"],
-    ["gemini-77.3-flash-lite-20261027", "gemini-77.3-flash"],
+    ["gemini-77.3-pro-preview", "gemini-77.3-flash-lite"],
+    ["gemini-77.3-flash-lite-20261027", "gemini-77.3-flash-lite"],
     ["mimo-v77.3-pro-ultraspeed-serving-2", "mimo-v77.3-flash"],
     ["MiniMax-M77.3-highspeed", "MiniMax-M77.3-flash"],
   ])("routes qualified/multiword parent %s to exact %s", (parent, target) => {
@@ -60,6 +60,30 @@ describe("version-independent family ladders", () => {
       kind: "routed",
       modelId: target,
     });
+  });
+  it("routes Gemini Carbon workers to same-version Argon rather than another release", () => {
+    expect(
+      route("gemini-77.3-carbon", [
+        model("parent", "gemini-78-argon"),
+        model("parent", "gemini-77.3-argon"),
+        model("parent", "gemini-77.3-hydrogen"),
+      ], "worker"),
+    ).toMatchObject({ kind: "routed", modelId: "gemini-77.3-argon" });
+  });
+  it.each([
+    ["gemini-77.3-argon", "worker", "gemini-77.3-hydrogen"],
+    ["gemini-77.3-pro-preview", "worker", "gemini-77.3-hydrogen"],
+    ["gemini-77.3-pro", "worker", "gemini-77.3-hydrogen"],
+    ["gemini-77.3-hydrogen", "worker", "gemini-77.3-flash-lite"],
+    ["gemini-77.3-flash", "worker", "gemini-77.3-flash-lite"],
+  ])("routes %s for %s to %s", (parent, role, target) => {
+    expect(route(parent, [model("parent", target)], role)).toMatchObject({
+      kind: "routed", modelId: target,
+    });
+  });
+  it("retains Gemini Carbon when only another version has a target", () => {
+    expect(route("gemini-77.3-carbon", [model("parent", "gemini-78-argon")], "worker"))
+      .toMatchObject({ kind: "retained", model: { id: "gemini-77.3-carbon" } });
   });
   it("accepts a ladder without releases or concrete identities", () => {
     expect(

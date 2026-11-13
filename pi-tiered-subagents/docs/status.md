@@ -220,7 +220,7 @@ data and validates it; it never touches a file of its own.
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -233,7 +233,7 @@ The mapping is shipped policy, not operator-configurable settings.
 
 The size ladder is XL → L → M → S, with S as the floor. Size assignments are
 Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L, sonnet = M,
-haiku = S; GPT astra = XL, sol = L, pro/terra/default = M, luna/mini/nano = S.
+haiku = S; Gemini carbon = XL, argon/pro-preview/pro = L, hydrogen/flash = M, flash-lite = S; GPT astra = XL, sol = L, pro/terra/default = M, luna/mini/nano = S.
 Dated snapshots use the size of their tier. Worker from XL targets L; Equal
 review starts at the parent's own rung, including XL.
 
@@ -249,7 +249,7 @@ price-based or name-based guessing. A reviewer retaining its own rung by Equal
 is a designed choice, not an exhaustion fallback. The launch reason names the
 role and target as well as the chosen model, including retained outcomes.
 
-Flash-named tiers, including the separate flash-lite rung, are worker class;
+In planner/worker families, flash-named tiers are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
 runtime name-based classification. MiniMax M3.1-flash is the worker rung
 below its planner flagship, available only to routing within version 3.1.
