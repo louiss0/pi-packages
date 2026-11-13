@@ -373,19 +373,28 @@ describe("routeModel", () => {
     ["custom-role", "gemini-2.5-flash-lite", "S"],
   ])("%s selects the Gemini size target", (role, expected, size) => {
     const parent = model("google", "gemini-2.5-flash-lite");
-    const outcome = routeModel(parent, context([
+    const outcome = routeModel(
       parent,
-      model("google", "gemini-2.5-pro"),
-      model("google", "gemini-2.5-flash"),
-    ]), role);
+      context([
+        parent,
+        model("google", "gemini-2.5-pro"),
+        model("google", "gemini-2.5-flash"),
+      ]),
+      role,
+    );
     expect(outcome).toMatchObject({ kind: "routed", modelId: expected });
     expect(outcome.reason).toContain(`${role} targets ${size}`);
   });
 
   it("keeps a Gemini reviewer's parent rung", () => {
     const parent = model("google", "gemini-2.5-flash");
-    expect(routeModel(parent, context([parent, model("google", "gemini-2.5-pro")]), "reviewer"))
-      .toMatchObject({ kind: "routed", modelId: parent.id });
+    expect(
+      routeModel(
+        parent,
+        context([parent, model("google", "gemini-2.5-pro")]),
+        "reviewer",
+      ),
+    ).toMatchObject({ kind: "routed", modelId: parent.id });
   });
   it("uses a Gemini worker tier within its version", () => {
     const outcome = routeModel(

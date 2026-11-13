@@ -63,11 +63,15 @@ describe("version-independent family ladders", () => {
   });
   it("routes Gemini Carbon workers to same-version Argon rather than another release", () => {
     expect(
-      route("gemini-77.3-carbon", [
-        model("parent", "gemini-78-argon"),
-        model("parent", "gemini-77.3-argon"),
-        model("parent", "gemini-77.3-hydrogen"),
-      ], "worker"),
+      route(
+        "gemini-77.3-carbon",
+        [
+          model("parent", "gemini-78-argon"),
+          model("parent", "gemini-77.3-argon"),
+          model("parent", "gemini-77.3-hydrogen"),
+        ],
+        "worker",
+      ),
     ).toMatchObject({ kind: "routed", modelId: "gemini-77.3-argon" });
   });
   it.each([
@@ -78,12 +82,18 @@ describe("version-independent family ladders", () => {
     ["gemini-77.3-flash", "worker", "gemini-77.3-flash-lite"],
   ])("routes %s for %s to %s", (parent, role, target) => {
     expect(route(parent, [model("parent", target)], role)).toMatchObject({
-      kind: "routed", modelId: target,
+      kind: "routed",
+      modelId: target,
     });
   });
   it("retains Gemini Carbon when only another version has a target", () => {
-    expect(route("gemini-77.3-carbon", [model("parent", "gemini-78-argon")], "worker"))
-      .toMatchObject({ kind: "retained", model: { id: "gemini-77.3-carbon" } });
+    expect(
+      route(
+        "gemini-77.3-carbon",
+        [model("parent", "gemini-78-argon")],
+        "worker",
+      ),
+    ).toMatchObject({ kind: "retained", model: { id: "gemini-77.3-carbon" } });
   });
   it("accepts a ladder without releases or concrete identities", () => {
     expect(
