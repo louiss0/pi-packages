@@ -1,3 +1,13 @@
+## 1.1.3 (2026-11-13)
+
+### 🩹 Fixes
+
+- **pi-tiered-subagents:** read the project's own file, and write only that layer ([bc4a456](https://github.com/louiss0/pi-packages/commit/bc4a456))
+
+### ❤️ Thank You
+
+- openhands
+
 ## 1.1.2 (2026-10-13)
 
 This was a version bump only for pi-session-manager to align it with other projects, there were no code changes.

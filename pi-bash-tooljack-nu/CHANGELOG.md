@@ -1,3 +1,17 @@
+## 1.2.7 (2026-11-13)
+
+### 🩹 Fixes
+
+- **pi-tiered-subagents:** read the project's own file, and write only that layer ([bc4a456](https://github.com/louiss0/pi-packages/commit/bc4a456))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.2.1
+
+### ❤️ Thank You
+
+- openhands
+
 ## 1.2.6 (2026-10-13)
 
 ### 🧱 Updated Dependencies

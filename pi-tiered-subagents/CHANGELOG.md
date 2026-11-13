@@ -1,3 +1,13 @@
+## 1.1.0 (2026-11-13)
+
+### 🚀 Features
+
+- **pi-tiered-subagents:** update Gemini model routing tiers ([23bad8e](https://github.com/louiss0/pi-packages/commit/23bad8e))
+
+### ❤️ Thank You
+
+- openhands
+
 # 1.0.0 (2026-10-29)
 
 ### 🚀 Features

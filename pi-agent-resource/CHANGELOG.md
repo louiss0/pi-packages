@@ -1,3 +1,17 @@
+## 5.0.1 (2026-11-13)
+
+### 🩹 Fixes
+
+- **pi-agent-resource:** adapt to the Pi 1.3.0 upgrade ([344f3b3](https://github.com/louiss0/pi-packages/commit/344f3b3))
+
+### 🧱 Updated Dependencies
+
+- Updated pi-form-components to 3.2.1
+
+### ❤️ Thank You
+
+- openhands
+
 # 5.0.0 (2026-10-13)
 
 ### 🚀 Features
