@@ -2,6 +2,8 @@
 
 This document describes the architecture of the pi-subagents fork: a focused, composable core with a stable API boundary that other extensions can build on.
 
+> **Turn budgets have been removed.** References below to `turn-limits.ts`, `TurnBudget`, `TurnBudgetTracker`, `turnBudget`, `maxTurns`, `wrapUpTurns`, and the turn-budget warning/stop behaviour describe an earlier implementation and are kept as architectural history. Children now run until they finish, are interrupted, or are explicitly stopped. `inherit_context: true` forks the parent's completed conversation branch in memory instead of flattening it into prose. See [status.md](../status.md) for the current state.
+
 ## Design principles
 
 1. **Narrow core** — the extension owns agent spawning, execution, and result retrieval.

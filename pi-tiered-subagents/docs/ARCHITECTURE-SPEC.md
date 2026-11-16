@@ -6,6 +6,8 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 >
 > **Maintainer clarification (story 92):** terminal presentation is a separate module **inside `pi-tiered-subagents`**, not a separate workspace/npm package. This supersedes the originally published package-extraction requirement; no second package or extension is required.
 >
+> **Later turn-budget decision:** turn budgets have been removed entirely. Stories 51–55 and 74, the "Turn policy and settings" requirements, the final-`TurnPolicy` diagram, the turn-ceiling table row, and every `max_turns`/`defaultMaxTurns`/`wrapUpTurns` requirement below are retained as the history of an approved design, not as current requirements. A child runs until it finishes, is interrupted, or is explicitly stopped; there is no turn ceiling, wrap-up warning, or turn counter. Separately, `inherit_context: true` now forks the parent's completed conversation branch into the child's `SessionManager` in memory (captured and sanitized at request time, with a fork-boundary entry marking the child's own turns) instead of flattening it into a Markdown prompt.
+>
 > **Authority:** this specification supersedes earlier requirements for extension-owned project-trust gating, foreground concurrency exemptions, mutable launch-time configuration lookup, and preservation of the inherited synchronous programmatic spawn interface. Product behavior not explicitly changed here remains governed by the original specification and accepted decisions.
 
 > **Later routing decision:** [issue #10](https://github.com/louiss0/pi-packages/issues/10)
@@ -505,7 +507,7 @@ flowchart TB
 - The runtime root retains Pi command/tool/message-renderer registrations and wires the library. The library does not receive ExtensionAPI or register through a hidden host reference.
 - The UI module defines small structural views/actions for agent summaries, progress, transcript reading, settings edits, and presentation lifetime. Runtime presentation adapters supply those views. Do not introduce a shared-contracts package.
 - Export local/public structural type surfaces, not inferred concrete foreign classes with private fields. SDK/TUI-specific implementation can remain internal to presentation adapters.
-- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, context policy, resume eligibility, or execution status.
+- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, turn limits, resume eligibility, or execution status.
 - Preserve useful UI behavior rather than redesigning workflows during extraction. Core execution must behave identically with or without presentation consumers. No separate UI service-readiness/event protocol is needed.
 
 ```mermaid
