@@ -8,7 +8,6 @@
  */
 
 import type { ResumeRefusal, SubagentStatus } from "#src/lifecycle/subagent";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import {
   renderOutcomeAddenda,
   renderOutcomeBody,
@@ -33,8 +32,6 @@ export type AgentReport = {
   /** The result text, absent when the run produced none. */
   result?: string | undefined;
   error?: string | undefined;
-  /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget | undefined;
   /** Whether the agent was stopped before the limiter ever admitted it. */
   stoppedWhileQueued: boolean;
   /** Present only when verbose was requested and a conversation is available. */
@@ -72,8 +69,6 @@ export type AgentReport = {
 type ReportProgress = {
   /** What the agent is doing now, as the widget words it. */
   activity: string;
-  /** Turns the run has completed; absent before its turn loop reports a budget. */
-  turns: number | undefined;
   /** Pre-formatted time since the run's last session event. */
   sinceLastProgress: string;
 };
@@ -151,8 +146,9 @@ function renderWaitExpired(seconds: number, status: SubagentStatus): string {
 
 /** One line saying what a running agent is doing and how long since it last moved. */
 function renderProgressLine(progress: ReportProgress): string {
-  const parts = [`Progress: ${progress.activity}`];
-  if (progress.turns !== undefined) parts.push(`Turns: ${progress.turns}`);
-  parts.push(`Last progress: ${progress.sinceLastProgress} ago`);
+  const parts = [
+    `Progress: ${progress.activity}`,
+    `Last progress: ${progress.sinceLastProgress} ago`,
+  ];
   return parts.join(" | ");
 }

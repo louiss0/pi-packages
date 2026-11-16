@@ -72,35 +72,24 @@ describe("entry-seam validation (story 106)", () => {
       {
         name: "reviewer.md",
         content:
-          "---\ndisplay_name: 42\nmax_turns: five\nenabled: yes\n---\n\nBody.",
+          '---\ndisplay_name: 42\nmodel: 42\nenabled: "yes"\n---\n\nBody.',
         path: "a/reviewer.md",
       },
     ]);
     expect(scope.definitions).toHaveLength(1);
     const patch = scope.definitions[0]?.patch;
     expect(patch?.displayName).toBeUndefined();
-    expect(patch?.maxTurns).toBeUndefined();
+    expect(patch?.model).toBeUndefined();
     expect(patch?.enabled).toBeUndefined();
     expect(scope.errors).toHaveLength(3);
     expect(scope.errors.join("\n")).toContain(
       '"display_name" value must be a string',
     );
-    expect(scope.errors.join("\n")).toContain(
-      '"max_turns" value must be a non-negative number',
-    );
+    expect(scope.errors.join("\n")).toContain('"model" value must be a string');
     expect(scope.errors.join("\n")).toContain(
       '"enabled" value must be true or false',
     );
     expect(scope.errors[0]).toContain("a/reviewer.md");
-  });
-
-  it("reports a negative turn ceiling rather than treating it as absent", () => {
-    const problems: string[] = [];
-    const patch = parseDefinitionContent("---\nmax_turns: -3\n---\n", (p) =>
-      problems.push(p),
-    );
-    expect(patch.maxTurns).toBeUndefined();
-    expect(problems).toHaveLength(1);
   });
 
   it("reports a thinking level Pi does not know, through the seam's diagnostics", () => {
@@ -133,7 +122,6 @@ describe("entry-seam validation (story 106)", () => {
     expect(problems).toEqual([]);
     expect(patch.model).toBeNull();
     expect(patch.description).toBe("Valid");
-    expect(patch.maxTurns).toBeUndefined();
   });
 });
 
@@ -172,12 +160,12 @@ describe("asynchronous definition loading (stories 107 and 108)", () => {
   });
 
   it("surfaces a field-level diagnostic on an otherwise usable file", async () => {
-    writeFileSync(join(dir, "reviewer.md"), "---\nmax_turns: many\n---\n");
+    writeFileSync(join(dir, "reviewer.md"), '---\nenabled: "yes"\n---\n');
     const scope = await loadDefinitionScopeAsync(dir);
     expect(scope.definitions).toHaveLength(1);
-    expect(scope.definitions[0]?.patch.maxTurns).toBeUndefined();
+    expect(scope.definitions[0]?.patch.enabled).toBeUndefined();
     expect(scope.errors).toHaveLength(1);
-    expect(scope.errors[0]).toContain('"max_turns"');
+    expect(scope.errors[0]).toContain('"enabled"');
   });
 
   it("rejects with the signal's reason when the caller has already aborted", async () => {

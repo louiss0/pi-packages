@@ -21,6 +21,7 @@ import type {
   ForegroundRunOutcome,
 } from "#src/lifecycle/subagent-manager";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { InheritedBranchEntry } from "#src/session/context";
 import type {
   Subagent,
   SubagentLifecycleObserver,
@@ -48,7 +49,7 @@ export interface SubagentsRuntime {
   readonly currentCtx: unknown | undefined;
   captureLaunchInputs(): {
     readonly snapshot: ParentSnapshot;
-    readonly parentContext: string | undefined;
+    readonly parentBranch: ReadonlyArray<InheritedBranchEntry> | undefined;
     readonly parentSession: {
       readonly parentSessionFile: string;
       readonly parentSessionId: string;
@@ -161,11 +162,11 @@ export class Subagents {
     }
 
     const { config } = prepared.value;
-    // The conversation was captured with the request; only its attachment
-    // waits on the resolved definition.
+    // The conversation branch was captured with the request; only its
+    // attachment waits on the resolved definition.
     const snapshot =
-      config.execution.inheritContext && inputs.parentContext
-        ? { ...inputs.snapshot, parentContext: inputs.parentContext }
+      config.execution.inheritContext && inputs.parentBranch?.length
+        ? { ...inputs.snapshot, parentBranch: inputs.parentBranch }
         : inputs.snapshot;
     const declaredTools = resolveChildToolNames(
       config.identity.definition.tools,
@@ -221,7 +222,6 @@ export class Subagents {
       definition: identity.definition,
       modelSelection: execution.modelSelection,
       thinkingDecision: execution.thinkingDecision,
-      turnPolicy: execution.turnPolicy,
       inheritContext: execution.inheritContext,
       parentSession: launch.parentSession,
       background,
@@ -252,7 +252,6 @@ export class Subagents {
       definition: identity.definition,
       modelSelection: execution.modelSelection,
       thinkingDecision: execution.thinkingDecision,
-      turnPolicy: execution.turnPolicy,
       inheritContext: execution.inheritContext,
       parentSession: launch.parentSession,
       owner: launch.owner,
@@ -284,7 +283,6 @@ export class Subagents {
       definition: identity.definition,
       modelSelection: execution.modelSelection,
       thinkingDecision: execution.thinkingDecision,
-      turnPolicy: execution.turnPolicy,
       inheritContext: execution.inheritContext,
       parentSession: launch.parentSession,
       owner: launch.owner,

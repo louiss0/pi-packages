@@ -166,6 +166,24 @@ function gluedVersionFamily(family: string, prefix: string): FamilyStrategy {
 }
 
 /**
+ * The chemical Gemini line.
+ *
+ * Pro and Flash IDs are deliberately unclaimed: they are not supported Gemini
+ * routing families and must retain their parent rather than enter this ladder.
+ */
+function geminiFamily(): FamilyStrategy {
+  const base = gluedVersionFamily("gemini", "gemini-");
+  return {
+    ...base,
+    belongs(id) {
+      if (!base.belongs(id)) return false;
+      const firstTier = base.parse(id)?.tierCandidates[0]?.toLowerCase();
+      return firstTier !== "pro" && firstTier !== "flash";
+    },
+  };
+}
+
+/**
  * A family whose id is `<prefix><tag><version>[-<variant>…]`, with a letter
  * in front of the version.
  *
@@ -274,13 +292,13 @@ function readVariants(text: string): string[] {
 /**
  * The strategies this package ships.
  *
- * Eight families, each with its own naming structure. A profile may refine
- * any of them; a family outside this set has no structure to read, so a
- * profile for one cannot be used.
+ * Eight families, each with its own naming structure and disjoint ownership of
+ * model ids. A profile may refine any of them; a family outside this set has
+ * no structure to read, so a profile for one cannot be used.
  */
 export const SHIPPED_STRATEGIES: ReadonlyArray<FamilyStrategy> = [
   gluedVersionFamily("gpt", "gpt-"),
-  gluedVersionFamily("gemini", "gemini-"),
+  geminiFamily(),
   gluedVersionFamily("qwen", "qwen"),
   gluedVersionFamily("glm", "glm-"),
   taggedVersionFamily("mimo", "mimo-", "v"),

@@ -46,7 +46,7 @@ export type Defined<T> = {
  * ```typescript
  * return {
  *   id,
- *   ...defined({ model, thinking, maxTurns }),
+ *   ...defined({ model, thinking }),
  * };
  * ```
  */

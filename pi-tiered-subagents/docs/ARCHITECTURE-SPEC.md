@@ -14,13 +14,19 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 > GLM. Exact pins, captured launch ownership, and reasoning policy are unchanged
 > by issue #10.
 
-> **Latest routing and retained-effort decision:**
+> **Earlier routing and retained-effort decision:**
 > [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
 > earlier cross-version links, unknown-family errors, and the retained-model
 > medium/low preference. Automatic routing is confined to the exact parent
 > family/version; unknown families retain the parent. With known parent effort,
 > automatic reasoning takes the next supported non-off rung below it, including
 > on retained models. The five-role mapping and size/role labels are unchanged.
+>
+> **Current defaults and family boundaries:** ADR 0017 replaces parent-relative
+> reasoning with the child model's upper-median supported non-off level. ADR
+> 0020 limits Gemini routing to the chemical ladder and drops Pro/Flash support.
+> ADR 0019 makes Reviewer inherit parent tools by default, without permitting
+> edits or removing explicit tool overrides.
 
 ## Problem Statement
 
@@ -124,7 +130,7 @@ The arrows describe responsibilities and information flow, not a requirement to 
 41. As a maintainer, I want an SDK adapter to translate model availability and reasoning support, so that SDK-specific details are localized and tested.
 42. As a user, I want a selected model that can no longer run to fail explicitly, so that execution never substitutes another identity after acceptance.
 43. As a user, I want Pi-compatible reasoning clamping and truthful not-applicable reporting preserved, so that the refactor does not change the established reasoning rules.
-44. As a user, I want retained-parent automatic reasoning to take the next supported non-off rung below known parent effort, staying at the floor, rather than jumping to fixed medium or low.
+44. As a user, I want retained-parent automatic reasoning to use the same upper median of supported non-off levels as changed-model reasoning, rather than inheriting or stepping down from parent effort.
 45. As a caller, I want inherited active tools and registered names captured at invocation, so that later parent changes cannot widen accepted work.
 46. As a caller, I want MCP wildcard patterns expanded against those captured registered names, so that a prepared plan contains exact capability names rather than deferred patterns.
 47. As a user, I want scheduling and child creation to use the same exact capability allowlist, so that workspace classification cannot disagree with permitted tools.
@@ -311,7 +317,7 @@ flowchart LR
 - The model-catalog adapter captures exact identities, available candidates, and SDK-reported reasoning capabilities into owned values. Use public model-resolution and reasoning-support APIs. Credentials, mutable registries, and concrete SDK model/session objects remain inside integration implementation.
 - Preserve exact explicit choice and family-ladder selection, updated by ADR 0015: automatic routing stays in the exact parent family/version; unknown families and exhausted or absent same-version targets retain the parent. No version fallback links exist in schema, data, or runtime; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
 - Preserve Pi-compatible thinking-level clamping. Translate SDK behavior into owned capability data or a narrow compatibility adapter, with differential/contract verification against public SDK helpers. Do not silently replace clamping with a new independent ranking algorithm to satisfy an import rule.
-- With known parent effort, automatic reasoning takes the next supported non-off rung below it in the chosen model's own level array, skipping gaps and landing on the model floor when no lower rung exists. Retained models use the same rule, with no fixed medium/low preference; at the parent's floor effort stays. Without parent effort, preserve medium/low/lowest-supported-non-off order. Explicit request/definition reasoning wins with Pi-compatible clamping; non-reasoning not-applicable state and explicit-off policy remain unchanged.
+- Automatic reasoning uses the upper median of the chosen model's supported non-off levels, sorted canonically and excluding off before the median is taken. Parent effort is irrelevant for changed and retained models. Explicit request/definition reasoning wins with Pi-compatible clamping; non-reasoning not-applicable state and explicit-off policy remain unchanged.
 - Materialize the exact accepted identity in the SDK adapter. Later provider or availability failure is an execution failure, not permission to select another model. Do not let SDK implicit default/fallback behavior silently undo this invariant.
 - Resolve inheritance and expand MCP patterns against the registered names captured at invocation. The prepared launch contains exact capability names, with management tools excluded. The same list drives workspace classification and SDK allowlisting.
 - Exact allowed names do not freeze implementation binaries, guarantee third-party tool availability, or constitute a sandbox. Preserve ordinary missing-tool behavior; do not add a special web prerequisite or silently widen capabilities to compensate.
@@ -327,7 +333,7 @@ No new launch authority or reroute-after-acceptance path is introduced.
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -499,7 +505,7 @@ flowchart TB
 - The runtime root retains Pi command/tool/message-renderer registrations and wires the library. The library does not receive ExtensionAPI or register through a hidden host reference.
 - The UI module defines small structural views/actions for agent summaries, progress, transcript reading, settings edits, and presentation lifetime. Runtime presentation adapters supply those views. Do not introduce a shared-contracts package.
 - Export local/public structural type surfaces, not inferred concrete foreign classes with private fields. SDK/TUI-specific implementation can remain internal to presentation adapters.
-- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, turn limits, resume eligibility, or execution status.
+- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, context policy, resume eligibility, or execution status.
 - Preserve useful UI behavior rather than redesigning workflows during extraction. Core execution must behave identically with or without presentation consumers. No separate UI service-readiness/event protocol is needed.
 
 ```mermaid

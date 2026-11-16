@@ -28,7 +28,7 @@ Both extensions provide the same core experience:
 
 - Foreground/background subagents with a live above-editor widget and a conversation viewer.
 - Custom agent types defined in `.pi/agents/<name>.md` with YAML frontmatter (system prompt, model, thinking, tools).
-- Fuzzy model selection, context inheritance, mid-run steering, session resume, and turn limits.
+- Fuzzy model selection, context inheritance, mid-run steering, and session resume.
 - A `pi.events` lifecycle bus (`subagents:created`, `started`, `completed`, `failed`, `steered`, `compacted`).
 
 ## What upstream has that this fork does not
@@ -54,7 +54,8 @@ This fork is a minimal core that other extensions build on, plus a small compani
 - **Typed service API** — `SubagentsService` exposed via `Symbol.for()` accessors, so another extension can spawn and manage subagents without importing this package or relying on ad-hoc event RPC.
 - **Child-session lifecycle events** — `subagents:child:spawning` / `session-created` / `bound` / `completed` / `disposed`, with `session-created` firing synchronously before `bindExtensions()` so consumers can register the child session deterministically, and `bound` firing after it resolves so they can observe what the child's extensions installed.
 - **`<active_agent>` system-prompt tag** — lets [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) resolve per-agent `permission:` frontmatter (allow / ask / deny — richer than a binary denylist) inside the child session.
-- **Turn budgets** — `max_turns` is a hard ceiling rather than a wrap-up point followed by grace turns, the child is told its remaining turns while it still has room to answer, and the budget is live on the record and in the widget.
+- **In-memory conversation forks** — `inherit_context: true` forks the completed parent branch into the child's session as real Pi session entries, captured in memory at request time. There is no markdown transcript flattening, no parent session file read, and no intermediate fork file; the child's transcript and reports show only its own turns.
+- **No turn ceilings** — children run until they finish, are interrupted, or are explicitly stopped. There is no `max_turns` parameter, frontmatter field, or `defaultMaxTurns`/`wrapUpTurns` setting.
 - **Companion packages** — permission policy and worktree isolation live in dedicated packages rather than the core.
 - **Re-architected codebase** — decomposed into seven domains behind a typed public API boundary, backed by ~994 tests.
 

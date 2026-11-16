@@ -9,7 +9,6 @@ import type {
   PersistedSubagentRecord,
 } from "#src/persisted-record";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { SubagentsSettings } from "#src/settings";
 import type { SessionOwner } from "#src/lifecycle/session-owner";
 
@@ -49,14 +48,9 @@ describe("record type contracts", () => {
     // @ts-expect-error a captured owner session identity cannot change
     owner.sessionId = "replacement";
 
-    const turnBudget: TurnBudget = { used: 1, phase: "within" };
-    turnBudget.used = 2;
-    turnBudget.maxTurns = 5;
-
     expectTypeOf<SubagentsSettings["maxConcurrent"]>().toEqualTypeOf<
       number | undefined
     >();
-    expectTypeOf(turnBudget.used).toEqualTypeOf<number>();
   });
 
   it("derives validated profile records from the schema shapes", () => {
@@ -76,16 +70,12 @@ describe("record type contracts", () => {
       status: "completed",
       result: "done",
       error: undefined,
-      turnBudget: { maxTurns: 5, used: 2, phase: "within" },
       startedAt: 1000,
       completedAt: 2000,
       outputFile: "/tmp/run.jsonl",
       toolUses: 3,
     };
-    const withoutCeiling: PersistedSubagentRecord = {
-      ...full,
-      turnBudget: { used: 2, phase: "within" },
-    };
+    void full;
     const minimalRun: PersistedRunSummary = {
       id: "run-1",
       type: "Explore",
@@ -106,9 +96,6 @@ describe("record type contracts", () => {
     expectTypeOf<PersistedSubagentRecord["completedAt"]>().toEqualTypeOf<
       number | undefined
     >();
-    const budget: PersistedSubagentRecord["turnBudget"] =
-      withoutCeiling.turnBudget;
-    void budget;
     void minimalRun;
     expectTypeOf<PersistedRunSummary["completedAt"]>().toEqualTypeOf<
       number | undefined

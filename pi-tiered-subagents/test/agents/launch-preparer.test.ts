@@ -2,8 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { collectDefinitions, type LoadedScopes } from "#src/agents/loader";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import type { ChildShapingSettings } from "#src/agents/launch-preparer";
-import type { ModelInfo, TurnSettings } from "#src/agents/resolver";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
+import type { ModelInfo } from "#src/agents/resolver";
 import { makeReasoningModel } from "#test/helpers/make-model";
 
 const modelInfo: ModelInfo = {
@@ -28,7 +27,6 @@ function makePreparer(
   loadScopes: (() => LoadedScopes) | LoadedScopes = workerScopes,
   options: {
     modelInfo?: () => ModelInfo;
-    turnSettings?: () => TurnSettings;
     childShaping?: () => ChildShapingSettings;
   } = {},
 ): LaunchPreparer {
@@ -36,12 +34,6 @@ function makePreparer(
     loadScopes: async () =>
       typeof loadScopes === "function" ? loadScopes() : loadScopes,
     modelInfo: options.modelInfo ?? (() => modelInfo),
-    turnSettings:
-      options.turnSettings ??
-      (() => ({
-        defaultMaxTurns: undefined,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      })),
     childShaping:
       options.childShaping ??
       (() => ({
@@ -59,7 +51,6 @@ function request(
     description: string;
     model: string;
     thinking: string;
-    maxTurns: number;
     inheritContext: boolean;
     runInBackground: boolean;
   }> = {},
@@ -154,7 +145,6 @@ describe("LaunchPreparer", () => {
         parentModel,
         modelRegistry: registry,
         ladders: { profiles: new Map(), strategies: new Map() },
-        parentThinkingLevel: "high",
       }),
     }).prepare(
       request({ model: "anthropic/claude-sonnet-5", thinking: "off" }),
@@ -210,10 +200,6 @@ describe("LaunchPreparer", () => {
         modelRegistry: registry,
         ladders: { profiles: new Map(), strategies: new Map() },
       }),
-      turnSettings: () => ({
-        defaultMaxTurns: undefined,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      }),
       childShaping: () => ({
         midRunUpdates: true,
         excludedExtensionPackages: [],
@@ -232,47 +218,6 @@ describe("LaunchPreparer", () => {
         id: "claude-sonnet-5",
       });
     }
-  });
-
-  it("captures the operator turn defaults before the definition load yields", async () => {
-    let turnSettings: TurnSettings = {
-      defaultMaxTurns: 8,
-      wrapUpTurns: 3,
-    };
-    const order: string[] = [];
-    const preparer = new LaunchPreparer({
-      loadScopes: async () => {
-        order.push("load");
-        // A settings edit lands while the load is in flight; the request must
-        // keep the values from when it was made.
-        turnSettings = { defaultMaxTurns: 20, wrapUpTurns: 5 };
-        return workerScopes();
-      },
-      modelInfo: () => modelInfo,
-      turnSettings: () => {
-        order.push("settings");
-        return turnSettings;
-      },
-      childShaping: () => ({
-        midRunUpdates: true,
-        excludedExtensionPackages: [],
-        promptInheritance: {},
-      }),
-    });
-
-    const outcome = await preparer.prepare(request());
-
-    expect(order).toEqual(["settings", "load"]);
-    expect(outcome).toMatchObject({
-      kind: "prepared",
-      value: {
-        config: {
-          execution: {
-            turnPolicy: { kind: "limited", maxTurns: 8, wrapUpTurns: 3 },
-          },
-        },
-      },
-    });
   });
 
   it("copies definition tool capabilities so a later catalog mutation cannot widen the plan", async () => {
@@ -342,10 +287,6 @@ describe("LaunchPreparer", () => {
           },
         ]),
       modelInfo: () => modelInfo,
-      turnSettings: () => ({
-        defaultMaxTurns: undefined,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      }),
       childShaping: () => ({
         midRunUpdates: true,
         excludedExtensionPackages: [],
@@ -370,10 +311,6 @@ describe("LaunchPreparer", () => {
     const preparer = new LaunchPreparer({
       loadScopes,
       modelInfo: () => modelInfo,
-      turnSettings: () => ({
-        defaultMaxTurns: undefined,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      }),
       childShaping: () => ({
         midRunUpdates: true,
         excludedExtensionPackages: [],
@@ -398,10 +335,6 @@ describe("LaunchPreparer", () => {
           resolve(workerScopes());
         }),
       modelInfo: () => modelInfo,
-      turnSettings: () => ({
-        defaultMaxTurns: undefined,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      }),
       childShaping: () => ({
         midRunUpdates: true,
         excludedExtensionPackages: [],

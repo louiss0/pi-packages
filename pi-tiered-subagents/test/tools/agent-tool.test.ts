@@ -353,7 +353,7 @@ describe("createAgentTool — resume path", () => {
       });
 
       expect(textOf(result)).toContain(
-        "aborted \u2014 turn limit reached, output may be incomplete",
+        "aborted \u2014 output may be incomplete",
       );
       expect(textOf(result)).toContain("Half of it");
     });

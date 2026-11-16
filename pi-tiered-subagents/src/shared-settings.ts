@@ -32,9 +32,6 @@ import {
   type SettingDefinition,
   type SettingStorageOptions,
 } from "@juanibiapina/pi-extension-settings";
-// The wrap-up default is the turn policy's own: the resolver falls back to the
-// same number when no layer names one, so the menu advertises a single value.
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /**
  * The name this package's settings live under in the shared store.
@@ -101,8 +98,6 @@ function storeOptions(
 /** The settings that hold a number. */
 export const NUMBER_SETTING_IDS = [
   "maxConcurrent",
-  "defaultMaxTurns",
-  "wrapUpTurns",
   "consumedSessionRetentionMinutes",
   "unconsumedSessionRetentionMinutes",
 ] as const;
@@ -119,9 +114,6 @@ export const JSON_SETTING_IDS = [
   "promptInheritance",
   "familyProfiles",
 ] as const;
-
-/** The setting this version no longer reads, named so the operator can be told. */
-export const RETIRED_SETTING_ID = "graceTurns";
 
 /** The defaults the shipped settings start from. */
 export const DEFAULT_MAX_CONCURRENT = 4;
@@ -251,18 +243,6 @@ export const SHARED_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
     label: "Max concurrent subagents",
     description: "How many background children may run at once.",
     defaultValue: String(DEFAULT_MAX_CONCURRENT),
-  },
-  {
-    id: "defaultMaxTurns",
-    label: "Default max turns",
-    description: "Turn ceiling for a child. 0 means unlimited.",
-    defaultValue: "0",
-  },
-  {
-    id: "wrapUpTurns",
-    label: "Wrap-up turns",
-    description: "Turns left when a child is warned about its budget.",
-    defaultValue: String(DEFAULT_WRAP_UP_TURNS),
   },
   {
     id: "consumedSessionRetentionMinutes",

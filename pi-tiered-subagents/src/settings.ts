@@ -5,11 +5,6 @@
 // are read on their own; only the project's file is ever written.
 
 import {
-  DEFAULT_WRAP_UP_TURNS,
-  isBelowMinimumTurns,
-  MIN_MAX_TURNS,
-} from "#src/lifecycle/turn-limits";
-import {
   BOOLEAN_SETTING_IDS,
   DEFAULT_ABORT_ALL_ON_INTERRUPT,
   DEFAULT_CONSUMED_RETENTION_MINUTES,
@@ -21,8 +16,6 @@ import {
   readBoolean,
   readJson,
   readNumber,
-  readSetting,
-  RETIRED_SETTING_ID,
   type SharedScope,
   type SharedScopes,
   writeBoolean,
@@ -33,19 +26,6 @@ import type { ChildShapingSettings } from "#src/agents/launch-preparer";
 import type { PromptInheritance } from "#src/types";
 export type SubagentsSettings = {
   maxConcurrent?: number;
-  /**
-   * 0 = unlimited — the extension's single source of truth for that convention:
-   * `normalizeMaxTurns()` in turn-limits.ts treats 0 → `undefined`, and the
-   * `/agents` → Settings input prompt explicitly says "0 = unlimited".
-   */
-  defaultMaxTurns?: number;
-  /** Turns left when a subagent is warned about its budget. */
-  wrapUpTurns?: number;
-  /**
-   * Load-only marker: a settings file still names the removed `graceTurns`.
-   * `load()` warns and strips it, so it is never applied, emitted, or saved.
-   */
-  legacyGraceTurns?: true;
   /** Minutes a consumed agent's session is retained after its last relevance event. */
   consumedSessionRetentionMinutes?: number;
   /** Minutes an unconsumed agent's session is retained (safety cap). */
@@ -97,8 +77,6 @@ export type SubagentsSettings = {
  */
 export type SettingsSnapshot = {
   maxConcurrent: number;
-  defaultMaxTurns: number;
-  wrapUpTurns: number;
   consumedSessionRetentionMinutes: number;
   unconsumedSessionRetentionMinutes: number;
   abortAllOnInterrupt: boolean;
@@ -127,8 +105,6 @@ export type SettingsEmit = (event: string, payload: unknown) => void;
  * Replaces the scattered free-function + SettingsAppliers callback pattern.
  */
 export class SettingsManager {
-  private _defaultMaxTurns: number | undefined = undefined;
-  private _wrapUpTurns: number = DEFAULT_WRAP_UP_TURNS;
   private _maxConcurrent: number = DEFAULT_MAX_CONCURRENT;
   private _consumedSessionRetentionMinutes: number =
     DEFAULT_CONSUMED_RETENTION_MINUTES;
@@ -163,30 +139,6 @@ export class SettingsManager {
     this.cwd = deps.cwd;
     this.agentDir = deps.agentDir;
     this.onMaxConcurrentChanged = deps.onMaxConcurrentChanged;
-  }
-
-  // ── defaultMaxTurns: 0 or undefined → unlimited (undefined); else at least MIN_MAX_TURNS ──
-
-  get defaultMaxTurns(): number | undefined {
-    return this._defaultMaxTurns;
-  }
-
-  set defaultMaxTurns(n: number | undefined) {
-    if (n == null || n === 0) {
-      this._defaultMaxTurns = undefined;
-    } else {
-      this._defaultMaxTurns = Math.max(MIN_MAX_TURNS, n);
-    }
-  }
-
-  // ── wrapUpTurns: minimum 1 ──
-
-  get wrapUpTurns(): number {
-    return this._wrapUpTurns;
-  }
-
-  set wrapUpTurns(n: number) {
-    this._wrapUpTurns = Math.max(1, n);
   }
 
   // ── maxConcurrent: minimum 1 ──
@@ -271,14 +223,9 @@ export class SettingsManager {
       this.agentDir,
       this.cwd,
     );
-    const { legacyGraceTurns, ...loaded } = settings;
-    warnAboutRetiredSettings(loaded, legacyGraceTurns === true);
+    const loaded = settings;
     if (typeof settings.maxConcurrent === "number")
       this.maxConcurrent = settings.maxConcurrent;
-    if (typeof settings.defaultMaxTurns === "number")
-      this.defaultMaxTurns = settings.defaultMaxTurns;
-    if (typeof settings.wrapUpTurns === "number")
-      this.wrapUpTurns = settings.wrapUpTurns;
     if (typeof settings.consumedSessionRetentionMinutes === "number")
       this.consumedSessionRetentionMinutes =
         settings.consumedSessionRetentionMinutes;
@@ -319,13 +266,10 @@ export class SettingsManager {
    * is the project's own, so the operator's data is never copied into the
    * project's file.
    *
-   * `defaultMaxTurns` uses 0 as the on-disk marker for unlimited (undefined).
    */
   snapshot(): SettingsSnapshot {
     const snapshot: SettingsSnapshot = {
       maxConcurrent: this._maxConcurrent,
-      defaultMaxTurns: this._defaultMaxTurns ?? 0,
-      wrapUpTurns: this._wrapUpTurns,
       consumedSessionRetentionMinutes: this._consumedSessionRetentionMinutes,
       unconsumedSessionRetentionMinutes:
         this._unconsumedSessionRetentionMinutes,
@@ -359,28 +303,6 @@ export class SettingsManager {
     this.maxConcurrent = n; // setter normalizes: max(1, n)
     this.onMaxConcurrentChanged?.();
     return this.saveAndNotify(`Max concurrency set to ${this.maxConcurrent}`);
-  }
-
-  /**
-   * Set defaultMaxTurns, persist, and return the toast.
-   * Pass 0 for unlimited (maps to undefined internally).
-   */
-  applyDefaultMaxTurns(n: number): {
-    message: string;
-    level: "info" | "warning";
-  } {
-    this.defaultMaxTurns = n === 0 ? undefined : n; // setter normalizes further
-    const label =
-      this.defaultMaxTurns == null ? "unlimited" : String(this.defaultMaxTurns);
-    return this.saveAndNotify(`Default max turns set to ${label}`);
-  }
-
-  /**
-   * Set wrapUpTurns, persist, and return the toast.
-   */
-  applyWrapUpTurns(n: number): { message: string; level: "info" | "warning" } {
-    this.wrapUpTurns = n; // setter normalizes: max(1, n)
-    return this.saveAndNotify(`Wrap-up turns set to ${this.wrapUpTurns}`);
   }
 
   /** Set the consumed-session retention window (minutes), persist, and return the toast. */
@@ -450,8 +372,6 @@ export class SettingsManager {
 // make no operational sense (e.g. 1e6 concurrent subagents). Permissive enough
 // that any realistic power-user setting passes through.
 const MAX_CONCURRENT_CEILING = 1024;
-const MAX_TURNS_CEILING = 10_000;
-const WRAP_UP_TURNS_CEILING = 1_000;
 // Retention windows: 1 minute floor, two-week ceiling (60 * 24 * 14).
 const RETENTION_MINUTES_CEILING = 20_160;
 
@@ -469,26 +389,6 @@ function isRetentionMinutes(n: unknown): n is number {
   );
 }
 
-/**
- * Tell the operator about settings this version reads differently, so a value
- * that stopped meaning what they wrote does not change behavior silently.
- */
-function warnAboutRetiredSettings(
-  settings: SubagentsSettings,
-  hasGraceTurns: boolean,
-): void {
-  if (hasGraceTurns) {
-    console.warn(
-      `[pi-subagents] graceTurns was removed; set wrapUpTurns (turns left when a subagent is warned, default ${DEFAULT_WRAP_UP_TURNS}) instead.`,
-    );
-  }
-  if (isBelowMinimumTurns(settings.defaultMaxTurns)) {
-    console.warn(
-      `[pi-subagents] defaultMaxTurns ${settings.defaultMaxTurns} is below the minimum of ${MIN_MAX_TURNS}; using ${MIN_MAX_TURNS}.`,
-    );
-  }
-}
-
 /** Drop fields that don't match the expected shape. Silent — garbage becomes absent. */
 function sanitize(raw: unknown): SubagentsSettings {
   if (!raw || typeof raw !== "object") return {};
@@ -500,23 +400,6 @@ function sanitize(raw: unknown): SubagentsSettings {
     (r.maxConcurrent as number) <= MAX_CONCURRENT_CEILING
   ) {
     out.maxConcurrent = r.maxConcurrent as number;
-  }
-  if (
-    Number.isInteger(r.defaultMaxTurns) &&
-    (r.defaultMaxTurns as number) >= 0 &&
-    (r.defaultMaxTurns as number) <= MAX_TURNS_CEILING
-  ) {
-    out.defaultMaxTurns = r.defaultMaxTurns as number;
-  }
-  if (
-    Number.isInteger(r.wrapUpTurns) &&
-    (r.wrapUpTurns as number) >= 1 &&
-    (r.wrapUpTurns as number) <= WRAP_UP_TURNS_CEILING
-  ) {
-    out.wrapUpTurns = r.wrapUpTurns as number;
-  }
-  if ("graceTurns" in r) {
-    out.legacyGraceTurns = true;
   }
   if (isRetentionMinutes(r.consumedSessionRetentionMinutes)) {
     out.consumedSessionRetentionMinutes = r.consumedSessionRetentionMinutes;
@@ -588,11 +471,6 @@ function readScope(
   for (const id of JSON_SETTING_IDS) {
     const value = readJson(id, scope, scopes);
     if (value !== undefined) raw[id] = value;
-  }
-  // A setting this version no longer reads is still worth naming: the
-  // operator is told what to use instead.
-  if (readSetting(RETIRED_SETTING_ID, scope, scopes) !== undefined) {
-    raw[RETIRED_SETTING_ID] = true;
   }
   return sanitize(raw);
 }

@@ -57,8 +57,6 @@ export type AgentDefinition = Readonly<{
   model?: string;
   /** A fixed reasoning level, when the definition names one. */
   thinking?: SubagentThinkingLevel;
-  /** A turn ceiling for the child, when the definition names one. */
-  maxTurns?: number;
   /** Whether the child starts from the parent's conversation. */
   inheritContext: boolean;
   /** Whether the child runs in the background by default. */
@@ -82,7 +80,6 @@ export type AgentDefinitionPatch = Readonly<{
   tools?: ToolSelection | null;
   model?: string | null;
   thinking?: SubagentThinkingLevel | null;
-  maxTurns?: number | null;
   inheritContext?: boolean | null;
   runInBackground?: boolean | null;
   enabled?: boolean | null;
@@ -144,7 +141,6 @@ export function mergeDefinition(
     ...defined({
       model: mergedOptional(patch.model, base.model),
       thinking: mergedOptional(patch.thinking, base.thinking),
-      maxTurns: mergedOptional(patch.maxTurns, base.maxTurns),
     }),
   };
 }

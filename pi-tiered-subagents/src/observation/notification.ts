@@ -1,6 +1,5 @@
 import { debugLog } from "#src/debug";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { getLifetimeTotal } from "#src/lifecycle/usage";
 import { defined } from "#src/optional";
 import {
@@ -22,8 +21,6 @@ export type NotificationDetails = {
   outputFile?: string;
   error?: string;
   resultPreview: string;
-  /** The run's turn budget; absent until its turn loop starts. */
-  turnBudget?: TurnBudget;
 };
 
 // ---- Pure helpers (exported for unit testing) ----
@@ -167,7 +164,6 @@ export function buildNotificationDetails(
     resultPreview: buildResultPreview(record, resultMaxLen),
     outputFile: record.outputFile,
     error: record.error,
-    turnBudget: record.turnBudget,
   });
 }
 
@@ -196,7 +192,6 @@ export function buildEventData(record: Subagent) {
     result: record.result,
     error: record.error,
     status: record.status,
-    turnBudget: record.turnBudget,
     toolUses: record.toolUses,
     durationMs,
     tokens,

@@ -43,7 +43,6 @@ import { createToolDeps } from "#test/helpers/make-deps";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /** A registry with one definition file, for the cases that need one. */
 function registryWith(
@@ -63,10 +62,6 @@ function createPreparer(registry: AgentRegistry, modelInfo: () => ModelInfo) {
   return new LaunchPreparer({
     loadScopes: async () => registry.currentScopes(),
     modelInfo,
-    turnSettings: () => ({
-      defaultMaxTurns: undefined,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-    }),
     childShaping: () => ({
       midRunUpdates: true,
       excludedExtensionPackages: [],
@@ -148,6 +143,39 @@ describe("the assembler's tool selection", () => {
     expect(config.toolNames).toEqual(["read", "bash", "edit"]);
   });
 
+  it("gives the shipped Reviewer the parent's active tools", () => {
+    const config = assembleSessionConfig(
+      "reviewer",
+      { ...base, activeToolNames: ["read", "bash", "edit", "write"] },
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("reviewer", {}),
+      assemblerIO,
+    );
+    expect(config.toolNames).toEqual(["read", "bash", "edit", "write"]);
+  });
+
+  it("strips recursive delegation tools from the shipped Reviewer", () => {
+    const config = assembleSessionConfig(
+      "reviewer",
+      {
+        ...base,
+        activeToolNames: [
+          "read",
+          "bash",
+          "subagent",
+          "get_subagent_result",
+          "steer_subagent",
+        ],
+      },
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("reviewer", {}),
+      assemblerIO,
+    );
+    expect(config.toolNames).toEqual(["read", "bash"]);
+  });
+
   it("strips the subagent-management tools from an inherited selection", () => {
     const config = assembleSessionConfig(
       "worker",
@@ -160,7 +188,7 @@ describe("the assembler's tool selection", () => {
     expect(config.toolNames).toEqual(["read"]);
   });
 
-  it("gives a restricted specialist exactly the tools it names", () => {
+  it("gives an explicitly restricted specialist exactly the tools it names", () => {
     const config = assembleSessionConfig(
       "reviewer",
       { ...base, activeToolNames: ["read", "bash", "edit", "write"] },
@@ -321,7 +349,14 @@ describe("the service door", () => {
             "mcp__gitlab__get_issue",
           ],
         },
-        parentContext: "parent conversation",
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
           parentSessionId: "session-1",
@@ -342,7 +377,6 @@ describe("the service door", () => {
             ...defined({
               model: definition.model,
               thinking: definition.thinking,
-              maxTurns: definition.maxTurns,
             }),
           }
         : {},
@@ -365,7 +399,16 @@ describe("the service door", () => {
     await adapter.launch("debug", "diagnose it");
 
     expect(manager.spawn).toHaveBeenCalledWith(
-      expect.objectContaining({ parentContext: "parent conversation" }),
+      expect.objectContaining({
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
+      }),
       "debug",
       "diagnose it",
       expect.anything(),
@@ -380,7 +423,7 @@ describe("the service door", () => {
     await adapter.launch("debug", "diagnose it", { inheritContext: false });
 
     const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
-    expect(snapshot).not.toHaveProperty("parentContext");
+    expect(snapshot).not.toHaveProperty("parentBranch");
   });
 
   it("starts a specialist with a fresh conversation", async () => {
@@ -391,7 +434,7 @@ describe("the service door", () => {
     await adapter.launch("worker", "do it");
 
     const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
-    expect(snapshot).not.toHaveProperty("parentContext");
+    expect(snapshot).not.toHaveProperty("parentBranch");
   });
 
   it("expands MCP patterns against request-time registered names before acceptance", async () => {
@@ -505,12 +548,10 @@ describe("both doors resolve alike", () => {
         thinking: "low",
         model: "anthropic/claude-haiku-4-5",
         inherit_context: false,
-        max_turns: 3,
         run_in_background: false,
       },
       registryWith("worker", {}),
       defined({ modelRegistry: haikuRegistry, ladders }),
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     if ("error" in tool) throw new Error(tool.error);
 
@@ -533,7 +574,14 @@ describe("both doors resolve alike", () => {
       currentCtx: { modelRegistry: haikuRegistry } as never,
       captureLaunchInputs: vi.fn(() => ({
         snapshot: STUB_SNAPSHOT,
-        parentContext: "parent conversation",
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
           parentSessionId: "session-1",
@@ -554,7 +602,6 @@ describe("both doors resolve alike", () => {
       model: "anthropic/claude-haiku-4-5",
       thinkingLevel: "low",
       inheritContext: false,
-      maxTurns: 3,
     });
 
     // The service door hands the shared resolution to the manager exactly as
@@ -566,7 +613,6 @@ describe("both doors resolve alike", () => {
       expect.objectContaining({
         description: "d",
         modelSelection: tool.execution.modelSelection,
-        turnPolicy: tool.execution.turnPolicy,
         inheritContext: false,
         // The request asked for `low`, but Haiku does not reason, so the
         // resolution carries a decision rather than a level — the same call
@@ -583,7 +629,7 @@ describe("automatic model selection at launch", () => {
   it.each([
     ["acme", "wonder-model-9", false],
     ["openai", "gpt-5.4-nano", true],
-  ])("keeps %s/%s and lowers effort by the next supported rung", (provider, id, registryHasParent) => {
+  ])("keeps %s/%s and selects the upper median supported effort", (provider, id, registryHasParent) => {
     const parent = makeReasoningModel({
       provider,
       id,
@@ -591,9 +637,9 @@ describe("automatic model selection at launch", () => {
         off: "off",
         minimal: null,
         low: "low",
-        medium: null,
+        medium: "medium",
         high: "high",
-        xhigh: null,
+        xhigh: "xhigh",
         max: "max",
       },
     });
@@ -602,7 +648,6 @@ describe("automatic model selection at launch", () => {
       registryWith("worker", {}),
       {
         parentModel: parent,
-        parentThinkingLevel: "max",
         modelRegistry: {
           getAll: () => (registryHasParent ? [parent] : []),
           getAvailable: () => (registryHasParent ? [parent] : []),
@@ -618,15 +663,12 @@ describe("automatic model selection at launch", () => {
           strategies: strategiesByFamily(SHIPPED_STRATEGIES),
         },
       },
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     expect(result).not.toHaveProperty("error");
     if ("error" in result) return;
     expect(result.execution.modelIdentity).toEqual({ provider, id });
     expect(result.execution.thinkingDecision.level).toBe("high");
-    expect(result.execution.thinkingDecision.reason).toContain(
-      "the parent's model was kept",
-    );
+    expect(result.execution.thinkingDecision.reason).toContain("upper median");
   });
 
   it.each([
@@ -655,7 +697,6 @@ describe("automatic model selection at launch", () => {
           strategies: strategiesByFamily(SHIPPED_STRATEGIES),
         },
       },
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     expect(result).not.toHaveProperty("error");
     if ("error" in result) return;

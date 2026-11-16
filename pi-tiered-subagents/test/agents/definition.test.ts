@@ -18,7 +18,6 @@ const BASE: AgentDefinition = {
   tools: { kind: "explicit", names: ["read", "grep", "find"] },
   model: "anthropic/claude-sonnet-5",
   thinking: "medium",
-  maxTurns: 12,
   inheritContext: false,
   runInBackground: true,
   enabled: true,

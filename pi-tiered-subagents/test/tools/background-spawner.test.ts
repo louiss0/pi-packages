@@ -226,12 +226,12 @@ describe("spawnBackground", () => {
       deps.subagents,
       makeParams({
         config: makeConfig({
-          notes: ["Note: max_turns 1 is below the minimum."],
+          notes: ["Note: a routing note."],
         }),
       }),
     );
     expect(textOf(result)).toMatch(
-      /^Note: max_turns 1 is below the minimum\.\n\nAgent (started|queued) in background\./,
+      /^Note: a routing note\.\n\nAgent (started|queued) in background\./,
     );
   });
 

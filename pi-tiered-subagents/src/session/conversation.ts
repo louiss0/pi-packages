@@ -9,11 +9,16 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { extractAssistantContent } from "#src/session/content-items";
 import { extractText } from "#src/session/context";
+import type { SessionMessage } from "#src/types";
 
 /**
  * Get the subagent's conversation messages as formatted text.
  */
-export function getAgentConversation(session: AgentSession): string {
+export function getAgentConversation(
+  session:
+    | Pick<AgentSession, "messages">
+    | { messages: ReadonlyArray<SessionMessage> },
+): string {
   const parts: string[] = [];
 
   for (const msg of session.messages) {

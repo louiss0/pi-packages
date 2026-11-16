@@ -3,21 +3,6 @@ import { createTestSubagent } from "./make-subagent";
 
 describe("createTestSubagent", () => {
   describe("live-activity shorthands", () => {
-    it("has no turn budget by default", () => {
-      expect(createTestSubagent().turnBudget).toBeUndefined();
-    });
-
-    it("seeds a turn budget", () => {
-      const record = createTestSubagent({
-        turnBudget: { maxTurns: 10, used: 4, phase: "within" },
-      });
-      expect(record.turnBudget).toEqual({
-        maxTurns: 10,
-        used: 4,
-        phase: "within",
-      });
-    });
-
     it("defaults activeTools to an empty map", () => {
       const record = createTestSubagent();
       expect(record.activeTools.size).toBe(0);

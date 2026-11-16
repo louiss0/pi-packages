@@ -34,7 +34,10 @@ import {
   type TurnLoopOptions,
   type TurnLoopResult,
 } from "#src/lifecycle/subagent-session";
-import type { TurnPolicy } from "#src/lifecycle/turn-limits";
+import {
+  seedInheritedBranch,
+  type ForkSessionManager,
+} from "#src/session/fork";
 import type { SessionStatsLike } from "#src/lifecycle/usage";
 import {
   AskParentTool,
@@ -84,7 +87,7 @@ export interface ResourceLoaderLike {
 }
 
 /** Minimal session-manager contract used by the factory. */
-export interface SessionManagerLike {
+export interface SessionManagerLike extends ForkSessionManager {
   newSession(opts: { parentSession?: string }): void;
   getSessionFile(): string | undefined;
   getSessionId(): string;
@@ -226,8 +229,6 @@ export type CreateSubagentSessionParams = {
    * installs no update tool.
    */
   notifyParent?: UpdateAnnouncer;
-  /** The run's turn ceiling, resolved once at the door. Enforced, not re-decided. */
-  turnPolicy: TurnPolicy;
   /** The definition captured by preparation; execution must not reselect it. */
   definition?: AgentDefinition;
   /** The child-shaping settings captured with the launch, when the door prepared one. */
@@ -261,9 +262,8 @@ export interface ChildSession {
   /** The child's current thinking level. */
   readonly thinkingLevel: ThinkingLevel;
   /**
-   * Drive one run's turn loop under a fresh budget at the session's limits:
-   * the initial run, or a resume, which keeps the policy and starts a new
-   * counter. Settles with the run's answer or rejects with its failure.
+   * Drive one run's turn loop: the initial run, or a resume on the same
+   * session. Settles with the run's answer or rejects with its failure.
    */
   runTurnLoop(prompt: string, opts: TurnLoopOptions): Promise<TurnLoopResult>;
   /** Deliver a steer to the live session. */
@@ -419,6 +419,11 @@ export async function createSubagentSession(
   sessionManager.newSession(
     defined({ parentSession: params.parentSession?.parentSessionId }),
   );
+  // Fork the parent's completed conversation into this session in memory.
+  // No parent file is read and no intermediate fork file is written.
+  if (snapshot.parentBranch?.length) {
+    seedInheritedBranch(sessionManager, snapshot.parentBranch);
+  }
   const sessionId = sessionManager.getSessionId();
 
   const childTools = buildChildTools(params);
@@ -449,10 +454,8 @@ export async function createSubagentSession(
       sessionId,
       sessionDir,
       agentName: type,
-      turnPolicy: params.turnPolicy,
       lifecycle: deps.lifecycle,
       outputFile: sessionManager.getSessionFile(),
-      parentContext: snapshot.parentContext,
     }),
   );
 

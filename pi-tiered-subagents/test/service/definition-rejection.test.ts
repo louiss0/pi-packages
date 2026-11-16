@@ -9,7 +9,7 @@ it.each([
       {
         name: "explore.md",
         path: "/agents/explore.md",
-        content: "---\nmax_turns: many\n---\n",
+        content: "---\nthinking: extreme\n---\n",
       },
     ],
   ],

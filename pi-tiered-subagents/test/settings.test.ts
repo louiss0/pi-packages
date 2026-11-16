@@ -67,10 +67,10 @@ describe("settings persistence", () => {
   });
 
   it("loads from global when no project file", () => {
-    writeGlobal({ maxConcurrent: 16, wrapUpTurns: 10 });
+    writeGlobal({ maxConcurrent: 16, consumedSessionRetentionMinutes: 10 });
     expect(loadSettings(globalDir, projectDir)).toEqual({
       maxConcurrent: 16,
-      wrapUpTurns: 10,
+      consumedSessionRetentionMinutes: 10,
     });
   });
 
@@ -80,20 +80,20 @@ describe("settings persistence", () => {
   });
 
   it("merges global + project with project winning on conflicts", () => {
-    writeGlobal({ maxConcurrent: 16, wrapUpTurns: 10 });
-    writeProject({ maxConcurrent: 4, defaultMaxTurns: 50 });
+    writeGlobal({ maxConcurrent: 16, consumedSessionRetentionMinutes: 10 });
+    writeProject({ maxConcurrent: 4, unconsumedSessionRetentionMinutes: 60 });
     expect(loadSettings(globalDir, projectDir)).toEqual({
       maxConcurrent: 4, // project wins
-      wrapUpTurns: 10, // from global
-      defaultMaxTurns: 50, // from project only
+      consumedSessionRetentionMinutes: 10, // from global
+      unconsumedSessionRetentionMinutes: 60, // from project only
     });
   });
 
   it("round-trips values: saveSettings then loadSettings", () => {
     const settings = {
       maxConcurrent: 7,
-      defaultMaxTurns: 30,
-      wrapUpTurns: 3,
+      consumedSessionRetentionMinutes: 30,
+      unconsumedSessionRetentionMinutes: 60,
     };
     saveSettings(settings, projectDir);
     // Only the values that were saved are written, so the load reports them
@@ -121,13 +121,6 @@ describe("settings persistence", () => {
     expect(existsSync(projectFile())).toBe(true);
   });
 
-  it("round-trips defaultMaxTurns: 0 (unlimited marker)", () => {
-    saveSettings({ defaultMaxTurns: 0 }, projectDir);
-    expect(loadSettings(globalDir, projectDir)).toMatchObject({
-      defaultMaxTurns: 0,
-    });
-  });
-
   it("ignores unknown extra fields on load (forward-compat)", () => {
     writeProject({ maxConcurrent: 2, futureField: "ignored" });
     const loaded = loadSettings(globalDir, projectDir);
@@ -137,18 +130,20 @@ describe("settings persistence", () => {
   });
 
   it("composes partial global + partial project correctly", () => {
-    writeGlobal({ wrapUpTurns: 10 });
+    writeGlobal({ consumedSessionRetentionMinutes: 10 });
     writeProject({ maxConcurrent: 2 });
     expect(loadSettings(globalDir, projectDir)).toEqual({
-      wrapUpTurns: 10,
+      consumedSessionRetentionMinutes: 10,
       maxConcurrent: 2,
     });
   });
 
   describe("sanitizer", () => {
     it("drops maxConcurrent < 1", () => {
-      writeProject({ maxConcurrent: 0, wrapUpTurns: 5 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({ wrapUpTurns: 5 });
+      writeProject({ maxConcurrent: 0, consumedSessionRetentionMinutes: 5 });
+      expect(loadSettings(globalDir, projectDir)).toEqual({
+        consumedSessionRetentionMinutes: 5,
+      });
     });
 
     it("drops negative maxConcurrent", () => {
@@ -163,23 +158,6 @@ describe("settings persistence", () => {
       expect(loadSettings(globalDir, projectDir).maxConcurrent).toBeUndefined();
       writeProject({ maxConcurrent: null });
       expect(loadSettings(globalDir, projectDir).maxConcurrent).toBeUndefined();
-    });
-
-    it("accepts defaultMaxTurns: 0 (explicit unlimited)", () => {
-      writeProject({ defaultMaxTurns: 0 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({
-        defaultMaxTurns: 0,
-      });
-    });
-
-    it("drops negative defaultMaxTurns", () => {
-      writeProject({ defaultMaxTurns: -1 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({});
-    });
-
-    it("drops wrapUpTurns < 1", () => {
-      writeProject({ wrapUpTurns: 0 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({});
     });
 
     it("accepts retention windows within [1, 20160]", () => {
@@ -221,44 +199,46 @@ describe("settings persistence", () => {
     it("keeps valid fields while dropping invalid siblings", () => {
       writeProject({
         maxConcurrent: 4, // ok
-        defaultMaxTurns: -5, // dropped
-        wrapUpTurns: 3, // ok
+        consumedSessionRetentionMinutes: -5, // dropped
+        unconsumedSessionRetentionMinutes: 3, // ok
       });
       expect(loadSettings(globalDir, projectDir)).toEqual({
         maxConcurrent: 4,
-        wrapUpTurns: 3,
+        unconsumedSessionRetentionMinutes: 3,
       });
     });
 
-    it("accepts values at the ceiling (maxConcurrent=1024, defaultMaxTurns=10000, wrapUpTurns=1000)", () => {
+    it("accepts values at the ceiling (maxConcurrent=1024, retention=20160)", () => {
       writeProject({
         maxConcurrent: 1024,
-        defaultMaxTurns: 10_000,
-        wrapUpTurns: 1_000,
+        consumedSessionRetentionMinutes: 20_160,
+        unconsumedSessionRetentionMinutes: 20_160,
       });
       expect(loadSettings(globalDir, projectDir)).toEqual({
         maxConcurrent: 1024,
-        defaultMaxTurns: 10_000,
-        wrapUpTurns: 1_000,
+        consumedSessionRetentionMinutes: 20_160,
+        unconsumedSessionRetentionMinutes: 20_160,
       });
     });
 
     it("drops values above the ceiling", () => {
       writeProject({ maxConcurrent: 1025 });
       expect(loadSettings(globalDir, projectDir).maxConcurrent).toBeUndefined();
-      writeProject({ defaultMaxTurns: 10_001 });
+      writeProject({ consumedSessionRetentionMinutes: 20_161 });
       expect(
-        loadSettings(globalDir, projectDir).defaultMaxTurns,
+        loadSettings(globalDir, projectDir).consumedSessionRetentionMinutes,
       ).toBeUndefined();
-      writeProject({ wrapUpTurns: 1_001 });
-      expect(loadSettings(globalDir, projectDir).wrapUpTurns).toBeUndefined();
+      writeProject({ unconsumedSessionRetentionMinutes: 20_161 });
+      expect(
+        loadSettings(globalDir, projectDir).unconsumedSessionRetentionMinutes,
+      ).toBeUndefined();
     });
 
     it("drops absurdly large values (e.g. 1e6)", () => {
       writeProject({
         maxConcurrent: 1_000_000,
-        defaultMaxTurns: 1_000_000,
-        wrapUpTurns: 1_000_000,
+        consumedSessionRetentionMinutes: 1_000_000,
+        unconsumedSessionRetentionMinutes: 1_000_000,
       });
       expect(loadSettings(globalDir, projectDir)).toEqual({});
     });
@@ -286,13 +266,23 @@ describe("settings persistence", () => {
     });
 
     it("drops a midRunUpdates that is neither true nor false", () => {
-      writeProject({ midRunUpdates: "yes", wrapUpTurns: 5 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({ wrapUpTurns: 5 });
+      writeProject({
+        midRunUpdates: "yes",
+        consumedSessionRetentionMinutes: 5,
+      });
+      expect(loadSettings(globalDir, projectDir)).toEqual({
+        consumedSessionRetentionMinutes: 5,
+      });
     });
 
     it("drops an abortAllOnInterrupt that is neither true nor false", () => {
-      writeProject({ abortAllOnInterrupt: "yes", wrapUpTurns: 5 });
-      expect(loadSettings(globalDir, projectDir)).toEqual({ wrapUpTurns: 5 });
+      writeProject({
+        abortAllOnInterrupt: "yes",
+        consumedSessionRetentionMinutes: 5,
+      });
+      expect(loadSettings(globalDir, projectDir)).toEqual({
+        consumedSessionRetentionMinutes: 5,
+      });
       writeProject({ abortAllOnInterrupt: 0 });
       expect(loadSettings(globalDir, projectDir)).toEqual({});
       writeProject({ abortAllOnInterrupt: null });
@@ -455,7 +445,7 @@ describe("settings persistence", () => {
         "npm:@cortexkit/pi-magic-context",
       ]);
       expect(sm.promptInheritanceFor("claude-bridge")).toBe("portable");
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
       expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
@@ -473,7 +463,7 @@ describe("settings persistence", () => {
 
       const sm = manager();
       sm.load();
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
       expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
@@ -491,7 +481,7 @@ describe("settings persistence", () => {
       const sm = manager();
       sm.load();
       expect(sm.excludedExtensionPackages).toEqual([]);
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
       expect(written[SETTINGS_EXTENSION_NAME].excludedExtensionPackages).toBe(
@@ -506,7 +496,7 @@ describe("settings persistence", () => {
 
       const sm = manager();
       sm.load();
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(projectFile(), "utf-8"));
       expect(written[SETTINGS_EXTENSION_NAME].promptInheritance).toBe(
@@ -518,24 +508,6 @@ describe("settings persistence", () => {
 
 describe("SettingsManager", () => {
   describe("constructor defaults", () => {
-    it("defaults to defaultMaxTurns: undefined (unlimited)", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      expect(sm.defaultMaxTurns).toBeUndefined();
-    });
-
-    it("defaults to wrapUpTurns: 2", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      expect(sm.wrapUpTurns).toBe(2);
-    });
-
     it("defaults to maxConcurrent: 4", () => {
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -646,7 +618,7 @@ describe("SettingsManager", () => {
       const sm = managerWith({ "claude-bridge": "portable" });
       writeFileSync(
         join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
+        JSON.stringify(toSharedStore({ maxConcurrent: 7 })),
       );
       sm.load();
       expect(sm.promptInheritanceFor("claude-bridge")).toBe("full");
@@ -682,84 +654,6 @@ describe("SettingsManager", () => {
       });
       sm.unconsumedSessionRetentionMinutes = 99_999;
       expect(sm.unconsumedSessionRetentionMinutes).toBe(20_160);
-    });
-  });
-
-  describe("defaultMaxTurns setter normalization", () => {
-    it("stores a positive value as-is", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.defaultMaxTurns = 10;
-      expect(sm.defaultMaxTurns).toBe(10);
-    });
-
-    it("maps 0 to undefined (unlimited)", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.defaultMaxTurns = 10;
-      sm.defaultMaxTurns = 0;
-      expect(sm.defaultMaxTurns).toBeUndefined();
-    });
-
-    it("maps undefined to undefined", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.defaultMaxTurns = 10;
-      sm.defaultMaxTurns = undefined;
-      expect(sm.defaultMaxTurns).toBeUndefined();
-    });
-
-    it("raises values below 2 (but not 0) to the minimum of 2", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.defaultMaxTurns = -5;
-      expect(sm.defaultMaxTurns).toBe(2);
-      sm.defaultMaxTurns = 1;
-      expect(sm.defaultMaxTurns).toBe(2);
-    });
-  });
-
-  describe("wrapUpTurns setter normalization", () => {
-    it("stores a positive value as-is", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.wrapUpTurns = 10;
-      expect(sm.wrapUpTurns).toBe(10);
-    });
-
-    it("clamps 0 to 1", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.wrapUpTurns = 0;
-      expect(sm.wrapUpTurns).toBe(1);
-    });
-
-    it("clamps negative values to 1", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.wrapUpTurns = -3;
-      expect(sm.wrapUpTurns).toBe(1);
     });
   });
 
@@ -813,7 +707,12 @@ describe("SettingsManager", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
         join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ wrapUpTurns: 7, maxConcurrent: 8 })),
+        JSON.stringify(
+          toSharedStore({
+            maxConcurrent: 8,
+            consumedSessionRetentionMinutes: 7,
+          }),
+        ),
       );
       const emit = vi.fn();
       const sm = new SettingsManager({
@@ -822,39 +721,8 @@ describe("SettingsManager", () => {
         agentDir: globalDir,
       });
       sm.load();
-      expect(sm.wrapUpTurns).toBe(7);
+      expect(sm.consumedSessionRetentionMinutes).toBe(7);
       expect(sm.maxConcurrent).toBe(8);
-      expect(sm.defaultMaxTurns).toBeUndefined();
-    });
-
-    it("applies defaultMaxTurns from disk (0 → unlimited)", () => {
-      mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      writeFileSync(
-        join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ defaultMaxTurns: 0 })),
-      );
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: globalDir,
-      });
-      sm.load();
-      expect(sm.defaultMaxTurns).toBeUndefined();
-    });
-
-    it("applies defaultMaxTurns: 50 from disk", () => {
-      mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      writeFileSync(
-        join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ defaultMaxTurns: 50 })),
-      );
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: globalDir,
-      });
-      sm.load();
-      expect(sm.defaultMaxTurns).toBe(50);
     });
 
     it("applies retention windows from disk", () => {
@@ -897,7 +765,7 @@ describe("SettingsManager", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
         join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
+        JSON.stringify(toSharedStore({ maxConcurrent: 7 })),
       );
       const sm = new SettingsManager({
         emit: vi.fn(),
@@ -908,68 +776,11 @@ describe("SettingsManager", () => {
       expect(sm.abortAllOnInterrupt).toBe(true);
     });
 
-    it("warns that graceTurns was removed, and neither applies, emits, nor persists it", () => {
-      mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      writeFileSync(
-        join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ graceTurns: 5, maxConcurrent: 6 })),
-      );
-      const emit = vi.fn();
-      const sm = new SettingsManager({
-        emit,
-        cwd: projectDir,
-        agentDir: globalDir,
-      });
-      const warnings = captureWarn(() => {
-        expect(sm.load()).toEqual({ maxConcurrent: 6 });
-      });
-      expect(warnings).toEqual([
-        "[pi-subagents] graceTurns was removed; set wrapUpTurns (turns left when a subagent is warned, default 2) instead.",
-      ]);
-      expect(emit).toHaveBeenCalledWith("subagents:settings_loaded", {
-        settings: { maxConcurrent: 6 },
-      });
-      expect(sm.wrapUpTurns).toBe(2);
-      expect(sm.snapshot()).not.toHaveProperty("graceTurns");
-    });
-
-    it("warns about a defaultMaxTurns below the minimum and runs with 2", () => {
-      mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      writeFileSync(
-        join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ defaultMaxTurns: 1 })),
-      );
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: globalDir,
-      });
-      const warnings = captureWarn(() => sm.load());
-      expect(warnings).toEqual([
-        "[pi-subagents] defaultMaxTurns 1 is below the minimum of 2; using 2.",
-      ]);
-      expect(sm.defaultMaxTurns).toBe(2);
-    });
-
-    it("does not warn for settings within range", () => {
-      mkdirSync(join(projectDir, ".pi"), { recursive: true });
-      writeFileSync(
-        join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ defaultMaxTurns: 2, wrapUpTurns: 3 })),
-      );
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: globalDir,
-      });
-      expect(captureWarn(() => sm.load())).toEqual([]);
-    });
-
     it("emits subagents:settings_loaded with merged settings", () => {
       mkdirSync(join(projectDir, ".pi"), { recursive: true });
       writeFileSync(
         join(projectDir, ".pi", "settings-extensions.json"),
-        JSON.stringify(toSharedStore({ wrapUpTurns: 7 })),
+        JSON.stringify(toSharedStore({ maxConcurrent: 7 })),
       );
       const emit = vi.fn();
       const sm = new SettingsManager({
@@ -980,7 +791,7 @@ describe("SettingsManager", () => {
       sm.load();
       expect(emit).toHaveBeenCalledTimes(1);
       expect(emit).toHaveBeenCalledWith("subagents:settings_loaded", {
-        settings: { wrapUpTurns: 7 },
+        settings: { maxConcurrent: 7 },
       });
     });
 
@@ -1048,8 +859,6 @@ describe("SettingsManager", () => {
       });
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 10,
         unconsumedSessionRetentionMinutes: 720,
         abortAllOnInterrupt: true,
@@ -1057,37 +866,15 @@ describe("SettingsManager", () => {
       });
     });
 
-    it("reflects mutations: defaultMaxTurns undefined maps to 0 in snapshot", () => {
+    it("reflects a mutated maxConcurrent", () => {
       const sm = new SettingsManager({
         emit: vi.fn(),
         cwd: "/tmp",
         agentDir: "/nonexistent",
       });
-      sm.defaultMaxTurns = undefined;
-      sm.wrapUpTurns = 3;
       sm.maxConcurrent = 8;
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 8,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 3,
-        consumedSessionRetentionMinutes: 10,
-        unconsumedSessionRetentionMinutes: 720,
-        abortAllOnInterrupt: true,
-        midRunUpdates: true,
-      });
-    });
-
-    it("reflects a concrete defaultMaxTurns value", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: "/tmp",
-        agentDir: "/nonexistent",
-      });
-      sm.defaultMaxTurns = 20;
-      expect(sm.snapshot()).toEqual({
-        maxConcurrent: 4,
-        defaultMaxTurns: 20,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 10,
         unconsumedSessionRetentionMinutes: 720,
         abortAllOnInterrupt: true,
@@ -1105,8 +892,6 @@ describe("SettingsManager", () => {
       sm.unconsumedSessionRetentionMinutes = 1440;
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 30,
         unconsumedSessionRetentionMinutes: 1440,
         abortAllOnInterrupt: true,
@@ -1123,8 +908,6 @@ describe("SettingsManager", () => {
       sm.toggleAbortAllOnInterrupt();
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 10,
         unconsumedSessionRetentionMinutes: 720,
         abortAllOnInterrupt: false,
@@ -1140,8 +923,6 @@ describe("SettingsManager", () => {
       });
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 10,
         unconsumedSessionRetentionMinutes: 720,
         abortAllOnInterrupt: true,
@@ -1157,8 +938,6 @@ describe("SettingsManager", () => {
       });
       expect(sm.snapshot()).toEqual({
         maxConcurrent: 4,
-        defaultMaxTurns: 0,
-        wrapUpTurns: 2,
         consumedSessionRetentionMinutes: 10,
         unconsumedSessionRetentionMinutes: 720,
         abortAllOnInterrupt: true,
@@ -1198,14 +977,12 @@ describe("SettingsManager", () => {
       });
       sm.load();
 
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(settingsPath, "utf-8"));
       expect(written).toEqual(
         toSharedStore({
-          maxConcurrent: 4,
-          defaultMaxTurns: 0,
-          wrapUpTurns: 7,
+          maxConcurrent: 7,
           consumedSessionRetentionMinutes: 10,
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: true,
@@ -1234,14 +1011,12 @@ describe("SettingsManager", () => {
       });
       sm.load();
 
-      sm.applyWrapUpTurns(7);
+      sm.applyMaxConcurrent(7);
 
       const written = JSON.parse(readFileSync(settingsPath, "utf-8"));
       expect(written).toEqual(
         toSharedStore({
-          maxConcurrent: 4,
-          defaultMaxTurns: 0,
-          wrapUpTurns: 7,
+          maxConcurrent: 7,
           consumedSessionRetentionMinutes: 10,
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: true,
@@ -1273,8 +1048,6 @@ describe("SettingsManager", () => {
       expect(written).toEqual(
         toSharedStore({
           maxConcurrent: 5,
-          defaultMaxTurns: 0,
-          wrapUpTurns: 2,
           consumedSessionRetentionMinutes: 10,
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: true,
@@ -1290,13 +1063,11 @@ describe("SettingsManager", () => {
         cwd: projectDir,
         agentDir: "/nonexistent",
       });
-      sm.wrapUpTurns = 3;
-      sm.saveAndNotify("Wrap-up turns set to 3");
+      sm.maxConcurrent = 8;
+      sm.saveAndNotify("Max concurrency set to 8");
       expect(emit).toHaveBeenCalledWith("subagents:settings_changed", {
         settings: {
-          maxConcurrent: 4,
-          defaultMaxTurns: 0,
-          wrapUpTurns: 3,
+          maxConcurrent: 8,
           consumedSessionRetentionMinutes: 10,
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: true,
@@ -1339,8 +1110,6 @@ describe("SettingsManager", () => {
         expect(emit).toHaveBeenCalledWith("subagents:settings_changed", {
           settings: {
             maxConcurrent: 4,
-            defaultMaxTurns: 0,
-            wrapUpTurns: 2,
             consumedSessionRetentionMinutes: 10,
             unconsumedSessionRetentionMinutes: 720,
             abortAllOnInterrupt: true,
@@ -1408,55 +1177,6 @@ describe("SettingsManager", () => {
       });
       expect(() => sm.applyMaxConcurrent(6)).not.toThrow();
       expect(sm.maxConcurrent).toBe(6);
-    });
-  });
-
-  describe("applyDefaultMaxTurns()", () => {
-    let projectDir: string;
-
-    beforeEach(() => {
-      projectDir = mkdtempSync(join(tmpdir(), "pi-sm-apply-dmt-"));
-    });
-
-    afterEach(() => {
-      rmSync(projectDir, { recursive: true, force: true });
-    });
-
-    it("sets to unlimited when 0 is passed and reports 'unlimited' in toast", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-      });
-      const toast = sm.applyDefaultMaxTurns(0);
-      expect(sm.defaultMaxTurns).toBeUndefined();
-      expect(toast).toEqual({
-        message: "Default max turns set to unlimited",
-        level: "info",
-      });
-    });
-
-    it("sets to the given value and includes it in the toast", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-      });
-      const toast = sm.applyDefaultMaxTurns(10);
-      expect(sm.defaultMaxTurns).toBe(10);
-      expect(toast.message).toBe("Default max turns set to 10");
-    });
-
-    it("does not call onMaxConcurrentChanged", () => {
-      const onChanged = vi.fn();
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-        onMaxConcurrentChanged: onChanged,
-      });
-      sm.applyDefaultMaxTurns(5);
-      expect(onChanged).not.toHaveBeenCalled();
     });
   });
 
@@ -1538,55 +1258,6 @@ describe("SettingsManager", () => {
       });
       sm.applyConsumedSessionRetentionMinutes(30);
       sm.applyUnconsumedSessionRetentionMinutes(1440);
-      expect(onChanged).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("applyWrapUpTurns()", () => {
-    let projectDir: string;
-
-    beforeEach(() => {
-      projectDir = mkdtempSync(join(tmpdir(), "pi-sm-apply-gt-"));
-    });
-
-    afterEach(() => {
-      rmSync(projectDir, { recursive: true, force: true });
-    });
-
-    it("sets wrapUpTurns and reports the post-normalization value in toast", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-      });
-      const toast = sm.applyWrapUpTurns(3);
-      expect(sm.wrapUpTurns).toBe(3);
-      expect(toast).toEqual({
-        message: "Wrap-up turns set to 3",
-        level: "info",
-      });
-    });
-
-    it("normalizes 0 to 1 and reports the post-normalization value in toast", () => {
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-      });
-      const toast = sm.applyWrapUpTurns(0);
-      expect(sm.wrapUpTurns).toBe(1);
-      expect(toast.message).toBe("Wrap-up turns set to 1");
-    });
-
-    it("does not call onMaxConcurrentChanged", () => {
-      const onChanged = vi.fn();
-      const sm = new SettingsManager({
-        emit: vi.fn(),
-        cwd: projectDir,
-        agentDir: "/nonexistent",
-        onMaxConcurrentChanged: onChanged,
-      });
-      sm.applyWrapUpTurns(5);
       expect(onChanged).not.toHaveBeenCalled();
     });
   });
@@ -1728,8 +1399,6 @@ describe("SettingsManager", () => {
       expect(emit).toHaveBeenCalledWith("subagents:settings_changed", {
         settings: {
           maxConcurrent: 4,
-          defaultMaxTurns: 0,
-          wrapUpTurns: 2,
           consumedSessionRetentionMinutes: 10,
           unconsumedSessionRetentionMinutes: 720,
           abortAllOnInterrupt: false,

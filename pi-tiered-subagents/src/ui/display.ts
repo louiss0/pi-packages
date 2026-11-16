@@ -12,14 +12,12 @@ import type {
   AgentStatus,
   InvocationTags,
   ModelIdentity,
-  TurnBudget,
 } from "./view-types.js";
 
 export type {
   AgentDefinitionLookup,
   InvocationTags,
   ModelIdentity,
-  TurnBudget,
 } from "./view-types.js";
 
 // ---- Types ----
@@ -48,8 +46,6 @@ export type AgentDetails = Readonly<{
   tags?: ReadonlyArray<string>;
   agentId?: string;
   error?: string;
-  /** The run's turn budget; absent until its turn loop starts. */
-  turnBudget?: TurnBudget;
 }>;
 
 // ---- Constants ----
@@ -111,13 +107,6 @@ export function formatSessionTokens(
   return `${tokenStr} ${theme.fg("dim", "(")}${annot.join(sep)}${theme.fg("dim", ")")}`;
 }
 
-/** Format a turn budget as turns used against the ceiling: "↻5≤30", or "↻5" when unlimited. */
-export function formatTurnBudget(budget: TurnBudget): string {
-  return budget.maxTurns != null
-    ? `${GLYPHS.turns}${budget.used}≤${budget.maxTurns}`
-    : `${GLYPHS.turns}${budget.used}`;
-}
-
 /** Format milliseconds as human-readable duration. */
 export function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
@@ -169,8 +158,6 @@ export function buildInvocationTags(invocation: InvocationTags | undefined): {
   if (invocation.thinking) tags.push(`thinking: ${invocation.thinking}`);
   if (invocation.inheritContext) tags.push("inherit context");
   if (invocation.runInBackground) tags.push("background");
-  if (invocation.maxTurns != null)
-    tags.push(`max turns: ${invocation.maxTurns}`);
   return { tags };
 }
 

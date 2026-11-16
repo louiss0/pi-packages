@@ -241,9 +241,6 @@ function assembleWithDefinition(
   // Thinking level: explicit option > agent config > undefined (inherit)
   const thinkingLevel = options.thinkingLevel ?? definition.thinking;
 
-  // The turn ceiling is not resolved here: the door decided it, once, from the
-  // request, the definition, and the operator's captured default. The assembler
-  // must not merge a second policy or read a default of its own.
   return {
     effectiveCwd,
     systemPrompt,

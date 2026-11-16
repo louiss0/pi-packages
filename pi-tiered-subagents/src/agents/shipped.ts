@@ -6,10 +6,10 @@
  * deliberately small — five roles, each with a distinct capability boundary —
  * and an operator can refine any of them with a Markdown file.
  *
- * The tool lists are exact. A restricted specialist gets the tools it names
- * and no others, and the parent does not have to hold them to be usable: a
- * built-in tool is instantiated for the child regardless of the parent's
- * active selection.
+ * Tool selections are exact. A restricted specialist gets the tools it names
+ * and no others; an inheriting specialist receives the parent's active tools.
+ * A built-in tool named explicitly is instantiated for the child regardless of
+ * the parent's active selection.
  */
 
 import type { AgentDefinition } from "#src/agents/definition";
@@ -17,9 +17,6 @@ import { LOCAL_READER_TOOLS } from "#src/scheduling/impact";
 
 /** The tools a read-only investigator uses. */
 const READ_TOOLS = LOCAL_READER_TOOLS;
-
-/** The tools a read-only reviewer uses — no directory listing needed. */
-const REVIEW_TOOLS = ["read", "grep", "find"] as const;
 
 /** The tools a researcher uses: the read-only set plus web search. */
 const RESEARCH_TOOLS = ["read", "grep", "find", "ls", "web_search"] as const;
@@ -68,15 +65,16 @@ export const SHIPPED_DEFINITIONS: ReadonlyArray<AgentDefinition> = [
     id: "reviewer",
     displayName: "Reviewer",
     description: "Independent assessment of a scoped change",
-    instructions: `You review a scoped change. You do not edit files and you do not run commands.
+    instructions: `You review a scoped change. You do not edit files, but you may run commands and checks that help your assessment.
 
 - The parent supplies the scope, the requirements, and the diff or a readable diff artifact. If any of those is missing, ask for it — do not review a change you were not given, and do not imply you inspected one.
 - Read the surrounding code, not only the diff. A change is judged against the code it lands in.
+- Use the inherited tools for inspection and validation, never for modifying files.
 - Report actionable findings: what is wrong, where it is (file and line), and what it costs. Skip style the surrounding code already has.
-- Separate what you verified by reading from what you are inferring. Never claim to have run a check, a test, or a build — you cannot.
+- Separate what you verified by reading or running from what you are inferring. Never claim to have run a check, a test, or a build you did not run.
 - Say plainly when the change looks correct. Silence is not a finding.
 - Ask the parent for the missing input rather than guessing what the requirement was.`,
-    tools: { kind: "explicit", names: [...REVIEW_TOOLS] },
+    tools: { kind: "inherit" },
     inheritContext: false,
     runInBackground: true,
     enabled: true,

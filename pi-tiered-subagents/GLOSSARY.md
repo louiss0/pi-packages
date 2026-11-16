@@ -61,13 +61,15 @@ specialist.
 
 A model series the package can read: `gpt`, `claude`, `gemini`, `glm`,
 `minimax`, `qwen`, `deepseek`, `mimo`. A family has a **naming structure**
-(how its ids are written) and, usually, a **ladder** (the profile data).
+(how its ids are written) and, usually, a **ladder** (the profile data). The
+`gemini` family supports only chemical tiers; Pro and Flash IDs are unclaimed
+and retained.
 
 ## Group
 
-The routing vocabulary a family uses: **size** (`gpt`, `claude`, `qwen`) or
-**planner-worker** (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`). Each family
-belongs to exactly one group.
+The routing vocabulary a family uses: **size** (`gpt`, `claude`, `gemini`,
+`qwen`) or **planner-worker** (`minimax`, `glm`, `mimo`, `deepseek`). Each
+family belongs to exactly one group.
 
 ## Size
 
@@ -109,20 +111,29 @@ target, or an unknown family, retains the parent.
 ## Reasoning level
 
 The effort a child reasons at, chosen after the model: the request's level,
-then the definition's, then automatic selection. With known parent effort,
-automatic selection takes the next supported non-off rung below it, staying
-at the floor; without parent effort, it prefers **medium**, then **low**, then
-the lowest supported non-off level. This includes retained models. Unsupported
-explicit levels are clamped; a non-reasoning model has no applicable level.
+then the definition's, then automatic selection. Automatic selection uses the
+**upper median** of the child model's supported non-off levels, independent of
+parent effort and including retained models. With an even number of levels, the
+higher middle rung wins. Unsupported explicit levels are clamped; a
+non-reasoning model has no applicable level.
 
 ## Parent snapshot
 
 The parent's owned state captured when a request is made: model identity and
 capabilities, reasoning effort, active and registered tool names, working
-directory, session identity, portable prompt inputs, and the conversation when
-the child is to inherit it. Launch-shaping settings are captured with it. A
-queued child uses these copied values, not the parent as it is when the child's
-slot opens; no live model registry or SDK session is part of the snapshot.
+directory, session identity, portable prompt inputs, and the inherited context
+branch when the child is to inherit it. Launch-shaping settings are captured
+with it. A queued child uses these copied values, not the parent as it is when
+the child's slot opens; no live model registry or SDK session is part of the
+snapshot.
+
+## Inherited context
+
+The completed portion of the parent's conversation branch captured for a child
+that opts into context inheritance, excluding the uncommitted parent turn step
+that requested the child and any parent-bound reasoning signatures. The child
+reasons over this history as prior conversation, while its own transcript and
+reported output expose only the turns the child itself produced.
 
 ## Definition catalog
 
@@ -146,9 +157,9 @@ must recover by parsing prose.
 
 The complete execution decision produced by preparation: the selected
 definition, exact capabilities, captured parent inputs, model and reasoning
-decisions, final turn policy, and child-shaping settings. Acceptance transfers
-this plan to the session runtime. Later file or setting edits affect future
-requests, not an accepted plan.
+decisions, and child-shaping settings. Acceptance transfers this plan to the
+session runtime. Later file or setting edits affect future requests, not an
+accepted plan.
 
 ## Launch acceptance
 

@@ -26,7 +26,6 @@ import {
   SubagentManager,
   type SubagentManagerObserver,
 } from "#src/lifecycle/subagent-manager";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import type { SubagentsDriver } from "#test/helpers/subagents-driver-types";
 import { SubagentsTestDriver } from "#test/helpers/subagents-driver";
@@ -196,7 +195,14 @@ export async function createSubagentsHarness(
     },
     captureLaunchInputs: () => ({
       snapshot: STUB_SNAPSHOT,
-      parentContext: "parent conversation",
+      parentBranch: [
+        {
+          type: "message",
+          id: "e1",
+          parentId: null,
+          message: { role: "user", content: "parent conversation" },
+        },
+      ],
       parentSession: {
         parentSessionFile: "/sessions/parent.jsonl",
         parentSessionId: "session-1",
@@ -211,10 +217,6 @@ export async function createSubagentsHarness(
       return registry.currentScopes();
     },
     modelInfo: options.modelInfo ?? defaultModelInfo,
-    turnSettings: () => ({
-      defaultMaxTurns: undefined,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-    }),
     childShaping: () => ({
       midRunUpdates: options.midRunUpdates ?? true,
       excludedExtensionPackages: [],

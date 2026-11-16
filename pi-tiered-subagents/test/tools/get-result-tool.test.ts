@@ -622,7 +622,6 @@ describe("createGetResultTool — progress", () => {
       startedAt: 1000,
       lastProgressAt: 8000,
       activeTools: ["bash"],
-      turnBudget: { used: 7, phase: "within" },
     });
 
     const result = await execute(makeManager(new Map([["agent-1", record]])), {
@@ -630,7 +629,7 @@ describe("createGetResultTool — progress", () => {
     });
 
     expect(textOf(result)).toContain(
-      "\nProgress: running command\u2026 | Turns: 7 | Last progress: 72.0s ago\n",
+      "\nProgress: running command\u2026 | Last progress: 72.0s ago\n",
     );
   });
 
@@ -934,22 +933,6 @@ describe("createGetResultTool — TUI rendering", () => {
   });
 
   describe("details payload", () => {
-    it("carries the run's turn budget and names its wrap-up in the report", async () => {
-      const turnBudget = { maxTurns: 2, used: 3, phase: "warned" } as const;
-      const records = new Map([
-        ["agent-1", createTestSubagent({ turnBudget })],
-      ]);
-
-      const result = await execute(makeManager(records), {
-        agent_id: "agent-1",
-      });
-
-      expect(result.details?.turnBudget).toEqual(turnBudget);
-      expect(textOf(result)).toContain(
-        "Status: completed (wrapped up \u2014 after turn-budget warning) |",
-      );
-    });
-
     it("carries a preview bounded well below the result it summarises", async () => {
       const records = new Map([
         ["agent-1", createTestSubagent({ result: longResult(200) })],

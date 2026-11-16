@@ -118,7 +118,6 @@ try {
       },
       type: "fixture",
       toolNames: ["list_mcp_resources", "read_mcp_resource"],
-      turnPolicy: { kind: "unlimited" },
     },
     deps,
   );

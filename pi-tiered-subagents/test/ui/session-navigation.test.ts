@@ -235,6 +235,70 @@ describe("fileSnapshotSource", () => {
     ]);
   });
 
+  it("omits inherited parent entries before the subagents:fork-boundary marker", async () => {
+    const forkedJsonl = [
+      {
+        type: "session",
+        version: 3,
+        id: "s1",
+        timestamp: "2026-06-23T00:00:00Z",
+        cwd: "/proj",
+      },
+      {
+        type: "message",
+        id: "p1",
+        parentId: null,
+        timestamp: "2026-06-23T00:00:01Z",
+        message: { role: "user", content: "parent question" },
+      },
+      {
+        type: "message",
+        id: "p2",
+        parentId: "p1",
+        timestamp: "2026-06-23T00:00:02Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "parent answer" }],
+        },
+      },
+      {
+        type: "custom",
+        customType: "subagents:fork-boundary",
+        id: "fork-1",
+        parentId: "p2",
+        timestamp: "2026-06-23T00:00:03Z",
+      },
+      {
+        type: "message",
+        id: "c1",
+        parentId: "fork-1",
+        timestamp: "2026-06-23T00:00:04Z",
+        message: { role: "user", content: "child task" },
+      },
+      {
+        type: "message",
+        id: "c2",
+        parentId: "c1",
+        timestamp: "2026-06-23T00:00:05Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "child result" }],
+        },
+      },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join("\n");
+
+    const source = await fileSnapshotSource(
+      "/tasks/forked.jsonl",
+      () => forkedJsonl,
+    );
+    expect(source.getMessages()).toEqual([
+      { role: "user", content: "child task" },
+      { role: "assistant", content: [{ type: "text", text: "child result" }] },
+    ]);
+  });
+
   it("is a static snapshot: no subscription, no streaming, no tool definitions", async () => {
     const source = await fileSnapshotSource(
       "/tasks/agent.jsonl",

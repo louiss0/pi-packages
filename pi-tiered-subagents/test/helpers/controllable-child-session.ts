@@ -11,8 +11,7 @@
  *   test settles it, and `pauseCreation()` holds a child unborn, so no test
  *   needs an arbitrary sleep to observe queued/running state.
  * - **settle / fail**: `run.settle(text)` completes a run with its answer,
- *   `run.settleExhausted(text)` ends it at the turn ceiling, `run.fail(err)`
- *   ends it in an execution failure.
+ *   `run.fail(err)` ends it in an execution failure.
  * - **steer**: every delivered steer is recorded on `child.steered`.
  * - **cancel**: through the run's real abort lever (`run.signal`). The default
  *   mirrors the real session — the loop returns once the lever fires — and
@@ -41,11 +40,6 @@ import type {
   TurnLoopOptions,
   TurnLoopResult,
 } from "#src/lifecycle/subagent-session";
-import type {
-  TurnBudget,
-  TurnBudgetPhase,
-  TurnPolicy,
-} from "#src/lifecycle/turn-limits";
 import type { SessionStatsLike } from "#src/lifecycle/usage";
 
 // ── One controllable run ──────────────────────────────────────────────────────
@@ -56,46 +50,21 @@ export interface ControllableRun {
   readonly prompt: string;
   /** The run's own abort lever, handed to the loop by the record. */
   readonly signal: AbortSignal | undefined;
-  /** Every budget the loop reported, in order: the initial state, then each advance. */
-  readonly budgets: readonly TurnBudget[];
   /** Settles (never rejects) when the loop settles, either way. */
   readonly settled: Promise<void>;
-  /** Count a turn and report the budget it left, as a real turn boundary would. */
-  advanceTurn(): void;
   /** Resolve the loop with the run's final answer (default "done"). */
   settle(responseText?: string): void;
-  /** Resolve the loop as a run the harness stopped at its turn ceiling. */
-  settleExhausted(responseText?: string): void;
   /** Reject the loop: the run ends in an execution failure. */
   fail(error: unknown): void;
   /** Fire the run's cancellation lever, if it has one. */
   cancel(): void;
 }
 
-/** The initial budget a run reports, derived from the child's captured policy. */
-function initialBudget(policy: TurnPolicy): TurnBudget {
-  return policy.kind === "limited"
-    ? { maxTurns: policy.maxTurns, used: 0, phase: "within" }
-    : { used: 0, phase: "within" };
-}
-
 function createControllableRun(
   prompt: string,
   opts: TurnLoopOptions,
-  policy: TurnPolicy,
   settleOnAbort: boolean,
 ): { run: ControllableRun; loop: Promise<TurnLoopResult> } {
-  // A fresh counter per run, as the real session's per-run budget tracker: a
-  // resume keeps the policy and starts over (story 74).
-  let budget = initialBudget(policy);
-  const budgets: TurnBudget[] = [];
-  const reportBudget = (): void => {
-    budgets.push(budget);
-    opts.onTurnBudget?.(budget);
-  };
-  // The real loop states the budget before the first turn.
-  reportBudget();
-
   const signal = opts.signal;
   // A lever that already fired takes no turn and has no answer, exactly as the
   // real promptForAnswer returns without prompting.
@@ -103,18 +72,12 @@ function createControllableRun(
     const run: ControllableRun = {
       prompt,
       signal,
-      budgets,
       settled: Promise.resolve(),
-      advanceTurn: () => {},
       settle: () => {},
-      settleExhausted: () => {},
       fail: () => {},
       cancel: () => {},
     };
-    return {
-      run,
-      loop: Promise.resolve({ responseText: "", turnBudget: budget }),
-    };
+    return { run, loop: Promise.resolve({ responseText: "" }) };
   }
 
   const outcome = Promise.withResolvers<TurnLoopResult>();
@@ -129,17 +92,11 @@ function createControllableRun(
   // a one-shot listener alone would leak when the run settles first.
   signal?.addEventListener("abort", onAbort, { once: true });
 
-  const finish = (responseText: string, phase?: TurnBudgetPhase): void => {
+  const finish = (responseText: string): void => {
     if (isSettled) return;
     isSettled = true;
     signal?.removeEventListener("abort", onAbort);
-    if (phase) {
-      budget = { ...budget, phase };
-      // The real tracker reports the final phase through the budget channel,
-      // so the record's budget reads exhausted, not only the loop result.
-      reportBudget();
-    }
-    outcome.resolve({ responseText, turnBudget: budget });
+    outcome.resolve({ responseText });
   };
   const failWith = (error: unknown): void => {
     if (isSettled) return;
@@ -151,19 +108,12 @@ function createControllableRun(
   const run: ControllableRun = {
     prompt,
     signal,
-    budgets,
     // Never rejects: a waiter learns the loop ended, not how.
     settled: outcome.promise.then(
       () => undefined,
       () => undefined,
     ),
-    advanceTurn(): void {
-      if (isSettled) return;
-      budget = { ...budget, used: budget.used + 1 };
-      reportBudget();
-    },
     settle: (responseText = "done") => finish(responseText),
-    settleExhausted: (responseText = "") => finish(responseText, "exhausted"),
     fail: failWith,
     cancel: onAbort,
   };
@@ -178,7 +128,7 @@ export interface ControllableChild {
   readonly session: ChildSession;
   /**
    * The params the factory was called with — the prepared launch as the child
-   * adapter actually received it (definition, turn policy, exact tool names).
+   * adapter actually received it (definition, exact tool names).
    */
   readonly params: CreateSubagentSessionParams;
   /** One entry per turn loop: the initial run, then one per resume. */
@@ -241,12 +191,7 @@ function createControllableChild(
       prompt: string,
       opts: TurnLoopOptions,
     ): Promise<TurnLoopResult> {
-      const { run, loop } = createControllableRun(
-        prompt,
-        opts,
-        params.turnPolicy,
-        settleOnAbort,
-      );
+      const { run, loop } = createControllableRun(prompt, opts, settleOnAbort);
       runs.push(run);
       notifyRunStarted();
       return loop;

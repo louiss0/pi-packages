@@ -15,8 +15,6 @@
  * extensions did or did not install.
  */
 
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
-
 /** Emitted at the start of a child run, before the session is created. */
 export const SUBAGENT_CHILD_SPAWNING = "subagents:child:spawning";
 
@@ -69,8 +67,6 @@ export type ChildBoundEvent = {
 export type ChildCompletedEvent = {
   sessionDir: string;
   agentName: string;
-  /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget;
 };
 
 /** Payload for `subagents:child:disposed`. */

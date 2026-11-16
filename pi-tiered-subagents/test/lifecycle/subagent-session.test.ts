@@ -15,23 +15,14 @@ import { defined } from "#src/optional";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubagentSession } from "#src/lifecycle/subagent-session";
-import { type TurnPolicy } from "#src/lifecycle/turn-limits";
 import {
   createChildLifecycleMock,
   createFactorySession,
 } from "#test/helpers/subagent-session-io";
 import { childCompletedEvent } from "#test/helpers/turn-loop-result";
-import { UNLIMITED_TURNS as UNLIMITED } from "#test/helpers/turn-policy";
 
 // ── Session mock factory ───────────────────────────────────────────────────────
 
-/**
- * The shared factory session, plus the facets a turn loop reads that it lacks:
- * a `prompt()` that appends a final assistant message, the turn-budget warning
- * channel, and token statistics. Its `emit` drives the session's events, and
- * its subscriptions have real removers, so `listenerCount()` pins whether one
- * the session owns for its whole life is released.
- */
 function createSession(finalText: string) {
   const base = createFactorySession();
   const session = {
@@ -39,12 +30,6 @@ function createSession(finalText: string) {
     prompt: vi.fn(async (): Promise<void> => {
       base.messages.push(assistantMessage(finalText));
     }),
-    sendCustomMessage: vi.fn(
-      (
-        _message: unknown,
-        _options?: { triggerTurn?: boolean },
-      ): Promise<void> => Promise.resolve(),
-    ),
     getSessionStats: vi.fn(() => ({
       tokens: { input: 100, output: 50, cacheWrite: 10 },
       contextUsage: { percent: 42 },
@@ -55,65 +40,6 @@ function createSession(finalText: string) {
 
 type TestSession = ReturnType<typeof createSession>["session"];
 
-/**
- * How one turn ended, as Pi's `turn_end` reports it: the assistant message's
- * `stopReason` and how many tool results the turn produced. The default is a
- * successful turn that ran a tool, so the agent loop would continue.
- */
-interface TurnSpec {
-  stopReason?: string;
-  toolResults?: number;
-}
-
-function emitTurnStart(session: TestSession) {
-  session.emit({ type: "turn_start" });
-}
-
-function emitTurnEnd(
-  session: TestSession,
-  { stopReason = "toolUse", toolResults = 1 }: TurnSpec = {},
-) {
-  session.emit({
-    type: "turn_end",
-    message: { role: "assistant", stopReason },
-    toolResults: Array.from({ length: toolResults }, () => ({
-      role: "toolResult",
-    })),
-  });
-}
-
-/**
- * Program session.prompt to run turns, each a `turn_start` then a `turn_end`,
- * then settle the run with a final assistant message. A number runs that many
- * default turns; an array spells out how each turn ended. The turns are the
- * meaningful input that drives the boundary each turn-limit test asserts on.
- *
- * A session abort ends the run the way Pi's does: no further turn completes.
- */
-function programTurns(
-  session: TestSession,
-  turns: number | TurnSpec[],
-  finalText = "done",
-) {
-  const specs =
-    typeof turns === "number"
-      ? Array.from({ length: turns }, (): TurnSpec => ({}))
-      : turns;
-  session.prompt = vi.fn(async () => {
-    for (const spec of specs) {
-      if (session.abort.mock.calls.length > 0) break;
-      emitTurnStart(session);
-      emitTurnEnd(session, spec);
-    }
-    session.messages.push(assistantMessage(finalText));
-  });
-}
-
-/**
- * An assistant message carrying one text block, as Pi appends it when a turn
- * settles. A `stopReason` is added only when given: the package's own fixtures
- * also model messages that carry none.
- */
 function assistantMessage(text: string, stopReason?: string) {
   return {
     role: "assistant",
@@ -122,14 +48,6 @@ function assistantMessage(text: string, stopReason?: string) {
   };
 }
 
-/**
- * The assistant message Pi appends when a provider fails a turn.
- *
- * Both SDK paths produce this shape: the agent loop returns the provider's
- * errored message, and `Agent.handleRunFailure` synthesises one with empty text
- * content. Neither throws, which is what made a failed turn indistinguishable
- * from a quiet one (#889).
- */
 function providerErrorMessage(errorMessage?: string) {
   return {
     ...assistantMessage("", "error"),
@@ -137,23 +55,8 @@ function providerErrorMessage(errorMessage?: string) {
   };
 }
 
-/**
- * Usage every real assistant message carries. `Agent.handleRunFailure` gives its
- * synthetic failure message `EMPTY_USAGE`, and `subscribeSubagentObserver` reads
- * `message.usage.input` unguarded, so an emitted `message_end` without this
- * field throws inside any fixture that wires a real Subagent over the session.
- */
 const EMPTY_USAGE = { input: 0, output: 0, cacheWrite: 0 };
 
-/**
- * Program session.prompt to settle the run by appending raw messages, emitting
- * the `message_end` the SDK emits for each one.
- *
- * Both halves are modelled deliberately: the event is what the session's own
- * listeners see, and the push is the agent state a later collaborator may
- * rewrite. A failure fixture that models only the state half cannot express a
- * turn whose error was stripped before the run settled (#898).
- */
 function programMessages(
   session: TestSession,
   messages: Array<Record<string, unknown>>,
@@ -169,15 +72,6 @@ function programMessages(
   });
 }
 
-/**
- * Program session.prompt to emit an errored `message_end` whose message never
- * reaches `session.messages`.
- *
- * This is the sequence Pi produces when a context overflow triggers recovery:
- * `_checkCompaction` removes the failed assistant message from agent state
- * before attempting compaction, and restores nothing when that attempt fails
- * (#898). The event is emitted before any of that runs.
- */
 function programStrippedFailure(session: TestSession, errorMessage: string) {
   session.prompt = vi.fn(async () => {
     session.emit({
@@ -187,7 +81,6 @@ function programStrippedFailure(session: TestSession, errorMessage: string) {
   });
 }
 
-/** Build a SubagentSession around a session stub with default meta. */
 function makeSubagentSession(
   session: TestSession,
   metaOverrides?: Partial<{
@@ -195,8 +88,6 @@ function makeSubagentSession(
     sessionId: string;
     sessionDir: string;
     agentName: string;
-    turnPolicy: TurnPolicy;
-    parentContext: string | undefined;
     lifecycle: ReturnType<typeof createChildLifecycleMock>;
   }>,
 ) {
@@ -208,12 +99,10 @@ function makeSubagentSession(
       sessionId: metaOverrides?.sessionId ?? "child-session-default",
       sessionDir: metaOverrides?.sessionDir ?? "/sessions/dir",
       agentName: metaOverrides?.agentName ?? "Explore",
-      turnPolicy: metaOverrides?.turnPolicy ?? UNLIMITED,
       lifecycle,
       outputFile: hasOutputFile
         ? metaOverrides.outputFile
         : "/sessions/child.jsonl",
-      parentContext: metaOverrides?.parentContext,
     }),
   );
   return { sub, lifecycle };
@@ -271,7 +160,7 @@ describe("SubagentSession — runTurnLoop response capture", () => {
     const { session } = createSession("LOCKED");
     const { sub } = makeSubagentSession(session);
     const result = await sub.runTurnLoop("Say LOCKED", {});
-    expect(result.responseText).toBe("LOCKED");
+    expect(result).toEqual({ responseText: "LOCKED" });
   });
 
   it("captures streamed text_delta events as the response", async () => {
@@ -289,173 +178,64 @@ describe("SubagentSession — runTurnLoop response capture", () => {
     });
     const { sub } = makeSubagentSession(session);
     const result = await sub.runTurnLoop("go", {});
-    expect(result.responseText).toBe("hello world");
+    expect(result).toEqual({ responseText: "hello world" });
   });
 
-  it("prepends parentContext to the prompt", async () => {
+  it("sends the prompt directly without any parent-context string prefix", async () => {
     const { session } = createSession("DONE");
-    const { sub } = makeSubagentSession(session, { parentContext: "CTX\n" });
+    const { sub } = makeSubagentSession(session);
     await sub.runTurnLoop("the task", {});
-    expect(session.prompt).toHaveBeenCalledWith("CTX\nthe task");
+    expect(session.prompt).toHaveBeenCalledWith("the task");
   });
 });
 
-describe("SubagentSession — runTurnLoop turn budget", () => {
-  describe("ceiling", () => {
-    it("stops the run after the ceiling turn when that turn ran tools", async () => {
-      const { session } = createSession("done");
-      programTurns(session, 5);
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(session.abort).toHaveBeenCalledOnce();
-      expect(result.turnBudget).toEqual({
-        maxTurns: 3,
-        used: 3,
-        phase: "exhausted",
-      });
-    });
+describe("SubagentSession — inherited fork boundary", () => {
+  it("excludes pre-existing inherited parent messages from messages, agentMessages, and getConversation", () => {
+    const { session } = createSession("X");
+    session.messages.push(
+      { role: "user", content: "parent question" },
+      assistantMessage("parent answer"),
+    );
 
-    it("lets a final answer on the ceiling turn end the run without a stop", async () => {
-      const { session } = createSession("done");
-      programTurns(session, [{}, {}, { stopReason: "stop", toolResults: 0 }]);
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(session.abort).not.toHaveBeenCalled();
-      expect(result.turnBudget).toEqual({
-        maxTurns: 3,
-        used: 3,
-        phase: "warned",
-      });
-    });
+    const { sub } = makeSubagentSession(session);
+    session.messages.push(
+      { role: "user", content: "child task" },
+      assistantMessage("child answer"),
+    );
 
-    it("stops a turn that starts past the ceiling", async () => {
-      const { session } = createSession("done");
-      // The ceiling turn answered, yet another turn starts (a steer queued on it).
-      session.prompt = vi.fn(async () => {
-        emitTurnStart(session);
-        emitTurnEnd(session);
-        emitTurnStart(session);
-        emitTurnEnd(session, { stopReason: "stop", toolResults: 0 });
-        emitTurnStart(session);
-      });
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 1 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(session.abort).toHaveBeenCalledOnce();
-      expect(result.turnBudget).toEqual({
-        maxTurns: 2,
-        used: 2,
-        phase: "exhausted",
-      });
-    });
-
-    it("does not count a turn whose response errored", async () => {
-      const { session } = createSession("done");
-      programTurns(session, [
-        {},
-        { stopReason: "error", toolResults: 0 },
-        { stopReason: "stop", toolResults: 0 },
-      ]);
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 1 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(result.turnBudget).toEqual({
-        maxTurns: 5,
-        used: 2,
-        phase: "within",
-      });
-    });
+    expect(sub.messages).toEqual([
+      { role: "user", content: "child task" },
+      assistantMessage("child answer"),
+    ]);
+    expect(sub.agentMessages).toEqual([
+      { role: "user", content: "child task" },
+      assistantMessage("child answer"),
+    ]);
+    const conv = sub.getConversation();
+    expect(conv).toContain("[User]: child task");
+    expect(conv).toContain("child answer");
+    expect(conv).not.toContain("parent question");
+    expect(conv).not.toContain("parent answer");
   });
 
-  describe("warning", () => {
-    it("warns with a context-only message once wrapUpTurns turns remain, never through a steer", async () => {
-      const { session } = createSession("done");
-      programTurns(session, [
-        {},
-        {},
-        {},
-        { stopReason: "stop", toolResults: 0 },
-      ]);
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(session.sendCustomMessage).toHaveBeenCalledOnce();
-      expect(session.sendCustomMessage).toHaveBeenCalledWith(
-        {
-          customType: "subagents:turn-budget-warning",
-          content:
-            "Turn budget: you have 2 turns left, including this one. The harness stops you after that. Finish your work and give your final answer within that budget.",
-          display: true,
-        },
-        { triggerTurn: false },
-      );
-      expect(session.steer).not.toHaveBeenCalled();
-      expect(result.turnBudget).toEqual({
-        maxTurns: 5,
-        used: 4,
-        phase: "warned",
-      });
-    });
+  it("does not fall back to an inherited parent assistant message when the child produced no text", async () => {
+    const { session } = createSession("unused");
+    session.messages.push(assistantMessage("parent answer before fork"));
+    session.prompt = vi.fn(async () => {});
 
-    it("states the budget before the first turn when every turn is a wrap-up turn", async () => {
-      const { session } = createSession("done");
-      programTurns(session, [{ stopReason: "stop", toolResults: 0 }]);
-      session.prompt.mockImplementationOnce(async () => {
-        expect(session.sendCustomMessage).toHaveBeenCalledOnce();
-        emitTurnStart(session);
-        emitTurnEnd(session, { stopReason: "stop", toolResults: 0 });
-      });
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 2 },
-      });
-      const result = await sub.runTurnLoop("go", {});
-      expect(session.sendCustomMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining("you have 2 turns left"),
-        }),
-        { triggerTurn: false },
-      );
-      expect(result.turnBudget).toEqual({
-        maxTurns: 2,
-        used: 1,
-        phase: "warned",
-      });
-    });
+    const { sub } = makeSubagentSession(session);
+    const result = await sub.runTurnLoop("go", {});
+
+    expect(result.responseText).toBe("");
   });
 
-  describe("reporting", () => {
-    it("reports the budget before the first turn and after each turn", async () => {
-      const { session } = createSession("done");
-      programTurns(session, 2);
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 4, wrapUpTurns: 2 },
-      });
-      const reports: unknown[] = [];
-      await sub.runTurnLoop("go", {
-        onTurnBudget: (budget) => reports.push(budget),
-      });
-      expect(reports).toEqual([
-        { maxTurns: 4, used: 0, phase: "within" },
-        { maxTurns: 4, used: 1, phase: "within" },
-        { maxTurns: 4, used: 2, phase: "warned" },
-      ]);
-    });
+  it("ignores an inherited parent assistant error that predates the child session", async () => {
+    const { session } = createSession("CHILD OK");
+    session.messages.push(providerErrorMessage("parent error before fork"));
 
-    it("counts an unlimited run's turns without warning or stopping it", async () => {
-      const { session } = createSession("done");
-      programTurns(session, 4);
-      const { sub } = makeSubagentSession(session);
-      const result = await sub.runTurnLoop("go", {});
-      expect(result.turnBudget).toEqual({ used: 4, phase: "within" });
-      expect(session.sendCustomMessage).not.toHaveBeenCalled();
-      expect(session.abort).not.toHaveBeenCalled();
+    const { sub } = makeSubagentSession(session);
+    await expect(sub.runTurnLoop("go", {})).resolves.toEqual({
+      responseText: "CHILD OK",
     });
   });
 });
@@ -464,7 +244,6 @@ describe("SubagentSession — runTurnLoop parent abort signal", () => {
   it("aborts the session when the parent signal fires mid-prompt", async () => {
     const controller = new AbortController();
     const { session } = createSession("X");
-    // prompt stays in flight until the parent signal aborts.
     session.prompt = vi.fn(
       () =>
         new Promise<void>((resolve) => {
@@ -503,26 +282,8 @@ describe("SubagentSession — runTurnLoop lifecycle events", () => {
       childCompletedEvent({
         sessionDir: "/d",
         agentName: "Explore",
-        turnBudget: { used: 0, phase: "within" },
       }),
     );
-  });
-
-  it("emits completed with the run's turn budget and no turn-limit flags", async () => {
-    const { session } = createSession("done");
-    programTurns(session, 3);
-    const { sub } = makeSubagentSession(session, {
-      sessionDir: "/d",
-      agentName: "Explore",
-      lifecycle,
-      turnPolicy: { kind: "limited", maxTurns: 5, wrapUpTurns: 2 },
-    });
-    await sub.runTurnLoop("go", {});
-    expect(lifecycle.completed).toHaveBeenCalledWith({
-      sessionDir: "/d",
-      agentName: "Explore",
-      turnBudget: { maxTurns: 5, used: 3, phase: "warned" },
-    });
   });
 
   it("releases its turn-outcome subscription on dispose", async () => {
@@ -586,9 +347,6 @@ describe("SubagentSession — runTurnLoop provider failures", () => {
     expect(lifecycle.completed).toHaveBeenCalledOnce();
   });
 
-  // The package's own fixtures push assistant messages carrying no stopReason
-  // at all, so an absent field must read as "not a failure" rather than being
-  // assumed present.
   it("resolves normally when the last assistant message carries no stopReason", async () => {
     const { session } = createSession("ALL DONE");
     const { sub } = makeSubagentSession(session, { lifecycle });
@@ -597,8 +355,6 @@ describe("SubagentSession — runTurnLoop provider failures", () => {
     expect(lifecycle.completed).toHaveBeenCalledOnce();
   });
 
-  // Pi removes a retried error from agent state before retrying, so an errored
-  // message that is no longer last is one the retry budget rescued.
   it("resolves normally when an errored turn was followed by a clean one", async () => {
     const { session } = createSession("unused");
     programMessages(session, [
@@ -611,11 +367,9 @@ describe("SubagentSession — runTurnLoop provider failures", () => {
     expect(lifecycle.completed).toHaveBeenCalledOnce();
   });
 
-  // The failure is read from the event stream rather than from session history,
-  // so a turn error Pi's overflow recovery already stripped still fails the run
-  // instead of reporting an earlier turn's work as the answer (#898).
   it("rejects when overflow recovery stripped the errored turn before the run settled", async () => {
     const { session } = createSession("unused");
+    const { sub } = makeSubagentSession(session, { lifecycle });
     session.messages.push(
       assistantMessage("work from an earlier turn", "stop"),
     );
@@ -623,15 +377,12 @@ describe("SubagentSession — runTurnLoop provider failures", () => {
       session,
       "prompt is too long: 210000 tokens > 200000 maximum",
     );
-    const { sub } = makeSubagentSession(session, { lifecycle });
     await expect(sub.runTurnLoop("go", {})).rejects.toThrow(
       "prompt is too long",
     );
     expect(lifecycle.completed).not.toHaveBeenCalled();
   });
 
-  // The other half of the same sequence: when the compaction succeeds, the
-  // continued turn emits its own clean message_end and the run recovered.
   it("resolves when overflow recovery stripped the errored turn and the retry succeeded", async () => {
     const { session } = createSession("unused");
     const recovered = assistantMessage("recovered", "stop");
@@ -665,25 +416,12 @@ describe("SubagentSession — a later run", () => {
     expect(session.prompt).toHaveBeenLastCalledWith("Continue");
     expect(result).toEqual({
       responseText: "RESUMED",
-      turnBudget: { used: 0, phase: "within" },
     });
   });
 
-  it("takes no parent-context prefix, which the first run already delivered", async () => {
-    const { session } = createSession("RESUMED");
-    const { sub } = makeSubagentSession(session, { parentContext: "CTX\n" });
-    await sub.runTurnLoop("go", {});
-    await sub.runTurnLoop("Continue", {});
-    expect(session.prompt).toHaveBeenNthCalledWith(1, "CTX\ngo");
-    expect(session.prompt).toHaveBeenLastCalledWith("Continue");
-  });
-
-  // The first run is the session's first call, whether or not it settled: a
-  // later run neither delivers the parent context again nor announces completion.
   it("stays a later run when the first run threw", async () => {
     const { session } = createSession("RESUMED");
     const { sub } = makeSubagentSession(session, {
-      parentContext: "CTX\n",
       lifecycle,
     });
     session.prompt.mockRejectedValueOnce(new Error("prompt failed"));
@@ -700,14 +438,10 @@ describe("SubagentSession — a later run", () => {
     const { sub } = makeSubagentSession(session, { lifecycle });
     await sub.runTurnLoop("go", {});
     await sub.runTurnLoop("Continue", {});
-    // Once, for the first run alone.
     expect(lifecycle.completed).toHaveBeenCalledOnce();
     expect(lifecycle.disposed).not.toHaveBeenCalled();
   });
 
-  // The same fail-open the initial run carried: a resume whose provider errors
-  // would otherwise be marked completed, carrying stale text from the turn
-  // before the failure (#889).
   it("rejects with the provider's error message when the resumed turn errored", async () => {
     const { session } = createSession("unused");
     const { sub } = makeSubagentSession(session);
@@ -720,10 +454,10 @@ describe("SubagentSession — a later run", () => {
 
   it("does not report an earlier turn's text as the resumed answer", async () => {
     const { session } = createSession("unused");
+    const { sub } = makeSubagentSession(session);
     session.messages.push(
       assistantMessage("work from the turn before the failure", "stop"),
     );
-    const { sub } = makeSubagentSession(session);
     await sub.runTurnLoop("go", {});
     programMessages(session, [providerErrorMessage("stream disconnected")]);
     await expect(sub.runTurnLoop("Continue", {})).rejects.toThrow(
@@ -733,10 +467,10 @@ describe("SubagentSession — a later run", () => {
 
   it("rejects when overflow recovery stripped the resumed turn's error", async () => {
     const { session } = createSession("unused");
+    const { sub } = makeSubagentSession(session);
     session.messages.push(
       assistantMessage("work from the turn before the failure", "stop"),
     );
-    const { sub } = makeSubagentSession(session);
     await sub.runTurnLoop("go", {});
     programStrippedFailure(session, "503 upstream unavailable");
     await expect(sub.runTurnLoop("Continue", {})).rejects.toThrow(
@@ -744,27 +478,23 @@ describe("SubagentSession — a later run", () => {
     );
   });
 
-  // `AgentSession.prompt()` resolves without running a turn when an extension
-  // command matches, when an `input` handler reports the prompt handled, or
-  // when the message is queued while streaming. A resume on an agent whose
-  // earlier run failed is not refused, so on those paths the session's own
-  // terminal state is the only answer available (#898).
-  it("rejects when the resume ran no turn and the session's last turn had errored", async () => {
+  it("rejects when the resume ran no turn and the child session's last turn had errored", async () => {
     const { session } = createSession("unused");
-    session.messages.push(providerErrorMessage("429 rate limit exceeded"));
-    session.prompt = vi.fn(async () => {});
     const { sub } = makeSubagentSession(session);
+    programMessages(session, [providerErrorMessage("429 rate limit exceeded")]);
+    await expect(sub.runTurnLoop("go", {})).rejects.toThrow(
+      "429 rate limit exceeded",
+    );
+
+    session.prompt = vi.fn(async () => {});
     await expect(sub.runTurnLoop("/skill:audit go", {})).rejects.toThrow(
       "429 rate limit exceeded",
     );
   });
 
-  // The composed case: the earlier run's failure was never in `session.messages`
-  // to begin with, because Pi's overflow recovery stripped it. A history read at
-  // the resume's start cannot see it either, so the outcome is tracked for the
-  // session's lifetime rather than re-derived per call (#898).
   it("rejects when a stripped earlier failure is followed by a resume that runs no turn", async () => {
     const { session } = createSession("unused");
+    const { sub } = makeSubagentSession(session);
     session.messages.push(
       assistantMessage("work from an earlier turn", "stop"),
     );
@@ -772,7 +502,6 @@ describe("SubagentSession — a later run", () => {
       session,
       "prompt is too long: 210000 tokens > 200000 maximum",
     );
-    const { sub } = makeSubagentSession(session);
     await expect(sub.runTurnLoop("go", {})).rejects.toThrow(
       "prompt is too long",
     );
@@ -785,12 +514,11 @@ describe("SubagentSession — a later run", () => {
 
   it("resolves when the resume's own turn succeeded after an earlier failure", async () => {
     const { session } = createSession("unused");
+    const { sub } = makeSubagentSession(session);
     session.messages.push(providerErrorMessage("429 rate limit exceeded"));
     programMessages(session, [assistantMessage("the second answer", "stop")]);
-    const { sub } = makeSubagentSession(session);
     await expect(sub.runTurnLoop("Continue", {})).resolves.toEqual({
       responseText: "the second answer",
-      turnBudget: { used: 0, phase: "within" },
     });
   });
 
@@ -800,57 +528,10 @@ describe("SubagentSession — a later run", () => {
     await sub.runTurnLoop("go", {});
     await expect(sub.runTurnLoop("Continue", {})).resolves.toEqual({
       responseText: "RESUMED",
-      turnBudget: { used: 0, phase: "within" },
     });
   });
 });
 
-describe("SubagentSession — a later run's turn budget", () => {
-  it("gives a resume a fresh budget with the original run's ceiling", async () => {
-    const { session } = createSession("done");
-    programTurns(session, 5);
-    const { sub } = makeSubagentSession(session, {
-      turnPolicy: { kind: "limited", maxTurns: 3, wrapUpTurns: 1 },
-    });
-    const first = await sub.runTurnLoop("go", {});
-    expect(first.turnBudget.phase).toBe("exhausted");
-
-    session.abort.mockClear();
-    programTurns(session, [{}, { stopReason: "stop", toolResults: 0 }]);
-    const reports: unknown[] = [];
-    const resumed = await sub.runTurnLoop("Continue", {
-      onTurnBudget: (budget) => reports.push(budget),
-    });
-    expect(reports[0]).toEqual({ maxTurns: 3, used: 0, phase: "within" });
-    expect(resumed.turnBudget).toEqual({
-      maxTurns: 3,
-      used: 2,
-      phase: "within",
-    });
-    expect(session.abort).not.toHaveBeenCalled();
-  });
-
-  it("stops a resume at the original run's ceiling", async () => {
-    const { session } = createSession("done");
-    programTurns(session, 1);
-    const { sub } = makeSubagentSession(session, {
-      turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 1 },
-    });
-    await sub.runTurnLoop("go", {});
-
-    programTurns(session, 4);
-    const resumed = await sub.runTurnLoop("Continue", {});
-    expect(session.abort).toHaveBeenCalledOnce();
-    expect(resumed.turnBudget).toEqual({
-      maxTurns: 2,
-      used: 2,
-      phase: "exhausted",
-    });
-  });
-});
-
-// Pi's AgentSession.abort() is a no-op with no run active, so aborting before
-// prompt() would not stop it: a loop whose signal already fired must not prompt.
 describe("SubagentSession — a turn loop whose signal already fired", () => {
   function firedSignal(): AbortSignal {
     const controller = new AbortController();
@@ -866,7 +547,6 @@ describe("SubagentSession — a turn loop whose signal already fired", () => {
       expect(session.prompt).not.toHaveBeenCalled();
       expect(result).toEqual({
         responseText: "",
-        turnBudget: { used: 0, phase: "within" },
       });
     });
 
@@ -882,18 +562,8 @@ describe("SubagentSession — a turn loop whose signal already fired", () => {
         childCompletedEvent({
           sessionDir: "/d",
           agentName: "Explore",
-          turnBudget: { used: 0, phase: "within" },
         }),
       );
-    });
-
-    it("sends no budget warning when every turn is a wrap-up turn", async () => {
-      const { session } = createSession("full answer");
-      const { sub } = makeSubagentSession(session, {
-        turnPolicy: { kind: "limited", maxTurns: 2, wrapUpTurns: 2 },
-      });
-      await sub.runTurnLoop("go", { signal: firedSignal() });
-      expect(session.sendCustomMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -905,23 +575,20 @@ describe("SubagentSession — a turn loop whose signal already fired", () => {
       const result = await sub.runTurnLoop("Continue", {
         signal: firedSignal(),
       });
-      // Prompted once, for the first run's answer; the resume took no turn.
       expect(session.prompt).toHaveBeenCalledOnce();
       expect(result).toEqual({
         responseText: "",
-        turnBudget: { used: 0, phase: "within" },
       });
     });
 
     it("resolves even when the previous run's last turn failed", async () => {
       const { session } = createSession("full answer");
-      session.messages.push(providerErrorMessage("401 invalid api key"));
       const { sub } = makeSubagentSession(session);
+      session.messages.push(providerErrorMessage("401 invalid api key"));
       await expect(
         sub.runTurnLoop("Continue", { signal: firedSignal() }),
       ).resolves.toEqual({
         responseText: "",
-        turnBudget: { used: 0, phase: "within" },
       });
     });
   });
@@ -939,9 +606,9 @@ describe("SubagentSession — steer", () => {
 describe("SubagentSession — delegate methods", () => {
   it("getConversation returns formatted text from session messages", () => {
     const { session } = createSession("X");
+    const { sub } = makeSubagentSession(session);
     session.messages.push({ role: "user", content: "Hello" });
     session.messages.push(assistantMessage("World"));
-    const { sub } = makeSubagentSession(session);
     const conv = sub.getConversation();
     expect(conv).toContain("[User]: Hello");
     expect(conv).toContain("[Assistant");
@@ -980,18 +647,18 @@ describe("SubagentSession — delegate methods", () => {
     expect(stats.tokens.input).toBe(100);
   });
 
-  it("messages returns the underlying session messages", () => {
+  it("messages returns the child's session messages", () => {
     const { session } = createSession("X");
-    session.messages.push({ role: "user", content: "hi" });
     const { sub } = makeSubagentSession(session);
-    expect(sub.messages).toBe(session.messages);
+    session.messages.push({ role: "user", content: "hi" });
+    expect(sub.messages).toEqual([{ role: "user", content: "hi" }]);
   });
 
-  it("agentMessages returns the underlying session messages typed", () => {
+  it("agentMessages returns the child's session messages typed", () => {
     const { session } = createSession("X");
-    session.messages.push({ role: "user", content: "hi" });
     const { sub } = makeSubagentSession(session);
-    expect(sub.agentMessages).toBe(session.messages);
+    session.messages.push({ role: "user", content: "hi" });
+    expect(sub.agentMessages).toEqual([{ role: "user", content: "hi" }]);
   });
 
   it("getToolDefinition delegates to the underlying session", () => {

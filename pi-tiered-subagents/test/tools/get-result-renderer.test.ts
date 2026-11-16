@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { merge, type Patch } from "#src/optional";
-import type { AgentStatus } from "#src/ui/view-types";
 import {
   type GetResultDetails,
   MAX_EXPANDED_LINES,
   renderGetResultLines,
 } from "#src/ui/get-result-renderer";
 import type { Theme } from "#src/ui/display";
+import type { AgentStatus } from "#src/ui/view-types";
 
 function makeTheme(): Theme {
   return {
@@ -271,16 +271,6 @@ describe("renderGetResultLines", () => {
       );
 
       expect(first?.startsWith(expected)).toBe(true);
-    });
-
-    it("leads with the warning glyph for a completed run the harness warned", () => {
-      const details = makeDetails({
-        status: "completed",
-        turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
-      });
-      const [first] = renderGetResultLines(details, "", false, theme);
-
-      expect(first?.startsWith("[warning:\u2713]")).toBe(true);
     });
   });
 });

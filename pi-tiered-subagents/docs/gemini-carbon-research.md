@@ -2,6 +2,13 @@
 
 Research checked against Google's primary sources on 2026-10-29. This is a research note, not an approved routing change.
 
+> **Implementation follow-up (2026-11-15):** the routing policy has since moved
+> beyond the implementation implications below. ADR 0018 established the
+> chemical mapping Krypton XL → Carbon L → Argon M → Hydrogen S. ADR 0020 then
+> removed Pro and Flash routing support entirely; those IDs are now retained.
+> This note's release research remains historical evidence, not current profile
+> documentation or an availability claim.
+
 ## Confirmed release facts
 
 - Google announced **Gemini 4 Carbon on October 28, 2026**, describing it as its strongest model, with improvements over Gemini 4 Argon in coding, long-horizon agentic work, and cybersecurity. Google reports AA Intelligence Index v5.0 scores of 59 for Carbon and 50 for Argon. These are Google's published results, not independently reproduced measurements. [Carbon announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-carbon/) and [Gemini comparison](https://deepmind.google/models/gemini/).

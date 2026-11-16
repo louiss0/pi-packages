@@ -1,8 +1,7 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { AgentStatus, TurnBudget } from "./view-types.js";
-import { formatMs, formatTokens, formatTurnBudget } from "./display.js";
+import type { AgentStatus } from "./view-types.js";
+import { formatMs, formatTokens } from "./display.js";
 import { GLYPHS } from "./glyphs.js";
-import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
 /** The completion facts this renderer reads; structurally supplied by the runtime. */
 export type NotificationDetails = Readonly<{
@@ -13,7 +12,6 @@ export type NotificationDetails = Readonly<{
   durationMs: number;
   outputFile?: string;
   resultPreview: string;
-  turnBudget?: TurnBudget;
 }>;
 
 /** A still-running child's message, independent of runtime notification delivery. */
@@ -37,7 +35,7 @@ export type StatusPresentation = Readonly<{
 
 /** Decide the icon and status label for a notification's status, once. */
 export function resolveStatusPresentation(
-  outcome: Pick<NotificationDetails, "status" | "turnBudget">,
+  outcome: Pick<NotificationDetails, "status">,
 ): StatusPresentation {
   if (
     outcome.status === "error" ||
@@ -49,22 +47,22 @@ export function resolveStatusPresentation(
       iconStyle: "error",
       statusText: outcome.status,
     };
-  const statusText = wrappedUpAtTurnLimit(outcome)
-    ? "completed (wrapped up)"
-    : "completed";
-  return { iconGlyph: GLYPHS.success, iconStyle: "success", statusText };
+  return {
+    iconGlyph: GLYPHS.success,
+    iconStyle: "success",
+    statusText: "completed",
+  };
 }
 
 /** Fields `buildStatsParts` reads from a `NotificationDetails`. */
 type StatsSource = Pick<
   NotificationDetails,
-  "turnBudget" | "toolUses" | "totalTokens" | "durationMs"
+  "toolUses" | "totalTokens" | "durationMs"
 >;
 
-/** Assemble the stats-line parts (turns, tool uses, tokens, duration), omitting zero fields. */
+/** Assemble the stats-line parts (tool uses, tokens, duration), omitting zero fields. */
 export function buildStatsParts(d: StatsSource): string[] {
   const parts: string[] = [];
-  if (d.turnBudget) parts.push(formatTurnBudget(d.turnBudget));
   if (d.toolUses > 0)
     parts.push(`${d.toolUses} tool use${d.toolUses === 1 ? "" : "s"}`);
   if (d.totalTokens > 0) parts.push(formatTokens(d.totalTokens));

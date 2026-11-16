@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-10-22
+superseded_by: 0013 and then 0017 for automatic reasoning policy
 ---
 
 # 0008 — The reasoning level follows the model

@@ -5,8 +5,6 @@ import { AgentRegistry } from "#src/agents/registry";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
 import { resolveSpawnConfig, type ModelInfo } from "#src/tools/spawn-config";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /** The registry with the shipped specialists and no files. */
 const testRegistry = new AgentRegistry(() => ({
@@ -58,11 +56,6 @@ function makeModelInfo(
   });
 }
 
-const defaultSettings = {
-  defaultMaxTurns: undefined as number | undefined,
-  wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-};
-
 /** The common parameters of a spawn request. */
 function params(overrides: Record<string, unknown> = {}) {
   return {
@@ -79,7 +72,6 @@ describe("resolveSpawnConfig — type resolution", () => {
       params({ subagent_type: "explore" }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     expect("error" in result && result.error).toBeFalsy();
     if ("error" in result) return;
@@ -92,7 +84,6 @@ describe("resolveSpawnConfig — type resolution", () => {
       params({ subagent_type: "unknown-type" }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     expect("error" in result).toBe(true);
     if (!("error" in result)) return;
@@ -105,7 +96,6 @@ describe("resolveSpawnConfig — type resolution", () => {
       params({ subagent_type: "explore" }),
       registry,
       makeModelInfo(),
-      defaultSettings,
     );
     expect("error" in result).toBe(true);
     if (!("error" in result)) return;
@@ -117,7 +107,6 @@ describe("resolveSpawnConfig — type resolution", () => {
       params({ subagent_type: "EXPLORE" }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.identity.subagentType).toBe("explore");
@@ -129,7 +118,6 @@ describe("resolveSpawnConfig — type resolution", () => {
       params({ subagent_type: "explore" }),
       registry,
       makeModelInfo(),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.identity.displayName).toBe("Scout");
@@ -146,7 +134,6 @@ describe("resolveSpawnConfig — model resolution", () => {
       params(),
       testRegistry,
       makeModelInfo({ parentModel }),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.modelIdentity).toEqual({
@@ -166,7 +153,6 @@ describe("resolveSpawnConfig — model resolution", () => {
           getAvailable: () => [],
         },
       }),
-      defaultSettings,
     );
     expect("error" in result && result.error).toBeTruthy();
   });
@@ -194,12 +180,7 @@ describe("resolveSpawnConfig — model label", () => {
     request: Record<string, unknown>,
     modelInfo: Parameters<typeof resolveSpawnConfig>[2],
   ) {
-    const result = resolveSpawnConfig(
-      params(request),
-      testRegistry,
-      modelInfo,
-      defaultSettings,
-    );
+    const result = resolveSpawnConfig(params(request), testRegistry, modelInfo);
     if ("error" in result) throw new Error(result.error);
     return result.presentation.detailBase.modelName;
   }
@@ -226,114 +207,12 @@ describe("resolveSpawnConfig — model label", () => {
   });
 });
 
-describe("resolveSpawnConfig — the turn policy", () => {
-  it("normalizes max_turns from params", () => {
-    const result = resolveSpawnConfig(
-      params({ max_turns: 10 }),
-      testRegistry,
-      makeModelInfo(),
-      defaultSettings,
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toEqual({
-      kind: "limited",
-      maxTurns: 10,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-    });
-  });
-
-  it("takes the definition's turn ceiling when the request names none", () => {
-    const registry = registryWith("worker", { maxTurns: 8 });
-    const result = resolveSpawnConfig(
-      params(),
-      registry,
-      makeModelInfo(),
-      defaultSettings,
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 8 });
-  });
-
-  it("lets the request win over the definition's turn ceiling", () => {
-    const registry = registryWith("worker", { maxTurns: 8 });
-    const result = resolveSpawnConfig(
-      params({ max_turns: 3 }),
-      registry,
-      makeModelInfo(),
-      defaultSettings,
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 3 });
-  });
-
-  it("uses settings defaultMaxTurns when no max_turns in params", () => {
-    const result = resolveSpawnConfig(params(), testRegistry, makeModelInfo(), {
-      defaultMaxTurns: 25,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-    });
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toMatchObject({ maxTurns: 25 });
-  });
-
-  it("resolves to unlimited when neither params nor settings specify", () => {
-    const result = resolveSpawnConfig(
-      params(),
-      testRegistry,
-      makeModelInfo(),
-      defaultSettings,
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toEqual({ kind: "unlimited" });
-  });
-
-  it("captures the wrap-up allowance with the ceiling", () => {
-    const result = resolveSpawnConfig(
-      params({ max_turns: 6 }),
-      testRegistry,
-      makeModelInfo(),
-      { defaultMaxTurns: undefined, wrapUpTurns: 4 },
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toEqual({
-      kind: "limited",
-      maxTurns: 6,
-      wrapUpTurns: 4,
-    });
-  });
-
-  it("honours a deliberately unlimited request over the operator's default", () => {
-    const result = resolveSpawnConfig(
-      params({ max_turns: 0 }),
-      testRegistry,
-      makeModelInfo(),
-      {
-        defaultMaxTurns: 25,
-        wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-      },
-    );
-    if ("error" in result) return;
-    expect(result.execution.turnPolicy).toEqual({ kind: "unlimited" });
-  });
-
-  it("advises when the ceiling was raised to the minimum", () => {
-    const result = resolveSpawnConfig(
-      params({ max_turns: 1 }),
-      testRegistry,
-      makeModelInfo(),
-      defaultSettings,
-    );
-    if ("error" in result) return;
-    expect(result.notes.join("\n")).toContain("below the minimum");
-  });
-});
-
 describe("resolveSpawnConfig — invocation fields", () => {
   it("sets runInBackground from params", () => {
     const result = resolveSpawnConfig(
       params({ run_in_background: true }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.runInBackground).toBe(true);
@@ -341,24 +220,14 @@ describe("resolveSpawnConfig — invocation fields", () => {
 
   it("takes the definition's background mode when the request names none", () => {
     const registry = registryWith("worker", { runInBackground: false });
-    const result = resolveSpawnConfig(
-      params(),
-      registry,
-      makeModelInfo(),
-      defaultSettings,
-    );
+    const result = resolveSpawnConfig(params(), registry, makeModelInfo());
     if ("error" in result) return;
     expect(result.execution.runInBackground).toBe(false);
   });
 
   it("takes the definition's conversation mode when the request names none", () => {
     const registry = registryWith("worker", { inheritContext: true });
-    const result = resolveSpawnConfig(
-      params(),
-      registry,
-      makeModelInfo(),
-      defaultSettings,
-    );
+    const result = resolveSpawnConfig(params(), registry, makeModelInfo());
     if ("error" in result) return;
     expect(result.execution.inheritContext).toBe(true);
   });
@@ -369,7 +238,6 @@ describe("resolveSpawnConfig — invocation fields", () => {
       params(),
       registry,
       makeModelInfo({ parentModel: makeReasoningModel() }),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.thinking).toBe("low");
@@ -381,7 +249,6 @@ describe("resolveSpawnConfig — invocation fields", () => {
       params({ thinking: "high" }),
       registry,
       makeModelInfo({ parentModel: makeReasoningModel() }),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.thinking).toBe("high");
@@ -393,7 +260,6 @@ describe("resolveSpawnConfig — invocation fields", () => {
       params(),
       registry,
       makeModelInfo({ parentModel: makeModel() }),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.execution.thinking).toBeUndefined();
@@ -405,7 +271,6 @@ describe("resolveSpawnConfig — invocation fields", () => {
       params({ thinking: "extreme" }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     expect("error" in result).toBe(true);
   });
@@ -414,10 +279,9 @@ describe("resolveSpawnConfig — invocation fields", () => {
 describe("resolveSpawnConfig — detailBase and tags", () => {
   it("builds detailBase with description from params", () => {
     const result = resolveSpawnConfig(
-      params({ description: "my task", turnPolicy: UNLIMITED_TURNS }),
+      params({ description: "my task" }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.presentation.detailBase.description).toBe("my task");
@@ -430,7 +294,6 @@ describe("resolveSpawnConfig — detailBase and tags", () => {
       params({ thinking: "high" }),
       testRegistry,
       makeModelInfo({ parentModel: makeReasoningModel() }),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.presentation.agentTags).toContain("thinking: high");
@@ -441,19 +304,13 @@ describe("resolveSpawnConfig — detailBase and tags", () => {
       params({ run_in_background: true }),
       testRegistry,
       makeModelInfo(),
-      defaultSettings,
     );
     if ("error" in result) return;
     expect(result.presentation.agentTags).toContain("background");
   });
 
   it("tags the background default the shipped specialists carry", () => {
-    const result = resolveSpawnConfig(
-      params(),
-      testRegistry,
-      makeModelInfo(),
-      defaultSettings,
-    );
+    const result = resolveSpawnConfig(params(), testRegistry, makeModelInfo());
     if ("error" in result) return;
     expect(result.presentation.agentTags).toEqual(["background"]);
   });

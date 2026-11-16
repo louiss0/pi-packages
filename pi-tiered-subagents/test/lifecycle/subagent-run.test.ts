@@ -2,7 +2,6 @@ import { defined } from "#src/optional";
 import { describe, expect, it, vi } from "vitest";
 import { SubagentRun } from "#src/lifecycle/subagent-run";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 
 const ALL_STATUSES: SubagentStatus[] = [
   "queued",
@@ -338,51 +337,6 @@ describe("SubagentRun", () => {
       const run = runIn("running");
       run.stopQueued(7000);
       expect([run.status, run.stoppedWhileQueued]).toEqual(["stopped", false]);
-    });
-  });
-
-  describe("turn budget", () => {
-    const WITHIN: TurnBudget = { maxTurns: 5, used: 1, phase: "within" };
-    const WARNED: TurnBudget = { maxTurns: 5, used: 3, phase: "warned" };
-    const EXHAUSTED: TurnBudget = { maxTurns: 5, used: 5, phase: "exhausted" };
-
-    it("has no budget until the run's turn loop reports one", () => {
-      expect(new SubagentRun("initial", true).turnBudget).toBeUndefined();
-    });
-
-    it("seeds the budget from init", () => {
-      expect(
-        new SubagentRun("initial", true, { turnBudget: WARNED }).turnBudget,
-      ).toEqual(WARNED);
-    });
-
-    it("records each budget the running turn loop reports", () => {
-      const run = runIn("running");
-      run.setTurnBudget(WITHIN);
-      expect(run.turnBudget).toEqual(WITHIN);
-      run.setTurnBudget(WARNED);
-      expect(run.turnBudget).toEqual(WARNED);
-    });
-
-    it("keeps the live budget through a terminal transition", () => {
-      const run = runIn("running");
-      run.setTurnBudget(EXHAUSTED);
-      run.markAborted("partial", 5000);
-      expect(run.turnBudget).toEqual(EXHAUSTED);
-    });
-
-    it("a stop during the warned phase keeps stopped and the budget the loop reached", () => {
-      const run = runIn("running");
-      run.setTurnBudget(WARNED);
-      run.markStopped(500);
-      run.markCompleted("late", 2000);
-      expect([run.status, run.turnBudget]).toEqual(["stopped", WARNED]);
-    });
-
-    it("is the run's own: another run starts with none", () => {
-      const first = runIn("running");
-      first.setTurnBudget(WARNED);
-      expect(new SubagentRun("resume", true).turnBudget).toBeUndefined();
     });
   });
 

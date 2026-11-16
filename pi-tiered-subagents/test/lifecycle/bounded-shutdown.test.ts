@@ -15,7 +15,6 @@ import {
   toSubagentSession,
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 describe("bounded child shutdown", () => {
   afterEach(() => {
@@ -33,7 +32,6 @@ describe("bounded child shutdown", () => {
       sessionId: "child",
       sessionDir: "/child",
       agentName: "Explore",
-      turnPolicy: UNLIMITED_TURNS,
       lifecycle,
     });
 
@@ -54,7 +52,6 @@ describe("bounded child shutdown", () => {
       sessionId: "child",
       sessionDir: "/child",
       agentName: "Explore",
-      turnPolicy: UNLIMITED_TURNS,
       lifecycle,
     });
 
@@ -93,7 +90,6 @@ describe("bounded child shutdown", () => {
     for (const prompt of ["one", "two"]) {
       manager.spawn(STUB_SNAPSHOT, "explore", prompt, {
         description: prompt,
-        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
         owner,
       });
@@ -115,7 +111,6 @@ describe("bounded child shutdown", () => {
       sessionId: "child",
       sessionDir: "/child",
       agentName: "Explore",
-      turnPolicy: UNLIMITED_TURNS,
       lifecycle,
     });
 

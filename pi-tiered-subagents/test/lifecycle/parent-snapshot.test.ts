@@ -1,12 +1,13 @@
 import { defined } from "#src/optional";
+import type { InheritedBranchEntry } from "#src/session/context";
 import { describe, expect, it, vi } from "vitest";
 
-const { buildParentContextMock } = vi.hoisted(() => ({
-  buildParentContextMock: vi.fn((): string => ""),
+const { captureParentBranchMock } = vi.hoisted(() => ({
+  captureParentBranchMock: vi.fn((): ReadonlyArray<InheritedBranchEntry> => []),
 }));
 
 vi.mock("#src/session/context", () => ({
-  buildParentContext: buildParentContextMock,
+  captureParentBranch: captureParentBranchMock,
 }));
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -79,29 +80,37 @@ describe("buildParentSnapshot", () => {
     ]);
   });
 
-  it("sets parentContext to undefined when inheritContext is false", () => {
+  it("sets parentBranch to undefined when inheritContext is false", () => {
     const snapshot = buildParentSnapshot(makeCtx(), false);
-    expect(snapshot.parentContext).toBeUndefined();
-    expect(buildParentContextMock).not.toHaveBeenCalled();
+    expect(snapshot.parentBranch).toBeUndefined();
+    expect(captureParentBranchMock).not.toHaveBeenCalled();
   });
 
-  it("sets parentContext to undefined when inheritContext is undefined", () => {
+  it("sets parentBranch to undefined when inheritContext is undefined", () => {
     const snapshot = buildParentSnapshot(makeCtx());
-    expect(snapshot.parentContext).toBeUndefined();
-    expect(buildParentContextMock).not.toHaveBeenCalled();
+    expect(snapshot.parentBranch).toBeUndefined();
+    expect(captureParentBranchMock).not.toHaveBeenCalled();
   });
 
-  it("populates parentContext when inheritContext is true and conversation exists", () => {
-    buildParentContextMock.mockReturnValueOnce("# Parent Conversation\n...");
+  it("populates parentBranch when inheritContext is true and conversation exists", () => {
+    const branch: ReadonlyArray<InheritedBranchEntry> = [
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        message: { role: "user", content: "Hello" },
+      },
+    ];
+    captureParentBranchMock.mockReturnValueOnce(branch);
     const snapshot = buildParentSnapshot(makeCtx(), true);
-    expect(snapshot.parentContext).toBe("# Parent Conversation\n...");
-    expect(buildParentContextMock).toHaveBeenCalledTimes(1);
+    expect(snapshot.parentBranch).toEqual(branch);
+    expect(captureParentBranchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("sets parentContext to undefined when inheritContext is true but conversation is empty", () => {
-    buildParentContextMock.mockReturnValueOnce("");
+  it("sets parentBranch to undefined when inheritContext is true but conversation is empty", () => {
+    captureParentBranchMock.mockReturnValueOnce([]);
     const snapshot = buildParentSnapshot(makeCtx(), true);
-    expect(snapshot.parentContext).toBeUndefined();
+    expect(snapshot.parentBranch).toBeUndefined();
   });
 
   describe("portablePrompt", () => {

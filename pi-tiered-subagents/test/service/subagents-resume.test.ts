@@ -3,9 +3,8 @@
  * interface (ARCHITECTURE-SPEC stories 72–75; behavioral coverage item 13).
  *
  * Resume dispatches before any new-launch preparation: no definition or model
- * is resolved again, the child's captured configuration is retained, and each
- * resumed run gets a fresh turn counter under the captured policy. These
- * scenarios drive `service.resume` with the real manager and preparer
+ * is resolved again, and the child's captured configuration is retained.
+ * These scenarios drive `service.resume` with the real manager and preparer
  * underneath; the controllable child proves what execution actually received.
  */
 
@@ -29,9 +28,7 @@ describe("resume through the service", () => {
     let scopes = scopesWithWorkerPatch({});
     const h = await createSubagentsHarness({ scopes: () => scopes });
     try {
-      const launched = await h.service.launch("worker", "first task", {
-        maxTurns: 4,
-      });
+      const launched = await h.service.launch("worker", "first task", {});
       if (launched.kind !== "accepted")
         throw new Error(`expected acceptance, got ${launched.message}`);
       const child = await h.children.childBorn(0);
@@ -69,48 +66,6 @@ describe("resume through the service", () => {
       expect(relaunched.kind).toBe("rejected");
       if (relaunched.kind === "rejected")
         expect(relaunched.reason).toBe("disabled-agent");
-    } finally {
-      await h.dispose();
-    }
-  });
-
-  it("starts every resumed run with a fresh turn counter under the captured policy", async () => {
-    const h = await createSubagentsHarness();
-    try {
-      const launched = await h.service.launch("worker", "task", {
-        maxTurns: 4,
-      });
-      if (launched.kind !== "accepted")
-        throw new Error(`expected acceptance, got ${launched.message}`);
-      const child = await h.children.childBorn(0);
-      const firstRun = await child.runStarted(0);
-      firstRun.advanceTurn();
-      firstRun.advanceTurn();
-      firstRun.settle("first answer");
-      await h.service.waitForAll();
-      expect(h.service.getRecord(launched.id)?.turnBudget).toEqual({
-        maxTurns: 4,
-        used: 2,
-        phase: "within",
-      });
-
-      const resumed = h.service.resume(launched.id, "more work");
-      const secondRun = await child.runStarted(1);
-      // Story 74: the same ceiling, a fresh counter — the resumed run does not
-      // inherit the two turns the first run spent.
-      expect(secondRun.budgets[0]).toEqual({
-        maxTurns: 4,
-        used: 0,
-        phase: "within",
-      });
-      secondRun.advanceTurn();
-      secondRun.settle("second answer");
-      await resumed;
-      expect(h.service.getRecord(launched.id)?.turnBudget).toEqual({
-        maxTurns: 4,
-        used: 1,
-        phase: "within",
-      });
     } finally {
       await h.dispose();
     }

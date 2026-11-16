@@ -16,7 +16,7 @@ configuration, not the historical upstream `subagents.json` format.
 | Use a particular model for one task | `model` in the `subagent` request |
 | Always use your preferred model for one specialist | `model` in `.pi/agents/<name>.md` or your global agent file |
 | Change the tiers used by automatic family routing | `familyProfiles` in the shared settings store |
-| Change concurrency, turn limits, or retention | `/subagents:settings` or the shared settings file |
+| Change concurrency or retention | `/subagents:settings` or the shared settings file |
 
 - [How automatic selection works](#how-automatic-selection-works)
 - [Pick your own model](#pick-your-own-model)
@@ -72,7 +72,7 @@ Worker targets L, while its Reviewer starts at the parent's own XL rung.
 | `gpt` | `size` | Astra = XL → Sol = L → Terra, Pro, unnamed default = M → Luna, Mini, Nano = S |
 | `claude` | `size` | Fable = XL → Opus = L → Sonnet = M → Haiku = S |
 | `qwen` | `size` | Max = L → Plus = M → Flash = S |
-| `gemini` | `size` | Carbon = XL → Argon, Pro Preview, Pro = L → Hydrogen, Flash = M → Flash Lite = S |
+| `gemini` | `size` | Chemical line: Krypton = XL → Carbon = L → Argon = M → Hydrogen = S |
 | `minimax` | `planner-worker` | Highspeed, unnamed default = planner → Flash = worker |
 | `glm` | `planner-worker` | Unnamed default = planner → Flash = worker |
 | `mimo` | `planner-worker` | Pro Ultraspeed, Pro, unnamed default = planner → Flash = worker |
@@ -80,9 +80,9 @@ Worker targets L, while its Reviewer starts at the parent's own XL rung.
 
 These are routing relationships, **not a vendor release list or an availability
 promise**. The authoritative data is in
-[`src/models/profiles.ts`](../src/models/profiles.ts). Kimi is not currently an
-automatic-routing family; an unpinned Kimi parent is retained. A user-selected
-exact model does not need to belong to a supported automatic-routing family.
+[`src/models/profiles.ts`](../src/models/profiles.ts). Kimi and Gemini Pro/Flash
+IDs are not automatic-routing families; their parents are retained. A
+user-selected exact model does not need to belong to a supported family.
 
 ### Same family, same version, runnable models only
 
@@ -99,8 +99,9 @@ For example, **if those exact IDs are runnable**:
 - `claude-opus-4-5` + `worker` targets M: `claude-sonnet-4-5`.
 - The same parent + `explore` targets S: `claude-haiku-4-5`.
 - The same parent + `reviewer` starts at its own Opus rung.
-- `gemini-2.5-pro` + `worker` targets `gemini-2.5-flash`, then
-  `gemini-2.5-flash-lite` if necessary.
+- `gemini-4-krypton` + `worker` targets L: `gemini-4-carbon`.
+- Gemini Pro and Flash parents are unsupported and retained, even if chemical
+  candidates or other Pro/Flash IDs are runnable.
 - A DeepSeek parent with no worker rung is retained for non-review roles.
 
 A dated parent can supply its tier and version, but automatic candidates are
@@ -190,8 +191,7 @@ clears an inherited optional choice.
 | `model` | Exact `provider/modelId`; unset means automatic routing |
 | `thinking` | Explicit reasoning level; unset means automatic reasoning |
 | `tools` | Complete allowlist, `inherit`, `none`, or `[]` |
-| `max_turns` | Turn ceiling; `0` means unlimited, positive limits have a minimum of 2 |
-| `inherit_context` | Whether to inherit the parent's conversation |
+| `inherit_context` | Whether the child forks the parent's completed conversation branch as real session entries |
 | `run_in_background` | Default execution mode |
 | `enabled` | `false` prevents this specialist from being requested |
 
@@ -207,11 +207,28 @@ one does not install it. The runtime strips `subagent`, `get_subagent_result`, a
 `steer_subagent` from child capabilities, so children cannot delegate recursively.
 Communication tools such as `ask_parent` are handled separately.
 
-A new custom specialist defaults to inherited tools, fresh conversation, and
-background execution. Treat tool overrides as a permission decision: broadening
-a read-only specialist's tools changes what it can do. Scheduling follows the
+A new custom specialist and the shipped Reviewer default to inherited tools;
+Worker and Debug do as well. Reviewer is instructed to use them for inspection
+and validation, not file edits. Other shipped specialists use their documented
+explicit lists. Treat tool overrides as a permission decision: broadening a
+read-only specialist's tools changes what it can do. Scheduling follows the
 effective tools, not the specialist's name; shell/editor/unknown tools count as
 potential writers. This is not a filesystem sandbox.
+
+### Inherited context
+
+`inherit_context: true` (the shipped `debug` specialist, or an explicit
+`inherit_context` on `subagent()`) forks the parent's completed conversation
+branch into the child as real Pi session entries. The completed tool calls and
+tool results the parent already produced stay in the child's context, so a
+diagnostic child does not re-run a probe the parent just ran.
+
+The fork happens in memory at request time: the parent's session tree is read
+directly, no parent `.jsonl` is read from disk, and no intermediate fork file is
+written. The uncommitted parent turn that called `subagent` is cut, signed and
+redacted Anthropic thinking blocks are stripped, and label entries are dropped
+while the remaining entries are re-chained. The child's transcript viewer and
+`get_subagent_result` report only the turns the child itself produced.
 
 ## Settings files and precedence
 
@@ -237,7 +254,6 @@ A complete example of the on-disk shape:
 {
   "pi-tiered-subagents": {
     "maxConcurrent": "4",
-    "defaultMaxTurns": "30",
     "abortAllOnInterrupt": "true",
     "familyProfiles": "{\"claude\":{\"group\":\"size\",\"tiers\":[{\"tier\":\"opus\",\"size\":\"L\"},{\"tier\":\"sonnet\",\"size\":\"M\"},{\"tier\":\"haiku\",\"size\":\"S\"}]}}"
   }
@@ -316,16 +332,16 @@ The model is chosen first. Its supported reasoning levels then determine effort:
 
 1. Request `thinking` wins.
 2. Otherwise, definition `thinking` wins.
-3. Otherwise, use the next supported non-off level below the parent's effort.
+3. Otherwise, use the upper median of the child model's supported non-off levels.
 
-Gaps are skipped: with supported levels `[low, high, max]`, parent `max` becomes
-`high`, not `low`. At the floor, effort stays at the supported non-off floor.
-This step-down also applies when the **model itself was retained**.
+For an even number of supported levels, the higher of the two middle levels
+wins: `[minimal, low, medium, high]` selects `medium`, while all six non-off
+levels select `high`. Gapped arrays use the same rule: `[low, high, max]` also
+selects `high`. Parent effort never changes automatic selection, including when
+the model itself was retained.
 
-With no parent effort, automatic selection prefers medium, then low, then the
-lowest supported non-off level. Explicit levels are clamped to what the model
-supports. A non-reasoning model reports *not applicable*. Explicit `off` is not
-allowed for a reasoning model.
+Explicit levels are clamped to what the model supports. A non-reasoning model
+reports *not applicable*. Explicit `off` is not allowed for a reasoning model.
 
 Thinking choices are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`,
 subject to those model-specific rules. In model-facing calls the field is
@@ -339,16 +355,10 @@ the role policy or pin models.
 | Setting | Default | Meaning / accepted on-disk range |
 | --- | --- | --- |
 | `maxConcurrent` | `4` | 1–1024 concurrent children; workspace writer scheduling still applies |
-| `defaultMaxTurns` | `0` | Unlimited at 0; positive ceilings normalize to at least 2; maximum 10,000 |
-| `wrapUpTurns` | `2` | Warn with this many turns remaining; 1–1000 |
 | `consumedSessionRetentionMinutes` | `10` | Retain a collected child's session; 1–20,160 minutes |
 | `unconsumedSessionRetentionMinutes` | `720` | Safety retention for an uncollected child's session; 1–20,160 minutes |
 | `abortAllOnInterrupt` | `true` | ESC stops background/queued children too; foreground work aborts on ESC either way |
 | `midRunUpdates` | `true` | Give background children `notify_parent`; disabling it does not disable ask-back |
-
-Turn ceilings resolve request `max_turns` → definition `max_turns` →
-`defaultMaxTurns`. A request or definition value of 0 explicitly selects
-unlimited execution. `graceTurns` is retired; use `wrapUpTurns`.
 
 The following structured settings are hand-edited, JSON-encoded strings rather
 than settings-menu controls:

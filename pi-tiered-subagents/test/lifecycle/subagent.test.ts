@@ -17,13 +17,11 @@ import {
   SubagentState,
   type SubagentStatus,
 } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type {
   WorkspacePrepareContext,
   WorkspaceProvider,
 } from "#src/lifecycle/workspace";
 import type { RunConfig } from "#src/runtime";
-import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type { CompactionInfo, SubagentType } from "#src/types";
 import { gatedScheduler } from "#test/helpers/gated-scheduler";
 import {
@@ -44,10 +42,6 @@ import {
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { createChildLifecycleMock } from "#test/helpers/subagent-session-io";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
-
-const WARNED: TurnBudget = { maxTurns: 5, used: 3, phase: "warned" };
-const EXHAUSTED: TurnBudget = { maxTurns: 5, used: 5, phase: "exhausted" };
 
 type SessionFactory = (
   params: CreateSubagentSessionParams,
@@ -194,7 +188,6 @@ function createRunnableAgent(overrides?: {
   baseCwd?: string;
   workspaceProvider?: WorkspaceProvider;
   isBackground?: boolean;
-  turnPolicy?: TurnPolicy;
   status?: SubagentStatus;
 }) {
   const createSubagentSession =
@@ -211,7 +204,6 @@ function createRunnableAgent(overrides?: {
       prompt: "do something",
       getRunConfig: overrides?.getRunConfig,
       childShaping: overrides?.childShaping,
-      turnPolicy: overrides?.turnPolicy ?? UNLIMITED_TURNS,
       parentSession: overrides?.parentSession,
       signal: overrides?.signal,
       baseCwd: overrides?.baseCwd ?? "/base",
@@ -1270,8 +1262,6 @@ describe("Subagent", () => {
 
   describe("the mid-run update channel", () => {
     const updatesOn = {
-      defaultMaxTurns: undefined,
-      wrapUpTurns: 5,
       midRunUpdates: true,
     };
 
@@ -1658,17 +1648,6 @@ describe("Subagent", () => {
       expect(agent.result).toBe("All done.");
     });
 
-    it("records a question an aborted run declared before it ran out of turns", async () => {
-      const { agent } = await runToOutcome({
-        responseText: "",
-        question: "Still stuck on which?",
-        turnBudget: EXHAUSTED,
-      });
-
-      expect(agent.status).toBe("aborted");
-      expect(agent.pendingQuestion).toBe("Still stuck on which?");
-    });
-
     it("completes the round trip: ask, answer by resuming, continue", async () => {
       const { agent, stub } = await runToOutcome({
         responseText: "",
@@ -1835,8 +1814,6 @@ describe("Subagent", () => {
               sessionId: "child-1",
               sessionDir: "/sessions",
               agentName: "Explore",
-              turnPolicy: { kind: "unlimited" },
-              parentContext: undefined,
               lifecycle: createChildLifecycleMock(),
             }),
           ),
@@ -1970,18 +1947,6 @@ describe("Subagent", () => {
         const { agent: record } = await runToOutcome({});
         expect(record.status).toBe("completed");
         expect(record.result).toBe("done");
-      });
-
-      it("transitions to aborted, a terminal error, when the harness exhausted the turn budget", async () => {
-        const { agent: record } = await runToOutcome({ turnBudget: EXHAUSTED });
-        expect(record.status).toBe("aborted");
-        expect(record.isTerminalError()).toBe(true);
-      });
-
-      it("transitions to completed, not a terminal error, when the run wrapped up at its turn limit", async () => {
-        const { agent: record } = await runToOutcome({ turnBudget: WARNED });
-        expect(record.status).toBe("completed");
-        expect(record.isTerminalError()).toBe(false);
       });
 
       it("fires observer.onRunFinished on completion", async () => {
@@ -2181,27 +2146,10 @@ describe("Subagent", () => {
         expect(agent.result).toBe("Mapped the configs.");
       });
 
-      it("disposes an aborted run that declared a question", async () => {
-        const { agent, workspace } = await runWithWorkspace({
-          responseText: "",
-          question: "Still stuck?",
-          turnBudget: EXHAUSTED,
-        });
-        expect(workspace.dispose).toHaveBeenCalledWith({
-          status: "aborted",
-          description: "run test",
-        });
-        expect(agent.pendingQuestion).toBe("Still stuck?");
-        expect(agent.result).toBe(ADDENDUM);
-      });
-
-      // A child warned it is running out of turns can still finish with a question,
-      // and a resume gets a fresh budget to act on the answer.
-      it("holds the workspace when a run wrapped up at its turn limit and declared a question", async () => {
+      it("holds the workspace when a run declared a question", async () => {
         const { agent, workspace } = await runWithWorkspace({
           responseText: "Partway.",
           question: "Which one?",
-          turnBudget: WARNED,
         });
         expect(agent.status).toBe("completed");
         expect(workspace.dispose).not.toHaveBeenCalled();
@@ -2210,13 +2158,11 @@ describe("Subagent", () => {
         expect(agent.result).toBe("Partway.");
       });
 
-      it("holds the workspace when a resumed run wrapped up at its turn limit and declared another question", async () => {
+      it("holds the workspace when a resumed run declared another question", async () => {
         const { agent, workspace, stub, ask } = await heldWorkspaceAgent();
         stub.runTurnLoop.mockImplementation(() => {
           ask("And the fallback?");
-          return Promise.resolve(
-            turnLoopResult({ responseText: "Partway.", turnBudget: WARNED }),
-          );
+          return Promise.resolve(turnLoopResult({ responseText: "Partway." }));
         });
 
         await agent.resume("The project one.", { background: true });
@@ -2268,61 +2214,6 @@ describe("Subagent", () => {
         await agent.run();
         expect(loopSignal?.aborted).toBe(true);
         expect(agent.status).toBe("stopped");
-      });
-    });
-
-    describe("live turn budget", () => {
-      it("shows the budget the turn loop reports while the run is still going", async () => {
-        const { factory, stub } = createFactory();
-        const gate = Promise.withResolvers<TurnLoopResult>();
-        stub.runTurnLoop.mockImplementation(
-          (_prompt: string, opts: TurnLoopOptions) => {
-            opts.onTurnBudget?.(WARNED);
-            return gate.promise;
-          },
-        );
-        const agent = createRunnableAgent({ createSubagentSession: factory });
-        const run = agent.run();
-        await vi.waitFor(() => expect(stub.runTurnLoop).toHaveBeenCalled());
-        expect(agent.status).toBe("running");
-        expect(agent.turnBudget).toEqual(WARNED);
-        gate.resolve(turnLoopResult({ turnBudget: WARNED }));
-        await run;
-        expect(agent.turnBudget).toEqual(WARNED);
-      });
-    });
-
-    describe("turn policy threading", () => {
-      it("hands the session factory the ceiling the door resolved, unchanged", async () => {
-        // The record carries a decision, not the inputs to one: a later
-        // default-budget change must not reach an accepted run.
-        const { factory, params } = createFactory();
-        const policy: TurnPolicy = {
-          kind: "limited",
-          maxTurns: 6,
-          wrapUpTurns: 3,
-        };
-        const agent = createRunnableAgent({
-          createSubagentSession: factory,
-          turnPolicy: policy,
-          getRunConfig: () => ({
-            defaultMaxTurns: 10,
-            wrapUpTurns: 9,
-            midRunUpdates: true,
-          }),
-        });
-        await agent.run();
-        expect(params().turnPolicy).toStrictEqual(policy);
-      });
-
-      it("passes a deliberately unlimited policy through unchanged", async () => {
-        const { factory, params } = createFactory();
-        const agent = createRunnableAgent({
-          createSubagentSession: factory,
-          turnPolicy: { kind: "unlimited" },
-        });
-        await agent.run();
-        expect(params().turnPolicy).toEqual({ kind: "unlimited" });
       });
     });
   });
@@ -2595,23 +2486,18 @@ describe("Subagent", () => {
         expect(agent.pendingQuestion).toBe("And the fallback?");
       });
 
-      it("disposes as aborted when the resumed child asks again but exhausts its budget", async () => {
+      it("holds the workspace when a resumed child asks again", async () => {
         const { agent, workspace, stub, ask } = await heldWorkspaceAgent();
         stub.runTurnLoop.mockImplementation(() => {
           ask("And the fallback?");
-          return Promise.resolve(
-            turnLoopResult({ responseText: "Partway.", turnBudget: EXHAUSTED }),
-          );
+          return Promise.resolve(turnLoopResult({ responseText: "Partway." }));
         });
 
         await agent.resume("The project one.", { background: true });
 
-        expect(agent.status).toBe("aborted");
-        expect(workspace.dispose).toHaveBeenCalledWith({
-          status: "aborted",
-          description: "run test",
-        });
-        expect(agent.result).toBe(`Partway.${ADDENDUM}`);
+        expect(agent.status).toBe("completed");
+        expect(workspace.dispose).not.toHaveBeenCalled();
+        expect(agent.result).toBe("Partway.");
       });
 
       it("disposes best-effort when the resume throws", async () => {
@@ -2716,42 +2602,6 @@ describe("Subagent", () => {
         const { agent } = createResumableAgent();
         await agent.resume("continue", { background: true });
         expect(agent.error).toBeUndefined();
-      });
-    });
-
-    describe("turn budget", () => {
-      it("shows the budget the resumed turn loop reports while the resume is going", async () => {
-        const { agent, stub } = createResumableAgent();
-        const fresh: TurnBudget = { maxTurns: 5, used: 0, phase: "within" };
-        const gate = Promise.withResolvers<TurnLoopResult>();
-        stub.runTurnLoop.mockImplementation(
-          (
-            _prompt: string,
-            { onTurnBudget }: { onTurnBudget?: (budget: TurnBudget) => void },
-          ) => {
-            onTurnBudget?.(fresh);
-            return gate.promise;
-          },
-        );
-        const resumed = agent.resume("continue", { background: true });
-        await vi.waitFor(() => expect(stub.runTurnLoop).toHaveBeenCalled());
-        expect(agent.turnBudget).toEqual(fresh);
-        gate.resolve(turnLoopResult({ turnBudget: fresh }));
-        await resumed;
-      });
-
-      it("ends aborted, and notifies the observer, when the resume exhausts its budget", async () => {
-        const onRunFinished = vi.fn();
-        const { agent, stub } = createResumableAgent({
-          observer: { onRunFinished },
-        });
-        stub.runTurnLoop.mockResolvedValue(
-          turnLoopResult({ responseText: "partial", turnBudget: EXHAUSTED }),
-        );
-        await agent.resume("continue", { background: true });
-        expect(agent.status).toBe("aborted");
-        expect(agent.result).toBe("partial");
-        expect(onRunFinished).toHaveBeenCalledExactlyOnceWith(agent, "resume");
       });
     });
 
@@ -3004,31 +2854,15 @@ describe("Subagent", () => {
       expect(agent.result).toBe("Partway.");
     });
 
-    it("holds the workspace of a run that wrapped up at its turn limit and declared a question", async () => {
+    it("holds the workspace of a run that declared a question", async () => {
       const { agent, workspace } = await run({
         responseText: "Partway.",
         question: "And the fallback?",
-        turnBudget: WARNED,
       });
       expect(agent.status).toBe("completed");
       expect(workspace.dispose).not.toHaveBeenCalled();
       expect(agent.resumeRefusal).toBeUndefined();
       expect(agent.result).toBe("Partway.");
-    });
-
-    it("disposes as aborted when the run exhausted its budget, keeping the question", async () => {
-      const { agent, workspace } = await run({
-        responseText: "Partway.",
-        question: "And the fallback?",
-        turnBudget: EXHAUSTED,
-      });
-      expect(agent.status).toBe("aborted");
-      expect(workspace.dispose).toHaveBeenCalledExactlyOnceWith({
-        status: "aborted",
-        description: "run test",
-      });
-      expect(agent.pendingQuestion).toBe("And the fallback?");
-      expect(agent.result).toBe(`Partway.${ADDENDUM}`);
     });
 
     it("disposes as error when the run failed, dropping the question", async () => {

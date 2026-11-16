@@ -51,7 +51,7 @@ concatenated.
 | --- | --- | --- | --- |
 | `explore` | `read, grep, find, ls` | Fresh | Routed |
 | `worker` | Parent's active tools, captured at request time | Fresh | Routed |
-| `reviewer` | `read, grep, find` | Fresh | Routed |
+| `reviewer` | Parent's active tools, captured at request time; instructed not to edit | Fresh | Routed |
 | `debug` | Parent's active tools, captured at request time | Inherited | Routed |
 | `researcher` | `read, grep, find, ls, web_search` | Fresh | Routed |
 
@@ -71,17 +71,17 @@ or definition model pin bypasses this grid.
 <!-- model-matrix:grid:start -->
 | Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash-lite` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
-| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-carbon` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
-| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-flash-lite` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-carbon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-krypton` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
+| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
 
 | Family | Representative parent (all candidates available) |
 | --- | --- |
 | gpt | `example/gpt-97.2-astra` |
 | claude | `example/claude-fable-97-2` |
-| gemini | `example/gemini-97.2-carbon` |
+| gemini | `example/gemini-97.2-krypton` |
 | glm | `example/glm-97.2` |
 | minimax | `example/MiniMax-M97.2-highspeed` |
 | qwen | `example/qwen97.2-max` |
@@ -89,9 +89,9 @@ or definition model pin bypasses this grid.
 | mimo | `example/mimo-v97.2-pro-ultraspeed` |
 <!-- model-matrix:grid:end -->
 
-Two additional per-agent differences are not about families: `worker` and
-`debug` inherit the parent's active tools, and `debug` inherits the parent's
-conversation. Pinning `model: anthropic/claude-sonnet-5` in, say,
+Two additional per-agent differences are not about families: `worker`,
+`reviewer`, and `debug` inherit the parent's active tools, while `debug` also
+inherits the parent's conversation. Pinning `model: anthropic/claude-sonnet-5` in, say,
 `.pi/agents/explore.md` changes the **whole row** for that agent — the pin
 applies on every family, not as a family-specific setting.
 
@@ -190,41 +190,26 @@ identities and retain outcomes come only from the router.
 
 | Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
 | --- | --- | --- | --- | --- | --- |
-| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `worker` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `reviewer` | `example/gemini-97.2-carbon` | **retain** | **retain** |
-| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-carbon` | 97.2 / carbon (XL) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (L) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-argon` | 97.2 / argon (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `reviewer` | `example/gemini-97.2-pro-preview` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-pro-preview` | 97.2 / pro-preview (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (L) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (L) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (L) | `reviewer` | `example/gemini-97.2-pro` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (L) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-pro` | 97.2 / pro (L) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `reviewer` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (M) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (M) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (M) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (M) | `reviewer` | `example/gemini-97.2-flash` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (M) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-flash` | 97.2 / flash (M) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `explore` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `worker` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `reviewer` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `debug` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
-| `example/gemini-97.2-flash-lite` | 97.2 / flash-lite (S) | `researcher` | `example/gemini-97.2-flash-lite` | **retain** | **retain** |
+| `example/gemini-97.2-krypton` | 97.2 / krypton (XL) | `explore` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-krypton` | 97.2 / krypton (XL) | `worker` | `example/gemini-97.2-carbon` | **retain** | **retain** |
+| `example/gemini-97.2-krypton` | 97.2 / krypton (XL) | `reviewer` | `example/gemini-97.2-krypton` | **retain** | **retain** |
+| `example/gemini-97.2-krypton` | 97.2 / krypton (XL) | `debug` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-krypton` | 97.2 / krypton (XL) | `researcher` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (L) | `explore` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (L) | `worker` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (L) | `reviewer` | `example/gemini-97.2-carbon` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (L) | `debug` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-carbon` | 97.2 / carbon (L) | `researcher` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (M) | `explore` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (M) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (M) | `reviewer` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (M) | `debug` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-argon` | 97.2 / argon (M) | `researcher` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (S) | `explore` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (S) | `worker` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (S) | `reviewer` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (S) | `debug` | `example/gemini-97.2-argon` | **retain** | **retain** |
+| `example/gemini-97.2-hydrogen` | 97.2 / hydrogen (S) | `researcher` | `example/gemini-97.2-hydrogen` | **retain** | **retain** |
 
 ### glm — planner-worker
 
@@ -352,7 +337,7 @@ route(parent, context, agentId = "worker"):
 | `explore` | S | worker class |
 | Custom identifier | Same as worker | Same as worker |
 
-A **group** is the family's routing policy shape. A **size** (S, M, L) labels a
+A **group** is the family's routing policy shape. A **size** (S, M, L, XL) labels a
 size-family tier; a **class** (planner, worker) labels a planner/worker-family
 tier. Runtime routing reads those declarations; it does not infer class from
 price or a model-name substring. The top rung of the target size/role is the
@@ -373,20 +358,19 @@ Consequences worth naming:
 - **Providers are deterministic.** Prefer the parent provider for the exact ID;
   otherwise require a unique matching provider. Multiple alternate providers
   make a tier unusable, so cheaper eligible tiers are tried before retention.
-- **Tier matching is specific.** `flash-lite` is its own S rung, not
-  `flash`; dated Claude snapshots use the size of their matched tier.
+- **Unsupported Gemini lines.** Pro and Flash IDs are not claimed by any
+  shipped family and retain their parent. Bare Gemini IDs have no known tier
+  and are also retained; dated Claude snapshots use their matched tier's size.
 - **Explicit beats routing, always.** A request or definition model is resolved
   exactly — no ladder walk, no family check, no provider swap.
 - **No silent reroute.** A selected identity that later cannot be materialized
   fails as that child's outcome; it does not become a different model.
 - **Reasoning follows the model.** The thinking level is chosen after the model
-  resolves: request → definition → **one rung down from the parent's effort**
-  using the next supported non-off rung; the lowest supported rung stays put.
-  Without parent effort, medium steps down to low or the lowest supported
-  non-off rung. This also applies when automatic model routing retains the
-  parent. Explicit request or definition reasoning still wins. A non-reasoning
-  model is valid and reports “not applicable”. This effort policy is unchanged
-  by role-aware model routing.
+  resolves: request → definition → **the upper median of the child model's
+  supported non-off levels**. Parent effort does not affect automatic selection,
+  including when routing retains the parent's model. Explicit request or
+  definition reasoning still wins. A non-reasoning model is valid and reports
+  “not applicable”. This effort policy is unchanged by role-aware model routing.
 
 ## 6. What this matrix does not promise
 
@@ -399,7 +383,7 @@ Consequences worth naming:
   still be runnable.
 - **An unknown family retains the parent**, without guessing a replacement. A
   known family whose rung is unknown or whose exact-version candidates are unavailable also retains the parent.
-  Kimi has no shipped profile; GLM does.
+  Kimi and Gemini Pro/Flash IDs have no shipped profile; GLM does.
 - **Operators replace profiles whole.** A project `familyProfiles` entry for one
   family replaces that family's version-independent tiers entirely;
   other families are untouched. Legacy `fallbacks` settings are ignored; the
@@ -426,7 +410,7 @@ the real router and compares the entire content, including the role-aware grid,
 every concrete parent for every shipped role, and both restricted availability
 scenarios. Every other-versions-only outcome must retain the parent. Hand edits
 anywhere in these regions fail the evidence test. It also verifies the five shipped definitions remain unpinned
-and that the grid covers the eight supported families (GLM included, Kimi gone).
+and that the grid covers the eight supported families (GLM included, Kimi and Gemini Pro/Flash unsupported).
 
 This is documentation-drift evidence, **not the sole correctness oracle**:
 independent literal examples in the router and selection tests verify the

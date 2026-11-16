@@ -2,7 +2,10 @@
  * parent-snapshot.ts — Capture parent session state as a plain data snapshot.
  */
 
-import { buildParentContext } from "#src/session/context";
+import {
+  captureParentBranch,
+  type InheritedBranchEntry,
+} from "#src/session/context";
 import type { ExactModelIdentity } from "#src/models/identity";
 import { defined } from "#src/optional";
 import type { SessionContext } from "#src/types";
@@ -67,8 +70,8 @@ export type ParentSnapshot = {
    * a server connecting later cannot widen queued work.
    */
   registeredToolNames: ReadonlyArray<string>;
-  /** Pre-built parent conversation text (when inheritContext was requested). */
-  parentContext?: string;
+  /** Captured and sanitized parent branch entries (when inheritContext was requested). */
+  parentBranch?: ReadonlyArray<InheritedBranchEntry>;
   /**
    * The parent's operator-authored parts, rendered as an identity a child on a
    * re-homing provider may adopt in place of the assembled prompt (ADR 0009):
@@ -93,7 +96,7 @@ export function buildParentSnapshot(
   activeToolNames: ReadonlyArray<string> = [],
   registeredToolNames: ReadonlyArray<string> = [],
 ): ParentSnapshot {
-  const parentContext = inheritContext ? buildParentContext(ctx) : undefined;
+  const parentBranch = inheritContext ? captureParentBranch(ctx) : undefined;
   return {
     cwd: ctx.cwd,
     systemPrompt: ctx.getSystemPrompt(),
@@ -103,7 +106,8 @@ export function buildParentSnapshot(
     registeredToolNames: [...registeredToolNames],
     ...defined({
       parentModelIdentity: parentModelIdentity(ctx.model),
-      parentContext: parentContext || undefined,
+      parentBranch:
+        parentBranch && parentBranch.length > 0 ? parentBranch : undefined,
       portablePrompt: buildPortablePrompt(promptOptions),
     }),
   };

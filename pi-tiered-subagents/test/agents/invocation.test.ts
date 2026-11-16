@@ -11,7 +11,6 @@ const DEFINITION: AgentDefinition = {
   tools: { kind: "inherit" },
   model: "anthropic/claude-sonnet-5",
   thinking: "medium",
-  maxTurns: 12,
   inheritContext: false,
   runInBackground: true,
   enabled: true,
@@ -24,7 +23,6 @@ describe("resolveInvocation", () => {
     expect(resolved.model).toBe("anthropic/claude-sonnet-5");
     expect(resolved.modelFromParams).toBe(false);
     expect(resolved.thinking).toBe("medium");
-    expect(resolved.maxTurns).toBe(12);
     expect(resolved.inheritContext).toBe(false);
     expect(resolved.runInBackground).toBe(true);
   });
@@ -33,14 +31,12 @@ describe("resolveInvocation", () => {
     const resolved = resolveInvocation(DEFINITION, {
       model: "anthropic/claude-opus-5",
       thinking: "high",
-      maxTurns: 3,
       inheritContext: true,
       runInBackground: false,
     });
     expect(resolved.model).toBe("anthropic/claude-opus-5");
     expect(resolved.modelFromParams).toBe(true);
     expect(resolved.thinking).toBe("high");
-    expect(resolved.maxTurns).toBe(3);
     expect(resolved.inheritContext).toBe(true);
     expect(resolved.runInBackground).toBe(false);
   });
@@ -49,7 +45,6 @@ describe("resolveInvocation", () => {
     const resolved = resolveInvocation(DEFINITION, { thinking: "low" });
     expect(resolved.thinking).toBe("low");
     expect(resolved.model).toBe("anthropic/claude-sonnet-5");
-    expect(resolved.maxTurns).toBe(12);
   });
 
   it("names no model when neither the request nor the definition does", () => {

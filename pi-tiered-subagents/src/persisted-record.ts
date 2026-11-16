@@ -10,24 +10,15 @@
  * The payload is validated completely before it is accepted: a malformed field
  * that summary-only parsing used to ignore makes the entry unusable, while the
  * rest of the history still loads. Pi's session-entry envelope is deliberately
- * not strict — only the payload this package wrote is.
+ * not strict — only the payload this package wrote is. Retired turn-budget
+ * fields are tolerated so older session files still load.
  */
 
 import * as v from "valibot";
 import { SUBAGENT_STATUSES } from "#src/lifecycle/subagent-state";
-import { TURN_BUDGET_PHASES } from "#src/lifecycle/turn-limits";
 
 /** The `customType` every persisted run record is appended under. */
 export const SUBAGENT_RECORD_ENTRY = "subagents:record";
-
-/** The budget shape the writer persists; reuses the runtime phase vocabulary. */
-const turnBudgetSchema = v.strictObject({
-  maxTurns: v.optional(
-    v.pipe(v.number(), v.integer(), v.safeInteger(), v.minValue(1)),
-  ),
-  used: v.pipe(v.number(), v.integer(), v.safeInteger(), v.minValue(0)),
-  phase: v.picklist(TURN_BUDGET_PHASES),
-});
 
 const timestampSchema = v.pipe(v.number(), v.finite());
 
@@ -40,7 +31,12 @@ const persistedPayloadSchema = v.pipe(
     status: v.picklist(SUBAGENT_STATUSES),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
-    turnBudget: v.optional(turnBudgetSchema),
+    /**
+     * Accepted and ignored: session files written before turn budgets were
+     * removed still carry a `turnBudget` key, and those transcripts must
+     * remain readable.
+     */
+    turnBudget: v.optional(v.unknown()),
     startedAt: timestampSchema,
     completedAt: v.optional(timestampSchema),
     /** The run's session JSONL, which a reader can open after the live session is gone. */
@@ -72,7 +68,7 @@ type RequiredUndefined<T, K extends keyof T> = Omit<T, K> & {
 export type PersistedSubagentRecord = Readonly<
   RequiredUndefined<
     PersistedPayload,
-    "result" | "error" | "turnBudget" | "completedAt" | "outputFile"
+    "result" | "error" | "completedAt" | "outputFile"
   >
 >;
 
@@ -110,7 +106,6 @@ export function toPersistedRecord(
     status: record.status,
     result: record.result,
     error: record.error,
-    turnBudget: record.turnBudget,
     startedAt: record.startedAt,
     completedAt: record.completedAt,
     outputFile: record.outputFile,

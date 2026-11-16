@@ -50,7 +50,6 @@ export class SubagentsTestDriver implements SubagentsDriver {
           description: options?.description,
           model: options?.model,
           thinking: options?.thinkingLevel,
-          maxTurns: options?.maxTurns,
           inheritContext: options?.inheritContext,
         }),
       },
@@ -168,7 +167,6 @@ function snapshot(
       pendingQuestion: run.pendingQuestion,
       error: run.error,
       completedAt: run.completedAt,
-      turnBudget: run.turnBudget ? { ...run.turnBudget } : undefined,
       outputFile: record.outputFile,
       resumeRefusal:
         run === record.latestRun ? record.resumeRefusal : undefined,

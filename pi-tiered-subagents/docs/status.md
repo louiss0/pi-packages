@@ -14,6 +14,42 @@ implementation history and verification evidence, not release approval.
 > [stabilization.md](stabilization.md) for the evidence table and the remaining
 > known limitations.
 
+> **Turn budgets have been removed.** The sections below that describe a
+> resolved `limited`/`unlimited` turn policy, `max_turns`, `defaultMaxTurns`,
+> and `wrapUpTurns` are retained as implementation history only. Children now
+> run until they finish, are interrupted, or are explicitly stopped. Likewise
+> `inherit_context: true` now forks the parent's completed conversation branch
+> in memory as real Pi session entries instead of flattening it into prose.
+
+## Median reasoning, chemical-only Gemini, and Reviewer inheritance
+
+The current automatic thinking policy is the upper median of the child model's
+supported non-off levels. It ignores parent effort for both changed and retained
+models; explicit request and definition levels still take precedence. See
+[ADR 0017](adr/0017-automatic-reasoning-is-the-upper-median.md).
+
+Gemini automatic routing supports only the chemical `gemini` family: Krypton
+XL, Carbon L, Argon M, Hydrogen S. Pro and Flash profiles and strategies have
+been removed; those IDs are unclaimed and retain their parent rather than
+routing into the chemical ladder or one another. See
+[ADR 0020](adr/0020-drop-gemini-pro-and-flash-support.md).
+
+The shipped Reviewer inherits the parent's active tools at request time. Its
+instructions permit commands and checks but forbid edits, and explicit
+Reviewer tool overrides still replace inheritance. Recursion exclusions and
+capability-based scheduling are unchanged. See
+[ADR 0019](adr/0019-reviewer-inherits-parent-tools.md).
+
+Verification for this increment: 195 focused routing, reasoning, registry, and
+launch tests passed during implementation. The final complete suite passed
+**2,565 tests with one platform-specific skip across 136 files**, with the Nx
+daemon disabled for the final run. Package
+`typecheck`, `lint`, `check`, and `metadata` targets passed; the typecheck
+wrapper continues to report the recorded third-party settings diagnostics.
+Independent review found no correctness or safety defects; its documentation,
+dead-input, and Reviewer recursion-coverage findings were addressed before the
+final suite.
+
 ## Current API boundary
 
 The maintainer has removed the cross-extension runtime API. Delegation is now
@@ -112,7 +148,7 @@ agent is this?".
 | Module | What it owns |
 | --- | --- |
 | `src/agents/definition.ts` | The definition model, the layering vocabulary (not specified / explicit / cleared / empty), the tool selection, and the child's tool list |
-| `src/agents/shipped.ts` | The five shipped specialists, with their exact tool lists and standing instructions |
+| `src/agents/shipped.ts` | The five shipped specialists, with their tool selections and standing instructions |
 | `src/agents/loader.ts` | Reading a definition file, and reporting a duplicate identifier |
 | `src/agents/registry.ts` | The three layers, their merge, and the selection that rejects an unknown or disabled agent |
 | `src/agents/invocation.ts` | The precedence between a request and a definition |
@@ -126,7 +162,7 @@ body is either inherited (empty) or replaced (non-empty).
 
 | Area | Stories | State |
 | --- | --- | --- |
-| Five scoped specialists | 6–24 | Done. `explore`, `worker`, `reviewer`, `debug`, `researcher`, with the exact tool lists the specification names. |
+| Five scoped specialists | 6–24 | Done. `explore`, `worker`, `reviewer`, `debug`, `researcher`, with the shipped tool selections and explicit override behavior. |
 | Normalized identifiers, display names, duplicate reporting | 25–27 | Done. |
 | Layered definitions: shipped → global → project | 28, 36, 37 | Done. The project layer is read like the global one; see *Trust is Pi's, not this package's* below. |
 | Omission inherits, explicit replaces, null clears, empty stays empty | 29–32 | Done. |
@@ -233,7 +269,9 @@ The mapping is shipped policy, not operator-configurable settings.
 
 The size ladder is XL → L → M → S, with S as the floor. Size assignments are
 Qwen max = L, plus = M, flash = S; Claude fable = XL, opus = L, sonnet = M,
-haiku = S; Gemini carbon = XL, argon/pro-preview/pro = L, hydrogen/flash = M, flash-lite = S; GPT astra = XL, sol = L, pro/terra/default = M, luna/mini/nano = S.
+haiku = S; Gemini chemical krypton = XL, carbon = L, argon = M, hydrogen = S;
+GPT astra = XL, sol = L, pro/terra/default = M, luna/mini/nano = S. Gemini Pro
+and Flash IDs are unsupported and retained.
 Dated snapshots use the size of their tier. Worker from XL targets L; Equal
 review starts at the parent's own rung, including XL.
 
@@ -308,11 +346,12 @@ matching, starting rung, and fallback rank behind a small shared interface;
 the router owns the common exact-version walk. No class-internal tests are
 required.
 
-Automatic retained-model reasoning with known parent effort takes the next
-supported non-off rung: on `[low, high, max]`, `max` becomes `high`, not `low`.
-Gaps are skipped and floor effort stays. No-parent medium/low/lowest defaults,
-explicit request/definition precedence and clamping, and non-reasoning
-*not applicable* reporting remain unchanged.
+At the time of ADR 0015, retained-model reasoning stepped below known parent
+effort and standalone reasoning preferred medium/low/lowest supported non-off.
+ADR 0017 later replaced both policies: current automatic reasoning is the upper
+median of the child model's supported non-off levels, regardless of parent
+effort or model retention. Explicit request/definition precedence, clamping,
+and non-reasoning *not applicable* reporting remain unchanged.
 
 Verification for this follow-up:
 
@@ -336,7 +375,7 @@ Verification for this follow-up:
 | An agent-file model wins over the automatic routing | 56 | Done. |
 | Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
 | An explicit choice works without a known family | 59 | Done. |
-| Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover the eight agreed families. |
+| Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover eight families. Gemini supports only its chemical line. |
 | Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; obsolete tier-level `fallbacks` is accepted and discarded. |
 | The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
@@ -351,8 +390,8 @@ is known.
 
 | Rule | Stories | State |
 | --- | --- | --- |
-| Automatic defaults: medium, then low, then the lowest supported non-off, or one rung below the parent's effort when it is known | 68 | Done, with a recorded deviation: no parent effort → the specified order; parent effort known → one rung down the child's own array. See [adr/0013](adr/0013-the-child-steps-one-rung-down-in-reasoning.md). The supported levels come from Pi's own report about the model, not from its name. |
-| Retained-model automatic effort takes the next supported non-off rung | 69; ADR 0015 | With known parent effort, choose the highest supported level strictly below it, skipping gaps; at the floor, effort stays. No fixed medium/low preference applies. Without parent effort, medium/low/lowest non-off remains. Explicit request/definition levels still win. |
+| Automatic default: upper median of supported non-off levels | 68, 69; ADR 0017 | Done. The child model's canonical supported levels determine the median, with the higher middle rung selected for an even array. Parent effort and model retention do not affect the result. |
+| Retained models use the same automatic median | 69; ADR 0017 | Done. The reasoning request contains no parent-effort or retained-model inputs. |
 | The request's level wins over the definition's | 70 | Done. |
 | An unsupported level is clamped, never rejected | 71 | Done. The clamp is Pi's own, so the runtime cannot disagree with Pi about a level, and it never lands on "off" for a reasoning model. |
 | A model that does not reason is still usable | 72 | Done. |
@@ -377,6 +416,14 @@ Recorded in [adr/](adr/):
   definition has one prompt shape and the request always wins.
 - [0006](adr/0006-background-by-default.md) — the background is the default
   for both doors.
+- [0017](adr/0017-automatic-reasoning-is-the-upper-median.md) — automatic
+  reasoning is centered on the child model rather than the parent's effort.
+- [0018](adr/0018-separate-the-gemini-family-ladders.md) — the historical
+  separation of Gemini chemical, Pro, and Flash lines.
+- [0020](adr/0020-drop-gemini-pro-and-flash-support.md) — Pro and Flash support
+  is removed, leaving only the chemical Gemini ladder.
+- [0019](adr/0019-reviewer-inherits-parent-tools.md) — Reviewer inherits
+  request-time parent tools while retaining non-editing instructions.
 
 ## The shared settings backend
 
@@ -663,13 +710,12 @@ The recovered suite pins the behaviour this derivative must preserve:
     asserted to make them pass; `src/optional.ts` holds the vocabulary that
     makes omission expressible. See *The type system as a seam* above.
     ARCHITECTURE-SPEC stories 104–105.
-14. **A child's default reasoning is one rung below its parent's.** The
-    specified automatic order (medium → low → lowest supported non-off) is kept
-    only when no parent effort is known; when it is known, the child steps one
-    rung down **in its own model's level array**, and lands on that model's
-    floor where no rung exists. This partially supersedes SPEC story 68 and the
-    matching line in ARCHITECTURE-SPEC. See
-    [adr/0013](adr/0013-the-child-steps-one-rung-down-in-reasoning.md).
+14. **A child's automatic reasoning is the upper median of its own model's
+    supported non-off levels.** The higher middle rung wins for an even array,
+    off is excluded, and neither parent effort nor retaining the parent's model
+    changes the result. This supersedes the earlier parent-relative step-down
+    policy. See
+    [adr/0017](adr/0017-automatic-reasoning-is-the-upper-median.md).
 
 ## SDK drift found while characterizing (Pi 1.0.0 → 1.3.0)
 

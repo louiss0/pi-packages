@@ -29,8 +29,6 @@ export type LaunchModelContext = Readonly<{
   ladders: RoutingLadders;
   /** The parent's model, which the automatic routing steps down from. */
   parentModel?: Model<any>;
-  /** The effort the parent is running at. */
-  parentThinkingLevel?: SubagentThinkingLevel;
 }>;
 
 /** What the request and the definition asked for. */
@@ -108,11 +106,9 @@ export function resolveLaunchModel(
     : undefined;
   const thinkingDecision = resolveThinking(
     defined({
-      parentModelKept,
       model: selectedModel,
       requested: request.requestedThinking,
       defined: request.definitionThinking,
-      parentLevel: context.parentThinkingLevel,
     }),
   );
 

@@ -20,7 +20,6 @@ import {
   isTerminalErrorStatus,
   type SubagentStatus,
 } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 
 /** Which run of a subagent this is: the one that created its session, or a resume of it. */
 export type RunKind = "initial" | "resume";
@@ -51,8 +50,6 @@ export interface RunOutcome {
   readonly workspaceNotice: string | undefined;
   /** The updates no announcement delivered; what the carrier still owes. */
   readonly runUpdates: ReadonlyArray<string>;
-  /** The run's turn limit and its use; absent when no limit applied. */
-  readonly turnBudget: TurnBudget | undefined;
   /** A resume replaced this run after it settled. */
   readonly replaced: boolean;
   isActive(): boolean;
@@ -80,8 +77,6 @@ export type RunOutcomeInit = {
   pendingQuestion?: string;
   /** What a teardown with no result text reported. */
   workspaceNotice?: string;
-  /** The run's turn limit and its use. */
-  turnBudget?: TurnBudget;
   /** Updates the child sent, in order, each still owed to a carrier. */
   runUpdates?: ReadonlyArray<string>;
   /** Time the parent collected the outcome; undefined = obligation still open. */
@@ -152,13 +147,6 @@ export class SubagentRun implements RunOutcome {
     return this._workspaceNotice;
   }
 
-  // The run's turn budget, live: the turn loop reports it before the first turn
-  // and after each boundary, so the last report is already the outcome's.
-  private _turnBudget: TurnBudget | undefined;
-  get turnBudget(): TurnBudget | undefined {
-    return this._turnBudget;
-  }
-
   // The updates the child sent during this run, each remembering whether the
   // announcement channel delivered it, so a message reaches the parent once,
   // through whichever channel could reach it, and no carrier repeats it.
@@ -204,7 +192,6 @@ export class SubagentRun implements RunOutcome {
     this._completedAt = init.completedAt;
     this._pendingQuestion = init.pendingQuestion;
     this._workspaceNotice = init.workspaceNotice;
-    this._turnBudget = init.turnBudget;
     for (const message of init.runUpdates ?? []) this.recordUpdate(message);
     this._consumedAt = init.consumedAt;
   }
@@ -350,11 +337,6 @@ export class SubagentRun implements RunOutcome {
       (update) => !update.announced && update.message === message,
     );
     if (owed) owed.announced = true;
-  }
-
-  /** Record the budget the running turn loop reports. */
-  setTurnBudget(budget: TurnBudget): void {
-    this._turnBudget = budget;
   }
 
   /**

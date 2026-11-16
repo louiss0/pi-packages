@@ -60,7 +60,6 @@ describe("startProgressStream", () => {
       toolUses: 7,
       lifetimeUsage: { input: 2000, output: 0, cacheWrite: 0 },
       responseText: "The retry wrapper swallows the error.",
-      turnBudget: { maxTurns: 10, used: 3, phase: "within" },
     });
     await vi.advanceTimersByTimeAsync(80);
     stop();
@@ -71,7 +70,6 @@ describe("startProgressStream", () => {
         ...detailBase,
         toolUses: 7,
         tokens: "2.0k token",
-        turnBudget: { maxTurns: 10, used: 3, phase: "within" },
         durationMs: 80,
         status: "running",
         activity: "The retry wrapper swallows the error.",
