@@ -223,7 +223,6 @@ export class SettingsManager {
       this.agentDir,
       this.cwd,
     );
-    const loaded = settings;
     if (typeof settings.maxConcurrent === "number")
       this.maxConcurrent = settings.maxConcurrent;
     if (typeof settings.consumedSessionRetentionMinutes === "number")
@@ -245,8 +244,8 @@ export class SettingsManager {
       ? { ...settings.familyProfiles }
       : undefined;
     this._projectSettings = { ...projectSettings };
-    this.emit("subagents:settings_loaded", { settings: loaded });
-    return loaded;
+    this.emit("subagents:settings_loaded", { settings });
+    return settings;
   }
 
   /**
@@ -265,7 +264,6 @@ export class SettingsManager {
    * file says what the operator last chose. The data the operator hand-edits
    * is the project's own, so the operator's data is never copied into the
    * project's file.
-   *
    */
   snapshot(): SettingsSnapshot {
     const snapshot: SettingsSnapshot = {

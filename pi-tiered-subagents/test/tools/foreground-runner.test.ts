@@ -450,7 +450,7 @@ describe("runForeground", () => {
     });
   });
 
-  it("streams the live turn budget of the record once its session exists", async () => {
+  it("streams the live record details once its session exists", async () => {
     const running = createTestSubagent({
       status: "running",
       completedAt: undefined,
@@ -487,7 +487,10 @@ describe("runForeground", () => {
     // Partial match: the streamed details also carry a spinner frame and a wall-clock duration.
     expect(onUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        details: expect.objectContaining({}),
+        details: expect.objectContaining({
+          status: "running",
+          toolUses: running.toolUses,
+        }),
       }),
     );
 

@@ -170,7 +170,11 @@ export function listNavigableAgents(
   return [...live, ...snapshots];
 }
 
-/** Custom session entry marking the boundary between inherited parent entries and the child's own turns. */
+/**
+ * Custom session entry marking the boundary between inherited parent entries
+ * and the child's own turns. Duplicated from `src/session/fork.ts`: the UI
+ * boundary rule forbids presentation modules importing session implementation.
+ */
 export const FORK_BOUNDARY_ENTRY = "subagents:fork-boundary";
 
 /**
