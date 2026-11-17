@@ -1,9 +1,7 @@
 import { defined } from "#src/optional";
 import type { AgentDefinition } from "#src/agents/definition";
 import { defaultDefinition } from "#src/agents/definition";
-import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /** Flat options for {@link createResolvedSpawnConfig}; only the scalars tests vary. */
 export interface ResolvedSpawnConfigOptions {
@@ -17,8 +15,6 @@ export interface ResolvedSpawnConfigOptions {
   definition?: AgentDefinition;
   /** Advisories the result leads with. */
   notes?: string[];
-  /** The resolved turn ceiling; unlimited unless a test says otherwise. */
-  turnPolicy?: TurnPolicy;
 }
 
 /**
@@ -60,7 +56,6 @@ export function createResolvedSpawnConfig(
         clamped: false,
         reason: "no model was resolved, so there is no reasoning level to set",
       },
-      turnPolicy: options.turnPolicy ?? UNLIMITED_TURNS,
       inheritContext: false,
       runInBackground,
     },

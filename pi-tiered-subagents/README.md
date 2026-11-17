@@ -48,8 +48,6 @@ Opens an interactive menu for runtime controls. It takes no command arguments; c
 | Choice | Workflow impact |
 | --- | --- |
 | Max concurrency | Controls how many children can execute at once; default **4**. Workspace writer scheduling still applies. |
-| Default max turns | Sets the fallback work budget; **0** means unlimited. Positive ceilings normalize to at least two turns. Request and definition limits take precedence. |
-| Wrap-up turns | Warns a child as it approaches its ceiling so it can finish and report; default **2**. |
 | Consumed-session retention | Keeps a collected child's session available for follow-up; default **10 minutes**. |
 | Unconsumed-session retention | Caps how long an uncollected child's session is retained; default **720 minutes**. |
 | Abort all subagents on ESC | When enabled, interrupting the parent also stops queued and background children; enabled by default. Foreground work is interrupted either way. |
@@ -78,10 +76,9 @@ Launches a specialist for scoped work, or resumes an existing child for a follow
 | `string:subagent_type` | Yes | Shipped or custom agent identifier. Unknown and disabled identifiers are rejected, not replaced. |
 | `string:model` | No | Exact `provider/modelId` for a new launch; overrides the definition and automatic routing. Unavailable pins fail rather than silently rerouting. |
 | `string:thinking` | No | Reasoning request: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`, subject to model support and the reasoning rules below. |
-| `number:max_turns` | No | Positive turn ceiling for a new launch; otherwise the definition or runtime default applies. The tool schema requires at least 1, and execution normalizes positive ceilings to at least 2. |
 | `boolean:run_in_background` | No | `true` returns after acceptance; `false` awaits the outcome. New launches inherit the definition's default when omitted. Resumes default to foreground unless explicitly set to `true`. |
 | `string:resume` | No | Existing agent ID whose conversation should continue. Uses the captured session configuration rather than preparing a new model or capability set. |
-| `boolean:inherit_context` | No | For a new launch, overrides whether the child receives the parent's conversation. Otherwise the definition decides. |
+| `boolean:inherit_context` | No | For a new launch, overrides whether the child forks the parent's conversation branch. Otherwise the definition decides. The completed parent history is forked in memory as real session entries, not flattened into prose; only the child's own turns appear in its transcript. |
 
 For example, a model-facing call can delegate exploration without waiting:
 
@@ -140,17 +137,17 @@ Outside the viewer, Pi's ordinary <kbd>Esc</kbd> interruption follows the interr
 
 ### Features
 
-#### Workspace scheduling and execution budgets
+#### Workspace scheduling
 
 Only one child with potentially writing capabilities can operate in a workspace at a time. Read-only children can run alongside that writer. Scheduling follows the **effective tools**, not the role name: shells, editors, and unknown tools count as potential writers. This coordinates child access; it is not a filesystem sandbox or a lock on the parent agent's own edits.
 
-Concurrency admission applies to foreground and background work. Near a configured turn ceiling, the runtime warns the child to wrap up, then stops the run at the limit. Retained sessions allow later follow-up without rebuilding the child's conversation; retention expiry can make a child non-resumable.
+Concurrency admission applies to foreground and background work. Children run until they finish, are interrupted, or are explicitly stopped; there is no turn ceiling. Retained sessions allow later follow-up without rebuilding the child's conversation; retention expiry can make a child non-resumable.
 
 #### Role-aware model and reasoning selection
 
 A request model pin wins over a definition pin; otherwise the runtime routes from the parent's model using the resolved specialist identifier.
 
-| Specialist | Size families: GPT, Claude, Qwen | Planner/worker families: Gemini, MiniMax, GLM, MiMo, DeepSeek |
+| Specialist | Size families: GPT, Claude, Gemini chemical, Qwen | Planner/worker families: MiniMax, GLM, MiMo, DeepSeek |
 | --- | --- | --- |
 | `worker` | One size below the parent, clamped at S | Worker |
 | `explore`, `researcher` | S | Worker |

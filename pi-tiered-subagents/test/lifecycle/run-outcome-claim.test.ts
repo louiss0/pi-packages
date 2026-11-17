@@ -10,7 +10,6 @@ import {
 } from "#test/helpers/mock-session";
 import { TEST_OWNER } from "#test/helpers/owner";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 function registry() {
   return new AgentRegistry(() => ({
@@ -50,7 +49,6 @@ describe("foreground run outcome claim", () => {
         "answer immediately",
         {
           description: "immediate foreground child",
-          turnPolicy: UNLIMITED_TURNS,
           owner: TEST_OWNER,
         },
       );

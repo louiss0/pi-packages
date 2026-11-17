@@ -101,12 +101,10 @@ describe("createAgentLookup", () => {
   it("accepts a partial definition override", () => {
     const override: Patch<AgentDefinition> = {
       displayName: "Custom",
-      maxTurns: 7,
     };
     const lookup = createAgentLookup(override);
     const selection = lookup.select("explore");
     expect(selection.ok && selection.definition.displayName).toBe("Custom");
-    expect(selection.ok && selection.definition.maxTurns).toBe(7);
     // other defaults still present
     expect(selection.ok && selection.definition.instructions).toBe(
       "You are Explore.",

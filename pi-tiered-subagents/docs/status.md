@@ -14,6 +14,42 @@ implementation history and verification evidence, not release approval.
 > [stabilization.md](stabilization.md) for the evidence table and the remaining
 > known limitations.
 
+> **Turn budgets have been removed.** The sections below that describe a
+> resolved `limited`/`unlimited` turn policy, `max_turns`, `defaultMaxTurns`,
+> and `wrapUpTurns` are retained as implementation history only. Children now
+> run until they finish, are interrupted, or are explicitly stopped. Likewise
+> `inherit_context: true` now forks the parent's completed conversation branch
+> in memory as real Pi session entries instead of flattening it into prose.
+
+## Median reasoning, chemical-only Gemini, and Reviewer inheritance
+
+The current automatic thinking policy is the upper median of the child model's
+supported non-off levels. It ignores parent effort for both changed and retained
+models; explicit request and definition levels still take precedence. See
+[ADR 0017](adr/0017-automatic-reasoning-is-the-upper-median.md).
+
+Gemini automatic routing supports only the chemical `gemini` family: Krypton
+XL, Carbon L, Argon M, Hydrogen S. Pro and Flash profiles and strategies have
+been removed; those IDs are unclaimed and retain their parent rather than
+routing into the chemical ladder or one another. See
+[ADR 0020](adr/0020-drop-gemini-pro-and-flash-support.md).
+
+The shipped Reviewer inherits the parent's active tools at request time. Its
+instructions permit commands and checks but forbid edits, and explicit
+Reviewer tool overrides still replace inheritance. Recursion exclusions and
+capability-based scheduling are unchanged. See
+[ADR 0019](adr/0019-reviewer-inherits-parent-tools.md).
+
+Verification for this increment: 195 focused routing, reasoning, registry, and
+launch tests passed during implementation. The final complete suite passed
+**2,565 tests with one platform-specific skip across 136 files**, with the Nx
+daemon disabled for the final run. Package
+`typecheck`, `lint`, `check`, and `metadata` targets passed; the typecheck
+wrapper continues to report the recorded third-party settings diagnostics.
+Independent review found no correctness or safety defects; its documentation,
+dead-input, and Reviewer recursion-coverage findings were addressed before the
+final suite.
+
 ## Current API boundary
 
 The maintainer has removed the cross-extension runtime API. Delegation is now

@@ -29,7 +29,6 @@ import {
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 const registry = new AgentRegistry(() => ({
   global: { definitions: [], errors: [] },
@@ -77,7 +76,6 @@ function createOwnedManager(): {
 
 const BASE_CONFIG = {
   description: "d",
-  turnPolicy: UNLIMITED_TURNS,
   background: { kind: "explicit", isBackground: true },
 } as const;
 

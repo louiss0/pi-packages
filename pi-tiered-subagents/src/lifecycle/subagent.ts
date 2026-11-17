@@ -33,7 +33,6 @@ import {
   SubagentState,
   type SubagentStatus,
 } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
@@ -42,7 +41,6 @@ import type { ModelSelection } from "#src/models/selection";
 import { defined } from "#src/optional";
 import type { ThinkingDecision } from "#src/thinking/resolve";
 import type { RunConfig } from "#src/runtime";
-import type { TurnPolicy } from "#src/lifecycle/turn-limits";
 import type {
   CompactionInfo,
   ParentSessionInfo,
@@ -139,13 +137,6 @@ export interface SubagentExecution {
    * prompt-inheritance resolver at execution.
    */
   childShaping?: ChildShapingSettings;
-  /**
-   * The run's turn ceiling, resolved once at the door.
-   *
-   * Captured with the launch rather than read at run time, so a later change
-   * to the operator's default budget cannot alter accepted work.
-   */
-  turnPolicy: TurnPolicy;
   thinkingLevel?: ThinkingLevel;
   /**
    * How the resolved model was chosen, and why — the decision behind a launch.
@@ -277,9 +268,6 @@ export class Subagent {
    */
   get workspaceNotice(): string | undefined {
     return this.currentRun.workspaceNotice;
-  }
-  get turnBudget(): TurnBudget | undefined {
-    return this.currentRun.turnBudget;
   }
   get toolUses(): number {
     return this.state.toolUses;
@@ -636,7 +624,6 @@ export class Subagent {
                 this.announceUpdate(message);
               }
             : undefined,
-          turnPolicy: this.execution.turnPolicy,
           definition: this.execution.definition,
           childShaping: this.execution.childShaping,
           toolNames: this.execution.toolNames,
@@ -682,9 +669,6 @@ export class Subagent {
         run,
         await session.runTurnLoop(prompt, {
           signal: run.signal,
-          onTurnBudget: (budget) => {
-            run.setTurnBudget(budget);
-          },
         }),
       );
     } catch (err) {
@@ -1027,29 +1011,21 @@ export class Subagent {
   private complete(run: SubagentRun, result: TurnLoopResult): void {
     run.release();
 
-    // The harness ending the run at its turn limit is the one way a run that
-    // returned is not complete.
-    const exhausted = result.turnBudget.phase === "exhausted";
-    const finalStatus: SubagentStatus = exhausted ? "aborted" : "completed";
     // A completed child that declared a question is inviting a resume, so its
-    // workspace stays live for the resume to re-enter, including a run that
-    // wrapped up at its turn limit: the resume gets a fresh budget to act on the
-    // answer. Every other outcome ends the run for good and tears it down here.
-    // The question was recorded by ask_parent during the run, so it is already
-    // on the record here.
-    const holdForResume =
-      finalStatus === "completed" && run.pendingQuestion !== undefined;
+    // workspace stays live for the resume to re-enter. Every other outcome ends
+    // the run for good and tears it down here. The question was recorded by
+    // ask_parent during the run, so it is already on the record here.
+    const holdForResume = run.pendingQuestion !== undefined;
     const finalResult = holdForResume
       ? result.responseText
       : result.responseText +
         this.workspaceBracket.dispose({
-          status: finalStatus,
+          status: "completed",
           description: this.description,
         });
 
     // The run this completion ends, which a resume may already have replaced.
-    if (exhausted) run.markAborted(finalResult);
-    else run.markCompleted(finalResult);
+    run.markCompleted(finalResult);
 
     this.execution.observer?.onRunFinished?.(this, run.kind);
   }

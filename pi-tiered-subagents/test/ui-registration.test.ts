@@ -245,7 +245,7 @@ describe("runtime-loaded UI registrations (offline SDK)", () => {
       "Settings",
       expect.arrayContaining([
         expect.stringMatching(/^Max concurrency \(current: /),
-        expect.stringMatching(/^Default max turns \(current: /),
+        expect.stringMatching(/^Consumed-session retention \(current: /),
       ]),
     ]);
   });

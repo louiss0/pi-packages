@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { defined, type Patch } from "#src/optional";
-import type { AgentStatus } from "#src/ui/view-types";
-import type { TurnBudget } from "#src/ui/view-types";
 import {
   renderAgentResult,
   renderBackground,
@@ -13,6 +11,7 @@ import {
   renderStopped,
 } from "#src/ui/result-renderer";
 import type { AgentDetails, Theme } from "#src/ui/display";
+import type { AgentStatus } from "#src/ui/view-types";
 
 function makeTheme(): Theme {
   return {
@@ -20,8 +19,6 @@ function makeTheme(): Theme {
     bold: (text: string) => `**${text}**`,
   };
 }
-
-const WARNED: TurnBudget = { maxTurns: 2, used: 3, phase: "warned" };
 
 function makeDetails(overrides: Patch<AgentDetails> = {}): AgentDetails {
   return {
@@ -58,23 +55,6 @@ describe("renderStats", () => {
     const result = renderStats(details, theme);
     expect(result).toContain("[dim:thinking: high]");
     expect(result).toContain("[dim:inherit context]");
-  });
-
-  it("includes the turns used against the ceiling", () => {
-    const details = makeDetails({
-      turnBudget: { maxTurns: 30, used: 5, phase: "within" },
-    });
-    expect(renderStats(details, theme)).toContain("[dim:↻5≤30]");
-  });
-
-  it("includes an unlimited run's turns without a ceiling", () => {
-    const details = makeDetails({ turnBudget: { used: 5, phase: "within" } });
-    expect(renderStats(details, theme)).toContain("[dim:↻5]");
-  });
-
-  it("excludes turns when the run has no turn budget yet", () => {
-    const details = makeDetails({ turnBudget: undefined });
-    expect(renderStats(details, theme)).not.toContain("↻");
   });
 
   it("includes singular tool use", () => {
@@ -177,17 +157,6 @@ describe("renderCompleted", () => {
     );
   });
 
-  it("uses warning icon for a completed run the harness warned", () => {
-    const details = makeDetails({
-      status: "completed",
-      durationMs: 2000,
-      turnBudget: WARNED,
-    });
-    expect(renderCompleted(details, "", false, theme)).toContain(
-      "[warning:\u2713]",
-    );
-  });
-
   it("includes formatted duration", () => {
     const details = makeDetails({ status: "completed", durationMs: 3500 });
     expect(renderCompleted(details, "", false, theme)).toContain("[dim:3.5s]");
@@ -197,17 +166,6 @@ describe("renderCompleted", () => {
     const details = makeDetails({ status: "completed", durationMs: 2000 });
     expect(renderCompleted(details, "", false, theme)).toContain(
       "[dim:  \u23BF  Done]",
-    );
-  });
-
-  it("collapsed view shows 'Wrapped up (budget warning)' for a completed run the harness warned", () => {
-    const details = makeDetails({
-      status: "completed",
-      durationMs: 2000,
-      turnBudget: WARNED,
-    });
-    expect(renderCompleted(details, "", false, theme)).toContain(
-      "[dim:  \u23BF  Wrapped up (budget warning)]",
     );
   });
 
@@ -290,7 +248,7 @@ describe("renderFailed", () => {
   it("shows aborted message with warning color for aborted status", () => {
     const details = makeDetails({ status: "aborted" });
     expect(renderFailed(details, theme)).toContain(
-      "[warning:  \u23BF  Aborted (turn limit reached)]",
+      "[warning:  \u23BF  Aborted]",
     );
   });
 });
@@ -326,17 +284,6 @@ describe("renderAgentResult", () => {
     );
   });
 
-  it("dispatches to renderCompleted for a completed run the harness warned", () => {
-    const details = makeDetails({
-      status: "completed",
-      durationMs: 1000,
-      turnBudget: WARNED,
-    });
-    expect(renderAgentResult(details, "", false, false, theme)).toContain(
-      "[warning:\u2713]",
-    );
-  });
-
   it("dispatches to renderStopped for stopped status", () => {
     const details = makeDetails({ status: "stopped" });
     expect(renderAgentResult(details, "", false, false, theme)).toContain(
@@ -354,7 +301,7 @@ describe("renderAgentResult", () => {
   it("dispatches to renderFailed for aborted status", () => {
     const details = makeDetails({ status: "aborted" });
     expect(renderAgentResult(details, "", false, false, theme)).toContain(
-      "[warning:  \u23BF  Aborted (turn limit reached)]",
+      "[warning:  \u23BF  Aborted]",
     );
   });
 });

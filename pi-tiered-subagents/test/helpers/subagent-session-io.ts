@@ -46,6 +46,11 @@ export function createSubagentSessionIO() {
       newSession: vi.fn(),
       getSessionFile: vi.fn().mockReturnValue("/sessions/child.jsonl"),
       getSessionId: vi.fn().mockReturnValue("child-session-id"),
+      appendMessage: vi.fn(() => "fork-message"),
+      appendCustomMessageEntry: vi.fn(() => "fork-custom-message"),
+      appendCompaction: vi.fn(() => "fork-compaction"),
+      appendContextEdit: vi.fn(() => "fork-context-edit"),
+      appendCustomEntry: vi.fn(() => "fork-boundary"),
     }),
     createSettingsManager: vi.fn().mockReturnValue({}),
     // Identity by default: no package exclusions, so children inherit everything.

@@ -16,7 +16,7 @@ configuration, not the historical upstream `subagents.json` format.
 | Use a particular model for one task | `model` in the `subagent` request |
 | Always use your preferred model for one specialist | `model` in `.pi/agents/<name>.md` or your global agent file |
 | Change the tiers used by automatic family routing | `familyProfiles` in the shared settings store |
-| Change concurrency, turn limits, or retention | `/subagents:settings` or the shared settings file |
+| Change concurrency or retention | `/subagents:settings` or the shared settings file |
 
 - [How automatic selection works](#how-automatic-selection-works)
 - [Pick your own model](#pick-your-own-model)
@@ -191,8 +191,7 @@ clears an inherited optional choice.
 | `model` | Exact `provider/modelId`; unset means automatic routing |
 | `thinking` | Explicit reasoning level; unset means automatic reasoning |
 | `tools` | Complete allowlist, `inherit`, `none`, or `[]` |
-| `max_turns` | Turn ceiling; `0` means unlimited, positive limits have a minimum of 2 |
-| `inherit_context` | Whether to inherit the parent's conversation |
+| `inherit_context` | Whether the child forks the parent's completed conversation branch as real session entries |
 | `run_in_background` | Default execution mode |
 | `enabled` | `false` prevents this specialist from being requested |
 
@@ -255,7 +254,6 @@ A complete example of the on-disk shape:
 {
   "pi-tiered-subagents": {
     "maxConcurrent": "4",
-    "defaultMaxTurns": "30",
     "abortAllOnInterrupt": "true",
     "familyProfiles": "{\"claude\":{\"group\":\"size\",\"tiers\":[{\"tier\":\"opus\",\"size\":\"L\"},{\"tier\":\"sonnet\",\"size\":\"M\"},{\"tier\":\"haiku\",\"size\":\"S\"}]}}"
   }
@@ -357,16 +355,10 @@ the role policy or pin models.
 | Setting | Default | Meaning / accepted on-disk range |
 | --- | --- | --- |
 | `maxConcurrent` | `4` | 1–1024 concurrent children; workspace writer scheduling still applies |
-| `defaultMaxTurns` | `0` | Unlimited at 0; positive ceilings normalize to at least 2; maximum 10,000 |
-| `wrapUpTurns` | `2` | Warn with this many turns remaining; 1–1000 |
 | `consumedSessionRetentionMinutes` | `10` | Retain a collected child's session; 1–20,160 minutes |
 | `unconsumedSessionRetentionMinutes` | `720` | Safety retention for an uncollected child's session; 1–20,160 minutes |
 | `abortAllOnInterrupt` | `true` | ESC stops background/queued children too; foreground work aborts on ESC either way |
 | `midRunUpdates` | `true` | Give background children `notify_parent`; disabling it does not disable ask-back |
-
-Turn ceilings resolve request `max_turns` → definition `max_turns` →
-`defaultMaxTurns`. A request or definition value of 0 explicitly selects
-unlimited execution. `graceTurns` is retired; use `wrapUpTurns`.
 
 The following structured settings are hand-edited, JSON-encoded strings rather
 than settings-menu controls:

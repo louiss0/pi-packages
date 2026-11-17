@@ -1,7 +1,6 @@
 import { defined } from "#src/optional";
 import type { AgentDefinitionLookup } from "#src/agents/registry";
 import { isShippedSpecialist } from "#src/agents/shipped";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import { getLifetimeTotal, type LifetimeUsage } from "#src/lifecycle/usage";
 import {
   type AgentDetails,
@@ -33,7 +32,6 @@ export function buildDetails(
     model?: ModelIdentity | undefined;
     /** Durable prepared identity, available while the child is queued. */
     modelIdentity?: ModelIdentity | undefined;
-    turnBudget?: TurnBudget | undefined;
   },
   overrides?: Partial<AgentDetails>,
 ): AgentDetails {
@@ -48,7 +46,6 @@ export function buildDetails(
         modelLabel(record.modelIdentity ?? record.model) ?? base.modelName,
       agentId: record.id,
       error: record.error,
-      turnBudget: record.turnBudget,
     }),
     ...overrides,
   };

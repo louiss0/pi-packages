@@ -157,9 +157,9 @@ must recover by parsing prose.
 
 The complete execution decision produced by preparation: the selected
 definition, exact capabilities, captured parent inputs, model and reasoning
-decisions, final turn policy, and child-shaping settings. Acceptance transfers
-this plan to the session runtime. Later file or setting edits affect future
-requests, not an accepted plan.
+decisions, and child-shaping settings. Acceptance transfers this plan to the
+session runtime. Later file or setting edits affect future requests, not an
+accepted plan.
 
 ## Launch acceptance
 

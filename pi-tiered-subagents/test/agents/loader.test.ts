@@ -88,11 +88,6 @@ describe("parseDefinitionContent", () => {
     expect(patch.runInBackground).toBe(false);
     expect(patch.enabled).toBe(false);
   });
-
-  it("reads a turn ceiling", () => {
-    const patch = parseDefinitionContent("---\nmax_turns: 8\n---\n");
-    expect(patch.maxTurns).toBe(8);
-  });
 });
 
 describe("loadDefinitionScope", () => {

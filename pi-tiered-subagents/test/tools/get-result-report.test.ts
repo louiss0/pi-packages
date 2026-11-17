@@ -206,20 +206,8 @@ describe("formatAgentReport", () => {
       makeReport({ status: "aborted", result: "Half of the inv" }),
     );
 
-    expect(text).toContain(
-      "aborted \u2014 turn limit reached, output may be incomplete",
-    );
+    expect(text).toContain("aborted \u2014 output may be incomplete");
     expect(text).toContain("Half of the inv");
-  });
-
-  it("names a turn-limit wrap-up on a completed run the harness warned", () => {
-    const report = makeReport({
-      status: "completed",
-      turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
-    });
-    expect(formatAgentReport(report)).toContain(
-      "Status: completed (wrapped up \u2014 after turn-budget warning) |",
-    );
   });
 
   it("adds no status note for a plain completion", () => {
@@ -295,13 +283,12 @@ describe("formatAgentReport", () => {
       duration: "80.0s (running)",
     };
 
-    it("names the activity, turns used, and time since the last progress before the description", () => {
+    it("names the activity and time since the last progress before the description", () => {
       const text = formatAgentReport(
         makeReport({
           ...running,
           progress: {
             activity: "running command\u2026",
-            turns: 7,
             sinceLastProgress: "72.0s",
           },
         }),
@@ -309,19 +296,18 @@ describe("formatAgentReport", () => {
       expect(text).toBe(
         "Agent: agent-1\n" +
           "Type: General | Status: running | Tool uses: 3 | Duration: 80.0s (running)\n" +
-          "Progress: running command\u2026 | Turns: 7 | Last progress: 72.0s ago\n" +
+          "Progress: running command\u2026 | Last progress: 72.0s ago\n" +
           "Description: Investigate the bug\n\n" +
           "Agent is still running. Use wait: true or check back later.",
       );
     });
 
-    it("omits the turns before the run reports a budget", () => {
+    it("omits the progress section when no activity was reported", () => {
       const text = formatAgentReport(
         makeReport({
           ...running,
           progress: {
             activity: "thinking\u2026",
-            turns: undefined,
             sinceLastProgress: "3.0s",
           },
         }),

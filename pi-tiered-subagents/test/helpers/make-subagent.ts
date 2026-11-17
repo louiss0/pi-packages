@@ -6,7 +6,6 @@ import {
   SubagentState,
   type SubagentStatus,
 } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { SubagentType } from "#src/types";
 import {
   createSubagentSessionStub,
@@ -14,7 +13,6 @@ import {
 } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { TEST_OWNER } from "#test/helpers/owner";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /**
  * A minimal, mandatory SubagentExecution for tests that build a passive record
@@ -31,9 +29,6 @@ export function makeStubExecution(
     snapshot: STUB_SNAPSHOT,
     prompt: "do something",
     baseCwd: "",
-    // Unlimited unless a fixture is about the budget: a ceiling nobody asked
-    // for would stop turns the test expects to happen.
-    turnPolicy: UNLIMITED_TURNS,
     // Spread after the defaults so a `Patch` key explicitly set to `undefined`
     // is dropped rather than overwriting the default — the `defined()` filter
     // mirrors what the seam's `Object.hasOwn` consumers expect.
@@ -69,8 +64,6 @@ export type TestSubagentOptions = Patch<{
   pendingQuestion?: string;
   /** Seed what a teardown with no result text reported. */
   workspaceNotice?: string;
-  /** Seed the run's turn limit and its use. */
-  turnBudget?: TurnBudget;
   error?: string;
   /** Seed the never-started marker (the agent was stopped before it was admitted). */
   stoppedWhileQueued?: boolean;
@@ -163,7 +156,6 @@ export function createTestSubagent(
       stoppedWhileQueued: overrides.stoppedWhileQueued,
       pendingQuestion: overrides.pendingQuestion,
       workspaceNotice: overrides.workspaceNotice,
-      turnBudget: overrides.turnBudget,
       runUpdates,
       consumedAt: overrides.consumedAt,
     }),

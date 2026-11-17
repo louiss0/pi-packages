@@ -5,23 +5,9 @@ import { makeMenuUI } from "#test/helpers/ui-stubs";
 function makeSettings() {
   return {
     maxConcurrent: 4,
-    defaultMaxTurns: undefined as number | undefined,
-    wrapUpTurns: 2,
     applyMaxConcurrent: vi.fn(
       (): { message: string; level: "info" | "warning" } => ({
         message: "Max concurrency set to 8",
-        level: "info",
-      }),
-    ),
-    applyDefaultMaxTurns: vi.fn(
-      (): { message: string; level: "info" | "warning" } => ({
-        message: "Default max turns set to unlimited",
-        level: "info",
-      }),
-    ),
-    applyWrapUpTurns: vi.fn(
-      (): { message: string; level: "info" | "warning" } => ({
-        message: "Wrap-up turns set to 3",
         level: "info",
       }),
     ),
@@ -85,15 +71,13 @@ describe("SubagentsSettingsHandler", () => {
     expect(typeof handler).toBe("function");
   });
 
-  it("shows the seven settings options with current values", async () => {
+  it("shows the five settings options with current values", async () => {
     const { handler } = makeHandler();
     const ui = makeMenuUI([undefined]); // cancel immediately
     await handler({ ui });
     const options = menuOptions(ui);
     expect(options).toEqual([
       "Max concurrency (current: 4)",
-      "Default max turns (current: unlimited)",
-      "Wrap-up turns (current: 2)",
       "Consumed-session retention (current: 10 min)",
       "Unconsumed-session retention (current: 720 min)",
       "Abort all subagents on ESC (current: on)",
@@ -124,7 +108,7 @@ describe("SubagentsSettingsHandler", () => {
     const ui = makeMenuUI([undefined]);
     await handler({ ui });
     const options = menuOptions(ui);
-    expect(options[5]).toBe("Abort all subagents on ESC (current: off)");
+    expect(options[3]).toBe("Abort all subagents on ESC (current: off)");
   });
 
   it("applies no change when the settings list is cancelled", async () => {
@@ -132,8 +116,6 @@ describe("SubagentsSettingsHandler", () => {
     const ui = makeMenuUI([undefined]);
     await handler({ ui });
     expect(settings.applyMaxConcurrent).not.toHaveBeenCalled();
-    expect(settings.applyDefaultMaxTurns).not.toHaveBeenCalled();
-    expect(settings.applyWrapUpTurns).not.toHaveBeenCalled();
     expect(ui.input).not.toHaveBeenCalled();
   });
 });
@@ -174,63 +156,6 @@ describe("SubagentsSettingsHandler — max concurrency", () => {
     ui.input = vi.fn().mockResolvedValue("abc");
     await handler({ ui });
     expect(settings.applyMaxConcurrent).not.toHaveBeenCalled();
-    expect(ui.notify).toHaveBeenCalledWith(
-      "Must be a positive integer.",
-      "warning",
-    );
-  });
-});
-
-describe("SubagentsSettingsHandler — default max turns", () => {
-  it("delegates 0 (unlimited) to applyDefaultMaxTurns", async () => {
-    const { handler, settings } = makeHandler();
-    const ui = makeMenuUI(["Default max turns (current: unlimited)"]);
-    ui.input = vi.fn().mockResolvedValue("0");
-    await handler({ ui });
-    expect(settings.applyDefaultMaxTurns).toHaveBeenCalledWith(0);
-    expect(ui.notify).toHaveBeenCalledWith(
-      "Default max turns set to unlimited",
-      "info",
-    );
-  });
-
-  it("delegates a positive value to applyDefaultMaxTurns", async () => {
-    const { handler, settings } = makeHandler();
-    const ui = makeMenuUI(["Default max turns (current: unlimited)"]);
-    ui.input = vi.fn().mockResolvedValue("20");
-    await handler({ ui });
-    expect(settings.applyDefaultMaxTurns).toHaveBeenCalledWith(20);
-  });
-
-  it("rejects a negative value with a warning and does not apply", async () => {
-    const { handler, settings } = makeHandler();
-    const ui = makeMenuUI(["Default max turns (current: unlimited)"]);
-    ui.input = vi.fn().mockResolvedValue("-1");
-    await handler({ ui });
-    expect(settings.applyDefaultMaxTurns).not.toHaveBeenCalled();
-    expect(ui.notify).toHaveBeenCalledWith(
-      "Must be 0 (unlimited) or a positive integer.",
-      "warning",
-    );
-  });
-});
-
-describe("SubagentsSettingsHandler — wrap-up turns", () => {
-  it("delegates a valid value to applyWrapUpTurns and notifies the returned toast", async () => {
-    const { handler, settings } = makeHandler();
-    const ui = makeMenuUI(["Wrap-up turns (current: 2)"]);
-    ui.input = vi.fn().mockResolvedValue("3");
-    await handler({ ui });
-    expect(settings.applyWrapUpTurns).toHaveBeenCalledWith(3);
-    expect(ui.notify).toHaveBeenCalledWith("Wrap-up turns set to 3", "info");
-  });
-
-  it("rejects a value below 1 with a warning and does not apply", async () => {
-    const { handler, settings } = makeHandler();
-    const ui = makeMenuUI(["Wrap-up turns (current: 2)"]);
-    ui.input = vi.fn().mockResolvedValue("0");
-    await handler({ ui });
-    expect(settings.applyWrapUpTurns).not.toHaveBeenCalled();
     expect(ui.notify).toHaveBeenCalledWith(
       "Must be a positive integer.",
       "warning",

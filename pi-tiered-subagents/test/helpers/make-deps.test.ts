@@ -4,8 +4,6 @@ import type { ForegroundManagerDeps } from "#src/tools/foreground-runner";
 import { createToolDeps } from "./make-deps";
 import { STUB_SNAPSHOT } from "./stub-ctx";
 import { TEST_OWNER } from "./owner";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 describe("createToolDeps", () => {
   describe("manager defaults", () => {
@@ -14,7 +12,6 @@ describe("createToolDeps", () => {
       expect(
         manager.spawn(STUB_SNAPSHOT, "general-purpose", "prompt", {
           description: "test",
-          turnPolicy: UNLIMITED_TURNS,
           background: { kind: "explicit", isBackground: true },
           owner: TEST_OWNER,
         }),
@@ -27,7 +24,7 @@ describe("createToolDeps", () => {
         STUB_SNAPSHOT,
         "general-purpose",
         "prompt",
-        { description: "test", turnPolicy: UNLIMITED_TURNS, owner: TEST_OWNER },
+        { description: "test", owner: TEST_OWNER },
       );
       expect(outcome.kind).toBe("accepted");
       if (outcome.kind !== "accepted") throw new Error("unreachable");
@@ -53,10 +50,6 @@ describe("createToolDeps", () => {
       expect(createToolDeps().agentDir).toBeTypeOf("string");
     });
 
-    it("settings.defaultMaxTurns is undefined by default", () => {
-      expect(createToolDeps().settings.defaultMaxTurns).toBeUndefined();
-    });
-
     it("settings.maxConcurrent is 4 by default", () => {
       expect(createToolDeps().settings.maxConcurrent).toBe(4);
     });
@@ -80,7 +73,6 @@ describe("createToolDeps", () => {
       });
       deps.manager.spawn(STUB_SNAPSHOT, "t", "p", {
         description: "test",
-        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
         owner: TEST_OWNER,
       });
@@ -90,12 +82,9 @@ describe("createToolDeps", () => {
     it("replaces settings when overridden", () => {
       const deps = createToolDeps({
         settings: {
-          defaultMaxTurns: 10,
-          wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
           maxConcurrent: 2,
         },
       });
-      expect(deps.settings.defaultMaxTurns).toBe(10);
       expect(deps.settings.maxConcurrent).toBe(2);
     });
   });

@@ -22,7 +22,6 @@ import {
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { TEST_OWNER } from "#test/helpers/owner";
 import { turnLoopResult } from "#test/helpers/turn-loop-result";
-import { UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 /** The tools a specialist gets, as the shipped definitions give them. */
 const READ_ONLY = ["read", "grep", "find", "ls"];
@@ -99,7 +98,6 @@ function registryFor(): WorkspaceGateRegistry {
 function spawnBg(manager: SubagentManager, type: string, prompt: string) {
   const outcome = manager.spawn(WRITING_SNAPSHOT, type, prompt, {
     description: prompt,
-    turnPolicy: UNLIMITED_TURNS,
     background: { kind: "explicit", isBackground: true },
     owner: TEST_OWNER,
   });
@@ -229,7 +227,6 @@ describe("children that may change files", () => {
     const pending = acceptedRecord(
       manager.spawnAndWait(WRITING_SNAPSHOT, "writer", "now", {
         description: "foreground",
-        turnPolicy: UNLIMITED_TURNS,
         owner: TEST_OWNER,
       }),
     );
@@ -265,7 +262,6 @@ describe("children that may change files", () => {
     const id2 = acceptedId(
       manager.spawn(WRITING_SNAPSHOT, "writer", "cancelled", {
         description: "cancelled",
-        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
         signal: controller.signal,
         owner: TEST_OWNER,
@@ -462,7 +458,6 @@ describe("children that may change files", () => {
     const id1 = acceptedId(
       first.spawn(snapshot, "writer", "one", {
         description: "one",
-        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
         owner: TEST_OWNER,
       }),
@@ -470,7 +465,6 @@ describe("children that may change files", () => {
     const id2 = acceptedId(
       second.spawn(snapshot, "writer", "two", {
         description: "two",
-        turnPolicy: UNLIMITED_TURNS,
         background: { kind: "explicit", isBackground: true },
         owner: TEST_OWNER,
       }),

@@ -189,10 +189,10 @@ describe("SubagentRuntime context query methods", () => {
 
     expect(inputs.snapshot).toHaveProperty("registeredToolNames");
     expect(inputs.snapshot).toHaveProperty("activeToolNames");
-    // The session identity and conversation are captured together (story 16);
-    // the content of parentContext depends on buildParentContext, which is
+    // The session identity and conversation branch are captured together (story 16);
+    // the content of parentBranch depends on captureParentBranch, which is
     // not mocked here — the structural claim is that it is a property.
-    expect("parentContext" in inputs).toBe(true);
+    expect("parentBranch" in inputs).toBe(true);
     expect(inputs.parentSession).toEqual({
       parentSessionFile: "/sessions/test.jsonl",
       parentSessionId: "test-session-id",

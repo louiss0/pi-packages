@@ -20,13 +20,6 @@ export interface AgentDefinitionLookup {
   find(id: string): AgentDefinitionView | undefined;
 }
 
-/** Recorded turn-budget facts, not a turn-limit policy or tracker. */
-export type TurnBudget = Readonly<{
-  maxTurns?: number;
-  used: number;
-  phase: "within" | "warned" | "exhausted";
-}>;
-
 /** Lifetime token components, excluding repeatedly-read cache tokens. */
 export type LifetimeUsage = Readonly<{
   input: number;
@@ -54,8 +47,6 @@ export type WidgetAgent = Readonly<{
   error?: string | undefined;
   lifetimeUsage?: LifetimeUsage | undefined;
   compactionCount: number;
-  /** The run's recorded budget; absent until its turn loop starts. */
-  turnBudget?: TurnBudget | undefined;
   activeTools: ReadonlyMap<string, string>;
   responseText: string;
   /** Context-window utilisation (0–100), or null when unavailable. */
@@ -77,7 +68,6 @@ export type WidgetAgentIdentity = Readonly<{
 /** Resolved launch facts that terminal tags name; no resolver dependency. */
 export type InvocationTags = Readonly<{
   thinking?: string;
-  maxTurns?: number;
   inheritContext: boolean;
   runInBackground: boolean;
 }>;

@@ -30,37 +30,26 @@
 import type { ResumeRefusal } from "#src/lifecycle/subagent";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import { assertNever } from "./exhaustive";
-import {
-  type TurnBudget,
-  wrappedUpAtTurnLimit,
-} from "#src/lifecycle/turn-limits";
 
 /**
  * What a terminal status means, independent of how a carrier renders it.
  *
  * One source of truth for the facts, because the carriers disagreed on them:
- * the nudge reported an abort as "max turns exceeded" while the foreground
- * result added "output may be incomplete", and the pull and resume carriers
- * reported nothing at all. Presentation still differs — see the two renderers
- * below — because a standalone label and a mid-sentence parenthetical are
- * different grammar, not different facts.
+ * an abort needed a generic incomplete-output caveat in some carriers while
+ * others reported only the bare status. Presentation still differs — see the
+ * two renderers below — because a standalone label and a mid-sentence
+ * parenthetical are different grammar, not different facts.
  */
 type StatusMeaning = {
-  /** Sentence-initial label, e.g. "Wrapped up". */
+  /** Sentence-initial label, e.g. "Stopped". */
   label: string;
-  /** Why, without terminal punctuation, e.g. "after turn-budget warning". */
+  /** Why, without terminal punctuation, e.g. "user request". */
   detail: string;
 };
 
-/** A run that finished on its own after the harness warned it about its turn limit. */
-const WRAPPED_UP: StatusMeaning = {
-  label: "Wrapped up",
-  detail: "after turn-budget warning",
-};
-
 /**
- * Only what the status presentations read: the status, the error an error
- * label names, and the budget that qualifies a completed run.
+ * Only what the status presentations read: the status and the error an error
+ * label names.
  *
  * A read view over a live record, so its optionals accept an explicit
  * `undefined`: a record's getters answer `undefined` for "not decided", and a
@@ -72,23 +61,15 @@ const WRAPPED_UP: StatusMeaning = {
 export type StatusOutcome = {
   status: SubagentStatus;
   error?: string | undefined;
-  turnBudget?: TurnBudget | undefined;
 };
 
 function statusMeaning(outcome: StatusOutcome): StatusMeaning | undefined {
   switch (outcome.status) {
     case "aborted":
-      return {
-        label: "Aborted",
-        detail: "turn limit reached, output may be incomplete",
-      };
+      return { label: "Aborted", detail: "output may be incomplete" };
     case "stopped":
       return { label: "Stopped", detail: "user request" };
     case "completed":
-      if (wrappedUpAtTurnLimit(outcome)) {
-        return WRAPPED_UP;
-      }
-      return undefined;
     case "running":
     case "queued":
     case "error":
@@ -122,7 +103,7 @@ const RESUME_REFUSAL_CLAUSES: Record<
 };
 
 /**
- * Standalone label form, e.g. "Wrapped up (after turn-budget warning)".
+ * Standalone label form, e.g. "Aborted (output may be incomplete)".
  *
  * An error reports its message instead: the status alone does not say what
  * went wrong.
@@ -134,7 +115,7 @@ export function renderStatusLabel(outcome: StatusOutcome): string {
 }
 
 /**
- * Parenthetical suffix form, e.g. " (wrapped up — after turn-budget warning)", for a
+ * Parenthetical suffix form, e.g. " (stopped — user request)", for a
  * carrier appending to its own sentence. Empty when the status is unremarkable
  * or when the body already carries the explanation, as an error's does.
  */

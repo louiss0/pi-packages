@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { merge, type Patch } from "#src/optional";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import {
   type OutcomeAddenda,
   type OutcomeBody,
@@ -27,40 +26,11 @@ function makeOutcome(overrides: Patch<OutcomeBody> = {}): OutcomeBody {
 }
 
 describe("status vocabulary", () => {
-  const warned: TurnBudget = { maxTurns: 2, used: 3, phase: "warned" };
-  const exhausted: TurnBudget = { maxTurns: 2, used: 7, phase: "exhausted" };
-
-  // One case, spelled out, before the status table below generalizes the rest.
-  it("renders a completed run the harness warned as wrapped up, in both presentations", () => {
-    expect(renderStatusLabel({ status: "completed", turnBudget: warned })).toBe(
-      "Wrapped up (after turn-budget warning)",
-    );
-    expect(renderStatusNote({ status: "completed", turnBudget: warned })).toBe(
-      " (wrapped up \u2014 after turn-budget warning)",
-    );
-  });
-
-  it("renders an aborted run by its status, not its budget", () => {
-    expect(
-      renderStatusLabel({ status: "aborted", turnBudget: exhausted }),
-    ).toBe("Aborted (turn limit reached, output may be incomplete)");
-  });
-
-  it("renders a completed run within its budget as done", () => {
-    const within: TurnBudget = { maxTurns: 5, used: 2, phase: "within" };
-    expect(renderStatusLabel({ status: "completed", turnBudget: within })).toBe(
-      "Done",
-    );
-    expect(renderStatusNote({ status: "completed", turnBudget: within })).toBe(
-      "",
-    );
-  });
-
   const rows: { status: SubagentStatus; label: string; note: string }[] = [
     {
       status: "aborted",
-      label: "Aborted (turn limit reached, output may be incomplete)",
-      note: " (aborted \u2014 turn limit reached, output may be incomplete)",
+      label: "Aborted (output may be incomplete)",
+      note: " (aborted \u2014 output may be incomplete)",
     },
     {
       status: "stopped",

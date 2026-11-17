@@ -334,14 +334,14 @@ describe("runForeground", () => {
       deps.subagents,
       makeParams({
         config: createResolvedSpawnConfig({
-          notes: ["Note: max_turns 1 is below the minimum."],
+          notes: ["Note: a routing note."],
           description: "fg task",
         }),
       }),
       undefined,
       undefined,
     );
-    expect(textOf(result)).toContain("below the minimum");
+    expect(textOf(result)).toContain("a routing note");
   });
 
   it("calls onUpdate with streaming details while running", async () => {
@@ -454,7 +454,6 @@ describe("runForeground", () => {
     const running = createTestSubagent({
       status: "running",
       completedAt: undefined,
-      turnBudget: { maxTurns: 10, used: 8, phase: "warned" },
     });
     const { promise, resolve } = Promise.withResolvers<Subagent>();
     const spawnAndWait = vi.fn(
@@ -488,9 +487,7 @@ describe("runForeground", () => {
     // Partial match: the streamed details also carry a spinner frame and a wall-clock duration.
     expect(onUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        details: expect.objectContaining({
-          turnBudget: { maxTurns: 10, used: 8, phase: "warned" },
-        }),
+        details: expect.objectContaining({}),
       }),
     );
 
@@ -689,7 +686,7 @@ describe("runForeground", () => {
         deps.subagents,
         makeParams({
           config: createResolvedSpawnConfig({
-            notes: ["Note: max_turns 1 is below the minimum."],
+            notes: ["Note: a routing note."],
             description: "fg task",
           }),
         }),
@@ -697,9 +694,7 @@ describe("runForeground", () => {
         undefined,
       );
       const text = textOf(result);
-      expect(text.startsWith("Note: max_turns 1 is below the minimum.")).toBe(
-        true,
-      );
+      expect(text.startsWith("Note: a routing note.")).toBe(true);
       expect(text.indexOf("Agent ID: agent-1")).toBeGreaterThan(0);
     });
   });

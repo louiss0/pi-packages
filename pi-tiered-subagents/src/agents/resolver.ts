@@ -23,12 +23,6 @@ import { resolveLaunchModel } from "#src/models/launch";
 import type { ModelRegistry } from "#src/models/registry";
 import type { RoutingLadders } from "#src/models/router";
 import { type ThinkingDecision } from "#src/thinking/resolve";
-import {
-  isBelowMinimumTurns,
-  MIN_MAX_TURNS,
-  resolveTurnPolicy,
-  type TurnPolicy,
-} from "#src/lifecycle/turn-limits";
 import type { SubagentType, ThinkingLevel } from "#src/types";
 import { defined } from "#src/optional";
 import {
@@ -66,14 +60,6 @@ export type SpawnExecution = {
   modelSelection: ModelSelection;
   /** The reasoning level, and what was decided about it. */
   thinkingDecision: ThinkingDecision;
-  /**
-   * The run's turn ceiling, resolved once here.
-   *
-   * A closed decision with no unresolved fallback: the child session enforces
-   * this and never merges another default of its own, so a later change to the
-   * operator's default cannot alter accepted work.
-   */
-  turnPolicy: TurnPolicy;
   /** The reasoning level, when the child reasons at one. */
   thinking?: ThinkingLevel;
   inheritContext: boolean;
@@ -121,8 +107,6 @@ export type SpawnRequest = Readonly<{
   requestedModel?: string;
   /** The reasoning level the caller named, when it did. */
   requestedThinking?: SubagentThinkingLevel;
-  /** The turn ceiling the caller named, before the definition fills it. */
-  requestedMaxTurns?: number;
   /** The caller's context preference, before the definition fills it. */
   inheritContext?: boolean;
   /** The caller's background preference, before the definition fills it. */
@@ -131,19 +115,6 @@ export type SpawnRequest = Readonly<{
   rawType?: SubagentType;
   /** The session facts the automatic routing reads. */
   modelInfo: ModelInfo;
-  /**
-   * The operator's turn-budget defaults, captured with the launch.
-   *
-   * Read at preparation, so a queued child runs with the budget that was in
-   * force when the request was made.
-   */
-  settings: TurnSettings;
-}>;
-
-/** The operator's turn-budget defaults the resolver reads. */
-export type TurnSettings = Readonly<{
-  defaultMaxTurns: number | undefined;
-  wrapUpTurns: number;
 }>;
 
 /**
@@ -161,7 +132,6 @@ export function resolveSpawn(
     ...defined({
       model: request.requestedModel,
       thinking: request.requestedThinking,
-      maxTurns: request.requestedMaxTurns,
       inheritContext: request.inheritContext,
       runInBackground: request.runInBackground,
     }),
@@ -198,23 +168,11 @@ export function resolveSpawn(
 
   const modelName = modelLabel(modelIdentity);
 
-  // The turn ceiling, decided once: the request's, then the definition's, then
-  // the operator's default, captured here so a later default change reaches
-  // only the next launch.
-  const turnPolicy = resolveTurnPolicy({
-    ...defined({
-      resolvedMaxTurns: resolvedInvocation.maxTurns,
-      defaultMaxTurns: request.settings.defaultMaxTurns,
-    }),
-    wrapUpTurns: request.settings.wrapUpTurns,
-  });
-
   const { tags: invocationTags } = buildInvocationTags(
     defined({
       thinking,
       inheritContext,
       runInBackground,
-      maxTurns: resolvedInvocation.maxTurns,
     }),
   );
   const agentTags = invocationTags;
@@ -231,7 +189,6 @@ export function resolveSpawn(
       definition: request.definition,
     },
     notes: [
-      ...buildMinimumTurnsNote(resolvedInvocation.maxTurns),
       ...buildModelNote(modelSelection),
       ...buildThinkingNote(thinkingDecision),
     ],
@@ -240,7 +197,6 @@ export function resolveSpawn(
       description,
       modelSelection,
       thinkingDecision,
-      turnPolicy,
       inheritContext,
       runInBackground,
       ...defined({ modelIdentity, thinking }),
@@ -285,17 +241,4 @@ function buildModelNote(selection: ModelSelection): string[] {
   const model = selection.identity;
   const named = model ? `${model.provider}/${model.id}` : "the parent's model";
   return [`Note: the child runs on ${named} — ${selection.reason}.`];
-}
-
-/**
- * Advise that the resolved max_turns was raised to the minimum.
- *
- * The value came from this call or from the agent file, and either way the caller
- * would otherwise read a budget it never got.
- */
-function buildMinimumTurnsNote(maxTurns: number | undefined): string[] {
-  if (!isBelowMinimumTurns(maxTurns)) return [];
-  return [
-    `Note: max_turns ${maxTurns} is below the minimum of ${MIN_MAX_TURNS} (one turn to work, one to answer), so the subagent runs with ${MIN_MAX_TURNS}.`,
-  ];
 }

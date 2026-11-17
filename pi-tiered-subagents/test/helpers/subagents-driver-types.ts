@@ -1,7 +1,6 @@
 /** Test-only contracts for driving the internal preparer/manager chain. */
 import type { ResumeRefusal, SubagentStatus } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
-import type { TurnBudget } from "#src/lifecycle/turn-limits";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { ModelSelection } from "#src/models/selection";
 import type { ThinkingDecision } from "#src/thinking/resolve";
@@ -19,7 +18,6 @@ export type SubagentRecord = {
   pendingQuestion?: string;
   error?: string;
   toolUses: number;
-  turnBudget?: TurnBudget;
   startedAt: number;
   completedAt?: number;
   lifetimeUsage: LifetimeUsage;
@@ -47,7 +45,6 @@ export type ResumeResult =
 export type LaunchOptions = {
   description?: string;
   model?: string;
-  maxTurns?: number;
   thinkingLevel?: string;
   inheritContext?: boolean;
   signal?: AbortSignal;

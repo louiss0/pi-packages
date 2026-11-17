@@ -39,7 +39,6 @@ import {
 } from "#src/agents/registry";
 import { LaunchPreparer } from "#src/agents/launch-preparer";
 import { DefinitionErrorReporter } from "#src/agents/report";
-import type { TurnSettings } from "#src/agents/resolver";
 import { createChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import {
@@ -180,7 +179,7 @@ export interface AgentToolManager {
 }
 
 /** Narrow settings accessor — only the fields the Agent tool reads. */
-export type AgentToolSettings = TurnSettings & {
+export type AgentToolSettings = {
   readonly maxConcurrent: number;
 };
 
@@ -384,7 +383,6 @@ export function createAgentTool({
           description: params.description as string | undefined,
           model: params.model as string | undefined,
           thinking: params.thinking as string | undefined,
-          maxTurns: params.max_turns as number | undefined,
           inheritContext: params.inherit_context as boolean | undefined,
           runInBackground: params.run_in_background as boolean | undefined,
         }),
@@ -615,7 +613,6 @@ export function createGetResultTool(
         runUpdates: outcome.runUpdates,
         result: outcome.result,
         error: outcome.error,
-        turnBudget: outcome.turnBudget,
         pendingQuestion: outcome.pendingQuestion,
         workspaceNotice: outcome.workspaceNotice,
         conversation: verbose ? record.getConversation() : undefined,
@@ -658,7 +655,6 @@ export function createGetResultTool(
       transcriptPath: record.outputFile,
       preview: buildPreview(outcome.result),
       error: outcome.error,
-      turnBudget: outcome.turnBudget,
       modelName: modelLabel(record.modelIdentity),
     });
   }
@@ -761,7 +757,6 @@ class WaitBound {
 function progressOf(record: Subagent): AgentReport["progress"] {
   return {
     activity: describeActivity(record.activeTools, record.responseText),
-    turns: record.turnBudget?.used,
     sinceLastProgress: formatMs(Date.now() - record.lastProgressAt),
   };
 }
@@ -1095,15 +1090,11 @@ export type SettingsToast = {
 /** Narrow settings surface required by the /subagents:settings command. */
 export interface SubagentsSettingsManager {
   readonly maxConcurrent: number;
-  readonly defaultMaxTurns: number | undefined;
-  readonly wrapUpTurns: number;
   readonly consumedSessionRetentionMinutes: number;
   readonly unconsumedSessionRetentionMinutes: number;
   readonly abortAllOnInterrupt: boolean;
   readonly midRunUpdates: boolean;
   applyMaxConcurrent(n: number): SettingsToast;
-  applyDefaultMaxTurns(n: number): SettingsToast;
-  applyWrapUpTurns(n: number): SettingsToast;
   applyConsumedSessionRetentionMinutes(n: number): SettingsToast;
   applyUnconsumedSessionRetentionMinutes(n: number): SettingsToast;
   toggleAbortAllOnInterrupt(): SettingsToast;
@@ -1148,26 +1139,6 @@ const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     minimum: 1,
     validationMessage: "Must be a positive integer.",
     apply: (settings, n) => settings.applyMaxConcurrent(n),
-  },
-  {
-    kind: "numeric",
-    label: "Default max turns",
-    currentDisplay: (settings) => settings.defaultMaxTurns ?? "unlimited",
-    inputTitle: "Default max turns before wrap-up (0 = unlimited)",
-    inputDefault: (settings) => String(settings.defaultMaxTurns ?? 0),
-    minimum: 0,
-    validationMessage: "Must be 0 (unlimited) or a positive integer.",
-    apply: (settings, n) => settings.applyDefaultMaxTurns(n),
-  },
-  {
-    kind: "numeric",
-    label: "Wrap-up turns",
-    currentDisplay: (settings) => settings.wrapUpTurns,
-    inputTitle: "Turns left when a subagent is warned to wrap up",
-    inputDefault: (settings) => String(settings.wrapUpTurns),
-    minimum: 1,
-    validationMessage: "Must be a positive integer.",
-    apply: (settings, n) => settings.applyWrapUpTurns(n),
   },
   {
     kind: "numeric",
@@ -1571,7 +1542,6 @@ export default function (pi: ExtensionAPI) {
       refreshProfiles();
       return runtime.getModelInfo();
     },
-    turnSettings: () => settings,
     childShaping: () => settings.captureChildShaping(),
   });
 
@@ -1856,13 +1826,6 @@ ${agentGuidelines}
               "Thinking level: off, minimal, low, medium, high, xhigh, max. Overrides the agent definition's own level. A level the chosen model does not support is clamped to one it does, and the result says so.",
           }),
         ),
-        max_turns: Type.Optional(
-          Type.Number({
-            description:
-              "Maximum number of agentic turns before stopping. Omit to use the agent's own limit, or unlimited when it declares none.",
-            minimum: 1,
-          }),
-        ),
         run_in_background: Type.Optional(
           Type.Boolean({
             description:
@@ -1975,7 +1938,7 @@ ${agentGuidelines}
 
   pi.registerCommand("subagents:settings", {
     description:
-      "Configure subagent settings (concurrency, turn limits, retention, interrupt policy)",
+      "Configure subagent settings (concurrency, retention, interrupt policy)",
     handler: async (_args, ctx) => {
       await handleSubagentsSettings(settings, { ui: ctx.ui });
     },

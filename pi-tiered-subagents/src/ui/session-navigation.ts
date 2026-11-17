@@ -170,24 +170,40 @@ export function listNavigableAgents(
   return [...live, ...snapshots];
 }
 
+/** Custom session entry marking the boundary between inherited parent entries and the child's own turns. */
+export const FORK_BOUNDARY_ENTRY = "subagents:fork-boundary";
+
 /**
  * Source a transcript from a persisted child-session JSONL snapshot.
  *
  * For an agent whose live session the retention sweep released: the in-memory
  * message history is gone, but the session file survives on disk (and the
  * record retains its path). Reads the file, drops the `SessionHeader`, and resolves the
- * message list via Pi's own parser. A static snapshot — no subscription, no
- * streaming, no live tool registry. `readFile` is injected so this module makes
- * no `fs` calls.
+ * message list via Pi's own parser. Entries before the fork boundary are omitted,
+ * so the operator sees only the child's own turns. A static snapshot — no
+ * subscription, no streaming, no live tool registry. `readFile` is injected so
+ * this module makes no `fs` calls.
  */
 export async function fileSnapshotSource(
   outputFile: string,
   readFile: (path: string) => string | Promise<string>,
 ): Promise<TranscriptSource> {
   const entries = parseSessionEntries(await readFile(outputFile));
-  const sessionEntries = entries.filter(
+  const allSessionEntries = entries.filter(
     (entry): entry is SessionEntry => entry.type !== "session",
   );
+  const boundaryIdx = allSessionEntries.findLastIndex(
+    (entry) =>
+      entry.type === "custom" && entry.customType === FORK_BOUNDARY_ENTRY,
+  );
+  const sessionEntries =
+    boundaryIdx === -1
+      ? allSessionEntries
+      : allSessionEntries
+          .slice(boundaryIdx + 1)
+          .map((entry, index) =>
+            index === 0 ? { ...entry, parentId: null } : entry,
+          );
   const { messages, model, thinkingLevel } =
     buildSessionContext(sessionEntries);
   // Pi also reads the model off each assistant message, so a file whose messages

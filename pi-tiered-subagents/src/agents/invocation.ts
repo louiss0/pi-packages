@@ -29,8 +29,6 @@ export type ResolvedInvocation = Readonly<{
   modelFromParams: boolean;
   /** The reasoning level the launch runs at, when one was chosen. */
   thinking?: SubagentThinkingLevel;
-  /** The turn ceiling for the launch, when one was named. */
-  maxTurns?: number;
   /** Whether the child starts from the parent's conversation. */
   inheritContext: boolean;
   /** Whether the launch runs in the background. */
@@ -41,7 +39,6 @@ export type ResolvedInvocation = Readonly<{
 export type InvocationParams = Readonly<{
   model?: string;
   thinking?: SubagentThinkingLevel;
-  maxTurns?: number;
   inheritContext?: boolean;
   runInBackground?: boolean;
 }>;
@@ -82,12 +79,11 @@ export function resolveInvocation(
     modelFromParams: params.model !== undefined,
     inheritContext: params.inheritContext ?? definition.inheritContext,
     runInBackground: params.runInBackground ?? definition.runInBackground,
-    // A definition that names no model, level, or ceiling leaves the key
-    // absent, so a later reader cannot mistake "unset" for "set to nothing".
+    // A definition that names no model or level leaves the key absent, so a
+    // later reader cannot mistake "unset" for "set to nothing".
     ...defined({
       model,
       thinking: params.thinking ?? definition.thinking,
-      maxTurns: params.maxTurns ?? definition.maxTurns,
     }),
   };
 }

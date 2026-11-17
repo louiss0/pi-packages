@@ -8,10 +8,7 @@
  * result-renderer.ts pattern used by the subagent tool's renderer.
  */
 
-import type {
-  AgentStatus as SubagentStatus,
-  TurnBudget,
-} from "./view-types.js";
+import type { AgentStatus as SubagentStatus } from "./view-types.js";
 import { renderOutcomeIcon } from "./result-renderer.js";
 import type { Theme } from "./display.js";
 import { GLYPHS } from "./glyphs.js";
@@ -48,8 +45,6 @@ export type GetResultDetails = Readonly<{
   /** First non-empty line of the result body, clipped. Never the whole result. */
   preview?: string | undefined;
   error?: string | undefined;
-  /** The run's turn limit and its use; absent when no limit applied. */
-  turnBudget?: TurnBudget | undefined;
   /** Whether the conversation was requested, so the expanded view can say where it went. */
   verbose: boolean;
   transcriptPath?: string | undefined;

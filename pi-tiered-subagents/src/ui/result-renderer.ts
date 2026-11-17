@@ -6,14 +6,10 @@
  * Consumed by the renderResult hook registered at the extension root.
  */
 
-import type {
-  AgentStatus as SubagentStatus,
-  TurnBudget,
-} from "./view-types.js";
+import type { AgentStatus as SubagentStatus } from "./view-types.js";
 import type { AgentDetails, Theme } from "./display.js";
-import { formatMs, formatTurnBudget } from "./display.js";
+import { formatMs } from "./display.js";
 import { GLYPHS, spinnerAt } from "./glyphs.js";
-import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
 // ---- Dispatcher ----
 
@@ -58,7 +54,7 @@ export function renderBackground(details: AgentDetails, theme: Theme): string {
   );
 }
 
-/** Render completed status, with a turn-limit caveat when it wrapped up, and optional expanded result text. */
+/** Render completed status and optional expanded result text. */
 export function renderCompleted(
   details: AgentDetails,
   resultText: string,
@@ -66,10 +62,7 @@ export function renderCompleted(
   theme: Theme,
 ): string {
   const duration = formatMs(details.durationMs);
-  const wrappedUp = wrappedUpAtTurnLimit(details);
-  const icon = wrappedUp
-    ? renderWrappedUpIcon(theme)
-    : renderStatusIcon("completed", theme);
+  const icon = renderStatusIcon("completed", theme);
   const s = renderStats(details, theme);
   let line = icon + (s ? " " + s : "");
   line += " " + theme.fg("dim", "\u00B7") + " " + theme.fg("dim", duration);
@@ -90,8 +83,7 @@ export function renderCompleted(
       }
     }
   } else {
-    const doneText = wrappedUp ? "Wrapped up (budget warning)" : "Done";
-    line += "\n" + theme.fg("dim", `  ${GLYPHS.subLine}  ${doneText}`);
+    line += "\n" + theme.fg("dim", `  ${GLYPHS.subLine}  Done`);
   }
   return line;
 }
@@ -119,35 +111,19 @@ export function renderFailed(details: AgentDetails, theme: Theme): string {
         `  ${GLYPHS.subLine}  Error: ${details.error ?? "unknown"}`,
       );
   } else {
-    line +=
-      "\n" +
-      theme.fg("warning", `  ${GLYPHS.subLine}  Aborted (turn limit reached)`);
+    line += "\n" + theme.fg("warning", `  ${GLYPHS.subLine}  Aborted`);
   }
   return line;
 }
 
 // ---- Shared helpers ----
 
-/**
- * The themed glyph for an outcome: its status glyph, drawn in the warning color
- * for a run that wrapped up at its turn limit.
- */
+/** The themed glyph for an outcome's status. */
 export function renderOutcomeIcon(
-  // A read view over a live record, so the optional takes an explicit
-  // `undefined` — see the note on `StatusOutcome`.
-  outcome: {
-    readonly status: SubagentStatus;
-    readonly turnBudget?: TurnBudget | undefined;
-  },
+  outcome: { readonly status: SubagentStatus },
   theme: Theme,
 ): string {
-  if (wrappedUpAtTurnLimit(outcome)) return renderWrappedUpIcon(theme);
   return renderStatusIcon(outcome.status, theme);
-}
-
-/** A success glyph in the warning color: finished, with a turn-limit caveat. */
-function renderWrappedUpIcon(theme: Theme): string {
-  return theme.fg("warning", GLYPHS.success);
 }
 
 /**
@@ -174,16 +150,13 @@ export function renderStatusIcon(status: SubagentStatus, theme: Theme): string {
 }
 
 /**
- * Build the stats string: "anthropic/claude-haiku-4-5 · thinking: high · ↻5≤30 · 3 tool uses · 33.8k token".
+ * Build the stats string: "anthropic/claude-haiku-4-5 · thinking: high · 3 tool uses · 33.8k token".
  * Returns an empty string when all fields are absent or zero.
  */
 export function renderStats(details: AgentDetails, theme: Theme): string {
   const parts: string[] = [];
   if (details.modelName) parts.push(details.modelName);
   if (details.tags) parts.push(...details.tags);
-  if (details.turnBudget) {
-    parts.push(formatTurnBudget(details.turnBudget));
-  }
   if (details.toolUses > 0)
     parts.push(
       `${details.toolUses} tool use${details.toolUses === 1 ? "" : "s"}`,

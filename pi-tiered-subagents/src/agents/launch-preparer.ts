@@ -13,11 +13,7 @@ import { type AgentDefinition } from "#src/agents/definition";
 import type { Model } from "@earendil-works/pi-ai";
 import type { DefinitionDiagnostic, LoadedScopes } from "#src/agents/loader";
 import { buildCatalog } from "#src/agents/registry";
-import type {
-  ModelInfo,
-  ResolvedSpawnConfig,
-  TurnSettings,
-} from "#src/agents/resolver";
+import type { ModelInfo, ResolvedSpawnConfig } from "#src/agents/resolver";
 import { resolveSpawn } from "#src/agents/resolver";
 import {
   parseThinkingLevel,
@@ -36,7 +32,6 @@ export type LaunchRequest = Readonly<{
   model?: string;
   /** Kept as a string until this shared validation boundary. */
   thinking?: string;
-  maxTurns?: number;
   inheritContext?: boolean;
   runInBackground?: boolean;
 }>;
@@ -109,8 +104,6 @@ export interface LaunchPreparerDeps {
   readonly loadScopes: (signal?: AbortSignal) => Promise<LoadedScopes>;
   /** Parent model facts are read before resolution can yield. */
   readonly modelInfo: () => ModelInfo;
-  /** Operator turn defaults are captured with this request. */
-  readonly turnSettings: () => TurnSettings;
   /** Child-shaping settings are captured with this request. */
   readonly childShaping: () => ChildShapingSettings;
 }
@@ -136,7 +129,6 @@ export class LaunchPreparer {
     // Capture the invocation-time facts first. These reads must reflect the
     // request, not the moment the definition files finished loading.
     const modelInfo = copyModelInfo(this.deps.modelInfo());
-    const turnSettings = { ...this.deps.turnSettings() };
     const childShapingCapture = this.deps.childShaping();
 
     if (signal?.aborted) return cancelledRejection();
@@ -184,13 +176,11 @@ export class LaunchPreparer {
         description: request.description,
         requestedModel: request.model,
         requestedThinking,
-        requestedMaxTurns: request.maxTurns,
         inheritContext: request.inheritContext,
         runInBackground: request.runInBackground,
         rawType: request.type as SubagentType,
       }),
       modelInfo,
-      settings: turnSettings,
     });
 
     if ("error" in config) {

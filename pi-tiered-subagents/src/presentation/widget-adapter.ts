@@ -39,7 +39,6 @@ export function createWidgetSource(records: WidgetRecordSource): WidgetSource {
 /** Copy every mutable nested value rather than passing a readonly live alias. */
 function toWidgetAgent(record: WidgetRecord): WidgetAgent {
   const usage = record.lifetimeUsage;
-  const budget = record.turnBudget;
   const model = record.modelIdentity;
   return defined({
     id: record.id,
@@ -55,7 +54,6 @@ function toWidgetAgent(record: WidgetRecord): WidgetAgent {
     completedAt: record.completedAt,
     error: record.error,
     lifetimeUsage: usage ? { ...usage } : undefined,
-    turnBudget: budget ? { ...budget } : undefined,
     model: model ? { provider: model.provider, id: model.id } : undefined,
   });
 }

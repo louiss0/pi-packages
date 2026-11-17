@@ -32,7 +32,6 @@ function makeAgent(overrides: Patch<WidgetAgent> = {}): WidgetAgent {
       completedAt: 6000,
       compactionCount: 0,
       // Activity fields (folded from the former WidgetActivity)
-      turnBudget: { maxTurns: 10, used: 3, phase: "within" },
       activeTools: new Map(),
       responseText: "",
       contextPercent: null,
@@ -83,8 +82,6 @@ describe("renderFinishedLine", () => {
     expect(line).toContain("5 tool uses");
     // Duration (5000ms = 5.0s)
     expect(line).toContain("5.0s");
-    // Turn count with max
-    expect(line).toContain("↻3≤10");
     // No trailing status text for completed
     expect(line).not.toContain("error");
     expect(line).not.toContain("aborted");
@@ -104,18 +101,6 @@ describe("renderFinishedLine", () => {
     const line = renderFinishedLine(agent, testRegistry, theme);
 
     expect(line).not.toContain("tool use");
-  });
-
-  it("shows an unlimited run's turns without a ceiling", () => {
-    const agent = makeAgent({ turnBudget: { used: 3, phase: "within" } });
-    const line = renderFinishedLine(agent, testRegistry, theme);
-    expect(line).toContain("↻3");
-    expect(line).not.toContain("↻3≤");
-  });
-
-  it("omits turns for a run that never reported a turn budget", () => {
-    const agent = makeAgent({ turnBudget: undefined, status: "stopped" });
-    expect(renderFinishedLine(agent, testRegistry, theme)).not.toContain("↻");
   });
 
   it("uses Date.now() for duration when completedAt is undefined", () => {
@@ -161,17 +146,6 @@ describe("renderFinishedLine", () => {
     expect(line).toContain("[warning: aborted]");
   });
 
-  it("renders a completed run the harness warned with warning icon and turn limit text", () => {
-    const agent = makeAgent({
-      status: "completed",
-      turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
-    });
-    const line = renderFinishedLine(agent, testRegistry, theme);
-
-    expect(line).toContain("[warning:\u2713]");
-    expect(line).toContain("[warning: (budget warning)]");
-  });
-
   it("renders stopped status with dim icon and text", () => {
     const agent = makeAgent({ status: "stopped" });
     const line = renderFinishedLine(agent, testRegistry, theme);
@@ -184,29 +158,11 @@ describe("renderFinishedLine", () => {
 describe("renderRunningLines", () => {
   const theme = stubTheme();
 
-  it("shows a warned run's turns in the warning color", () => {
-    const agent = makeAgent({
-      status: "running",
-      completedAt: undefined,
-      turnBudget: { maxTurns: 10, used: 8, phase: "warned" },
-    });
-    const [header] = renderRunningLines(agent, testRegistry, 0, theme);
-    expect(header).toContain("[warning:↻8≤10]");
-  });
-
-  it("shows turns within budget without the warning color", () => {
-    const agent = makeAgent({ status: "running", completedAt: undefined });
-    const [header] = renderRunningLines(agent, testRegistry, 0, theme);
-    expect(header).toContain("↻3≤10");
-    expect(header).not.toContain("[warning:↻");
-  });
-
   it("returns header and activity lines", () => {
     const agent = makeAgent({
       status: "running",
       completedAt: undefined,
       activeTools: new Map([["read_1", "read"]]),
-      turnBudget: { maxTurns: 10, used: 2, phase: "within" },
     });
     const [header, activityLine] = renderRunningLines(
       agent,
@@ -219,8 +175,6 @@ describe("renderRunningLines", () => {
     expect(header).toContain("[accent:⠋]");
     expect(header).toContain("**Worker**");
     expect(header).toContain("[muted:test task]");
-    // Stats: turn count
-    expect(header).toContain("↻2≤10");
     // Tool uses
     expect(header).toContain("5 tool uses");
 
@@ -336,7 +290,6 @@ describe("renderWidgetLines", () => {
     const agent = makeAgent({
       status: "running",
       completedAt: undefined,
-      turnBudget: { used: 1, phase: "within" },
     });
 
     const lines = callRenderWidgetLines({ agents: [agent] });
@@ -364,7 +317,6 @@ describe("renderWidgetLines", () => {
       id: "f1",
       status: "completed",
       completedAt: 6000,
-      turnBudget: { used: 5, phase: "within" },
     });
     const queued = makeAgent({
       id: "q1",

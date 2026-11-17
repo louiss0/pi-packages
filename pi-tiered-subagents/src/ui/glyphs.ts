@@ -13,7 +13,6 @@
  *
  * Coverage on macOS 15, counted in families:
  *
- *   ↻ U+21BB turns          1  (Menlo)
  *   ⇊ U+21CA compactions    1  (Menlo)
  *   ✓ U+2713 success        6
  *   ✗ U+2717 failure        6
@@ -34,11 +33,9 @@
 
 /** Semantic indicator glyphs rendered in the widget, inline results, and notifications. */
 export const GLYPHS = {
-  /** Turn count, as `↻5≤30`. */
-  turns: "↻",
   /** Session compaction count, annotating the token field. */
   compactions: "⇊",
-  /** Completed outcome, also used dim/warning for a wrapped-up agent. */
+  /** Completed outcome. */
   success: "✓",
   /** Error or aborted outcome. */
   failure: "✗",

@@ -517,7 +517,6 @@ export function parseDefinitionContent(
       tools: toolSelection(fm.tools, report),
       model: stringField("model", fm.model, report),
       thinking: thinkingField(fm.thinking, report),
-      maxTurns: numberField("max_turns", fm.max_turns, report),
       inheritContext: booleanField(
         "inherit_context",
         fm.inherit_context,
@@ -550,26 +549,6 @@ function stringField(
     return undefined;
   }
   return value.trim();
-}
-
-/**
- * A number field: absent stays absent, an explicit null clears, and a
- * non-negative number is taken as written. Anything else is reported.
- */
-function numberField(
-  key: string,
-  value: unknown,
-  report?: FieldReporter,
-): number | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    report?.(
-      `the "${key}" value must be a non-negative number; the value is ignored`,
-    );
-    return undefined;
-  }
-  return value;
 }
 
 /**

@@ -93,7 +93,6 @@ describe("run outcomes", () => {
       const running = h.service.run("worker", "compute");
       const child = await h.children.childBorn(0);
       const run = await child.runStarted(0);
-      run.advanceTurn();
       run.settle("42");
 
       const outcome = await running;
@@ -102,7 +101,6 @@ describe("run outcomes", () => {
       expect(outcome.record.status).toBe("completed");
       expect(outcome.record.result).toBe("42");
       expect(outcome.record.completedAt).toEqual(expect.any(Number));
-      expect(outcome.record.turnBudget?.used).toBe(1);
       expect(outcome.record.isBackground).toBe(false);
     } finally {
       await h.dispose();
@@ -122,28 +120,6 @@ describe("run outcomes", () => {
         throw new Error(`expected a settled run, got ${outcome.message}`);
       expect(outcome.record.status).toBe("error");
       expect(outcome.record.error).toBe("provider reported an error");
-    } finally {
-      await h.dispose();
-    }
-  });
-
-  it("settles with an aborted record when the run exhausts its turn ceiling", async () => {
-    const h = await createSubagentsHarness();
-    try {
-      const running = h.service.run("worker", "compute", { maxTurns: 3 });
-      const child = await h.children.childBorn(0);
-      const run = await child.runStarted(0);
-      run.settleExhausted("partial findings");
-
-      const outcome = await running;
-      if (outcome.kind !== "settled")
-        throw new Error(`expected a settled run, got ${outcome.message}`);
-      expect(outcome.record.status).toBe("aborted");
-      expect(outcome.record.result).toBe("partial findings");
-      expect(outcome.record.turnBudget).toMatchObject({
-        maxTurns: 3,
-        phase: "exhausted",
-      });
     } finally {
       await h.dispose();
     }

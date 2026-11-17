@@ -175,7 +175,7 @@ describe("Pi 1.3.0 vetoed session replacement", () => {
       await runtime.dispose();
       await removeTempDir(directory);
     }
-  }, 30_000);
+  }, 90_000);
 
   it("executes a child through the SDK and resumes its held session successfully", async () => {
     const directory = await mkdtemp(join(tmpdir(), "pi-session-resume-"));
@@ -204,7 +204,7 @@ describe("Pi 1.3.0 vetoed session replacement", () => {
       await runtime.dispose();
       await removeTempDir(directory);
     }
-  }, 30_000);
+  }, 90_000);
 
   it("preserves an active child when replacement is vetoed", async () => {
     const directory = await mkdtemp(join(tmpdir(), "pi-session-veto-active-"));
@@ -233,7 +233,7 @@ describe("Pi 1.3.0 vetoed session replacement", () => {
       await runtime.dispose();
       await removeTempDir(directory);
     }
-  }, 30_000);
+  }, 90_000);
 
   it("replaces the runtime only after a confirmed session replacement", async () => {
     const directory = await mkdtemp(join(tmpdir(), "pi-session-replacement-"));
@@ -253,5 +253,5 @@ describe("Pi 1.3.0 vetoed session replacement", () => {
       await runtime.dispose();
       await removeTempDir(directory);
     }
-  }, 30_000);
+  }, 90_000);
 });

@@ -12,7 +12,10 @@ import {
   type ParentPromptOptions,
   type ParentSnapshot,
 } from "#src/lifecycle/parent-snapshot";
-import { buildParentContext } from "#src/session/context";
+import {
+  captureParentBranch,
+  type InheritedBranchEntry,
+} from "#src/session/context";
 import type { RoutingLadders } from "#src/models/router";
 import type { ModelInfo } from "#src/tools/spawn-config";
 import type { SessionContext } from "#src/types";
@@ -20,9 +23,7 @@ import type { SessionContext } from "#src/types";
 /**
  * The settings a run reads live, rather than the ones it captured.
  *
- * Only an operational control belongs here: the turn ceiling and wrap-up
- * allowance are resolved into a `TurnPolicy` when the launch is prepared, so a
- * change to them reaches only the next launch.
+ * Only an operational control belongs here.
  */
 export type RunConfig = Readonly<{
   /** Whether a background child gets the `notify_parent` channel. */
@@ -114,20 +115,21 @@ export class SubagentRuntime {
    * Capture every parent input a launch needs before its first asynchronous
    * step (ARCHITECTURE-SPEC stories 15 and 16).
    *
-   * This is the one capture operation: the snapshot, the conversation text,
-   * and the session identity are taken together, so no caller can read
-   * inconsistent slices of parent state. The snapshot excludes the
-   * conversation text, which is the one input whose need depends on the
-   * resolved definition; it is captured here too, so a later parent turn
-   * cannot change what an accepted child inherits. The caller attaches it
-   * when the resolved definition asks for it.
+   * This is the one capture operation: the snapshot, the inherited context
+   * branch, and the session identity are taken together, so no caller can read
+   * inconsistent slices of parent state. The snapshot excludes the branch,
+   * which is the one input whose need depends on the resolved definition; it
+   * is captured here too, so a later parent turn cannot change what an
+   * accepted child inherits. The caller attaches it when the resolved
+   * definition asks for it.
    */
   captureLaunchInputs(): {
     snapshot: ParentSnapshot;
-    parentContext: string | undefined;
+    parentBranch: ReadonlyArray<InheritedBranchEntry> | undefined;
     parentSession: { parentSessionFile: string; parentSessionId: string };
   } {
     const ctx = this.currentCtx!;
+    const branch = captureParentBranch(ctx);
     return {
       snapshot: buildParentSnapshot(
         ctx,
@@ -136,7 +138,7 @@ export class SubagentRuntime {
         this.listActiveTools(),
         this.listRegisteredTools(),
       ),
-      parentContext: buildParentContext(ctx) || undefined,
+      parentBranch: branch.length > 0 ? branch : undefined,
       parentSession: this.getSessionInfo(),
     };
   }

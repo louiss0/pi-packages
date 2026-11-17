@@ -6,22 +6,16 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import type {
-  AgentDefinitionLookup,
-  TurnBudget,
-  WidgetAgent,
-} from "./view-types.js";
+import type { AgentDefinitionLookup, WidgetAgent } from "./view-types.js";
 import {
   describeActivity,
   formatModel,
   formatMs,
   formatSessionTokens,
-  formatTurnBudget,
   getDisplayName,
   type Theme,
 } from "./display.js";
 import { GLYPHS, spinnerAt } from "./glyphs.js";
-import { wrappedUpAtTurnLimit } from "./outcome-presentation.js";
 
 export type { WidgetAgent } from "./view-types.js";
 
@@ -40,10 +34,7 @@ export function renderFinishedLine(
 
   let icon: string;
   let statusText: string;
-  if (wrappedUpAtTurnLimit(agent)) {
-    icon = theme.fg("warning", GLYPHS.success);
-    statusText = theme.fg("warning", " (budget warning)");
-  } else if (agent.status === "completed") {
+  if (agent.status === "completed") {
     icon = theme.fg("success", GLYPHS.success);
     statusText = "";
   } else if (agent.status === "stopped") {
@@ -60,7 +51,6 @@ export function renderFinishedLine(
   }
 
   const parts: string[] = [];
-  if (agent.turnBudget) parts.push(formatTurnBudget(agent.turnBudget));
   if (agent.toolUses > 0)
     parts.push(`${agent.toolUses} tool use${agent.toolUses === 1 ? "" : "s"}`);
   parts.push(duration);
@@ -91,7 +81,6 @@ export function renderRunningLines(
       : "";
 
   const parts: string[] = [];
-  if (agent.turnBudget) parts.push(renderRunningTurns(agent.turnBudget, theme));
   if (agent.toolUses > 0)
     parts.push(`${agent.toolUses} tool use${agent.toolUses === 1 ? "" : "s"}`);
   if (tokenText) parts.push(tokenText);
@@ -105,12 +94,6 @@ export function renderRunningLines(
   const activityLine = theme.fg("dim", `  ${GLYPHS.subLine}  ${activityText}`);
 
   return [header, activityLine];
-}
-
-/** A running agent's turns, in the warning color once the harness has warned it about its budget. */
-function renderRunningTurns(budget: TurnBudget, theme: Theme): string {
-  const turns = formatTurnBudget(budget);
-  return budget.phase === "warned" ? theme.fg("warning", turns) : turns;
 }
 
 /** ` [provider/id]` after the agent's name, or nothing while the model is unknown. */

@@ -505,7 +505,7 @@ flowchart TB
 - The runtime root retains Pi command/tool/message-renderer registrations and wires the library. The library does not receive ExtensionAPI or register through a hidden host reference.
 - The UI module defines small structural views/actions for agent summaries, progress, transcript reading, settings edits, and presentation lifetime. Runtime presentation adapters supply those views. Do not introduce a shared-contracts package.
 - Export local/public structural type surfaces, not inferred concrete foreign classes with private fields. SDK/TUI-specific implementation can remain internal to presentation adapters.
-- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, turn limits, resume eligibility, or execution status.
+- Keep model-facing text, outcome meaning, notification timing/claiming, and persistence policy in the runtime. A terminal renderer may format facts but must not decide routing, context policy, resume eligibility, or execution status.
 - Preserve useful UI behavior rather than redesigning workflows during extraction. Core execution must behave identically with or without presentation consumers. No separate UI service-readiness/event protocol is needed.
 
 ```mermaid

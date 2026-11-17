@@ -19,7 +19,6 @@ import {
   parseThinkingLevel,
   thinkingLevelError,
 } from "#src/config/thinking-level";
-import type { TurnSettings } from "#src/agents/resolver";
 import type { SubagentType } from "#src/types";
 
 // Re-exported for the narrow interfaces that name the resolved shapes they
@@ -33,7 +32,6 @@ export type {
   SpawnIdentity,
   SpawnExecution,
   SpawnPresentation,
-  TurnSettings,
 } from "#src/agents/resolver";
 export { resolveSpawn } from "#src/agents/resolver";
 
@@ -47,7 +45,6 @@ export function resolveSpawnConfig(
   params: Record<string, unknown>,
   registry: AgentDefinitionLookup,
   modelInfo: ModelInfo,
-  settings: TurnSettings,
 ): ResolvedSpawnConfig | SpawnConfigError {
   // Validated at the door, so the merge below and every layer past it receive a
   // level the SDK recognizes rather than one it would clamp to "off" (Refs #834).
@@ -72,10 +69,8 @@ export function resolveSpawnConfig(
       requestedThinking: thinkingFromParams,
       rawType,
       modelInfo,
-      settings,
       description: params.description as string | undefined,
       requestedModel: params.model as string | undefined,
-      requestedMaxTurns: params.max_turns as number | undefined,
       inheritContext: params.inherit_context as boolean | undefined,
       runInBackground: params.run_in_background as boolean | undefined,
     }),

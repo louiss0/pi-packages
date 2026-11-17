@@ -19,13 +19,6 @@ import {
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { emitChildSessionShutdown } from "#src/lifecycle/child-shutdown";
 import {
-  type TurnBudget,
-  type TurnBudgetAction,
-  TurnBudgetTracker,
-  type TurnOutcome,
-  type TurnPolicy,
-} from "#src/lifecycle/turn-limits";
-import {
   getSessionContextPercent,
   type SessionStatsLike,
 } from "#src/lifecycle/usage";
@@ -36,15 +29,11 @@ import type { SessionMessage, ThinkingLevel } from "#src/types";
 /** Outcome of one turn loop. */
 export type TurnLoopResult = {
   responseText: string;
-  /** The run's turn budget as the loop ended. */
-  turnBudget: TurnBudget;
 };
 
 /** Per-call options for one run's turn loop. */
 export type TurnLoopOptions = {
   signal?: AbortSignal;
-  /** Receives the run's budget at the start and after every turn boundary that changes it. */
-  onTurnBudget?: (budget: TurnBudget) => void;
 };
 
 /** Session-level facts known at creation, supplied by the factory. */
@@ -56,13 +45,6 @@ export type SubagentSessionMeta = {
   /** Child session directory — carried on the completed event as transcript location. */
   sessionDir: string;
   agentName: string;
-  /**
-   * The turn ceiling every run of this session is held to, resolved once at the
-   * door. A resume keeps this decision and starts a fresh counter.
-   */
-  turnPolicy: TurnPolicy;
-  /** Parent context prepended to the first run's prompt, absent when none was inherited. */
-  parentContext?: string;
   lifecycle: ChildLifecyclePublisher;
 };
 
@@ -79,9 +61,17 @@ export class SubagentSession {
 
   /**
    * Set as the session's first run starts, settled or not: only that run
-   * carries the parent context and announces the child's completion.
+   * announces the child's completion.
    */
   private hasRun = false;
+
+  /**
+   * The last inherited parent message present when this session was built.
+   * The child's own turns are the messages after it. Identity, not a numeric
+   * offset, survives compaction: when Pi rewrites the history the inherited
+   * message is gone, and everything left belongs to the child.
+   */
+  private readonly inheritedLastMessage: SessionMessage | undefined;
 
   /**
    * How the session's last assistant turn ended, tracked for the session's
@@ -98,7 +88,8 @@ export class SubagentSession {
     private readonly _session: AgentSession,
     private readonly meta: SubagentSessionMeta,
   ) {
-    this.turnFailure = collectTurnFailure(_session);
+    this.inheritedLastMessage = _session.messages.at(-1);
+    this.turnFailure = collectTurnFailure(_session, () => this.ownMessages());
   }
 
   /**
@@ -124,12 +115,10 @@ export class SubagentSession {
   }
 
   /**
-   * Drive one run's turn loop under a fresh budget at the session's limits:
-   * the initial run, or a resume, whose parent asked for more work and for
-   * which an exhausted run's remainder would be none.
+   * Drive one run's turn loop: the initial run, or a resume.
    *
-   * The session's first run prefixes the parent context captured at spawn and
-   * emits `completed` once its prompt resolves; a later run does neither.
+   * The session's first run emits `completed` once its prompt resolves; a later
+   * run does not.
    */
   async runTurnLoop(
     prompt: string,
@@ -137,28 +126,18 @@ export class SubagentSession {
   ): Promise<TurnLoopResult> {
     const firstRun = !this.hasRun;
     this.hasRun = true;
-    const tracker = new TurnBudgetTracker(this.meta.turnPolicy);
-    const responseText = await this.promptForAnswer(
-      firstRun ? this.withParentContext(prompt) : prompt,
-      tracker,
-      opts,
-    );
+    const responseText = await this.promptForAnswer(prompt, opts);
     if (firstRun) {
       this.meta.lifecycle.completed({
         sessionDir: this.meta.sessionDir,
         agentName: this.meta.agentName,
-        turnBudget: tracker.budget,
       });
     }
-    return { responseText, turnBudget: tracker.budget };
-  }
-
-  private withParentContext(prompt: string): string {
-    return this.meta.parentContext ? this.meta.parentContext + prompt : prompt;
+    return { responseText };
   }
 
   /**
-   * Prompt the session for one run's answer, held to the tracker's budget.
+   * Prompt the session for one run's answer.
    *
    * A signal that already fired takes no turn and has no answer. Forwarding it
    * would not stop the prompt: Pi's `abort()` is a no-op while no run is active,
@@ -167,20 +146,10 @@ export class SubagentSession {
    */
   private async promptForAnswer(
     prompt: string,
-    tracker: TurnBudgetTracker,
     opts: TurnLoopOptions,
   ): Promise<string> {
     if (opts.signal?.aborted) return "";
     const session = this._session;
-    // Lexically owned temporary subscriptions: each `using` releases its
-    // listener at scope exit, in reverse declaration order, on success and on
-    // throw — the bracketed-resources case ARCHITECTURE-SPEC §12 reserves
-    // `using` for, after the loader/runtime verification of story 109. The
-    // names are underscore-prefixed because the bindings exist only to be
-    // disposed; noUnusedLocals flags an unreferenced `using` otherwise.
-    using _turns = asDisposable(
-      this.enforceTurnBudget(tracker, opts.onTurnBudget),
-    );
     const collector = collectResponseText(session);
     using _text = asDisposable(collector.unsubscribe);
     using _abort = asDisposable(forwardAbortSignal(session, opts.signal));
@@ -188,56 +157,8 @@ export class SubagentSession {
     await session.prompt(prompt);
     failIfProviderErrored(this.turnFailure.getFailure());
 
-    return collector.getText().trim() || getLastAssistantText(session);
-  }
-
-  /**
-   * Hold the session to the tracker's budget: state it up front when the whole
-   * budget is wrap-up turns, then act on each turn boundary and report the
-   * budget as it changes. Returns the unsubscribe for the turn listener.
-   */
-  private enforceTurnBudget(
-    tracker: TurnBudgetTracker,
-    report: ((budget: TurnBudget) => void) | undefined,
-  ): () => void {
-    if (tracker.warnBeforeFirstTurn()) this.sendBudgetWarning(tracker);
-    report?.(tracker.budget);
-    return this._session.subscribe((event: AgentSessionEvent) => {
-      if (event.type === "turn_end") {
-        this.actOnTurnBudget(tracker, tracker.onTurnEnd(turnOutcome(event)));
-        report?.(tracker.budget);
-      } else if (event.type === "turn_start") {
-        const action = tracker.onTurnStart();
-        this.actOnTurnBudget(tracker, action);
-        if (action) report?.(tracker.budget);
-      }
-    });
-  }
-
-  private actOnTurnBudget(
-    tracker: TurnBudgetTracker,
-    action: TurnBudgetAction,
-  ): void {
-    if (action === "warn") this.sendBudgetWarning(tracker);
-    else if (action === "stop") void this._session.abort();
-  }
-
-  /**
-   * Tell the child how many turns it has left, as context for its next turn.
-   *
-   * A context-only custom message rather than a steer: Pi appends it to the
-   * transcript at the turn's end and forces no turn, where a queued steer keeps
-   * the agent loop going even after a turn that made no tool calls, replacing a
-   * final answer with a reply to the warning.
-   */
-  private sendBudgetWarning(tracker: TurnBudgetTracker): void {
-    void this._session.sendCustomMessage(
-      {
-        customType: TURN_BUDGET_WARNING_TYPE,
-        content: budgetWarningText(tracker.remaining ?? 0),
-        display: true,
-      },
-      { triggerTurn: false },
+    return (
+      collector.getText().trim() || getLastAssistantText(this.ownMessages())
     );
   }
 
@@ -246,9 +167,9 @@ export class SubagentSession {
     await this._session.steer(message);
   }
 
-  /** Return the session's conversation as formatted text. */
+  /** Return the child's own conversation messages as formatted text. */
   getConversation(): string {
-    return getAgentConversation(this._session);
+    return getAgentConversation({ messages: this.agentMessages });
   }
 
   /** Return the session context window utilization (0-100), or null when unavailable. */
@@ -266,14 +187,27 @@ export class SubagentSession {
     return this._session.getSessionStats();
   }
 
-  /** The session's message history. */
-  get messages(): ReadonlyArray<unknown> {
-    return this._session.messages;
+  /**
+   * The child's own messages, excluding inherited parent history. A compacted
+   * history no longer holds the fork's last inherited message; everything it
+   * holds then belongs to the child's own run.
+   */
+  private ownMessages(): ReadonlyArray<SessionMessage> {
+    const messages = this._session.messages;
+    const last = this.inheritedLastMessage;
+    if (last === undefined) return messages;
+    const at = messages.indexOf(last);
+    return at === -1 ? messages : messages.slice(at + 1);
   }
 
-  /** The session's message history, typed for Pi's session-rendering machinery. */
+  /** The child session's own message history (excluding inherited parent messages). */
+  get messages(): ReadonlyArray<unknown> {
+    return this.ownMessages();
+  }
+
+  /** The child session's own message history, typed for Pi's session-rendering machinery. */
   get agentMessages(): ReadonlyArray<SessionMessage> {
-    return this._session.messages;
+    return this.ownMessages();
   }
 
   /** Resolve a registered tool definition by name, for Pi's tool-execution components. */
@@ -284,16 +218,6 @@ export class SubagentSession {
   /**
    * Tear down: child `session_shutdown` + session.dispose() + emit `disposed`
    * (registry unregister).
-   *
-   * The order is load-bearing. The shutdown emit runs first because
-   * `AgentSession.dispose()` invalidates the extension runner, after which every
-   * handler's context throws (#709). The `disposed` event runs last because it
-   * unregisters the child from the permission system, so a shutdown handler
-   * still resolves against a live registration.
-   *
-   * Idempotent: the teardown promise is retained before a caller can yield, so
-   * concurrent callers (a retention sweep racing a manager teardown) await the
-   * same emission and disposal exactly once.
    */
   dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise;
@@ -308,8 +232,6 @@ export class SubagentSession {
     try {
       this._session.dispose?.();
     } finally {
-      // Registry release must happen even when an SDK disposer throws: callers
-      // must not retain a dead child merely because its SDK resource was faulty.
       this.meta.lifecycle.disposed({ sessionId: this.meta.sessionId });
     }
   }
@@ -317,49 +239,18 @@ export class SubagentSession {
 
 // ── Private turn-loop helpers ───────────────────────────────────────────────────
 
-/**
- * What a failed turn reports when the provider named no reason. An empty
- * `errorMessage` is as uninformative as an absent one, so both land here.
- */
 const PROVIDER_ERROR_WITHOUT_MESSAGE =
   "provider reported an error with no message";
 
-/**
- * Throw when the run's last turn ended in a provider error.
- *
- * Pi does not throw on a provider failure: the agent loop appends an assistant
- * message with `stopReason: "error"` and an `errorMessage`, then ends the turn
- * normally. Without this read a failed turn is indistinguishable from a quiet
- * one, and the run reports a successful, empty completion (#889).
- */
 function failIfProviderErrored(failure: string | undefined): void {
   if (failure) throw new Error(failure);
 }
 
-/**
- * Subscribe to a session and record how its last assistant message ended.
- *
- * Read live rather than scanned back from `session.messages` once the run has
- * settled: Pi's overflow recovery removes the failed message from agent state
- * before attempting compaction and restores nothing when that compaction fails,
- * so a run's own error may no longer be in the history by the time it ends
- * (#898). `message_end` is emitted before any of that runs.
- *
- * Last-one-wins rather than latched: a successful auto-retry emits a later,
- * clean `message_end`, and that run recovered. A hard abort and a user stop
- * both yield `stopReason: "aborted"`, which is a terminal outcome the run
- * already reports through its own channel.
- *
- * Subscribed for the session's whole life, and seeded from whatever history it
- * already had. `prompt()` can resolve without running a turn at all — an
- * extension command matched, an `input` handler reported the prompt handled, a
- * message was queued while streaming — and a resume is not refused for an agent
- * whose earlier run failed. Such a call observes no event of its own, so the
- * answer has to be one the collector was already holding: what an earlier call
- * observed, or, for turns that predate the subscription, what the history says.
- */
-function collectTurnFailure(session: AgentSession) {
-  let failure = readLastTurnFailure(session);
+function collectTurnFailure(
+  session: AgentSession,
+  ownMessages: () => ReadonlyArray<SessionMessage>,
+) {
+  let failure = readLastTurnFailure(ownMessages());
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     if (event.type !== "message_end" || event.message.role !== "assistant")
       return;
@@ -371,43 +262,14 @@ function collectTurnFailure(session: AgentSession) {
   return { getFailure: () => failure, unsubscribe };
 }
 
-/** How the session's last assistant message ended, read from its history. */
-function readLastTurnFailure(session: AgentSession): string | undefined {
-  // `findLast` walks the history newest-first without an index that could
-  // read past the end, and narrows the message to its assistant variant.
-  const last = session.messages.findLast((msg) => msg.role === "assistant");
+function readLastTurnFailure(
+  messages: ReadonlyArray<SessionMessage>,
+): string | undefined {
+  const last = messages.findLast((msg) => msg.role === "assistant");
   if (!last || last.stopReason !== "error") return undefined;
   return last.errorMessage || PROVIDER_ERROR_WITHOUT_MESSAGE;
 }
 
-/** The custom-message type the turn-budget warning is sent as. */
-const TURN_BUDGET_WARNING_TYPE = "subagents:turn-budget-warning";
-
-/** The warning a child reads with `remaining` turns left, this coming one included. */
-function budgetWarningText(remaining: number): string {
-  const turns = remaining === 1 ? "1 turn" : `${remaining} turns`;
-  return (
-    `Turn budget: you have ${turns} left, including this one. ` +
-    "The harness stops you after that. Finish your work and give your final answer within that budget."
-  );
-}
-
-/** How a `turn_end` bears on the budget: whether it failed, and whether the agent loop continues. */
-function turnOutcome(
-  event: Extract<AgentSessionEvent, { type: "turn_end" }>,
-): TurnOutcome {
-  const stopReason =
-    event.message.role === "assistant" ? event.message.stopReason : undefined;
-  return {
-    failed: stopReason === "error" || stopReason === "aborted",
-    ranTools: event.toolResults.length > 0,
-  };
-}
-
-/**
- * Subscribe to a session and collect the last assistant message text.
- * Returns an object with a `getText()` getter and an `unsubscribe` function.
- */
 function collectResponseText(session: AgentSession) {
   let text = "";
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
@@ -424,29 +286,18 @@ function collectResponseText(session: AgentSession) {
   return { getText: () => text, unsubscribe };
 }
 
-/** Get the last assistant text from the completed session history. */
-function getLastAssistantText(session: AgentSession): string {
-  const texts = session.messages
+function getLastAssistantText(messages: ReadonlyArray<SessionMessage>): string {
+  const texts = messages
     .filter((msg) => msg.role === "assistant")
     .map((msg) => extractText(msg.content).trim())
     .filter((text) => text !== "");
   return texts.at(-1) ?? "";
 }
 
-/**
- * Adapt an unsubscribe function to a lexical `Disposable`, so a bracketed
- * operation can hold it with `using` instead of a hand-rolled try/finally.
- * For temporary subscriptions only: session-lifetime teardown stays with the
- * explicit awaited disposeOnce above (ARCHITECTURE-SPEC §12, story 109).
- */
 function asDisposable(unsubscribe: () => void): Disposable {
   return { [Symbol.dispose]: unsubscribe };
 }
 
-/**
- * Wire an AbortSignal to abort a session.
- * Returns a cleanup function to remove the listener.
- */
 function forwardAbortSignal(
   session: AgentSession,
   signal?: AbortSignal,

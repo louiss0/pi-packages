@@ -120,7 +120,6 @@ async function createInheritingChild(agentDir: string) {
       type: "fixture",
       toolNames: [],
       model: makeModel(),
-      turnPolicy: { kind: "unlimited" },
     },
     deps,
   );

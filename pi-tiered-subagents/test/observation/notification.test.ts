@@ -183,17 +183,6 @@ describe("buildNotificationDetails", () => {
     expect(details.resultPreview).toBe("Done.");
   });
 
-  it("carries the run's turn budget", () => {
-    const record = createTestSubagent({
-      turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
-    });
-    expect(buildNotificationDetails(record, 500).turnBudget).toEqual({
-      maxTurns: 2,
-      used: 3,
-      phase: "warned",
-    });
-  });
-
   it("truncates long result previews with ellipsis", () => {
     const record = createTestSubagent({
       description: "Test",
@@ -239,18 +228,6 @@ describe("buildEventData", () => {
       toolUses: 5,
       durationMs: 1000,
       tokens: { input: 1000, output: 500, total: 1500 },
-    });
-  });
-
-  it("carries the run's turn budget", () => {
-    const record = createTestSubagent({
-      turnBudget: { maxTurns: 2, used: 7, phase: "exhausted" },
-      status: "aborted",
-    });
-    expect(buildEventData(record).turnBudget).toEqual({
-      maxTurns: 2,
-      used: 7,
-      phase: "exhausted",
     });
   });
 
@@ -339,9 +316,9 @@ describe("NotificationManager", () => {
     expect(content).toContain('resume: "agent-3"');
   });
 
-  it("reports a question the torn-down workspace can no longer answer, without a resume call", async () => {
-    // An aborted child keeps its question but does not hold its workspace, so
-    // the disposal is driven by the production path rather than seeded state.
+  it("reports a question whose session was released, without a resume call", async () => {
+    // A child that asked a question keeps its workspace for a resume; the
+    // retention sweep releases the session, which tears the workspace down.
     const stub = createSubagentSessionStub();
     let askParent: ((question: string) => void) | undefined;
     stub.runTurnLoop.mockImplementation(() => {
@@ -349,7 +326,6 @@ describe("NotificationManager", () => {
       return Promise.resolve(
         turnLoopResult({
           responseText: "Got partway.",
-          turnBudget: { maxTurns: 2, used: 7, phase: "exhausted" },
         }),
       );
     });
@@ -365,6 +341,7 @@ describe("NotificationManager", () => {
       }),
     });
     await disposed.run();
+    await disposed.releaseSession();
     expect(disposed.pendingQuestion).toBe("Which config?");
     expect(disposed.workspaceDisposed).toBe(true);
     const args = makeArgs();
@@ -375,7 +352,7 @@ describe("NotificationManager", () => {
     const content = (firstSendCall(args)[0] as { content: string }).content;
     expect(content).toContain("Which config?");
     expect(content).toContain(
-      "it ran in an isolated workspace that has since been removed",
+      "its session was released after its retention window",
     );
     expect(content).not.toContain("resume:");
   });

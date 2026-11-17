@@ -159,7 +159,6 @@ async function childFixture(directory: string) {
           type: "fixture",
           toolNames: tools,
           model: makeModel(),
-          turnPolicy: { kind: "unlimited" },
         },
         deps,
       );

@@ -9,7 +9,6 @@ import {
   type SubagentsRuntime,
 } from "#src/service/subagents";
 import { SHIPPED_STRATEGIES, strategiesByFamily } from "#src/models/strategy";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 import type { Subagent } from "#src/lifecycle/subagent";
 import type { ResumeRefusalReason } from "#src/lifecycle/subagent-manager";
 import type {
@@ -59,7 +58,14 @@ export function createToolDeps(
     currentCtx: {},
     captureLaunchInputs: vi.fn(() => ({
       snapshot: STUB_SNAPSHOT,
-      parentContext: "parent conversation",
+      parentBranch: [
+        {
+          type: "message",
+          id: "e1",
+          parentId: null,
+          message: { role: "user", content: "parent conversation" },
+        },
+      ],
       parentSession: {
         parentSessionFile: "/sessions/parent.jsonl",
         parentSessionId: "session-1",
@@ -93,8 +99,6 @@ export function createToolDeps(
     },
     runtime,
     settings: {
-      defaultMaxTurns: undefined as number | undefined,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
       maxConcurrent: 4,
     },
     registry: defaultRegistry,
@@ -110,7 +114,6 @@ export function createToolDeps(
       return fixture.registry.currentScopes();
     },
     modelInfo: () => fixture.runtime.getModelInfo(),
-    turnSettings: () => fixture.settings,
     childShaping: () => ({
       midRunUpdates: true,
       excludedExtensionPackages: [],

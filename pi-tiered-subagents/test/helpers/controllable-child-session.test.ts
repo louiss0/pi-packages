@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import { createControllableChildFactory } from "#test/helpers/controllable-child-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-import { limitedTurns, UNLIMITED_TURNS } from "#test/helpers/turn-policy";
 
 function params(
   overrides: Partial<CreateSubagentSessionParams> = {},
@@ -10,7 +9,6 @@ function params(
   return {
     snapshot: STUB_SNAPSHOT,
     type: "worker",
-    turnPolicy: UNLIMITED_TURNS,
     ...overrides,
   };
 }
@@ -44,48 +42,6 @@ describe("createControllableChildFactory", () => {
     await expect(loop).rejects.toThrow("provider exploded");
     // The settled watcher resolves either way rather than rejecting.
     await expect(child.runAt(0).settled).resolves.toBeUndefined();
-  });
-
-  it("starts each run's budget counter fresh under the child's captured policy", async () => {
-    const factory = createControllableChildFactory();
-    await factory.createChild(params({ turnPolicy: limitedTurns(4, 2) }));
-    const child = factory.childAt(0);
-
-    const budgets: unknown[] = [];
-    child.session.runTurnLoop("first", {
-      onTurnBudget: (b) => budgets.push(b),
-    });
-    const first = child.runAt(0);
-    first.advanceTurn();
-    first.advanceTurn();
-    first.settle();
-    expect(first.budgets).toEqual([
-      { maxTurns: 4, used: 0, phase: "within" },
-      { maxTurns: 4, used: 1, phase: "within" },
-      { maxTurns: 4, used: 2, phase: "within" },
-    ]);
-
-    child.session.runTurnLoop("second", {});
-    // The resume's counter starts over: the first report has used 0 again.
-    expect(child.runAt(1).budgets[0]).toEqual({
-      maxTurns: 4,
-      used: 0,
-      phase: "within",
-    });
-    child.runAt(1).settle();
-  });
-
-  it("marks an exhausted settlement so the record reads the turn-limit outcome", async () => {
-    const factory = createControllableChildFactory();
-    await factory.createChild(params({ turnPolicy: limitedTurns(2) }));
-    const child = factory.childAt(0);
-
-    const loop = child.session.runTurnLoop("do work", {});
-    child.runAt(0).settleExhausted("partial");
-    await expect(loop).resolves.toMatchObject({
-      responseText: "partial",
-      turnBudget: { maxTurns: 2, used: 0, phase: "exhausted" },
-    });
   });
 
   it("settles a running loop when its abort lever fires, by default", async () => {

@@ -2,13 +2,13 @@ import type { TuiMode } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defined, type Patch } from "#src/optional";
 import { makeDefinitionLookup } from "#test/ui/helpers/definition-lookup";
-import type { AgentStatus } from "#src/ui/view-types";
 import {
   AgentWidget,
   assembleWidgetState,
   type UICtx,
 } from "#src/ui/agent-widget";
 import { makeWidgetAgent } from "#test/ui/helpers/make-widget-agent";
+import type { AgentStatus } from "#src/ui/view-types";
 
 // Minimal agent fixture — only the three fields AgentSummary requires.
 /** A record the widget reads: `completedAt` is present-or-absent, never `undefined`. */
@@ -259,12 +259,11 @@ describe("assembleWidgetState", () => {
 });
 
 describe("AgentWidget — presentation reads activity from widget snapshots", () => {
-  it("surfaces the turn budget, activeTools, and responseText from the record via renderWidget", () => {
+  it("surfaces activeTools and responseText from the record via renderWidget", () => {
     const record = makeWidgetAgent({
       status: "running",
       completedAt: undefined,
       startedAt: Date.now() - 100,
-      turnBudget: { maxTurns: 10, used: 3, phase: "within" },
       activeTools: new Map([["tool-1", "read"]]),
     });
     const manager = {
@@ -289,8 +288,6 @@ describe("AgentWidget — presentation reads activity from widget snapshots", ()
     expect(renderFn).toBeDefined();
     const lines = renderFn!(stubTui(), stubTheme()).render();
     const allText = lines.join("\n");
-    // The record's turn budget should appear
-    expect(allText).toContain("↻3≤10");
     // Active tool "read" → "reading…"
     expect(allText).toContain("reading");
   });
@@ -322,35 +319,6 @@ describe("AgentWidget — presentation reads activity from widget snapshots", ()
     expect(renderFn).toBeDefined();
     expect(renderFn!(stubTui(), stubTheme()).render().join("\n")).toContain(
       "anthropic/claude-sonnet-5",
-    );
-  });
-
-  it("surfaces the record's turn budget as a turn-limit wrap-up via renderWidget", () => {
-    const record = makeWidgetAgent({
-      status: "completed",
-      completedAt: Date.now(),
-      turnBudget: { maxTurns: 2, used: 3, phase: "warned" },
-    });
-    const manager = {
-      listAgents: () => [record],
-    };
-    const widget = new AgentWidget(manager, makeDefinitionLookup());
-
-    let renderFn:
-      | ((tui: unknown, theme: unknown) => { render(): string[] })
-      | undefined;
-    widget.setUICtx({
-      setStatus: () => {},
-      setWidget: (_key, content) => {
-        if (typeof content === "function")
-          renderFn = content as typeof renderFn;
-      },
-    });
-    widget.update();
-
-    expect(renderFn).toBeDefined();
-    expect(renderFn!(stubTui(), stubTheme()).render().join("\n")).toContain(
-      "(budget warning)",
     );
   });
 });

@@ -21,7 +21,6 @@ function persistedRecord(
       status: "completed",
       result: "done",
       error: undefined,
-      turnBudget: undefined,
       startedAt: 1000,
       completedAt: 4000,
       outputFile: "/tasks/run-1.jsonl",
@@ -37,7 +36,6 @@ function recordEntry(data: unknown): SessionEntryLike {
 
 describe("toPersistedRecord", () => {
   it("copies the persisted fields off the record, and no others", () => {
-    const turnBudget = { maxTurns: 5, used: 2, phase: "within" } as const;
     const record = createTestSubagent({
       id: "agent-9",
       type: "Explore",
@@ -45,7 +43,6 @@ describe("toPersistedRecord", () => {
       status: "error",
       result: "partial",
       error: "boom",
-      turnBudget,
       startedAt: 1000,
       completedAt: 2500,
       toolUses: 7,
@@ -60,7 +57,6 @@ describe("toPersistedRecord", () => {
       status: "error",
       result: "partial",
       error: "boom",
-      turnBudget,
       startedAt: 1000,
       completedAt: 2500,
       outputFile: "/tasks/a.jsonl",
@@ -159,7 +155,6 @@ describe("readPersistedRuns", () => {
       const {
         result: _result,
         error: _error,
-        turnBudget: _turnBudget,
         completedAt: _completedAt,
         outputFile: _outputFile,
         ...minimal
@@ -173,7 +168,6 @@ describe("readPersistedRuns", () => {
     it.each([
       ["result", 42],
       ["error", 42],
-      ["turnBudget", { used: 1, phase: "within", extra: true }],
     ])("rejects a malformed known field: %s", (field, value) => {
       expect(
         readPersistedRuns([
@@ -241,50 +235,6 @@ describe("readPersistedRuns", () => {
       ).toStrictEqual([{ ...summary, toolUses: 0 }]);
     });
 
-    it.each([
-      { maxTurns: 5, used: 0, phase: "within" },
-      { maxTurns: 5, used: 5, phase: "exhausted" },
-      { used: 0, phase: "within" },
-    ] as const)("accepts a valid turn budget: %o", (turnBudget) => {
-      expect(
-        readPersistedRuns([recordEntry(persistedRecord({ turnBudget }))]),
-      ).toStrictEqual([summary]);
-    });
-
-    it.each([
-      { maxTurns: 0, used: 1, phase: "within" },
-      { maxTurns: -1, used: 1, phase: "within" },
-      { maxTurns: 1.5, used: 1, phase: "within" },
-      { maxTurns: 5, used: -1, phase: "within" },
-      { maxTurns: 5, used: 1.5, phase: "within" },
-      { maxTurns: 5, used: 1, phase: "bogus" },
-      { maxTurns: 5, used: 1, phase: "within", extra: true },
-      { maxTurns: 5, used: 1, phase: "within", maxTurns_: 1 },
-    ])("rejects a malformed turn budget: %o", (turnBudget) => {
-      expect(
-        readPersistedRuns([
-          recordEntry({
-            ...persistedRecord(),
-            turnBudget,
-          }),
-        ]),
-      ).toEqual([]);
-    });
-
-    it("does not infer lifecycle relationships from counts or phase", () => {
-      // Used may exceed the ceiling and a phase may disagree with the counts:
-      // the budget records events, not a derivable state machine.
-      expect(
-        readPersistedRuns([
-          recordEntry(
-            persistedRecord({
-              turnBudget: { maxTurns: 2, used: 99, phase: "within" },
-            }),
-          ),
-        ]),
-      ).toStrictEqual([summary]);
-    });
-
     it.each(SUBAGENT_STATUSES)("accepts the known status %s", (status) => {
       expect(
         readPersistedRuns([recordEntry(persistedRecord({ status }))]),
@@ -333,6 +283,18 @@ describe("readPersistedRuns", () => {
       readPersistedRuns([recordEntry(toPersistedRecord(record))]),
     ).toStrictEqual([
       { ...summary, id: "round-trip", outputFile: "/tasks/round-trip.jsonl" },
+    ]);
+  });
+
+  it("still reads a session file written before turn budgets were removed", () => {
+    const legacy = {
+      ...persistedRecord({ id: "legacy" }),
+    };
+    expect(readPersistedRuns([recordEntry(legacy)])).toStrictEqual([
+      {
+        ...summary,
+        id: "legacy",
+      },
     ]);
   });
 });

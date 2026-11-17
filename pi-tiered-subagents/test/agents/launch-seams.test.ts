@@ -43,7 +43,6 @@ import { createToolDeps } from "#test/helpers/make-deps";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import { makeModel, makeReasoningModel } from "#test/helpers/make-model";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-import { DEFAULT_WRAP_UP_TURNS } from "#src/lifecycle/turn-limits";
 
 /** A registry with one definition file, for the cases that need one. */
 function registryWith(
@@ -63,10 +62,6 @@ function createPreparer(registry: AgentRegistry, modelInfo: () => ModelInfo) {
   return new LaunchPreparer({
     loadScopes: async () => registry.currentScopes(),
     modelInfo,
-    turnSettings: () => ({
-      defaultMaxTurns: undefined,
-      wrapUpTurns: DEFAULT_WRAP_UP_TURNS,
-    }),
     childShaping: () => ({
       midRunUpdates: true,
       excludedExtensionPackages: [],
@@ -354,7 +349,14 @@ describe("the service door", () => {
             "mcp__gitlab__get_issue",
           ],
         },
-        parentContext: "parent conversation",
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
           parentSessionId: "session-1",
@@ -375,7 +377,6 @@ describe("the service door", () => {
             ...defined({
               model: definition.model,
               thinking: definition.thinking,
-              maxTurns: definition.maxTurns,
             }),
           }
         : {},
@@ -398,7 +399,16 @@ describe("the service door", () => {
     await adapter.launch("debug", "diagnose it");
 
     expect(manager.spawn).toHaveBeenCalledWith(
-      expect.objectContaining({ parentContext: "parent conversation" }),
+      expect.objectContaining({
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
+      }),
       "debug",
       "diagnose it",
       expect.anything(),
@@ -413,7 +423,7 @@ describe("the service door", () => {
     await adapter.launch("debug", "diagnose it", { inheritContext: false });
 
     const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
-    expect(snapshot).not.toHaveProperty("parentContext");
+    expect(snapshot).not.toHaveProperty("parentBranch");
   });
 
   it("starts a specialist with a fresh conversation", async () => {
@@ -424,7 +434,7 @@ describe("the service door", () => {
     await adapter.launch("worker", "do it");
 
     const [snapshot] = callAt(vi.mocked(manager.spawn).mock.calls);
-    expect(snapshot).not.toHaveProperty("parentContext");
+    expect(snapshot).not.toHaveProperty("parentBranch");
   });
 
   it("expands MCP patterns against request-time registered names before acceptance", async () => {
@@ -538,12 +548,10 @@ describe("both doors resolve alike", () => {
         thinking: "low",
         model: "anthropic/claude-haiku-4-5",
         inherit_context: false,
-        max_turns: 3,
         run_in_background: false,
       },
       registryWith("worker", {}),
       defined({ modelRegistry: haikuRegistry, ladders }),
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     if ("error" in tool) throw new Error(tool.error);
 
@@ -566,7 +574,14 @@ describe("both doors resolve alike", () => {
       currentCtx: { modelRegistry: haikuRegistry } as never,
       captureLaunchInputs: vi.fn(() => ({
         snapshot: STUB_SNAPSHOT,
-        parentContext: "parent conversation",
+        parentBranch: [
+          {
+            type: "message",
+            id: "e1",
+            parentId: null,
+            message: { role: "user", content: "parent conversation" },
+          },
+        ],
         parentSession: {
           parentSessionFile: "/sessions/parent.jsonl",
           parentSessionId: "session-1",
@@ -587,7 +602,6 @@ describe("both doors resolve alike", () => {
       model: "anthropic/claude-haiku-4-5",
       thinkingLevel: "low",
       inheritContext: false,
-      maxTurns: 3,
     });
 
     // The service door hands the shared resolution to the manager exactly as
@@ -599,7 +613,6 @@ describe("both doors resolve alike", () => {
       expect.objectContaining({
         description: "d",
         modelSelection: tool.execution.modelSelection,
-        turnPolicy: tool.execution.turnPolicy,
         inheritContext: false,
         // The request asked for `low`, but Haiku does not reason, so the
         // resolution carries a decision rather than a level — the same call
@@ -650,7 +663,6 @@ describe("automatic model selection at launch", () => {
           strategies: strategiesByFamily(SHIPPED_STRATEGIES),
         },
       },
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     expect(result).not.toHaveProperty("error");
     if ("error" in result) return;
@@ -685,7 +697,6 @@ describe("automatic model selection at launch", () => {
           strategies: strategiesByFamily(SHIPPED_STRATEGIES),
         },
       },
-      { defaultMaxTurns: undefined, wrapUpTurns: DEFAULT_WRAP_UP_TURNS },
     );
     expect(result).not.toHaveProperty("error");
     if ("error" in result) return;

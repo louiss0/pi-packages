@@ -25,7 +25,6 @@ export type StreamedRecord = Pick<
   | "model"
   | "modelIdentity"
   | "lifetimeUsage"
-  | "turnBudget"
   | "activeTools"
   | "responseText"
 >;
@@ -68,7 +67,6 @@ export function startProgressStream(params: ProgressStreamParams): () => void {
         modelName:
           modelLabel(record?.modelIdentity ?? record?.model) ??
           detailBase.modelName,
-        turnBudget: record?.turnBudget,
       }),
     };
     onUpdate?.({
