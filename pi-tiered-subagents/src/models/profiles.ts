@@ -258,13 +258,10 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
     family: "gemini",
     group: "size",
     tiers: [
-      { tier: "carbon", size: "XL" },
-      { tier: "argon", size: "L" },
-      { tier: "pro-preview", size: "L" },
-      { tier: "pro", size: "L" },
-      { tier: "hydrogen", size: "M" },
-      { tier: "flash", size: "M" },
-      { tier: "flash-lite", size: "S" },
+      { tier: "krypton", size: "XL" },
+      { tier: "carbon", size: "L" },
+      { tier: "argon", size: "M" },
+      { tier: "hydrogen", size: "S" },
     ],
   },
   {

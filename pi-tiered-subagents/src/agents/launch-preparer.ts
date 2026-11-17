@@ -4,7 +4,7 @@
  *
  * The model-facing tool submits an owned request here. This module selects
  * the definition, validates the caller's
- * thinking level, captures the current routing/turn inputs, and delegates the
+ * thinking level, captures the current routing inputs, and delegates the
  * existing resolution policy. It does not allocate a child session or accept
  * work into the manager.
  */
@@ -219,7 +219,6 @@ function cancelledRejection(): LaunchPreparationOutcome {
   };
 }
 
-/** Copy nested child-shaping values: a prepared launch cannot track settings edits. */
 /** Copy mutable SDK/routing inputs so resolution cannot observe later session edits. */
 function copyModelInfo(info: ModelInfo): ModelInfo {
   const models = new Map<string, Model<any>>();
@@ -246,7 +245,6 @@ function copyModelInfo(info: ModelInfo): ModelInfo {
     ...defined({
       parentModel: info.parentModel ? copyModel(info.parentModel) : undefined,
       modelRegistry,
-      parentThinkingLevel: info.parentThinkingLevel,
     }),
     ladders: copyRoutingLadders(info.ladders),
   };

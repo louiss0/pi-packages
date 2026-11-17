@@ -51,8 +51,7 @@ describe("version-independent family ladders", () => {
 
   it.each([
     ["gpt-77.3-sol-code-2", "gpt-77.3-luna"],
-    ["gemini-77.3-pro-preview", "gemini-77.3-flash-lite"],
-    ["gemini-77.3-flash-lite-20261027", "gemini-77.3-flash-lite"],
+    ["gemini-77.3-krypton-code-2", "gemini-77.3-hydrogen"],
     ["mimo-v77.3-pro-ultraspeed-serving-2", "mimo-v77.3-flash"],
     ["MiniMax-M77.3-highspeed", "MiniMax-M77.3-flash"],
   ])("routes qualified/multiword parent %s to exact %s", (parent, target) => {
@@ -60,6 +59,27 @@ describe("version-independent family ladders", () => {
       kind: "routed",
       modelId: target,
     });
+  });
+  it("retains an unsupported qualified Flash parent", () => {
+    const parent = "gemini-77.3-flash-lite-20261027";
+    expect(
+      route(parent, [model("parent", "gemini-77.3-flash-lite")], "debug"),
+    ).toMatchObject({
+      kind: "retained",
+      model: { id: parent },
+    });
+  });
+  it("routes Gemini Krypton workers to same-version Carbon", () => {
+    expect(
+      route(
+        "gemini-77.3-krypton",
+        [
+          model("parent", "gemini-78-carbon"),
+          model("parent", "gemini-77.3-carbon"),
+        ],
+        "worker",
+      ),
+    ).toMatchObject({ kind: "routed", modelId: "gemini-77.3-carbon" });
   });
   it("routes Gemini Carbon workers to same-version Argon rather than another release", () => {
     expect(
@@ -76,10 +96,7 @@ describe("version-independent family ladders", () => {
   });
   it.each([
     ["gemini-77.3-argon", "worker", "gemini-77.3-hydrogen"],
-    ["gemini-77.3-pro-preview", "worker", "gemini-77.3-hydrogen"],
-    ["gemini-77.3-pro", "worker", "gemini-77.3-hydrogen"],
-    ["gemini-77.3-hydrogen", "worker", "gemini-77.3-flash-lite"],
-    ["gemini-77.3-flash", "worker", "gemini-77.3-flash-lite"],
+    ["gemini-77.3-hydrogen", "worker", "gemini-77.3-hydrogen"],
   ])("routes %s for %s to %s", (parent, role, target) => {
     expect(route(parent, [model("parent", target)], role)).toMatchObject({
       kind: "routed",

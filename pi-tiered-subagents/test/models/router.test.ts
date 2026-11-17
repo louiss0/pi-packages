@@ -366,19 +366,20 @@ describe("routeModel", () => {
   });
 
   it.each([
-    ["worker", "gemini-2.5-flash-lite", "S"],
-    ["explore", "gemini-2.5-flash-lite", "S"],
-    ["researcher", "gemini-2.5-flash-lite", "S"],
-    ["debug", "gemini-2.5-flash", "M"],
-    ["custom-role", "gemini-2.5-flash-lite", "S"],
-  ])("%s selects the Gemini size target", (role, expected, size) => {
-    const parent = model("google", "gemini-2.5-flash-lite");
+    ["worker", "gemini-2.5-hydrogen", "S"],
+    ["explore", "gemini-2.5-hydrogen", "S"],
+    ["researcher", "gemini-2.5-hydrogen", "S"],
+    ["debug", "gemini-2.5-argon", "M"],
+    ["custom-role", "gemini-2.5-hydrogen", "S"],
+  ])("%s selects the Gemini chemical size target", (role, expected, size) => {
+    const parent = model("google", "gemini-2.5-hydrogen");
     const outcome = routeModel(
       parent,
       context([
+        model("google", "gemini-2.5-krypton"),
+        model("google", "gemini-2.5-carbon"),
+        model("google", "gemini-2.5-argon"),
         parent,
-        model("google", "gemini-2.5-pro"),
-        model("google", "gemini-2.5-flash"),
       ]),
       role,
     );
@@ -386,27 +387,40 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain(`${role} targets ${size}`);
   });
 
-  it("keeps a Gemini reviewer's parent rung", () => {
-    const parent = model("google", "gemini-2.5-flash");
+  it("routes a Krypton worker to same-version Carbon", () => {
+    const parent = model("google", "gemini-4-krypton");
     expect(
       routeModel(
         parent,
-        context([parent, model("google", "gemini-2.5-pro")]),
-        "reviewer",
+        context([
+          parent,
+          model("google", "gemini-4-carbon"),
+          model("google", "gemini-5-carbon"),
+        ]),
+        "worker",
       ),
-    ).toMatchObject({ kind: "routed", modelId: parent.id });
+    ).toMatchObject({ kind: "routed", modelId: "gemini-4-carbon" });
   });
-  it("uses a Gemini worker tier within its version", () => {
+
+  it.each([
+    "gemini-2.5-pro-preview",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+  ])("retains unsupported Gemini Pro or Flash parent %s", (parentId) => {
+    const parent = model("google", parentId);
     const outcome = routeModel(
-      model("google", "gemini-2.5-pro"),
+      parent,
       context([
+        parent,
         model("google", "gemini-2.5-pro"),
-        model("google", "gemini-2.5-flash"),
+        model("google", "gemini-2.5-flash-lite"),
+        model("google", "gemini-2.5-hydrogen"),
       ]),
+      "worker",
     );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gemini-2.5-flash");
+    expect(outcome).toMatchObject({ kind: "retained", model: parent });
+    expect(outcome.reason).toContain("unknown family");
   });
 
   it.each([
@@ -427,30 +441,15 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain(`${role} targets ${target}`);
   });
 
-  it.each([
-    "3.7",
-    "3.5",
-  ])("review degrades to the parent's worker in %s, never another release's planner", (version) => {
-    const parent = model("google", `gemini-${version}-flash`);
-    const outcome = routeModel(
-      parent,
-      context([parent, model("google", "gemini-2.5-pro")]),
-      "reviewer",
-    );
-    expect(outcome).toMatchObject({ kind: "routed", model: parent });
-  });
-
-  it("degrades review downward when its planner target is unavailable", () => {
-    const parent = model("google", "gemini-2.5-pro");
-    const outcome = routeModel(
-      parent,
-      context([model("google", "gemini-2.5-flash")]),
-      "reviewer",
-    );
-    expect(outcome.kind).toBe("routed");
-    if (outcome.kind !== "routed") return;
-    expect(outcome.modelId).toBe("gemini-2.5-flash");
-    expect(outcome.reason).toContain("reviewer targets L");
+  it("retains a bare Gemini parent whose tier is unknown", () => {
+    const parent = model("google", "gemini-3");
+    expect(
+      routeModel(
+        parent,
+        context([parent, model("google", "gemini-3-hydrogen")]),
+        "explore",
+      ),
+    ).toMatchObject({ kind: "retained", model: parent });
   });
 
   it("tries a cheaper rung in the same version when the target is unavailable", () => {
@@ -473,17 +472,17 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("worker targets S");
   });
 
-  it("does not borrow a model from another version", () => {
-    const parent = model("google", "gemini-3.7-flash");
+  it("does not borrow a chemical model from another version", () => {
+    const parent = model("google", "gemini-3.7-krypton");
     const outcome = routeModel(
       parent,
-      context([model("google", "gemini-2.5-pro")]),
+      context([model("google", "gemini-2.5-carbon")]),
       "worker",
     );
     expect(outcome.kind).toBe("retained");
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
-    expect(outcome.reason).toContain("worker targets S");
+    expect(outcome.reason).toContain("worker targets L");
   });
 
   it("never chooses a model the session cannot run", () => {

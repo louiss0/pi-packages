@@ -8,7 +8,7 @@
  * ---
  * display_name: Reviewer
  * description: Independent assessment of a scoped change
- * tools: read, grep, find
+ * tools: inherit
  * model: anthropic/claude-sonnet-5
  * thinking: medium
  * inherit_context: false

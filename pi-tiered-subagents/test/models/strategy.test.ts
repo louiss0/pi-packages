@@ -80,19 +80,31 @@ describe("the Claude naming structure", () => {
 });
 
 describe("the Gemini naming structure", () => {
-  it("reads a version and a variant", () => {
-    expect(parse("gemini", "gemini-3.1-pro-preview")).toEqual({
+  it("reads a chemical version and variant", () => {
+    expect(parse("gemini", "gemini-4-krypton")).toEqual({
       family: "gemini",
-      version: "3.1",
-      tierCandidates: ["pro", "preview"],
+      version: "4",
+      tierCandidates: ["krypton"],
     });
   });
 
-  it("reads a two-word variant as its segments", () => {
-    expect(parse("gemini", "gemini-2.5-flash-lite")?.tierCandidates).toEqual([
-      "flash",
-      "lite",
-    ]);
+  it("claims chemical and bare IDs but not Pro or Flash IDs", () => {
+    const cases = [
+      ["gemini-4-krypton", ["gemini"]],
+      ["gemini-4-carbon", ["gemini"]],
+      ["gemini-3.1-pro-preview", []],
+      ["gemini-2.5-pro", []],
+      ["gemini-3.8-flash", []],
+      ["gemini-2.5-flash-lite", []],
+      ["gemini-3", ["gemini"]],
+    ] as const;
+    for (const [id, families] of cases) {
+      expect(
+        SHIPPED_STRATEGIES.filter((strategy) => strategy.belongs(id)).map(
+          (strategy) => strategy.family,
+        ),
+      ).toEqual(families);
+    }
   });
 });
 
@@ -172,9 +184,15 @@ describe("the shipped strategies", () => {
   });
 
   it("place no id in two families", () => {
-    for (const id of ["gpt-6.1-sol", "claude-opus-5", "glm-5.3-flash"]) {
+    for (const id of [
+      "gpt-6.1-sol",
+      "claude-opus-5",
+      "glm-5.3-flash",
+      "gemini-4-carbon",
+      "glm-5.3",
+    ]) {
       const families = SHIPPED_STRATEGIES.filter(
-        (strategy) => strategy.parse(id) !== undefined,
+        (strategy) => strategy.belongs(id) && strategy.parse(id) !== undefined,
       );
       expect(families).toHaveLength(1);
     }

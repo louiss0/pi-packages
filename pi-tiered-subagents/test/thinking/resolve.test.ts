@@ -12,7 +12,16 @@ function modelWithLevels(
   return makeModel({
     id: "claude-sonnet-5",
     reasoning: true,
-    thinkingLevelMap: levels,
+    thinkingLevelMap: {
+      off: null,
+      minimal: null,
+      low: null,
+      medium: null,
+      high: null,
+      xhigh: null,
+      max: null,
+      ...levels,
+    },
     ...defined(overrides),
   });
 }
@@ -100,143 +109,63 @@ describe("resolveThinking — an explicit level", () => {
   });
 });
 
-describe("resolveThinking — the automatic level", () => {
-  it("prefers medium", () => {
+describe("resolveThinking — the automatic upper median", () => {
+  it("selects the higher middle level of an even four-level array", () => {
     const decision = resolveThinking({ model: makeReasoningModel() });
     expect(decision.level).toBe("medium");
     expect(decision.source).toBe("automatic");
+    expect(decision.reason).toContain("upper median");
   });
 
-  it("falls back to low when the model has no medium", () => {
+  it("selects high from the six non-off levels", () => {
     const decision = resolveThinking({
       model: modelWithLevels({
         off: "off",
-        medium: null,
+        minimal: "minimal",
+        low: "low",
+        medium: "medium",
+        high: "high",
+        xhigh: "xhigh",
+        max: "max",
+      }),
+    });
+    expect(decision.level).toBe("high");
+  });
+
+  it("uses the upper median of a gapped even array", () => {
+    const decision = resolveThinking({
+      model: modelWithLevels({
+        off: "off",
         low: "low",
         high: "high",
       }),
     });
-    expect(decision.level).toBe("low");
+    expect(decision.level).toBe("high");
   });
 
-  it("falls back to the lowest supported level when it has neither", () => {
+  it("uses the middle of a gapped odd array", () => {
     const decision = resolveThinking({
       model: modelWithLevels({
         off: "off",
-        medium: null,
-        low: null,
-        minimal: "minimal",
+        low: "low",
         high: "high",
+        max: "max",
       }),
     });
-    expect(decision.level).toBe("minimal");
+    expect(decision.level).toBe("high");
   });
 
-  it("never turns reasoning off on a model that has it", () => {
+  it("keeps a singleton reasoning level", () => {
     const decision = resolveThinking({
       model: modelWithLevels({ off: "off", minimal: "minimal" }),
     });
-    expect(decision.level).not.toBe("off");
-  });
-});
-
-describe("resolveThinking — the parent's model was kept", () => {
-  it("uses the next supported rung instead of jumping to a preferred default", () => {
-    const decision = resolveThinking({
-      model: modelWithLevels({
-        off: "off",
-        minimal: null,
-        low: "low",
-        medium: null,
-        high: "high",
-        xhigh: null,
-        max: "max",
-      }),
-      parentLevel: "max",
-      parentModelKept: true,
-    });
-    expect(decision.level).toBe("high");
-    expect(decision.source).toBe("parent");
-    expect(decision.reason).toContain("one supported rung");
-  });
-
-  it.each([
-    "off",
-    "minimal",
-  ] as const)("uses the supported non-off floor when the parent is at %s below it", (parentLevel) => {
-    const decision = resolveThinking({
-      model: modelWithLevels({
-        off: "off",
-        minimal: null,
-        low: "low",
-        medium: null,
-        high: "high",
-        xhigh: null,
-        max: null,
-      }),
-      parentLevel,
-      parentModelKept: true,
-    });
-    expect(decision.level).toBe("low");
-    expect(decision.source).toBe("parent");
-    expect(decision.reason).toContain("lowest supported non-off level");
-  });
-
-  it("takes medium when it is the next supported rung below high", () => {
-    const decision = resolveThinking({
-      model: makeReasoningModel(),
-      parentLevel: "high",
-      parentModelKept: true,
-    });
-    expect(decision.level).toBe("medium");
-    expect(decision.source).toBe("parent");
-  });
-
-  it("drops to a supported level below the parent's when low is not lower", () => {
-    const decision = resolveThinking({
-      model: makeReasoningModel(),
-      parentLevel: "low",
-      parentModelKept: true,
-    });
-    // The parent is already at low, so the child steps below it rather than
-    // matching it.
     expect(decision.level).toBe("minimal");
-    expect(decision.reason).toContain(
-      "below the effort the parent was running at",
-    );
   });
 
-  it("never raises the parent's effort", () => {
+  it("never includes off in the median", () => {
     const decision = resolveThinking({
-      model: makeReasoningModel(),
-      parentLevel: "minimal",
-      parentModelKept: true,
-    });
-    expect(decision.level).not.toBe("medium");
-    expect(decision.level).not.toBe("high");
-  });
-
-  it("keeps the parent's effort when the model supports nothing lower", () => {
-    const decision = resolveThinking({
-      model: modelWithLevels({
-        off: "off",
-        minimal: null,
-        low: null,
-        medium: null,
-        high: "high",
-      }),
-      parentLevel: "high",
-      parentModelKept: true,
+      model: modelWithLevels({ off: "off", high: "high" }),
     });
     expect(decision.level).toBe("high");
-    expect(decision.reason).toContain("stands");
-  });
-
-  it("uses the automatic level when the parent's effort is unknown", () => {
-    const decision = resolveThinking({
-      model: makeReasoningModel(),
-      parentModelKept: true,
-    });
-    expect(decision.level).toBe("medium");
   });
 });

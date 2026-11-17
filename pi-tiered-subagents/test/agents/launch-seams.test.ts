@@ -148,6 +148,39 @@ describe("the assembler's tool selection", () => {
     expect(config.toolNames).toEqual(["read", "bash", "edit"]);
   });
 
+  it("gives the shipped Reviewer the parent's active tools", () => {
+    const config = assembleSessionConfig(
+      "reviewer",
+      { ...base, activeToolNames: ["read", "bash", "edit", "write"] },
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("reviewer", {}),
+      assemblerIO,
+    );
+    expect(config.toolNames).toEqual(["read", "bash", "edit", "write"]);
+  });
+
+  it("strips recursive delegation tools from the shipped Reviewer", () => {
+    const config = assembleSessionConfig(
+      "reviewer",
+      {
+        ...base,
+        activeToolNames: [
+          "read",
+          "bash",
+          "subagent",
+          "get_subagent_result",
+          "steer_subagent",
+        ],
+      },
+      {},
+      { isGitRepo: false, branch: "", platform: "linux" },
+      registryWith("reviewer", {}),
+      assemblerIO,
+    );
+    expect(config.toolNames).toEqual(["read", "bash"]);
+  });
+
   it("strips the subagent-management tools from an inherited selection", () => {
     const config = assembleSessionConfig(
       "worker",
@@ -160,7 +193,7 @@ describe("the assembler's tool selection", () => {
     expect(config.toolNames).toEqual(["read"]);
   });
 
-  it("gives a restricted specialist exactly the tools it names", () => {
+  it("gives an explicitly restricted specialist exactly the tools it names", () => {
     const config = assembleSessionConfig(
       "reviewer",
       { ...base, activeToolNames: ["read", "bash", "edit", "write"] },
@@ -583,7 +616,7 @@ describe("automatic model selection at launch", () => {
   it.each([
     ["acme", "wonder-model-9", false],
     ["openai", "gpt-5.4-nano", true],
-  ])("keeps %s/%s and lowers effort by the next supported rung", (provider, id, registryHasParent) => {
+  ])("keeps %s/%s and selects the upper median supported effort", (provider, id, registryHasParent) => {
     const parent = makeReasoningModel({
       provider,
       id,
@@ -591,9 +624,9 @@ describe("automatic model selection at launch", () => {
         off: "off",
         minimal: null,
         low: "low",
-        medium: null,
+        medium: "medium",
         high: "high",
-        xhigh: null,
+        xhigh: "xhigh",
         max: "max",
       },
     });
@@ -602,7 +635,6 @@ describe("automatic model selection at launch", () => {
       registryWith("worker", {}),
       {
         parentModel: parent,
-        parentThinkingLevel: "max",
         modelRegistry: {
           getAll: () => (registryHasParent ? [parent] : []),
           getAvailable: () => (registryHasParent ? [parent] : []),
@@ -624,9 +656,7 @@ describe("automatic model selection at launch", () => {
     if ("error" in result) return;
     expect(result.execution.modelIdentity).toEqual({ provider, id });
     expect(result.execution.thinkingDecision.level).toBe("high");
-    expect(result.execution.thinkingDecision.reason).toContain(
-      "the parent's model was kept",
-    );
+    expect(result.execution.thinkingDecision.reason).toContain("upper median");
   });
 
   it.each([

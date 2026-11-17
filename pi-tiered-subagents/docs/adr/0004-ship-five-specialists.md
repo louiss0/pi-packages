@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-10-22
+superseded_by: 0019 for Reviewer's tool selection
 ---
 
 # 0004 — Ship five specialists, not upstream's role set

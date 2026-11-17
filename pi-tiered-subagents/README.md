@@ -33,7 +33,7 @@ The package ships one extension, loaded through `extensions/index.ts`. Its five 
 | --- | --- | --- |
 | `explore` | Find files and trace existing behavior | Read-only file tools; fresh conversation; no shell |
 | `worker` | Implement and validate a scoped change | Inherits the parent's active capability tools; fresh conversation |
-| `reviewer` | Independently assess a supplied change | Read-only tools; fresh conversation; needs the requirements and diff or readable diff artifact |
+| `reviewer` | Independently assess a supplied change | Inherits the parent's active capability tools; fresh conversation; may run checks but is instructed not to edit; needs the requirements and diff or readable diff artifact |
 | `debug` | Reproduce a failure and recommend a repair | Inherits active capability tools and the parent's conversation; instructed not to implement the production repair |
 | `researcher` | Investigate external facts | Read-only file tools plus `web_search`, when available; fresh conversation |
 
@@ -161,7 +161,7 @@ Custom identifiers use worker routing. Changing a display label does not change 
 
 Automatic candidates stay within the parent's **family and version**. The router tries eligible rungs in preference order, preferring the parent's provider, then a unique runnable alternative provider. It skips unavailable or provider-ambiguous candidates. If none qualify—or the family, tier, or version is unknown—it retains the parent model and explains why. It never guesses by price or crosses versions. Exact user pins bypass this routing and never silently fall back.
 
-Reasoning is selected after the model. Request `thinking` wins over definition `thinking`; otherwise the child takes the next supported non-off level below the parent's effort, staying at the floor when necessary. With no known parent effort, it prefers medium, then low, then the lowest supported non-off level. Explicit levels are clamped to model support; explicit `off` is not allowed on a reasoning model. Non-reasoning models report reasoning as not applicable.
+Reasoning is selected after the model. Request `thinking` wins over definition `thinking`; otherwise the child uses the upper median of its model's supported non-off levels, regardless of the parent's effort or whether routing retained the parent's model. Explicit levels are clamped to model support; explicit `off` is not allowed on a reasoning model. Non-reasoning models report reasoning as not applicable.
 
 Launch reports expose the selected model, reasoning, and reasons for retention or clamping. See the [configuration guide](docs/configuration.md) for family profiles, exact pins, and troubleshooting.
 

@@ -83,10 +83,7 @@ describe("AgentRegistry", () => {
       kind: "explicit",
       names: ["read", "grep", "find", "ls"],
     });
-    expect(tools("reviewer")).toEqual({
-      kind: "explicit",
-      names: ["read", "grep", "find"],
-    });
+    expect(tools("reviewer")).toEqual({ kind: "inherit" });
     expect(tools("researcher")).toEqual({
       kind: "explicit",
       names: ["read", "grep", "find", "ls", "web_search"],
@@ -125,11 +122,8 @@ describe("AgentRegistry", () => {
     const found = registry().find("reviewer");
     expect(found?.description).toBe("A local reviewer");
     expect(found?.instructions).toBe("Look closely.");
-    // The tool restrictions survive a definition that names no tools.
-    expect(found?.tools).toEqual({
-      kind: "explicit",
-      names: ["read", "grep", "find"],
-    });
+    // Tool inheritance survives a definition that names no tools.
+    expect(found?.tools).toEqual({ kind: "inherit" });
     expect(found?.origin).toBe("global");
   });
 

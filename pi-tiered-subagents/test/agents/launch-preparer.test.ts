@@ -154,7 +154,6 @@ describe("LaunchPreparer", () => {
         parentModel,
         modelRegistry: registry,
         ladders: { profiles: new Map(), strategies: new Map() },
-        parentThinkingLevel: "high",
       }),
     }).prepare(
       request({ model: "anthropic/claude-sonnet-5", thinking: "off" }),

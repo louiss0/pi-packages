@@ -7,13 +7,22 @@
 > one-tier-down model rule and replace Kimi with GLM. Exact explicit selection
 > and reasoning requirements are unchanged by that follow-up.
 
-> **Latest routing and retained-effort decision:**
+> **Earlier routing and retained-effort decision:**
 > [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
 > earlier cross-version links, unknown-family errors, and the retained-model
 > medium/low preference. Automatic routing is confined to the exact parent
 > family/version; unknown families retain the parent. With known parent effort,
 > automatic reasoning takes the next supported non-off rung below it, including
 > on retained models. The five-role mapping and size/role labels are unchanged.
+>
+> **Current defaults and family boundaries:**
+> [ADR 0017](adr/0017-automatic-reasoning-is-the-upper-median.md) makes automatic
+> reasoning the upper median of the child model's supported non-off levels,
+> independent of parent effort. [ADR 0020](adr/0020-drop-gemini-pro-and-flash-support.md)
+> limits automatic Gemini routing to the chemical `gemini` ladder; Pro and Flash
+> IDs are unsupported and retained. [ADR 0019](adr/0019-reviewer-inherits-parent-tools.md) makes
+> Reviewer inherit parent tools by default while preserving non-editing conduct
+> and explicit tool overrides.
 
 ## Problem Statement
 
@@ -48,7 +57,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 6. As a parent agent, I want an explore specialist, so that I can delegate locating files and tracing existing behaviour.
 7. As a user, I want explore to have read, grep, find, and ls, so that it can investigate structure and content without a general-purpose shell.
 8. As a parent agent, I want a reviewer specialist, so that I can obtain an independent assessment of a scoped change.
-9. As a user, I want reviewer to have only read, grep, and find as capability tools, so that it cannot directly edit files or execute arbitrary commands.
+9. As a user, I want reviewer to inherit the parent's active tools by default, so that it can inspect and validate a change with the session's capabilities while remaining instructed not to edit files.
 10. As a reviewer, I want the parent to supply the review scope, requirements, and diff or readable diff artifact, so that I know precisely what to assess.
 11. As a reviewer, I want to request missing essential review input, so that I do not imply I inspected changes I never received.
 12. As a parent agent, I want a worker specialist, so that I can delegate implementation and validation of a scoped change.
@@ -87,7 +96,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 39. As an agent author, I want an explicit tool list to replace inheritance, so that a restricted specialist receives only its selected capability tools.
 40. As an agent author, I want a new definition with no effective tools selection to default to inheritance, so that it follows the session rather than a separate hardcoded list.
 41. As a user, I want inherited subagent-management tools excluded, so that child agents cannot recursively delegate in the first release.
-42. As a user, I want built-in read/search tools available in a child independently of the parent's active selection, so that a reviewer can use grep without enabling it in my main session.
+42. As a user, I want built-in read/search tools available in a child independently of the parent's active selection when an explicit tool list names them, so that a restricted specialist can use grep without enabling it in my main session.
 43. As a user, I want no new optional-tools syntax or special web integration system, so that ordinary tool lists remain sufficient.
 44. As a user, I want all agents except debug to start with fresh conversation context by default, so that delegated tasks remain focused.
 45. As a user, I want applicable user and project standing instructions retained separately from conversation history, so that specialists respect my working conventions.
@@ -116,8 +125,8 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 65. As a user, I want family routing to defer provider access and restrictions to session model resolution, so that it does not impose a separate same-provider policy or invent credentials.
 66. As a user, I want an unknown family to retain the parent model with an explanation, so that the runtime does not guess from price or names.
 67. As a user, I want a recognized family with no runnable role target or downward fallback to retain the parent model, so that reasoning fallback can still make delegation economical.
-68. As a user, I want automatic reasoning to take the next supported non-off rung below known parent effort, landing on the model floor when no lower rung exists, and to prefer medium, then low, then lowest supported non-off only without parent effort.
-69. As a user, I want retained-model automatic reasoning to take the next supported non-off rung below known parent effort, staying at the floor, rather than preferring fixed medium or low.
+68. As a user, I want automatic reasoning to use the upper median of the child model's supported non-off levels, so that the default is centered on the child's capabilities rather than the parent's effort.
+69. As a user, I want retained-model automatic reasoning to use that same upper-median rule, so that retaining the parent's model does not reintroduce parent-effort inheritance.
 70. As a user, I want explicit thinking chosen in the tool call to win over the file and then automatic selection, so that per-task choices are respected.
 71. As a user, I want unsupported non-off thinking requests clamped to supported levels, so that a specialist is not rejected for a level the chosen model cannot express exactly.
 72. As a user, I want a non-reasoning model to remain usable, so that lack of reasoning support does not invalidate an otherwise valid model choice.
@@ -168,13 +177,13 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 
 ### Roles, tools, and instructions
 
-- Explore lists read, grep, find, and ls. Reviewer lists read, grep, and find. Researcher lists read, grep, find, ls, and web_search directly.
+- Explore lists read, grep, find, and ls. Reviewer, worker, and debug inherit the parent's active tools by default. Researcher lists read, grep, find, ls, and web_search directly.
 - Researcher's web_search entry uses ordinary tool-list behaviour. Do not add optional_tools, integration profiles, alias detection, Firecrawl-specific matching, a mandatory web dependency, or a custom missing-search prerequisite. A listed name does not install or implement a tool. Do not add separate web fetching/retrieval tools automatically.
 - Worker and debug use the inherit keyword. The effective selection is the parent's active tools captured at request time, not every configured tool and not a hardcoded built-in list. Strip subagent-management tools unconditionally.
 - An explicit list replaces inheritance. Mixed inherit/list forms are not supported. If no definition layer supplies a selection, default to inherit. Empty lists mean no capability tools.
 - Built-in tools may be instantiated for children even when inactive in the parent. Extension tools require their actual implementations to be registered and usable in the child. Verify this after extension initialization; copying names is not sufficient evidence of working inheritance.
 - Retain existing child-parent communication mechanisms independently of capability-tool lists where upstream already injects them. They do not authorize recursive delegation.
-- Reviewer is a non-editing code assessor. Its parent supplies requirements, scope, and a diff or readable diff artifact. It inspects surrounding code and reports actionable findings and uncertainty without claiming it executed checks.
+- Reviewer is a non-editing code assessor. Its parent supplies requirements, scope, and a diff or readable diff artifact. It inspects surrounding code, may run commands and checks, and reports actionable findings, actual verification, and uncertainty without claiming checks it did not execute.
 - Worker performs the delegated implementation using inherited capabilities. Its standing instructions require scoped work, evidence of actual validation, and escalation of consequential ambiguities rather than unrelated changes or invented verification.
 - Debug owns diagnosis and diagnostic artifacts, not implementing the production repair. Emphasize a repeatable exact-symptom feedback loop, minimization, falsifiable hypotheses, targeted probes, one changed variable at a time, evidence-backed conclusions, secret redaction, and cleanup of temporary instrumentation. If blocked, distinguish missing evidence from a confirmed cause. Return findings to the parent; do not automatically launch worker.
 - The debug role's limits are instructions, not a filesystem sandbox, because its diagnostic work requires editing and execution capabilities.
@@ -188,7 +197,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 - Explicit model selections require exact provider/model identity. Parse the provider separately while preserving the remaining model ID, which may itself contain a namespace separator. Resolve exactly or fail. Do not use fuzzy matching, provider assumptions, or cross-provider fallback.
 - Explicit selection bypasses family recognition, including for new families the router does not know. Apply thinking handling independently after the explicit model resolves.
 - Model identity, display name, series, version, variant/tier, and qualifiers are separate concepts. Do not assume the last number is always a version, all pro or fast suffixes mean the same thing, or hyphen position is uniform across series.
-- Initially provide strategy classes for GPT, Claude, Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Keep version-independent tier ladders and target labels as profile data rather than subclasses per release. Never enumerate releases or concrete IDs in profiles. Version fallback links are not supported.
+- Initially provide strategies for GPT, Claude, chemical-only Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Gemini Pro and Flash IDs are deliberately unclaimed and retained. Keep version-independent tier ladders and target labels as profile data rather than subclasses per release. Never enumerate releases or concrete IDs in profiles. Version fallback links are not supported.
 - User-defined profiles follow the same schema and already-supported naming structures. They must be consumable without authoring a strategy class. Genuinely new naming structures require runtime code support. Do not accept user regexes, wildcard targets, matcher callbacks, parser functions, or executable settings.
 - Profiles declare ordered family tiers and labels, never versions or concrete identities. Strategies extract the parent version and construct exact candidate IDs. An ID is usable only if the session can run it exactly; do not fuzzy-match snapshots or serving variants.
 - Resolve the role target within the exact parent family and version (Equal anchors at the parent rung). For example, GPT 5.6 Sol may target GPT 5.6 Terra, while GPT 6.1 Sol cannot borrow GPT 6 Luna. These are representative profile examples, not vendor-availability claims. No version fallback links exist; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
@@ -202,7 +211,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `qwen`) | Planner/worker group (`gemini`, `minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -266,9 +275,9 @@ behavior through the existing seams. Do not expand family/version catalogues.
 ### Thinking selection
 
 - Resolve the child model before reasoning. Precedence is explicit tool-call thinking, then effective agent-file thinking, then automatic selection.
-- For reasoning-capable models with known parent effort, take the next supported non-off rung below it in the chosen model's own level array, skipping gaps and landing on the model floor when no lower rung exists. At the parent's own floor, effort stays. Use Pi's reported levels rather than names or series-wide assumptions.
-- Retained-parent automatic reasoning follows that same next-supported-rung rule: no fixed medium/low preference applies when parent effort is known. With no parent effort, prefer medium, then low, then the lowest supported non-off level.
-- Clamp unsupported explicit non-off requests using Pi-compatible ordering rather than rejecting an otherwise valid launch. Prevent clamping from silently selecting off for a reasoning-capable model. Do not use a numerical midpoint algorithm.
+- For reasoning-capable models, automatic selection uses the upper median of the chosen model's supported non-off levels, sorted in canonical effort order. It ignores parent effort and applies identically to changed and retained models.
+- With an even number of supported non-off levels, choose the higher of the two middle rungs. Exclude off before finding the median; singleton support keeps its only level.
+- Clamp unsupported explicit non-off requests using Pi-compatible ordering rather than rejecting an otherwise valid launch. Prevent clamping from silently selecting off for a reasoning-capable model. Automatic median selection must never invent an unsupported level.
 - Automatic selection never disables reasoning on a reasoning-capable model. Preserve the agreed prohibition on an explicit off request for such models; permitting non-reasoning models is not the same as disabling a capable model's reasoning.
 - Non-reasoning models are valid explicit and automatic candidates. Discard/reject the inapplicable thinking setting, not the subagent launch. Represent thinking as not applicable, not as successfully applied medium/low or an arbitrary setting that enables unsupported capability.
 
@@ -307,9 +316,9 @@ The user explicitly confirmed two complementary seams: behaviour of the shared c
 - Exact shipped tool lists, including researcher's literal web_search entry and ordinary missing-tool behaviour without bespoke prerequisites. Do not replace this acceptance criterion with a test that only copies tool names from the parent.
 - Both launch entry points produce the same effective role defaults and explicit model/thinking precedence.
 - Explicit model resolution: exact identities, model IDs containing namespace separators, rejection of shorthand, unavailable models, no provider fallback, and explicit use of unrecognized families.
-- Family routing: fixtures for all eight supported strategies (GLM replaces Kimi); role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
+- Family routing: fixtures for all eight supported strategies, including chemical Gemini ownership and unsupported Pro/Flash retention; role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
 - User-added profiles using supported schema/naming structures, named-profile replacement without erasing unrelated families, project-trust enforcement, and refusal to execute user matcher/parser logic.
-- Thinking: next-supported-rung selection with known parent effort, including retained models and gaps; unchanged floors; medium/low/lowest non-off defaults without parent effort; explicit precedence, supported-level clamping, no automatic off, explicit off policy, no increase on retained-parent fallback, non-reasoning models, and truthful not-applicable reporting.
+- Thinking: upper-median selection over odd, even, gapped, and singleton supported non-off arrays; exclusion of off; identical behavior for changed and retained models regardless of parent effort; explicit precedence, supported-level clamping, no automatic off, explicit off policy, non-reasoning models, and truthful not-applicable reporting.
 - Request-time snapshots: change parent model, effort, tools, and conversation while a request waits; assert that queued work uses its captured inputs.
 - Scheduling: readers can overlap, exclusive children do not overlap in a shared workspace, classification changes after overrides, and cancellation/failure/resume do not leak or bypass the exclusive slot.
 - Lifecycle regression: background default, explicit foreground, completion/result retrieval, failures, steering, questions/updates where retained, cancellation, resume eligibility, retention, transcripts, shutdown, provider registration inheritance, and package exclusions.

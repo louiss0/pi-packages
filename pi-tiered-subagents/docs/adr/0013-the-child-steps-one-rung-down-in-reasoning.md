@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-26
 supersedes: 0008 — for the case where the child runs on its own model
+superseded_by: 0017
 ---
 
 # 0013 — The child steps one rung down in reasoning

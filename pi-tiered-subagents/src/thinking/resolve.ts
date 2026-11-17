@@ -5,45 +5,25 @@
  * is a property of the model.
  *
  * The order of precedence is the request, then the definition, then the
- * automatic choice. The automatic choice **steps one rung down from the
- * effort the parent was running at**: the highest level the child's model
- * supports that is strictly below the parent's, skipping levels the model does
- * not have. With no parent effort to step down from, it prefers **medium**,
- * then **low**, then the lowest supported non-off level. It never turns
+ * automatic choice. The automatic choice is the **upper median of the child
+ * model's supported non-off levels**. Parent effort does not affect it, even
+ * when routing retains the parent's model. Automatic selection never turns
  * reasoning off on a model that has it.
  *
- * Two rules make the fallback honest:
- *
- * - A model that does not reason is not a failure. The level is discarded and
- *   reported as *not applicable*; the launch goes ahead.
- * - When the parent's model is kept and parent effort is known, take the next
- *   supported non-off rung below it, or the model's floor if none is lower.
- *   Effort already at the floor stands; a parent below the supported floor is
- *   brought to that floor and the limitation is reported.
- *
- * The supported levels come from Pi's own report about the model, and an
- * unsupported request is clamped the way Pi clamps it — never by a numerical
- * midpoint, and never silently down to "off" on a reasoning model.
+ * A model that does not reason is not a failure: the level is discarded and
+ * reported as *not applicable*. Explicit levels retain their clamping behavior.
  */
 
 import { type Model } from "@earendil-works/pi-ai";
 import { type SubagentThinkingLevel } from "#src/config/thinking-level";
-import { EFFORT, levelBelow, stepDown } from "#src/thinking/levels";
+import { middleLevel } from "#src/thinking/levels";
 import {
   supportedLevels as adapterSupportedLevels,
   clampLevel as adapterClampLevel,
 } from "#src/agents/sdk-adapter";
 
-/** The levels, in ascending order of effort. */
-const EFFORT_ORDER: ReadonlyArray<SubagentThinkingLevel> = EFFORT;
-
 /** Where the level came from. */
-export type ThinkingSource =
-  | "request"
-  | "definition"
-  | "automatic"
-  | "parent"
-  | "none";
+export type ThinkingSource = "request" | "definition" | "automatic" | "none";
 
 /** The level the child runs at, and what was decided. */
 export type ThinkingDecision = Readonly<{
@@ -72,16 +52,6 @@ export type ThinkingRequest = Readonly<{
   defined?: SubagentThinkingLevel;
   /** The model the child runs on. */
   model?: Model<any>;
-  /** The effort the parent was running at, when the parent has one. */
-  parentLevel?: SubagentThinkingLevel;
-  /**
-   * Whether the parent's model was kept because no lower target was
-   * available.
-   *
-   * Absent means the model changed — the default is a child that works on its
-   * own model, and the retained-parent rule does not apply.
-   */
-  parentModelKept?: boolean;
 }>;
 
 /**
@@ -139,18 +109,7 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
     return explicit(request.defined, "definition", supported, model);
   }
 
-  if (request.parentModelKept) {
-    return retainedParent(request.parentLevel, supported);
-  }
-
-  // The child has its own model, so it steps down from the parent's effort
-  // rather than taking a fixed default. "One rung" is expressed in the child's
-  // own array: gapped ladders skip the levels the model does not have.
-  if (request.parentLevel !== undefined) {
-    return belowParent(request.parentLevel, supported, model);
-  }
-
-  const level = automaticLevel(nonOff);
+  const level = middleLevel(supported);
   if (!level) {
     return {
       applicable: true,
@@ -164,7 +123,7 @@ export function resolveThinking(request: ThinkingRequest): ThinkingDecision {
     applicable: true,
     source: "automatic",
     clamped: false,
-    reason: `the default reasoning level for ${model.provider}/${model.id} is ${level}`,
+    reason: `the automatic reasoning level for ${model.provider}/${model.id} is ${level}, the upper median of its supported non-off levels`,
   };
 }
 
@@ -220,120 +179,5 @@ function explicit(
       source === "request"
         ? `${requested} is not a level ${model.provider}/${model.id} supports, so the request was clamped to ${clamped}`
         : `${requested} is not a level ${model.provider}/${model.id} supports, so the definition's level was clamped to ${clamped}`,
-  };
-}
-
-/**
- * The automatic level: medium, then low, then the lowest supported non-off
- * level.
- */
-function automaticLevel(
-  nonOff: ReadonlyArray<SubagentThinkingLevel>,
-): SubagentThinkingLevel | undefined {
-  if (nonOff.includes("medium")) return "medium";
-  if (nonOff.includes("low")) return "low";
-  // The levels arrive in ascending order, so the first non-off is the lowest.
-  return nonOff[0];
-}
-
-/**
- * The level for a child that runs on its own model: one rung below the parent.
- *
- * The rung is the highest level *this model* supports below the parent's, so a
- * model that reports `["low", "high", "max"]` steps from `max` to `high` and
- * from `high` to `low`, never to a level it cannot run and never to `off`.
- *
- * Where there is no rung below, the model's own floor is used. That floor can
- * be the parent's own effort (nothing lower exists, so nothing changes) or, on
- * a model that cannot go as low as the parent, above it — an unavoidable
- * property of the model, said plainly in the launch note rather than hidden.
- */
-function belowParent(
-  parentLevel: SubagentThinkingLevel,
-  supported: ReadonlyArray<SubagentThinkingLevel>,
-  model: Model<any>,
-): ThinkingDecision {
-  const below = levelBelow(supported, parentLevel);
-  if (below !== undefined) {
-    return {
-      level: below,
-      applicable: true,
-      source: "parent",
-      clamped: false,
-      reason: `the parent was running at ${parentLevel}, so the child runs one rung down at ${below}`,
-    };
-  }
-
-  const floor = stepDown(supported, parentLevel);
-  if (floor !== undefined && floor === parentLevel) {
-    return {
-      level: floor,
-      applicable: true,
-      source: "parent",
-      clamped: false,
-      reason: `${model.provider}/${model.id} supports no level below ${parentLevel}, so the parent's effort stands`,
-    };
-  }
-
-  return {
-    ...(floor ? { level: floor } : {}),
-    applicable: true,
-    source: "parent",
-    clamped: false,
-    reason: floor
-      ? `the lowest level ${model.provider}/${model.id} supports is ${floor}, above the parent's ${parentLevel}; the model has no lower rung`
-      : `${model.provider}/${model.id} supports no reasoning level below off`,
-  };
-}
-
-/**
- * The level for a child that keeps the parent's model.
- *
- * The next supported non-off rung below the parent's effort is used. Gaps are
- * skipped; where no lower rung exists the model's non-off floor is used.
- */
-function retainedParent(
-  parentLevel: SubagentThinkingLevel | undefined,
-  supported: ReadonlyArray<SubagentThinkingLevel>,
-): ThinkingDecision {
-  const nonOff = supported.filter((level) => level !== "off");
-
-  if (parentLevel === undefined) {
-    const level = automaticLevel(nonOff);
-    return {
-      ...(level ? { level } : {}),
-      applicable: true,
-      source: "automatic",
-      clamped: false,
-      reason: level
-        ? `the parent's model was kept, and its default reasoning level is ${level}`
-        : "the parent's model was kept, and it supports no reasoning level below off",
-    };
-  }
-
-  const parentEffort = EFFORT_ORDER.indexOf(parentLevel);
-  const nextLower = nonOff
-    .filter((level) => EFFORT_ORDER.indexOf(level) < parentEffort)
-    .at(-1);
-  if (nextLower) {
-    return {
-      level: nextLower,
-      applicable: true,
-      source: "parent",
-      clamped: false,
-      reason: `the parent's model was kept, and ${nextLower} is one supported rung below the effort the parent was running at (${parentLevel})`,
-    };
-  }
-
-  const floor = nonOff[0];
-  return {
-    ...(floor ? { level: floor } : {}),
-    applicable: true,
-    source: "parent",
-    clamped: false,
-    reason:
-      floor === parentLevel
-        ? `the parent's model was kept, and it supports no level below the effort the parent was running at (${parentLevel}), so that effort stands`
-        : `the parent's model was kept; its lowest supported non-off level is ${floor}, so the parent's ${parentLevel} effort cannot be lowered on this model`,
   };
 }

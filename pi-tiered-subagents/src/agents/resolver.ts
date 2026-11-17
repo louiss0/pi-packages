@@ -45,8 +45,6 @@ export type ModelInfo = {
   modelRegistry?: ModelRegistry;
   /** The routing ladders the automatic model selection walks. */
   ladders: RoutingLadders;
-  /** The effort the parent was running at, when the parent has one. */
-  parentThinkingLevel?: ThinkingLevel;
 };
 
 /** Identity: who is being spawned. */
@@ -189,7 +187,6 @@ export function resolveSpawn(
       ladders: request.modelInfo.ladders,
       ...defined({
         parentModel: request.modelInfo.parentModel,
-        parentThinkingLevel: request.modelInfo.parentThinkingLevel,
       }),
     },
   );
