@@ -64,6 +64,23 @@ function entry(overrides: Record<string, unknown>): InheritedBranchEntry {
 }
 
 describe("seedInheritedBranch", () => {
+  it("does not replay the parent's system-prompt message", () => {
+    const manager = makeManager();
+    const userMessage = { role: "user", content: "hello" };
+
+    seedInheritedBranch(manager, [
+      {
+        type: "message",
+        id: "s1",
+        message: { role: "system", content: "" },
+      },
+      { type: "message", id: "e1", message: userMessage },
+    ]);
+
+    expect(manager.appendMessage).toHaveBeenCalledOnce();
+    expect(manager.appendMessage).toHaveBeenCalledWith(userMessage);
+  });
+
   it("does nothing for an empty branch", () => {
     const manager = makeManager();
     seedInheritedBranch(manager, []);

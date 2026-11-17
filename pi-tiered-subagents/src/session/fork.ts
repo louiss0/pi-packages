@@ -81,6 +81,9 @@ function replayEntry(
 ): string | undefined {
   switch (entry.type) {
     case "message":
+      // `captureParentBranch` drops system-prompt messages; guard here too so
+      // a branch built directly cannot give the child a second system prompt.
+      if (isSystemMessage(entry.message)) return undefined;
       return manager.appendMessage(entry.message);
 
     case "custom_message":
@@ -129,6 +132,14 @@ function replayEntry(
     default:
       return undefined;
   }
+}
+
+function isSystemMessage(message: unknown): boolean {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    (message as { role?: unknown }).role === "system"
+  );
 }
 
 function asString(value: unknown): string {
