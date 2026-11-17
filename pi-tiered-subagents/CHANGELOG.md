@@ -1,3 +1,17 @@
+# 2.0.0 (2026-11-17)
+
+### 🚀 Features
+
+- **pi-tiered-subagents:** use upper-median automatic reasoning ([3190b39](https://github.com/louiss0/pi-packages/commit/3190b39))
+
+### 🩹 Fixes
+
+- **pi-tiered-subagents:** strip system and signatures from forks ([80bb176](https://github.com/louiss0/pi-packages/commit/80bb176))
+
+### ❤️ Thank You
+
+- openhands
+
 ## 1.1.0 (2026-11-13)
 
 ### 🚀 Features
