@@ -166,7 +166,7 @@ describe("captureParentBranch", () => {
     expect(captureParentBranch(makeCtx(entries))).toEqual(entries.slice(0, 3));
   });
 
-  it("strips signed Anthropic thinking blocks and redacted_thinking while keeping unsigned thinking", () => {
+  it("strips signed thinking from any provider while keeping unsigned thinking", () => {
     const entries = [
       {
         type: "message",
@@ -290,6 +290,129 @@ describe("captureParentBranch", () => {
     ]);
   });
 
+  it("drops the parent's system-prompt message, which is not conversation", () => {
+    const entries = [
+      {
+        type: "message",
+        id: "s1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: { role: "system", content: "" },
+      },
+      {
+        type: "message",
+        id: "e1",
+        parentId: "s1",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        message: { role: "user", content: "Debug this" },
+      },
+      {
+        type: "message",
+        id: "e2",
+        parentId: "e1",
+        timestamp: "2026-01-01T00:00:02.000Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+        },
+      },
+    ];
+
+    expect(captureParentBranch(makeCtx(entries))).toEqual([
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:01.000Z",
+        message: { role: "user", content: "Debug this" },
+      },
+      {
+        type: "message",
+        id: "e2",
+        parentId: "e1",
+        timestamp: "2026-01-01T00:00:02.000Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+        },
+      },
+    ]);
+  });
+
+  it("strips provider-bound signatures from every inherited content block", () => {
+    const entries = [
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: {
+          role: "assistant",
+          provider: "google",
+          api: "google-generative-ai",
+          model: "gemini-2.5-flash-lite",
+          content: [
+            { type: "thinking", thinking: "signed", thoughtSignature: "sig" },
+            { type: "redacted_thinking", data: "opaque" },
+            {
+              type: "toolCall",
+              id: "call-1",
+              name: "bash",
+              arguments: {},
+              thoughtSignature: "sig",
+            },
+            { type: "text", text: "answer", textSignature: "sig" },
+            { type: "text", text: "plain" },
+          ],
+        },
+      },
+      {
+        type: "message",
+        id: "e2",
+        parentId: "e1",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "bash",
+          content: [{ type: "text", text: "output", textSignature: "sig" }],
+        },
+      },
+    ];
+
+    expect(captureParentBranch(makeCtx(entries))).toEqual([
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: {
+          role: "assistant",
+          provider: "google",
+          api: "google-generative-ai",
+          model: "gemini-2.5-flash-lite",
+          content: [
+            { type: "toolCall", id: "call-1", name: "bash", arguments: {} },
+            { type: "text", text: "answer" },
+            { type: "text", text: "plain" },
+          ],
+        },
+      },
+      {
+        type: "message",
+        id: "e2",
+        parentId: "e1",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "bash",
+          content: [{ type: "text", text: "output" }],
+        },
+      },
+    ]);
+  });
+
   it("strips signed and redacted thinking blocks from custom messages too", () => {
     const entries = [
       {
@@ -300,7 +423,7 @@ describe("captureParentBranch", () => {
         content: [
           { type: "thinking", thinking: "signed", thinkingSignature: "sig-1" },
           { type: "redacted_thinking", data: "opaque" },
-          { type: "text", text: "kept note" },
+          { type: "text", text: "kept note", textSignature: "sig-2" },
         ],
         display: false,
       },
@@ -314,6 +437,53 @@ describe("captureParentBranch", () => {
         customType: "my-ext:note",
         content: [{ type: "text", text: "kept note" }],
         display: false,
+      },
+    ]);
+  });
+
+  it("strips signatures from a context edit's replacement content", () => {
+    const entries = [
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "old" }],
+        },
+      },
+      {
+        type: "context_edit",
+        id: "ce1",
+        parentId: "e1",
+        targetId: "e1",
+        replacement: {
+          content: [
+            { type: "text", text: "trimmed", textSignature: "sig" },
+            { type: "thinking", thinking: "signed", thoughtSignature: "sig" },
+          ],
+        },
+      },
+    ];
+
+    expect(captureParentBranch(makeCtx(entries))).toEqual([
+      {
+        type: "message",
+        id: "e1",
+        parentId: null,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "old" }],
+        },
+      },
+      {
+        type: "context_edit",
+        id: "ce1",
+        parentId: "e1",
+        targetId: "e1",
+        replacement: {
+          content: [{ type: "text", text: "trimmed" }],
+        },
       },
     ]);
   });
