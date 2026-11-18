@@ -1,19 +1,30 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { loadDefinitionScope } from "#src/agents/loader";
+import { buildCatalog } from "#src/agents/registry";
 
 const projectAgents = fileURLToPath(
   new URL("../../../.pi/agents", import.meta.url),
 );
 
-describe("the project's explorer agent", () => {
-  it("can save its findings to a file", () => {
-    const scope = loadDefinitionScope(projectAgents);
-    expect(scope.errors).toEqual([]);
-    const explorer = scope.definitions.find((entry) => entry.id === "explorer");
-    expect(explorer).toBeDefined();
-    if (!explorer) return;
-    expect(explorer.patch.tools).toEqual({
+describe("the project's explore agent", () => {
+  it("overrides the shipped specialist with write tools", () => {
+    const project = loadDefinitionScope(projectAgents);
+    const catalog = buildCatalog({
+      global: { definitions: [], errors: [] },
+      project,
+    });
+
+    expect(catalog.list().map((entry) => entry.id)).toEqual([
+      "debug",
+      "explore",
+      "researcher",
+      "reviewer",
+      "worker",
+    ]);
+    const explore = catalog.find("explore");
+    expect(explore?.origin).toBe("project");
+    expect(explore?.tools).toEqual({
       kind: "explicit",
       names: expect.arrayContaining([
         "read",
@@ -24,6 +35,6 @@ describe("the project's explorer agent", () => {
         "edit",
       ]),
     });
-    expect(explorer.patch.instructions?.toLowerCase()).toContain("save");
+    expect(explore?.instructions.toLowerCase()).toContain("save");
   });
 });
