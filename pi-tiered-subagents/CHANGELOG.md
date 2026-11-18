@@ -1,3 +1,17 @@
+## 2.0.2 (2026-11-18)
+
+### 🚀 Features
+
+- **agents:** add write-capable explorer definition ([79df970](https://github.com/louiss0/pi-packages/commit/79df970))
+
+### 🩹 Fixes
+
+- **agents:** override explore with write-capable definition ([5030ddb](https://github.com/louiss0/pi-packages/commit/5030ddb))
+
+### ❤️ Thank You
+
+- openhands
+
 ## 2.0.1 (2026-11-18)
 
 ### 🚀 Features
