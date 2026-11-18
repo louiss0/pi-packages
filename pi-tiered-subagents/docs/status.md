@@ -241,7 +241,7 @@ default line.
 
 Only declared data is read: a field the schema does not name is rejected, never
 evaluated. A replacement profile with an unsupported naming structure is
-refused — the eight shipped strategies are the structures this package can
+refused — the nine shipped strategies are the structures this package can
 read. This is profile validation, not an unknown-parent-family error: an
 unknown parent family retains the parent model.
 
@@ -256,7 +256,7 @@ data and validates it; it never touches a file of its own.
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `hy`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -375,7 +375,7 @@ Verification for this follow-up:
 | An agent-file model wins over the automatic routing | 56 | Done. |
 | Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
 | An explicit choice works without a known family | 59 | Done. |
-| Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover eight families. Gemini supports only its chemical line. |
+| Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover nine families. Gemini supports only its chemical line. |
 | Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; obsolete tier-level `fallbacks` is accepted and discarded. |
 | The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |

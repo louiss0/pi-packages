@@ -147,7 +147,7 @@ Concurrency admission applies to foreground and background work. Children run un
 
 A request model pin wins over a definition pin; otherwise the runtime routes from the parent's model using the resolved specialist identifier.
 
-| Specialist | Size families: GPT, Claude, Gemini chemical, Qwen | Planner/worker families: MiniMax, GLM, MiMo, DeepSeek |
+| Specialist | Size families: GPT, Claude, Gemini chemical, Qwen | Planner/worker families: MiniMax, GLM, Hy, MiMo, DeepSeek |
 | --- | --- | --- |
 | `worker` | One size below the parent, clamped at S | Worker |
 | `explore`, `researcher` | S | Worker |

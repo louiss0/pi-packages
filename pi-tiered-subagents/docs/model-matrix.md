@@ -1,7 +1,7 @@
 # Agent and model selection matrix
 
 Which specialist runs, and which model it runs on, are **two separate decisions**.
-All 5 × 8 agent/family combinations are valid, but automatic model selection is
+All 5 × 9 agent/family combinations are valid, but automatic model selection is
 **role-aware**, not uniform: the agent identifier determines a target within
 the parent's exact family **and version**. Explicit model pins still win over automatic routing.
 
@@ -69,13 +69,13 @@ Version 97.2 is illustrative, not a supported-release catalogue. The complete pa
 or definition model pin bypasses this grid.
 
 <!-- model-matrix:grid:start -->
-| Agent | gpt | claude | gemini | glm | minimax | qwen | deepseek | mimo |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
-| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-carbon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-krypton` | `example/glm-97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
-| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
-| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| Agent | gpt | claude | gemini | glm | hy | minimax | qwen | deepseek | mimo |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `explore` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/hy97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
+| `worker` | `example/gpt-97.2-sol` | `example/claude-opus-97-2` | `example/gemini-97.2-carbon` | `example/glm-97.2-flash` | `example/hy97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `reviewer` | `example/gpt-97.2-astra` | `example/claude-fable-97-2` | `example/gemini-97.2-krypton` | `example/glm-97.2` | `example/hy97.2` | `example/MiniMax-M97.2-highspeed` | `example/qwen97.2-max` | `example/deepseek-v97.2-pro` | `example/mimo-v97.2-pro-ultraspeed` |
+| `debug` | `example/gpt-97.2-terra` | `example/claude-sonnet-97-2` | `example/gemini-97.2-argon` | `example/glm-97.2-flash` | `example/hy97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-plus` | **retain** | `example/mimo-v97.2-flash` |
+| `researcher` | `example/gpt-97.2-luna` | `example/claude-haiku-97-2` | `example/gemini-97.2-hydrogen` | `example/glm-97.2-flash` | `example/hy97.2-flash` | `example/MiniMax-M97.2-flash` | `example/qwen97.2-flash` | **retain** | `example/mimo-v97.2-flash` |
 
 | Family | Representative parent (all candidates available) |
 | --- | --- |
@@ -83,6 +83,7 @@ or definition model pin bypasses this grid.
 | claude | `example/claude-fable-97-2` |
 | gemini | `example/gemini-97.2-krypton` |
 | glm | `example/glm-97.2` |
+| hy | `example/hy97.2` |
 | minimax | `example/MiniMax-M97.2-highspeed` |
 | qwen | `example/qwen97.2-max` |
 | deepseek | `example/deepseek-v97.2-pro` |
@@ -226,6 +227,21 @@ identities and retain outcomes come only from the router.
 | `example/glm-97.2-flash` | 97.2 / flash (worker) | `debug` | `example/glm-97.2-flash` | **retain** | **retain** |
 | `example/glm-97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/glm-97.2-flash` | **retain** | **retain** |
 
+### hy — planner-worker
+
+| Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
+| --- | --- | --- | --- | --- | --- |
+| `example/hy97.2` | 97.2 / (default) (planner) | `explore` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2` | 97.2 / (default) (planner) | `worker` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2` | 97.2 / (default) (planner) | `reviewer` | `example/hy97.2` | **retain** | **retain** |
+| `example/hy97.2` | 97.2 / (default) (planner) | `debug` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2` | 97.2 / (default) (planner) | `researcher` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2-flash` | 97.2 / flash (worker) | `explore` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2-flash` | 97.2 / flash (worker) | `worker` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2-flash` | 97.2 / flash (worker) | `reviewer` | `example/hy97.2` | **retain** | **retain** |
+| `example/hy97.2-flash` | 97.2 / flash (worker) | `debug` | `example/hy97.2-flash` | **retain** | **retain** |
+| `example/hy97.2-flash` | 97.2 / flash (worker) | `researcher` | `example/hy97.2-flash` | **retain** | **retain** |
+
 ### minimax — planner-worker
 
 | Parent model | Version / rung (size or role) | Agent | All available | Other versions only | None available |
@@ -328,7 +344,7 @@ route(parent, context, agentId = "worker"):
 
 ### Role targets
 
-| Agent | Size group: gpt, claude, gemini, qwen | Planner/worker group: minimax, glm, mimo, deepseek |
+| Agent | Size group: gpt, claude, gemini, qwen | Planner/worker group: minimax, glm, hy, mimo, deepseek |
 | --- | --- | --- |
 | `worker` | One size below parent, clamped at S | worker class |
 | `researcher` | S | worker class |
@@ -410,7 +426,7 @@ the real router and compares the entire content, including the role-aware grid,
 every concrete parent for every shipped role, and both restricted availability
 scenarios. Every other-versions-only outcome must retain the parent. Hand edits
 anywhere in these regions fail the evidence test. It also verifies the five shipped definitions remain unpinned
-and that the grid covers the eight supported families (GLM included, Kimi and Gemini Pro/Flash unsupported).
+and that the grid covers the nine supported families (GLM and Hy included, Kimi and Gemini Pro/Flash unsupported).
 
 This is documentation-drift evidence, **not the sole correctness oracle**:
 independent literal examples in the router and selection tests verify the

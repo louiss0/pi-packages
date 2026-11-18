@@ -23,7 +23,8 @@ export type ParsedModelId = Readonly<{
    *
    * A tier name may be one segment ("sol") or several joined ("flash-lite"),
    * so the profile's tier names are matched against the contiguous joins of
-   * this list.
+   * this list. Serving qualifiers such as `free` are dropped before it is
+   * returned.
    */
   tierCandidates: ReadonlyArray<string>;
 }>;
@@ -57,6 +58,12 @@ const VERSION = /^\d+(?:\.\d+)*$/;
 
 /** A date qualifier: eight digits, as the dated snapshots carry. */
 const DATE_QUALIFIER = /^\d{8}$/;
+
+/**
+ * A serving qualifier: `free` describes availability, not a tier. It is
+ * ignored by every family's id reader, just like a dated snapshot.
+ */
+const SERVING_QUALIFIER = /^free$/i;
 
 /**
  * The contiguous joins of a candidate list, shortest first.
@@ -239,8 +246,9 @@ function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
       const variants: string[] = [];
       let seenQualifier = false;
       for (const segment of segments.slice(1)) {
-        // A dated snapshot's date is a qualifier, not a version part.
-        if (DATE_QUALIFIER.test(segment)) {
+        // Dates and serving qualifiers name availability, not a version part
+        // or a tier.
+        if (DATE_QUALIFIER.test(segment) || SERVING_QUALIFIER.test(segment)) {
           seenQualifier = true;
           continue;
         }
@@ -280,19 +288,24 @@ function readVersion(
   return { value: match[0], length: match[0].length };
 }
 
-/** Read the variant segments that follow a version, dropping dated qualifiers. */
+/** Read the variant segments that follow a version, dropping qualifiers. */
 function readVariants(text: string): string[] {
   if (!text.startsWith("-")) return [];
   return text
     .slice(1)
     .split("-")
-    .filter((segment) => segment.length > 0 && !DATE_QUALIFIER.test(segment));
+    .filter(
+      (segment) =>
+        segment.length > 0 &&
+        !DATE_QUALIFIER.test(segment) &&
+        !SERVING_QUALIFIER.test(segment),
+    );
 }
 
 /**
  * The strategies this package ships.
  *
- * Eight families, each with its own naming structure and disjoint ownership of
+ * Nine families, each with its own naming structure and disjoint ownership of
  * model ids. A profile may refine any of them; a family outside this set has
  * no structure to read, so a profile for one cannot be used.
  */
@@ -301,6 +314,7 @@ export const SHIPPED_STRATEGIES: ReadonlyArray<FamilyStrategy> = [
   geminiFamily(),
   gluedVersionFamily("qwen", "qwen"),
   gluedVersionFamily("glm", "glm-"),
+  gluedVersionFamily("hy", "hy"),
   taggedVersionFamily("mimo", "mimo-", "v"),
   taggedVersionFamily("deepseek", "deepseek-", "v"),
   taggedVersionFamily("minimax", "MiniMax-", "M"),

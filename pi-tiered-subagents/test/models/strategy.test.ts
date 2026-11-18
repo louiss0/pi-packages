@@ -119,6 +119,34 @@ describe("the GLM naming structure", () => {
   });
 });
 
+describe("the Hy naming structure", () => {
+  it("reads the planner default and its flash worker tier", () => {
+    expect(parse("hy", "hy3")).toEqual({
+      family: "hy",
+      version: "3",
+      tierCandidates: [],
+    });
+    expect(parse("hy", "hy4-flash")).toEqual({
+      family: "hy",
+      version: "4",
+      tierCandidates: ["flash"],
+    });
+  });
+
+  it("ignores a free serving qualifier when reading the tier", () => {
+    expect(parse("hy", "hy3-free")).toEqual({
+      family: "hy",
+      version: "3",
+      tierCandidates: [],
+    });
+    expect(parse("hy", "hy4-flash-free")).toEqual({
+      family: "hy",
+      version: "4",
+      tierCandidates: ["flash"],
+    });
+  });
+});
+
 describe("the MiniMax naming structure", () => {
   it("reads a capitalized id", () => {
     expect(parse("minimax", "MiniMax-M2.7")).toEqual({
@@ -170,17 +198,35 @@ describe("the MiMo naming structure", () => {
 });
 
 describe("the shipped strategies", () => {
-  it("cover the eight agreed families", () => {
+  it("cover the nine agreed families", () => {
     expect([...strategies.keys()].sort()).toEqual([
       "claude",
       "deepseek",
       "gemini",
       "glm",
       "gpt",
+      "hy",
       "mimo",
       "minimax",
       "qwen",
     ]);
+  });
+
+  it("ignore a free serving qualifier in every naming structure", () => {
+    const cases = [
+      ["gpt", "gpt-6.1-sol-free", ["sol"]],
+      ["claude", "claude-opus-5-free", ["opus"]],
+      ["gemini", "gemini-4-krypton-free", ["krypton"]],
+      ["glm", "glm-5.3-flash-free", ["flash"]],
+      ["hy", "hy4-free", []],
+      ["minimax", "MiniMax-M2.7-highspeed-free", ["highspeed"]],
+      ["qwen", "qwen3.7-max-free", ["max"]],
+      ["deepseek", "deepseek-v4-pro-free", ["pro"]],
+      ["mimo", "mimo-v2.6-pro-free", ["pro"]],
+    ] as const;
+    for (const [family, id, tierCandidates] of cases) {
+      expect(parse(family, id)?.tierCandidates).toEqual(tierCandidates);
+    }
   });
 
   it("place no id in two families", () => {
@@ -190,6 +236,7 @@ describe("the shipped strategies", () => {
       "glm-5.3-flash",
       "gemini-4-carbon",
       "glm-5.3",
+      "hy4-flash",
     ]) {
       const families = SHIPPED_STRATEGIES.filter(
         (strategy) => strategy.belongs(id) && strategy.parse(id) !== undefined,

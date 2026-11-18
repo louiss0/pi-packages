@@ -273,6 +273,14 @@ export const SHIPPED_PROFILES: ReadonlyArray<FamilyProfile> = [
     ],
   },
   {
+    family: "hy",
+    group: "planner-worker",
+    tiers: [
+      { tier: "", role: "planner" },
+      { tier: "flash", role: "worker" },
+    ],
+  },
+  {
     family: "minimax",
     group: "planner-worker",
     tiers: [

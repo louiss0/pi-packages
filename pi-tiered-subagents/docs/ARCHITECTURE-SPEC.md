@@ -335,7 +335,7 @@ No new launch authority or reroute-after-acceptance path is introduced.
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `hy`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -733,7 +733,7 @@ flowchart TB
 6. **Definition validity:** retain four-way layering, normalized identifiers, exact tool replacement, body inheritance/replacement, and valid unrelated agents; reject invalid recognized fields and duplicate requested identifiers without a shipped/default fallback. Diagnose scope-wide read failure honestly.
 7. **No extension trust policy:** project layers are read without extension-owned trust inputs or branching. Remove tests requiring the extension to grant/revalidate trust; do not mock SDK trust as always true to hide a retained extension gate. Keep ordinary SDK behavior untouched.
 8. **Exact tools and real installation:** capture inheritance and wildcard expansion, exclude management names, and use one exact capability allowlist for admission and construction. Include genuine child-tool activation/registration checks where SDK behavior matters, not only copied requested names.
-9. **Model/reasoning continuity:** preserve the eight-family strategies, exact explicit identities, exact-version ladder walk, exhaustion and unknown-family retention reasons, ignored legacy `fallbacks`, Pi-compatible clamping, non-reasoning applicability, and next-supported-rung retained-parent reasoning (including gaps and floors). Change availability after acceptance and verify failure rather than rerouting.
+9. **Model/reasoning continuity:** preserve the nine-family strategies, exact explicit identities, exact-version ladder walk, exhaustion and unknown-family retention reasons, ignored legacy `fallbacks`, Pi-compatible clamping, non-reasoning applicability, and next-supported-rung retained-parent reasoning (including gaps and floors). Change availability after acceptance and verify failure rather than rerouting.
 10. **Turn policy:** request/definition/operator precedence, below-minimum normalization, explicit unlimited against a finite definition/default, captured wrap-up behavior, and later setting changes cannot restore a fallback. Assert the actual session-enforced budget, not just mocked manager arguments.
 11. **Live controls:** increasing/decreasing concurrency changes subsequent admissions; interrupt policy is read at interrupt; retention uses current windows. Captured exclusions, prompt policy, and update-tool availability do not change for accepted work.
 12. **Uniform admission:** launch, run, initial execution, and resume all consume the same capacity. Prove foreground/public bypass is gone. Preserve writer serialization, reader overlap, conservative unknown/shell classification, and release on failure/cancellation.

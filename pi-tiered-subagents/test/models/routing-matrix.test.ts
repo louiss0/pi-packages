@@ -23,7 +23,7 @@ describe("the routing matrix in docs/model-matrix.md", () => {
     expect(documented).toEqual(regions);
   });
 
-  it("covers the five unpinned shipped specialists and the eight supported families", () => {
+  it("covers the five unpinned shipped specialists and the nine supported families", () => {
     expect(
       SHIPPED_DEFINITIONS.map((definition) => definition.id).sort(),
     ).toEqual(["debug", "explore", "researcher", "reviewer", "worker"]);
@@ -46,6 +46,7 @@ describe("the routing matrix in docs/model-matrix.md", () => {
       "gemini",
       "glm",
       "gpt",
+      "hy",
       "mimo",
       "minimax",
       "qwen",

@@ -211,7 +211,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 Automatic routing uses the resolved agent identifier and the family profile's
 required `group`:
 
-| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `mimo`, `deepseek`) |
+| Agent | Size group (`gpt`, `claude`, `gemini`, `qwen`) | Planner/worker group (`minimax`, `glm`, `hy`, `mimo`, `deepseek`) |
 | --- | --- | --- |
 | `worker` (general-purpose work) | One size below the parent, clamped at S | worker |
 | `researcher` | S | worker |
@@ -316,7 +316,7 @@ The user explicitly confirmed two complementary seams: behaviour of the shared c
 - Exact shipped tool lists, including researcher's literal web_search entry and ordinary missing-tool behaviour without bespoke prerequisites. Do not replace this acceptance criterion with a test that only copies tool names from the parent.
 - Both launch entry points produce the same effective role defaults and explicit model/thinking precedence.
 - Explicit model resolution: exact identities, model IDs containing namespace separators, rejection of shorthand, unavailable models, no provider fallback, and explicit use of unrecognized families.
-- Family routing: fixtures for all eight supported strategies, including chemical Gemini ownership and unsupported Pro/Flash retention; role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
+- Family routing: fixtures for all nine supported strategies, including chemical Gemini ownership and unsupported Pro/Flash retention; role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
 - User-added profiles using supported schema/naming structures, named-profile replacement without erasing unrelated families, project-trust enforcement, and refusal to execute user matcher/parser logic.
 - Thinking: upper-median selection over odd, even, gapped, and singleton supported non-off arrays; exclusion of off; identical behavior for changed and retained models regardless of parent effort; explicit precedence, supported-level clamping, no automatic off, explicit off policy, non-reasoning models, and truthful not-applicable reporting.
 - Request-time snapshots: change parent model, effort, tools, and conversation while a request waits; assert that queued work uses its captured inputs.

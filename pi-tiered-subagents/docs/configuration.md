@@ -75,8 +75,14 @@ Worker targets L, while its Reviewer starts at the parent's own XL rung.
 | `gemini` | `size` | Chemical line: Krypton = XL → Carbon = L → Argon = M → Hydrogen = S |
 | `minimax` | `planner-worker` | Highspeed, unnamed default = planner → Flash = worker |
 | `glm` | `planner-worker` | Unnamed default = planner → Flash = worker |
+| `hy` | `planner-worker` | Unnamed default = planner → Flash = worker |
 | `mimo` | `planner-worker` | Pro Ultraspeed, Pro, unnamed default = planner → Flash = worker |
 | `deepseek` | `planner-worker` | Pro = planner; no worker rung |
+
+A trailing `free` is a serving qualifier, not a tier, in every shipped family.
+For example, `hy4-free` is placed on the planner rung and `hy4-flash-free`
+on the worker rung. Child candidates are still constructed without the
+qualifier, so they must be runnable under their exact unqualified IDs.
 
 These are routing relationships, **not a vendor release list or an availability
 promise**. The authoritative data is in
