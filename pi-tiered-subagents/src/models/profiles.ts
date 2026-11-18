@@ -206,6 +206,12 @@ export function validateProfile(
         problem: "a tier must be a lowercase name, not a model id or version",
       });
     }
+    if (tier.tier.split("-").includes("free")) {
+      problems.push({
+        where,
+        problem: 'a tier must not use the reserved "free" serving qualifier',
+      });
+    }
     if (strategy) {
       const id = strategy.construct("97.2", tier.tier);
       const parsed = strategy.parse(id);

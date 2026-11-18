@@ -374,6 +374,10 @@ Consequences worth naming:
 - **Providers are deterministic.** Prefer the parent provider for the exact ID;
   otherwise require a unique matching provider. Multiple alternate providers
   make a tier unusable, so cheaper eligible tiers are tried before retention.
+- **Serving qualifiers are not tiers.** A `free` segment is ignored when a
+  model id is read in every shipped family; `hy4-free` is the planner rung and
+  `hy4-flash-free` the worker rung. It is a reserved word in profile tier names
+  and is never copied into constructed child IDs.
 - **Unsupported Gemini lines.** Pro and Flash IDs are not claimed by any
   shipped family and retain their parent. Bare Gemini IDs have no known tier
   and are also retained; dated Claude snapshots use their matched tier's size.

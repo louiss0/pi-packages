@@ -183,6 +183,21 @@ describe("parseUserProfiles", () => {
 });
 
 describe("mergeProfiles", () => {
+  it.each([
+    "free",
+    "flash-free",
+    "free-flash",
+  ])("refuses the reserved free qualifier in tier %j", (tier) => {
+    const invalid = profile([{ tier, size: "L" }]);
+    const problems = validateProfile(invalid, strategies.get("gpt"));
+    expect(problems.map(({ problem }) => problem)).toContain(
+      'a tier must not use the reserved "free" serving qualifier',
+    );
+    expect(
+      mergeProfiles(SHIPPED_PROFILES, [invalid], [], strategies).problems[0],
+    ).toContain('reserved "free"');
+  });
+
   const global = profile([{ tier: "sol", size: "L" }]);
   const project = profile([{ tier: "luna", size: "S" }]);
   it("replaces whole families and gives the project layer precedence", () => {

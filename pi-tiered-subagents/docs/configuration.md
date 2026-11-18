@@ -82,7 +82,9 @@ Worker targets L, while its Reviewer starts at the parent's own XL rung.
 A trailing `free` is a serving qualifier, not a tier, in every shipped family.
 For example, `hy4-free` is placed on the planner rung and `hy4-flash-free`
 on the worker rung. Child candidates are still constructed without the
-qualifier, so they must be runnable under their exact unqualified IDs.
+qualifier, so they must be runnable under their exact unqualified IDs. Because
+`free` can never match a tier, a profile may not declare it as part of a tier
+name.
 
 These are routing relationships, **not a vendor release list or an availability
 promise**. The authoritative data is in
