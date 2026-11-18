@@ -1,3 +1,18 @@
+## 2.0.1 (2026-11-18)
+
+### 🚀 Features
+
+- **models:** add Hy routing and ignore free qualifiers ([3e8e4e8](https://github.com/louiss0/pi-packages/commit/3e8e4e8))
+
+### 🩹 Fixes
+
+- **models:** handle free as a reserved qualifier everywhere ([cda57e3](https://github.com/louiss0/pi-packages/commit/cda57e3))
+- **models:** reserve free in profile tier names ([4a41b0d](https://github.com/louiss0/pi-packages/commit/4a41b0d))
+
+### ❤️ Thank You
+
+- openhands
+
 # 2.0.0 (2026-11-17)
 
 ### 🚀 Features
