@@ -378,10 +378,11 @@ profile has no worker rung, so its non-review roles retain the parent.
 Profiles are data only. Each replacement declares `group: "size"` or
 `group: "planner-worker"` and `tiers`, most capable first. Size tiers require
 `size: "S" | "M" | "L" | "XL"`; planner/worker tiers require
-`role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names;
-the empty tier denotes the unnamed default line where the strategy supports it.
-Invalid labels, unsupported naming structures, empty ladders, and invalid tier
-names are reported. Unknown fields are rejected with deterministic field paths;
+`role: "planner" | "worker"`. Tier names are trimmed, unique lowercase names
+and may not use the reserved `free` serving qualifier; the empty tier denotes
+the unnamed default line where the strategy supports it. Invalid labels,
+unsupported naming structures, empty ladders, and invalid tier names are
+reported. Unknown fields are rejected with deterministic field paths;
 obsolete tier-level `fallbacks` alone is accepted and discarded.
 
 **Migration:** replace old `versions` arrays and per-tier `models` arrays with one

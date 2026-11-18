@@ -65,6 +65,11 @@ const DATE_QUALIFIER = /^\d{8}$/;
  */
 const SERVING_QUALIFIER = /^free$/i;
 
+/** Whether a segment names availability rather than a tier. */
+export function isServingQualifier(segment: string): boolean {
+  return SERVING_QUALIFIER.test(segment);
+}
+
 /**
  * The contiguous joins of a candidate list, shortest first.
  *
@@ -236,7 +241,10 @@ function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
     belongs: (id) => id.toLowerCase().startsWith(prefix.toLowerCase()),
     parse(id) {
       if (!id.toLowerCase().startsWith(prefix.toLowerCase())) return undefined;
-      const segments = id.slice(prefix.length).split("-");
+      const segments = id
+        .slice(prefix.length)
+        .split("-")
+        .filter((segment) => !isServingQualifier(segment));
       const line = segments[0];
       if (!line || VERSION.test(line)) return undefined;
 
@@ -298,7 +306,7 @@ function readVariants(text: string): string[] {
       (segment) =>
         segment.length > 0 &&
         !DATE_QUALIFIER.test(segment) &&
-        !SERVING_QUALIFIER.test(segment),
+        !isServingQualifier(segment),
     );
 }
 

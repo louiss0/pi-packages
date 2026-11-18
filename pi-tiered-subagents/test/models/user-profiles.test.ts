@@ -184,18 +184,44 @@ describe("parseUserProfiles", () => {
 
 describe("mergeProfiles", () => {
   it.each([
-    "free",
-    "flash-free",
-    "free-flash",
-  ])("refuses the reserved free qualifier in tier %j", (tier) => {
-    const invalid = profile([{ tier, size: "L" }]);
-    const problems = validateProfile(invalid, strategies.get("gpt"));
+    ["gpt", "free"],
+    ["gpt", "flash-free"],
+    ["gpt", "free-flash"],
+    ["claude", "free"],
+  ])("refuses the reserved free qualifier in %s tier %j", (family, tier) => {
+    const invalid: FamilyProfile = {
+      family,
+      group: "size",
+      tiers: [{ tier, size: "L" }],
+    };
+    const problems = validateProfile(invalid, strategies.get(family));
     expect(problems.map(({ problem }) => problem)).toContain(
       'a tier must not use the reserved "free" serving qualifier',
     );
-    expect(
-      mergeProfiles(SHIPPED_PROFILES, [invalid], [], strategies).problems[0],
-    ).toContain('reserved "free"');
+    const loaded = mergeProfiles(SHIPPED_PROFILES, [invalid], [], strategies);
+    expect(loaded.problems[0]).toContain('reserved "free"');
+    expect(loaded.profiles.get(family)).toBe(
+      SHIPPED_PROFILES.find((entry) => entry.family === family),
+    );
+  });
+
+  it("refuses a reserved tier read from settings", () => {
+    const parsed = parseUserProfiles({
+      hy: {
+        group: "planner-worker",
+        tiers: [{ tier: "free", role: "worker" }],
+      },
+    });
+    const loaded = mergeProfiles(
+      SHIPPED_PROFILES,
+      parsed.profiles,
+      [],
+      strategies,
+    );
+    expect(loaded.problems.join(" ")).toContain('reserved "free"');
+    expect(loaded.profiles.get("hy")).toBe(
+      SHIPPED_PROFILES.find((entry) => entry.family === "hy"),
+    );
   });
 
   const global = profile([{ tier: "sol", size: "L" }]);

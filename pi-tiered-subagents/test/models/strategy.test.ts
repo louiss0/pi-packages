@@ -227,6 +227,7 @@ describe("the shipped strategies", () => {
     for (const [family, id, tierCandidates] of cases) {
       expect(parse(family, id)?.tierCandidates).toEqual(tierCandidates);
     }
+    expect(parse("claude", "claude-free-5")).toBeUndefined();
   });
 
   it("place no id in two families", () => {

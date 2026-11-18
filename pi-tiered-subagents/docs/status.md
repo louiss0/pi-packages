@@ -309,8 +309,9 @@ A replacement must declare `group: "size"` or `group: "planner-worker"`.
 Every tier in a size profile requires `size: "S" | "M" | "L" | "XL"`; every tier
 in a planner/worker profile requires `role: "planner" | "worker"`. Invalid or
 missing labels are reported when read, not silently inferred. Tier names are
-trimmed and must be unique lowercase names; an empty tier name denotes the
-unnamed default line where the strategy supports it. Unknown profile fields
+trimmed, must be unique lowercase names, and may not use the reserved `free`
+serving qualifier; an empty tier name denotes the unnamed default line where
+the strategy supports it. Unknown profile fields
 are rejected with path-aware diagnostics, except an obsolete tier-level
 `fallbacks` field, which is accepted and discarded along with its contents.
 Upgrade catalogue-shaped replacements by replacing `versions` and per-tier
