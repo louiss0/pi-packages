@@ -132,19 +132,6 @@ describe("the Hy naming structure", () => {
       tierCandidates: ["flash"],
     });
   });
-
-  it("ignores a free serving qualifier when reading the tier", () => {
-    expect(parse("hy", "hy3-free")).toEqual({
-      family: "hy",
-      version: "3",
-      tierCandidates: [],
-    });
-    expect(parse("hy", "hy4-flash-free")).toEqual({
-      family: "hy",
-      version: "4",
-      tierCandidates: ["flash"],
-    });
-  });
 });
 
 describe("the MiniMax naming structure", () => {
@@ -210,24 +197,6 @@ describe("the shipped strategies", () => {
       "minimax",
       "qwen",
     ]);
-  });
-
-  it("ignore a free serving qualifier in every naming structure", () => {
-    const cases = [
-      ["gpt", "gpt-6.1-sol-free", ["sol"]],
-      ["claude", "claude-opus-5-free", ["opus"]],
-      ["gemini", "gemini-4-krypton-free", ["krypton"]],
-      ["glm", "glm-5.3-flash-free", ["flash"]],
-      ["hy", "hy4-free", []],
-      ["minimax", "MiniMax-M2.7-highspeed-free", ["highspeed"]],
-      ["qwen", "qwen3.7-max-free", ["max"]],
-      ["deepseek", "deepseek-v4-pro-free", ["pro"]],
-      ["mimo", "mimo-v2.6-pro-free", ["pro"]],
-    ] as const;
-    for (const [family, id, tierCandidates] of cases) {
-      expect(parse(family, id)?.tierCandidates).toEqual(tierCandidates);
-    }
-    expect(parse("claude", "claude-free-5")).toBeUndefined();
   });
 
   it("place no id in two families", () => {

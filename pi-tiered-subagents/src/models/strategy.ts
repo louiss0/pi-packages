@@ -23,8 +23,7 @@ export type ParsedModelId = Readonly<{
    *
    * A tier name may be one segment ("sol") or several joined ("flash-lite"),
    * so the profile's tier names are matched against the contiguous joins of
-   * this list. Serving qualifiers such as `free` are dropped before it is
-   * returned.
+   * this list.
    */
   tierCandidates: ReadonlyArray<string>;
 }>;
@@ -60,17 +59,6 @@ const VERSION = /^\d+(?:\.\d+)*$/;
 const DATE_QUALIFIER = /^\d{8}$/;
 
 /**
- * A serving qualifier: `free` describes availability, not a tier. It is
- * ignored by every family's id reader, just like a dated snapshot.
- */
-const SERVING_QUALIFIER = /^free$/i;
-
-/** Whether a segment names availability rather than a tier. */
-export function isServingQualifier(segment: string): boolean {
-  return SERVING_QUALIFIER.test(segment);
-}
-
-/**
  * The contiguous joins of a candidate list, shortest first.
  *
  * `["flash", "lite"]` yields "flash", "lite" and "flash-lite"; an empty list
@@ -97,7 +85,7 @@ export function candidateJoins(candidates: ReadonlyArray<string>): string[] {
  *
  * The empty name is the version's default rung: a model that names no tier.
  */
-export function tierSegments(tier: string): string[] {
+function tierSegments(tier: string): string[] {
   return tier === "" ? [] : tier.split("-");
 }
 
@@ -105,8 +93,7 @@ export function tierSegments(tier: string): string[] {
  * Whether a model's candidates name a tier.
  *
  * The tier's segments must be the *prefix* of the candidates: a model may
- * carry qualifiers the tier does not name — a serving variant, a dated
- * snapshot — and still belong to the tier.
+ * carry further qualifiers and still belong to the tier.
  */
 export function matchesTier(
   candidates: ReadonlyArray<string>,
@@ -241,10 +228,7 @@ function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
     belongs: (id) => id.toLowerCase().startsWith(prefix.toLowerCase()),
     parse(id) {
       if (!id.toLowerCase().startsWith(prefix.toLowerCase())) return undefined;
-      const segments = id
-        .slice(prefix.length)
-        .split("-")
-        .filter((segment) => !isServingQualifier(segment));
+      const segments = id.slice(prefix.length).split("-");
       const line = segments[0];
       if (!line || VERSION.test(line)) return undefined;
 
@@ -254,9 +238,8 @@ function lineThenVersionFamily(family: string, prefix: string): FamilyStrategy {
       const variants: string[] = [];
       let seenQualifier = false;
       for (const segment of segments.slice(1)) {
-        // Dates and serving qualifiers name availability, not a version part
-        // or a tier.
-        if (DATE_QUALIFIER.test(segment) || SERVING_QUALIFIER.test(segment)) {
+        // A dated snapshot's date is a qualifier, not a version part.
+        if (DATE_QUALIFIER.test(segment)) {
           seenQualifier = true;
           continue;
         }
@@ -302,12 +285,7 @@ function readVariants(text: string): string[] {
   return text
     .slice(1)
     .split("-")
-    .filter(
-      (segment) =>
-        segment.length > 0 &&
-        !DATE_QUALIFIER.test(segment) &&
-        !isServingQualifier(segment),
-    );
+    .filter((segment) => segment.length > 0 && !DATE_QUALIFIER.test(segment));
 }
 
 /**

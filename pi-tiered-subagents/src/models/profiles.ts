@@ -16,11 +16,7 @@
  */
 
 import * as v from "valibot";
-import {
-  type FamilyStrategy,
-  isServingQualifier,
-  tierSegments,
-} from "#src/models/strategy";
+import type { FamilyStrategy } from "#src/models/strategy";
 
 /** Capability labels used by role-aware routing. */
 const MODEL_SIZES = ["S", "M", "L", "XL"] as const;
@@ -208,12 +204,6 @@ export function validateProfile(
       problems.push({
         where,
         problem: "a tier must be a lowercase name, not a model id or version",
-      });
-    }
-    if (tierSegments(tier.tier).some(isServingQualifier)) {
-      problems.push({
-        where,
-        problem: 'a tier must not use the reserved "free" serving qualifier',
       });
     }
     if (strategy) {

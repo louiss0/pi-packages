@@ -160,14 +160,6 @@ describe("routeModel", () => {
     ["tencent", "hy3-flash", "reviewer", "hy3", "planner"],
     ["tencent", "hy4", "worker", "hy4-flash", "worker"],
     ["tencent", "hy4-flash", "reviewer", "hy4", "planner"],
-    ["openai", "gpt-6-astra-free", "worker", "gpt-6-sol", "L"],
-    ["anthropic", "claude-opus-4-5-free", "worker", "claude-sonnet-4-5", "M"],
-    ["zai", "glm-5.3-flash-free", "reviewer", "glm-5.3", "planner"],
-    ["minimax", "MiniMax-M3.1-free", "debug", "MiniMax-M3.1-flash", "worker"],
-    ["tencent", "hy3-free", "worker", "hy3-flash", "worker"],
-    ["tencent", "hy3-flash-free", "reviewer", "hy3", "planner"],
-    ["tencent", "hy4-free", "worker", "hy4-flash", "worker"],
-    ["tencent", "hy4-flash-free", "reviewer", "hy4", "planner"],
     ["deepseek", "deepseek-v4-pro", "reviewer", "deepseek-v4-pro", "planner"],
   ])("%s/%s routes %s to %s (%s)", (provider, parentId, role, expected, target) => {
     // Materialize this test's exact release, not a runtime release catalogue.
