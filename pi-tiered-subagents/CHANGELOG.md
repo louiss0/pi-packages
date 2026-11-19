@@ -1,3 +1,7 @@
+## 2.0.3 (2026-11-19)
+
+This was a version bump only for pi-tiered-subagents to align it with other projects, there were no code changes.
+
 ## 2.0.2 (2026-11-18)
 
 ### 🚀 Features
