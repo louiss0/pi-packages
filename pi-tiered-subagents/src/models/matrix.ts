@@ -91,9 +91,10 @@ export function generateModelMatrix(): ModelMatrixRegion[] {
 
   const full = samples
     .map(({ profile, parents }) => {
+      // A higher version is unreachable: the fallback walk only goes down.
       const otherVersions = all.map((model) => ({
         ...model,
-        id: model.id.replace("97.2", "96.2").replace("97-2", "96-2"),
+        id: model.id.replace("97.2", "97.3").replace("97-2", "97-3"),
       }));
       const rows = parents.flatMap(({ tier, candidate: parent }) =>
         roles.map((role) => [

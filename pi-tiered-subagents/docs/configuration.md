@@ -85,12 +85,16 @@ promise**. The authoritative data is in
 IDs are not automatic-routing families; their parents are retained. A
 user-selected exact model does not need to belong to a supported family.
 
-### Same family, same version, runnable models only
+### Same family, downward versions, runnable models only
 
 The router extracts the parent's version and tier, selects the role's target,
 and constructs exact candidate IDs using that family's naming strategy.
-It tries the target and eligible lower rungs in profile order. It never searches
-another version or guesses equivalent models by price.
+It tries the target and eligible lower rungs in profile order at the parent's
+version; when that version has nothing runnable, it repeats the same walk at
+every lower version in semver order — minors down to `.0`, then previous
+majors restarting the minor at the parent's own value (`6.2` → `6.1`, `6.0`,
+`5.2`, `5.1`, `5.0`, …) — stopping at the first runnable rung. It never walks
+upward or guesses equivalent models by price.
 
 For example, **if those exact IDs are runnable**:
 
@@ -311,7 +315,8 @@ Rules:
   unnamed default line where that family's naming strategy supports it.
 - Profiles contain **no releases, provider priorities, or concrete model IDs**.
   The naming strategy extracts a version from the parent and constructs an exact
-  candidate ID at that same version.
+  candidate ID at that version or, as a fallback, at lower versions in semver
+  order.
 - You can customize only families whose naming structure the runtime supports.
   An arbitrary new family key does not teach the router to parse its model IDs.
 - Invalid profiles are reported and not applied; unrelated families still load.
@@ -324,7 +329,8 @@ as well to restore shipped behavior everywhere.
 **Migration from earlier formats:** replace `versions` and per-tier `models`
 arrays with one version-independent `tiers` array. Those old fields are rejected.
 Obsolete tier-level `fallbacks` is accepted but discarded; it cannot enable
-cross-version routing. The historical `subagents.json` file is not this
+version fallback beyond the router's own downward ladder walk. The historical
+`subagents.json` file is not this
 package's runtime settings backend.
 
 ## Reasoning levels
@@ -390,12 +396,12 @@ should keep the default `full` behavior.
 
 | Symptom | What to check |
 | --- | --- |
-| The child kept the parent's model | Inspect the launch reason: unknown family/tier/version, absent role target, unavailable same-version IDs, or provider ambiguity can cause retention. Reviewer Equal may intentionally keep its rung. |
+| The child kept the parent's model | Inspect the launch reason: unknown family/tier/version, absent role target, unavailable IDs in every lower version, or provider ambiguity can cause retention. Reviewer Equal may intentionally keep its rung. |
 | My model choice was ignored | A request pin wins over a definition pin. Check project overrides and the resolved identifier. Changing a display name does not change routing policy. |
 | My custom reviewer steps down like a Worker | Custom identifiers use worker policy; override `reviewer.md` or pin the custom specialist's model. |
 | A configured model fails | Verify the full exact `provider/modelId` and session access. Explicit choices never silently reroute. |
 | My profile does not load | Check the string-valued store wrapper, then diagnostics for `group`, required labels, unknown fields, duplicate tiers, and unsupported naming structures. |
-| A smaller model exists but was skipped | It must have the exact same-version constructed ID and meet target/provider rules. A different version or dated alias is not a substitute. |
+| A smaller model exists but was skipped | It must have the exact constructed ID in the parent's version or a lower version the downward walk produces, and meet target/provider rules. A higher version or dated alias is not a substitute. |
 | Removing a project setting did not restore defaults | A global override may still apply. Clear an inherited model/thinking pin with `null` in the project definition. |
 | A changed setting did not affect a resumed child | Resume keeps the captured configuration; launch a new child for new model selection. |
 
