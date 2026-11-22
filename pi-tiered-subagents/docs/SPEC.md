@@ -11,14 +11,18 @@
 > [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
 > earlier cross-version links, unknown-family errors, and the retained-model
 > medium/low preference. Automatic routing is confined to the exact parent
-> family/version; unknown families retain the parent. With known parent effort,
+> family/version (ADR 0021 later replaced the exact-version boundary with a
+> downward version-ladder walk); unknown families retain the parent. With known
+> parent effort,
 > automatic reasoning takes the next supported non-off rung below it, including
 > on retained models. The five-role mapping and size/role labels are unchanged.
 >
 > **Current defaults and family boundaries:**
 > [ADR 0017](adr/0017-automatic-reasoning-is-the-upper-median.md) makes automatic
 > reasoning the upper median of the child model's supported non-off levels,
-> independent of parent effort. [ADR 0020](adr/0020-drop-gemini-pro-and-flash-support.md)
+> independent of parent effort. [ADR 0021](adr/0021-version-ladder-fallback.md)
+> lets automatic routing walk down the version ladder in semver order when the
+> parent's version has no runnable rung, never upward. [ADR 0020](adr/0020-drop-gemini-pro-and-flash-support.md)
 > limits automatic Gemini routing to the chemical `gemini` ladder; Pro and Flash
 > IDs are unsupported and retained. [ADR 0019](adr/0019-reviewer-inherits-parent-tools.md) makes
 > Reviewer inherit parent tools by default while preserving non-editing conduct
@@ -36,7 +40,7 @@ The repository currently contains a scaffold, copied upstream source and documen
 
 Build @code-fixer-23/pi-tiered-subagents as an independent, credited derivative that replaces the original runtime in a session. Preserve established subagent lifecycle functionality while adding five deliberately scoped specialists, layered agent-definition overrides, explicit tool inheritance, family-aware automatic model routing, supported reasoning defaults, capability-based workspace scheduling, and centralized extension settings.
 
-When no model is explicitly selected, identify the parent's family, version, and tier, map the resolved agent identifier to a size or role target, then walk downward from that target until the session can resolve an available candidate. Family strategies interpret supported naming structures; profiles provide concrete model identities and per-version tier order. Routing never leaves the exact parent family and version. Unknown families retain the parent rather than guessing. A recognized family with no runnable role target or downward fallback retains the parent model and uses a reasoning fallback where applicable.
+When no model is explicitly selected, identify the parent's family, version, and tier, map the resolved agent identifier to a size or role target, then walk downward from that target until the session can resolve an available candidate. Family strategies interpret supported naming structures; profiles provide concrete model identities and per-version tier order. Routing stays within the parent's exact family and walks down the version ladder in semver order — minors to `.0`, then previous majors — when the parent's version has nothing runnable, stopping at the first runnable rung or when the versions run out. Unknown families retain the parent rather than guessing. A recognized family with no runnable role target or downward fallback in any lower version retains the parent model and uses a reasoning fallback where applicable.
 
 Explicit model choices require an exact provider/model identity and bypass automatic family routing. Reasoning selection happens after model selection. Non-reasoning models are usable: discard the thinking setting, not the launch. Expose actual resolved decisions in the existing launch/result presentation.
 
@@ -119,7 +123,7 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 59. As a user, I want explicit model choices usable without a recognized family profile, so that automatic routing support is not a prerequisite for deliberate selection.
 60. As a user, I want automatic routing based on series, version, variant, and tier relationships, so that arbitrary name fragments or prices do not determine the child model.
 61. As a user, I want profiles for Claude, GLM, GPT, MiniMax, Gemini, Qwen, MiMo, and DeepSeek, so that the major agreed series are supported.
-62. As a user, I want automatic routing confined to the exact parent family and version, with no version fallback links in schema, data, or runtime, so that another release is never assumed to be a valid downgrade.
+62. As a user, I want automatic routing confined to the exact parent family with only downward version-ladder fallback and no version fallback links in schema, data, or runtime, so that another release is never assumed to be a valid downgrade beyond the defined semver-ordered walk.
 63. As a user, I want the router to start at the role target and walk downward to an available compatible candidate, so that one unavailable intermediate tier does not stop useful routing.
 64. As a user, I want concrete target model IDs ordered by preference, so that routing neither invents IDs nor depends on registry enumeration order.
 65. As a user, I want family routing to defer provider access and restrictions to session model resolution, so that it does not impose a separate same-provider policy or invent credentials.
@@ -200,10 +204,10 @@ Use @juanibiapina/pi-extension-settings as the single settings backend, includin
 - Initially provide strategies for GPT, Claude, chemical-only Gemini, GLM, MiniMax, Qwen, MiMo, and DeepSeek behind a shared family-strategy interface. Localize genuine series-specific interpretation there. Gemini Pro and Flash IDs are deliberately unclaimed and retained. Keep version-independent tier ladders and target labels as profile data rather than subclasses per release. Never enumerate releases or concrete IDs in profiles. Version fallback links are not supported.
 - User-defined profiles follow the same schema and already-supported naming structures. They must be consumable without authoring a strategy class. Genuinely new naming structures require runtime code support. Do not accept user regexes, wildcard targets, matcher callbacks, parser functions, or executable settings.
 - Profiles declare ordered family tiers and labels, never versions or concrete identities. Strategies extract the parent version and construct exact candidate IDs. An ID is usable only if the session can run it exactly; do not fuzzy-match snapshots or serving variants.
-- Resolve the role target within the exact parent family and version (Equal anchors at the parent rung). For example, GPT 5.6 Sol may target GPT 5.6 Terra, while GPT 6.1 Sol cannot borrow GPT 6 Luna. These are representative profile examples, not vendor-availability claims. No version fallback links exist; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
-- Walk downward from the resolved role target through permitted cheaper tiers rather than requiring the immediate rung or jumping straight to the cheapest model. Construct one exact ID per eligible tier at the parent version. Continue downward if unavailable or provider-ambiguous.
+- Resolve the role target within the exact parent family, trying the parent's version first and then every lower version in semver order — minors down to `.0`, then previous majors restarting the minor at the parent's own value — when the parent version has no runnable rung. For example, GPT 5.6 Sol may target GPT 5.6 Terra, and a GPT 6.1 Sol whose 6.1 rungs are all unavailable may land on a GPT 6.0 or 5.1 rung. These are representative profile examples, not vendor-availability claims. No declared version fallback links exist; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
+- Walk downward from the resolved role target through permitted cheaper tiers rather than requiring the immediate rung or jumping straight to the cheapest model. Construct one exact ID per eligible tier at each version in reach, parent version first. Continue downward if unavailable or provider-ambiguous.
 - Use session runnable models and restrictions. Prefer the parent provider for an exact ID; otherwise accept a unique matching provider. Multiple alternate providers make that rung unusable: walk cheaper tiers, then retain. Never impose same-provider-only selection, invent credentials, or choose by registry order.
-- Unknown parent families retain the captured parent model with an explanation. There is no output-cost ranking fallback. A known family with no runnable role target or eligible cheaper rung in the exact parent version also retains the captured parent model and applies automatic reasoning.
+- Unknown parent families retain the captured parent model with an explanation. There is no output-cost ranking fallback. A known family with no runnable role target or eligible cheaper rung in the parent version or any lower version also retains the captured parent model and applies automatic reasoning.
 - Validate profile data and supported naming structures explicitly. The exact settings encoding and profile schema must express the agreed semantics without becoming an executable configuration language. Malformed data must not silently create unrelated routing relationships.
 
 ### Role-aware model routing (issue #10)
@@ -232,8 +236,12 @@ Profiles describe **version-independent family ladders**, not a release or model
 catalogue. A strategy extracts the parent's version and tier; the role selects a
 size/role target on that family's ordered ladder. Equal starts at the parent's
 own rung. For each target or permitted cheaper rung, the strategy constructs one
-exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
-`claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
+exact ID, first at the **parent's version** and, only when that version has no
+runnable rung, at every **lower version in semver order** — minors down to
+`.0`, then previous majors restarting the minor at the parent's own value:
+`gpt-7-sol` can target `gpt-7-luna`, `gpt-7.1-sol` can fall back
+to a `gpt-7.0` or `gpt-6.1` rung, and `claude-opus-7-2` can target
+`claude-haiku-7-2`. There is no hardcoded list of
 releases. Construction is not an availability claim: only an exact ID in the
 session's runnable models can win. Dated or specialized IDs are not fuzzy
 substitutes for the constructed identity; an explicit pin still resolves exactly.
@@ -246,9 +254,11 @@ Provider selection is deterministic for each exact candidate ID:
 
 This is not same-provider-only routing, and registry order never chooses a
 provider. Session credentials, availability, and restrictions remain authoritative.
-No cross-version fallback is allowed. Unknown families, unparseable versions,
-unknown parent tiers, or exhausted ladders retain the captured parent and explain
-why. Planner review may degrade to a worker in the same version. DeepSeek's
+Automatic routing walks only downward through versions, by arithmetic on the
+parsed version — never upward, by declared links, or by a release catalogue.
+Unknown families, unparseable versions, unknown parent tiers, or exhausted
+ladders in every lower version retain the captured parent and explain
+why. Planner review may degrade to a worker. DeepSeek's
 profile has no worker rung, so its non-review roles retain the parent.
 
 Profiles are data only. Each replacement declares `group: "size"` or
@@ -270,7 +280,7 @@ family for automatic routing. Model pins and reasoning policies are unchanged.
 The routing-target policy has two implementations behind a small shared
 interface: `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`. Each owns
 label matching, starting rung, and fallback rank; the router owns the common
-exact-version walk. No new tests of class internals are required; test routing
+downward version-ladder walk. No new tests of class internals are required; test routing
 behavior through the existing seams. Do not expand family/version catalogues.
 
 ### Thinking selection
@@ -317,7 +327,7 @@ The user explicitly confirmed two complementary seams: behaviour of the shared c
 - Exact shipped tool lists, including researcher's literal web_search entry and ordinary missing-tool behaviour without bespoke prerequisites. Do not replace this acceptance criterion with a test that only copies tool names from the parent.
 - Both launch entry points produce the same effective role defaults and explicit model/thinking precedence.
 - Explicit model resolution: exact identities, model IDs containing namespace separators, rejection of shorthand, unavailable models, no provider fallback, and explicit use of unrecognized families.
-- Family routing: fixtures for all nine supported strategies, including chemical Gemini ownership and unsupported Pro/Flash retention; role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; exact-version confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
+- Family routing: fixtures for all nine supported strategies, including chemical Gemini ownership and unsupported Pro/Flash retention; role × family outcomes and reasons; required group/size/role validation; shipped-label sanity; an implementation-generated role-aware model matrix; concrete target IDs; ordered alternatives; downward-only version-ladder confinement; ignored legacy `fallbacks`; walking past unavailable tiers; unknown-family retention; and recognized-family exhaustion.
 - User-added profiles using supported schema/naming structures, named-profile replacement without erasing unrelated families, project-trust enforcement, and refusal to execute user matcher/parser logic.
 - Thinking: upper-median selection over odd, even, gapped, and singleton supported non-off arrays; exclusion of off; identical behavior for changed and retained models regardless of parent effort; explicit precedence, supported-level clamping, no automatic off, explicit off policy, non-reasoning models, and truthful not-applicable reporting.
 - Request-time snapshots: change parent model, effort, tools, and conversation while a request waits; assert that queued work uses its captured inputs.

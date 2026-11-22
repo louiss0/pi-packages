@@ -156,12 +156,25 @@ describe("version-independent family ladders", () => {
       ]),
     ).toMatchObject({ kind: "routed", modelId: "gpt-77-mini", provider: "c" });
   });
-  it("retains rather than choosing an arbitrary provider or another release", () => {
+  it("skips ambiguous providers, then walks down versions", () => {
     expect(
       route("gpt-77-sol", [
         model("a", "gpt-77-luna"),
         model("b", "gpt-77-luna"),
         model("parent", "gpt-76-mini"),
+      ]),
+    ).toMatchObject({
+      kind: "routed",
+      modelId: "gpt-76-mini",
+      provider: "parent",
+    });
+  });
+  it("retains when no lower version has a runnable rung", () => {
+    expect(
+      route("gpt-77-sol", [
+        model("a", "gpt-77-luna"),
+        model("b", "gpt-77-luna"),
+        model("parent", "gpt-78-mini"),
       ]),
     ).toMatchObject({ kind: "retained", model: { id: "gpt-77-sol" } });
   });

@@ -20,12 +20,16 @@ Published as [issue #9](https://github.com/louiss0/pi-packages/issues/9), with t
 > [ADR 0015](adr/0015-version-local-routing-and-retained-effort.md) supersedes
 > earlier cross-version links, unknown-family errors, and the retained-model
 > medium/low preference. Automatic routing is confined to the exact parent
-> family/version; unknown families retain the parent. With known parent effort,
+> family/version; unknown families retain the parent (ADR 0021 later replaced
+> the exact-version boundary with a downward version-ladder walk). With known
+> parent effort,
 > automatic reasoning takes the next supported non-off rung below it, including
 > on retained models. The five-role mapping and size/role labels are unchanged.
 >
 > **Current defaults and family boundaries:** ADR 0017 replaces parent-relative
 > reasoning with the child model's upper-median supported non-off level. ADR
+> 0021 replaces ADR 0015's exact-version boundary with a downward
+> version-ladder walk in semver order. ADR
 > 0020 limits Gemini routing to the chemical ladder and drops Pro/Flash support.
 > ADR 0019 makes Reviewer inherit parent tools by default, without permitting
 > edits or removing explicit tool overrides.
@@ -317,7 +321,7 @@ flowchart LR
 ### 5. Models, reasoning, tools, and prompt assembly
 
 - The model-catalog adapter captures exact identities, available candidates, and SDK-reported reasoning capabilities into owned values. Use public model-resolution and reasoning-support APIs. Credentials, mutable registries, and concrete SDK model/session objects remain inside integration implementation.
-- Preserve exact explicit choice and family-ladder selection, updated by ADR 0015: automatic routing stays in the exact parent family/version; unknown families and exhausted or absent same-version targets retain the parent. No version fallback links exist in schema, data, or runtime; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
+- Preserve exact explicit choice and family-ladder selection, updated by ADR 0015 and ADR 0021: automatic routing stays in the exact parent family and, when the parent version has no runnable rung, walks down the version ladder in semver order — minors to `.0`, then previous majors — never upward; unknown families and exhausted ladders in every lower version retain the parent. No version fallback links exist in schema, data, or runtime; obsolete tier-level `fallbacks` fields are accepted and discarded, while other unknown fields are rejected.
 - Preserve Pi-compatible thinking-level clamping. Translate SDK behavior into owned capability data or a narrow compatibility adapter, with differential/contract verification against public SDK helpers. Do not silently replace clamping with a new independent ranking algorithm to satisfy an import rule.
 - Automatic reasoning uses the upper median of the chosen model's supported non-off levels, sorted canonically and excluding off before the median is taken. Parent effort is irrelevant for changed and retained models. Explicit request/definition reasoning wins with Pi-compatible clamping; non-reasoning not-applicable state and explicit-off policy remain unchanged.
 - Materialize the exact accepted identity in the SDK adapter. Later provider or availability failure is an execution failure, not permission to select another model. Do not let SDK implicit default/fallback behavior silently undo this invariant.
@@ -356,8 +360,11 @@ Profiles describe **version-independent family ladders**, not a release or model
 catalogue. A strategy extracts the parent's version and tier; the role selects a
 size/role target on that family's ordered ladder. Equal starts at the parent's
 own rung. For each target or permitted cheaper rung, the strategy constructs one
-exact ID at the **same version**: `gpt-7-sol` can target `gpt-7-luna`, while
-`claude-opus-7-2` can target `claude-haiku-7-2`. There is no hardcoded list of
+exact ID at the **parent's version** and, when that version has no runnable
+rung, at every **lower version in semver order** (minors to `.0`, then previous
+majors): `gpt-7-sol` can target `gpt-7-luna`, `gpt-7.1-sol` can fall back to a
+`gpt-7.0` or `gpt-6.1` rung, and `claude-opus-7-2` can target
+`claude-haiku-7-2`. There is no hardcoded list of
 releases. Construction is not an availability claim: only an exact ID in the
 session's runnable models can win. Dated or specialized IDs are not fuzzy
 substitutes for the constructed identity; an explicit pin still resolves exactly.
@@ -370,9 +377,10 @@ Provider selection is deterministic for each exact candidate ID:
 
 This is not same-provider-only routing, and registry order never chooses a
 provider. Session credentials, availability, and restrictions remain authoritative.
-No cross-version fallback is allowed. Unknown families, unparseable versions,
-unknown parent tiers, or exhausted ladders retain the captured parent and explain
-why. Planner review may degrade to a worker in the same version. DeepSeek's
+Only downward version fallback is allowed, never upward. Unknown families,
+unparseable versions, unknown parent tiers, or exhausted ladders in every
+lower version retain the captured parent and explain
+why. Planner review may degrade to a worker. DeepSeek's
 profile has no worker rung, so its non-review roles retain the parent.
 
 Profiles are data only. Each replacement declares `group: "size"` or
@@ -396,8 +404,8 @@ family for automatic routing. Model pins and reasoning policies are unchanged.
 `SizeRoutingTarget` and `PlannerWorkerRoutingTarget` are separate TypeScript
 classes behind a small shared routing-target interface. Each owns its group's
 label matching, starting rung, and fallback rank. The router owns the common
-walk over the exact parent version and session availability; it does not
-reimplement group-specific matching or cross versions. Keep behavioral coverage
+downward walk over the version ladder and session availability; it does not
+reimplement group-specific matching or walk upward. Keep behavioral coverage
 at the routing/resolution seams; no new class-internal tests are required.
 The version-independent ladders preserve the five-role mapping and add no launch authority.
 
@@ -734,7 +742,7 @@ flowchart TB
 6. **Definition validity:** retain four-way layering, normalized identifiers, exact tool replacement, body inheritance/replacement, and valid unrelated agents; reject invalid recognized fields and duplicate requested identifiers without a shipped/default fallback. Diagnose scope-wide read failure honestly.
 7. **No extension trust policy:** project layers are read without extension-owned trust inputs or branching. Remove tests requiring the extension to grant/revalidate trust; do not mock SDK trust as always true to hide a retained extension gate. Keep ordinary SDK behavior untouched.
 8. **Exact tools and real installation:** capture inheritance and wildcard expansion, exclude management names, and use one exact capability allowlist for admission and construction. Include genuine child-tool activation/registration checks where SDK behavior matters, not only copied requested names.
-9. **Model/reasoning continuity:** preserve the nine-family strategies, exact explicit identities, exact-version ladder walk, exhaustion and unknown-family retention reasons, ignored legacy `fallbacks`, Pi-compatible clamping, non-reasoning applicability, and next-supported-rung retained-parent reasoning (including gaps and floors). Change availability after acceptance and verify failure rather than rerouting.
+9. **Model/reasoning continuity:** preserve the nine-family strategies, exact explicit identities, the downward version-ladder walk, exhaustion and unknown-family retention reasons, ignored legacy `fallbacks`, Pi-compatible clamping, non-reasoning applicability, and next-supported-rung retained-parent reasoning (including gaps and floors). Change availability after acceptance and verify failure rather than rerouting.
 10. **Turn policy:** request/definition/operator precedence, below-minimum normalization, explicit unlimited against a finite definition/default, captured wrap-up behavior, and later setting changes cannot restore a fallback. Assert the actual session-enforced budget, not just mocked manager arguments.
 11. **Live controls:** increasing/decreasing concurrency changes subsequent admissions; interrupt policy is read at interrupt; retention uses current windows. Captured exclusions, prompt policy, and update-tool availability do not change for accepted work.
 12. **Uniform admission:** launch, run, initial execution, and resume all consume the same capacity. Prove foreground/public bypass is gone. Preserve writer serialization, reader overlap, conservative unknown/shell classification, and release on failure/cancellation.

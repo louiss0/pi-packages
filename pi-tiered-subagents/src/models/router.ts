@@ -2,10 +2,12 @@
  * Role-aware model selection on data-only family ladders.
  *
  * Resolve the role's size/role target first, then try that rung and cheaper
- * rungs within the parent's exact family and version. Names only locate a
- * parent; group/size/role come from profile data, never name heuristics.
- * Versions are never crossed. Only models the session can run may win; an
- * unknown family or exhausted version ladder retains the parent.
+ * rungs within the parent's exact family. Names only locate a parent;
+ * group/size/role come from profile data, never name heuristics. When the
+ * parent's version has no runnable rung, the same walk repeats down the
+ * version ladder in semver order — minors to .0, then previous majors —
+ * until a model runs or the versions run out. Only models the session can
+ * run may win; an unknown family or an exhausted ladder retains the parent.
  */
 
 import type { Model } from "@earendil-works/pi-ai";
@@ -152,7 +154,10 @@ export function routeModel(
   const candidateTiers = startingTier
     ? profile.tiers.slice(profile.tiers.indexOf(startingTier))
     : [];
-  const found = pickRunnableTier(
+  // The parent's version first, then every lower version in semver order:
+  // minors down to .0 inside the major, then the major steps down and the
+  // minor restarts at the parent's own value.
+  let found = pickRunnableTier(
     candidateTiers,
     routingTarget,
     context.available,
@@ -160,22 +165,90 @@ export function routeModel(
     version,
     parent.provider,
   );
+  let routedVersion = version;
+  if (!found) {
+    for (const candidate of fallbackVersions(version)) {
+      found = pickRunnableTier(
+        candidateTiers,
+        routingTarget,
+        context.available,
+        strategy,
+        candidate,
+        parent.provider,
+      );
+      if (found) {
+        routedVersion = candidate;
+        break;
+      }
+    }
+  }
   if (!found) {
     return {
       kind: "retained",
       model: parent,
-      reason: `${agentId} targets ${routingTarget.label}: no runnable target or cheaper tier in ${strategy.family} ${version} (unavailable or provider-ambiguous); keeping ${parent.id}`,
+      reason: `${agentId} targets ${routingTarget.label}: no runnable target or cheaper tier in ${strategy.family} ${version} or any lower version (unavailable or provider-ambiguous); keeping ${parent.id}`,
     };
   }
 
+  const tierLabel = `${strategy.family} ${routedVersion} tier ${found.tierName || "default"}`;
+  const versionNote =
+    routedVersion === version
+      ? ""
+      : `, version ${routedVersion} below ${version}`;
   return {
     kind: "routed",
     model: found.model,
     provider: found.model.provider,
     modelId: found.model.id,
-    tier: `${strategy.family} ${version} tier ${found.tierName || "default"}`,
-    reason: `${agentId} targets ${routingTarget.label}: ${parent.id} → ${found.model.id} (${strategy.family} ${version} tier ${found.tierName || "default"})`,
+    tier: tierLabel,
+    reason: `${agentId} targets ${routingTarget.label}: ${parent.id} → ${found.model.id} (${tierLabel}${versionNote})`,
   };
+}
+
+/**
+ * Every version below `version`, in semver order: the last dotted segment is
+ * the minor and the rest is the major chain.
+ *
+ * `6.2` yields `6.1`, `6.0`, then each previous major with the minor
+ * restarted at the parent's own value — `5.2`, `5.1`, `5.0`, `4.2`, … — down
+ * to version 1. A single-segment version has no minor, so `75` yields `74`,
+ * `73`, … down to `1`. A version that is not all digits and dots yields
+ * nothing.
+ */
+function* fallbackVersions(version: string): Generator<string> {
+  const parts = version.split(".").map(Number);
+  if (parts.some((n) => !Number.isSafeInteger(n) || n < 0)) return;
+  if (parts.length === 1) {
+    const only = parts.at(0) ?? 0;
+    for (let m = only - 1; m >= 1; m--) yield String(m);
+    return;
+  }
+  const minor = parts.at(-1) ?? 0;
+  const major = parts.slice(0, -1);
+
+  // The rest of the parent's own major, minor counting down to .0.
+  for (let m = minor - 1; m >= 0; m--) yield [...major, m].join(".");
+
+  // Previous majors: decrement the major chain odometer-style; each new
+  // major restarts the minor at the parent's value and counts down to .0.
+  const chain = [...major];
+  while (chain.length > 0 && decrementChain(chain)) {
+    if (chain.every((n) => n === 0)) break;
+    for (let m = minor; m >= 0; m--) yield [...chain, m].join(".");
+  }
+}
+
+/** Decrement a dotted major chain, zeroing the segments below the borrow. */
+function decrementChain(chain: number[]): boolean {
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const segment = chain[i];
+    if (segment !== undefined && segment > 0) {
+      chain[i] = segment - 1;
+      for (let j = i + 1; j < chain.length; j++) chain[j] = 0;
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Try exact constructed IDs only; provider ambiguity makes a rung unusable. */

@@ -22,7 +22,7 @@ request ──► agent selection ──► definition (layered by name)
                   │
                   └─► model selection ──► exact request model
                                           exact definition model
-                                          automatic role-aware same-version family ladder
+                                          automatic role-aware family ladder with downward version fallback
 ```
 
 A family is a **model grouping** (GPT, Claude, Gemini, …). A role is a **task
@@ -105,9 +105,10 @@ routing policy. Availability is an explicit input:
 
 - **All available**: every candidate in every shipped profile is runnable.
 - **Other versions only**: every candidate in the parent's version is removed
-  (including the parent, its role target, and sibling candidates); all other
-  candidates remain runnable. Every outcome must retain the parent: automatic
-  routing never crosses a version or family boundary.
+  (including the parent, its role target, and sibling candidates); the
+  remaining candidates sit at a *higher* version, which the downward-only
+  version walk never produces. Every outcome must retain the parent:
+  automatic routing never leaves the parent family or walks upward.
 - **None available**: no candidate is runnable, exercising parent retention.
 - **retain**: the routing outcome keeps the exact parent identity. A routed
   identity equal to the parent is printed explicitly instead; intentional
@@ -336,10 +337,11 @@ route(parent, context, agentId = "worker"):
   no strategy claims the id    → retain parent
   profile/version/tier missing → retain parent
   resolve the role's target using the family's group and labels
-  starting at that target:
-    try the target rung, then cheaper same-version rungs in profile order
+  for the parent's version, then every lower version in semver
+  order (minors to .0, then previous majors) until one runs:
+    try the target rung, then cheaper rungs in profile order
     choose the first candidate the session can run
-  nothing runnable             → retain parent
+  nothing runnable in any lower version → retain parent
 ```
 
 ### Role targets
@@ -358,7 +360,10 @@ size-family tier; a **class** (planner, worker) labels a planner/worker-family
 tier. Runtime routing reads those declarations; it does not infer class from
 price or a model-name substring. The top rung of the target size/role is the
 starting point (reviewer equality uses the parent's own rung). Versions are
-never crossed to find a target, even when other versions are runnable.
+walked only downward, in semver order: when the parent's version has no
+runnable rung, the same walk repeats at every lower version — minors down to
+`.0`, then previous majors restarting the minor at the parent's own value —
+until a model runs or version 1 is passed.
 
 Consequences worth naming:
 
@@ -366,11 +371,14 @@ Consequences worth naming:
   tier below. Research and exploration target S; debugging targets M, even
   from an S parent. Review deliberately keeps the parent's size on size
   families and may step up to a planner on planner/worker families.
-- **Fallback goes downward from the target.** An unavailable target can lead to
-  cheaper rungs in the same version, then retention. A version with no target
-  for the role retains the parent, even when another version has that target.
-  For example, if no GPT 7 M or S candidate is runnable, its worker retains
-  the parent. Abstract rungs are not evidence of released models.
+- **Fallback goes downward from the target, then down the versions.** An
+  unavailable target can lead to cheaper rungs in the parent's version; when
+  that version has nothing runnable, the identical walk repeats at every lower
+  version in semver order, then retention. Higher versions are never reached.
+  For example, if no GPT 7.1 M or S candidate is runnable but a GPT 7.0 or
+  6.1 one is, its worker takes the closest lower rung; if no lower version can
+  run the role, the parent is retained even when a higher version could.
+  Abstract rungs are not evidence of released models.
 - **Providers are deterministic.** Prefer the parent provider for the exact ID;
   otherwise require a unique matching provider. Multiple alternate providers
   make a tier unusable, so cheaper eligible tiers are tried before retention.
@@ -395,10 +403,11 @@ Consequences worth naming:
   the all-available column.
 - **Family support does not guarantee a cheaper child.** DeepSeek has no worker
   class, so non-review roles retain the parent. Review uses its planner class.
-  MiniMax has an abstract flash worker rung; its exact same-version ID must
-  still be runnable.
+  MiniMax has an abstract flash worker rung; its constructed ID must still be
+  runnable in a version the downward walk produces.
 - **An unknown family retains the parent**, without guessing a replacement. A
-  known family whose rung is unknown or whose exact-version candidates are unavailable also retains the parent.
+  known family whose rung is unknown or whose constructed IDs are unavailable
+  in every lower version also retains the parent.
   Kimi and Gemini Pro/Flash IDs have no shipped profile; GLM does.
 - **Operators replace profiles whole.** A project `familyProfiles` entry for one
   family replaces that family's version-independent tiers entirely;

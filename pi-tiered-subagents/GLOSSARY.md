@@ -103,10 +103,12 @@ It is read, never executed: it holds no matcher, no pattern and no parser.
 ## Ladder
 
 A family's version-independent tiers in capability order. A role selects a target
-size or class within the parent's exact family and version, starting at the
+size or class within the parent's exact family, starting at the
 top matching rung (the parent's own rung for Equal) and walking through
-eligible cheaper rungs. Versions are never crossed; an exhausted or absent
-target, or an unknown family, retains the parent.
+eligible cheaper rungs. When the parent's version has no runnable rung, the
+same walk repeats at every lower version in semver order — minors down to
+`.0`, then previous majors — and no further; an exhausted ladder or an
+unknown family retains the parent.
 
 ## Reasoning level
 

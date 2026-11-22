@@ -199,7 +199,7 @@ protected by an equivalent host gate.
 | `src/models/strategy.ts` | How one family's ids are read and constructed from a version and tier. |
 | `src/models/profiles.ts` | Schema-derived profile types, validation, and shipped version-independent ladders. |
 | `src/models/routing-target.ts` | `SizeRoutingTarget` and `PlannerWorkerRoutingTarget`: label matching, starting rung, and fallback rank behind a small common interface. |
-| `src/models/router.ts` | The common downward walk within the exact parent family/version. |
+| `src/models/router.ts` | The common downward walk within the parent family, then down the version ladder in semver order. |
 | `src/models/selection.ts` | The precedence: the request, then the definition, then the routing. |
 | `src/models/user-profiles.ts` | The operator's profiles, read from the settings layers. |
 
@@ -275,26 +275,33 @@ and Flash IDs are unsupported and retained.
 Dated snapshots use the size of their tier. Worker from XL targets L; Equal
 review starts at the parent's own rung, including XL.
 
-Automatic model routing stays within the parent's exact family and version.
-A size or role target starts at the top matching rung in that version; Equal
-starts at the parent's own rung, not the top of its size. Construct each
-rung's exact model ID from the parent's version and tier, then look it up among
-the models the session can run, continuing through eligible cheaper rungs in the
-same version. No version fallback links are supported or
-inferred. If no role target or cheaper rung is runnable, keep the parent's
-model and report why. An unknown family also retains the parent, without
-price-based or name-based guessing. A reviewer retaining its own rung by Equal
-is a designed choice, not an exhaustion fallback. The launch reason names the
-role and target as well as the chosen model, including retained outcomes.
+Automatic model routing stays within the parent's exact family and walks down
+the version ladder in semver order (ADR 0021). A size or role target starts at
+the top matching rung; Equal starts at the parent's own rung, not the top of
+its size. Construct each rung's exact model ID from the parent's version and
+tier, then look it up among the models the session can run, continuing through
+eligible cheaper rungs. When the parent's version has no runnable rung, the
+identical walk repeats at every lower version — minors down to `.0` inside the
+major, then each previous major restarting the minor at the parent's own
+value, down to version 1 — stopping at the first runnable rung. Only downward
+versions are produced; a non-numeric version yields no fallback. If no lower
+version offers a role target or cheaper rung, keep the parent's model and
+report why. An unknown family also retains the parent, without price-based or
+name-based guessing. A reviewer retaining its own rung by Equal is a designed
+choice, not an exhaustion fallback. The launch reason names the role, target,
+and the version actually used, including retained outcomes.
 
 In planner/worker families, flash-named tiers are worker class;
 pro/non-flash flagship tiers are planner class. These are profile labels, not
 runtime name-based classification. MiniMax M3.1-flash is the worker rung
-below its planner flagship, available only to routing within version 3.1.
+below its planner flagship, reachable whenever the downward walk produces
+version 3.1.
 This is **MiniMax 3.1 flash, not Gemini 3.1 flash**. Older MiniMax versions
-cannot reach it; flash-only Gemini versions cannot reach a different version's
-planner, and Qwen cannot reach another version's S tier. Missing targets retain
-the parent. DeepSeek has planner but no worker class: reviewer targets pro,
+cannot reach it — `M3` walks down through `M2`, never up to `M3.1` — and
+flash-only Gemini versions cannot reach a different version's
+planner beyond the versions the downward walk produces, nor can Qwen reach an
+S tier above its own version's walk. Missing targets in every lower version
+retain the parent. DeepSeek has planner but no worker class: reviewer targets pro,
 and the other roles retain the parent.
 
 GLM uses a glued-version naming strategy (version adjoining the prefix,
@@ -302,7 +309,8 @@ variants following it) and a planner/worker profile. Kimi is no longer a
 supported automatic-routing family: an unpinned Kimi parent is retained.
 The shipped tier relationships are not a promise of vendor availability.
 Profiles label and order version-independent tiers; naming strategies construct
-exact same-version candidates, and session access decides which can run. Model routing changes neither exact-pin resolution nor reasoning
+exact candidates at the parent's version or, as a fallback, at lower versions
+in semver order, and session access decides which can run. Model routing changes neither exact-pin resolution nor reasoning
 selection.
 
 A replacement must declare `group: "size"` or `group: "planner-worker"`.
@@ -332,7 +340,8 @@ is generated through the implementation. Verification for this increment:
 - The standards/spec review resolved duplicated label rules and confirmed the
   generic downward fallback also applies to review when its target is unavailable.
   Its alternate cross-version target-path coverage is historical and is
-  superseded by ADR 0015's exact-version boundary.
+  superseded by ADR 0015's exact-version boundary, itself later replaced by
+  ADR 0021's downward version-ladder walk.
 
 ### Version-local routing and retained effort (ADR 0015)
 
@@ -343,8 +352,10 @@ no new families or versions are added. The verification counts immediately
 above describe the earlier issue-#10 increment, not evidence for this change.
 `SizeRoutingTarget` and `PlannerWorkerRoutingTarget` separately own label
 matching, starting rung, and fallback rank behind a small shared interface;
-the router owns the common exact-version walk. No class-internal tests are
-required.
+the router owns the common downward walk and availability checks. No
+class-internal tests are required. ADR 0021 later replaced the exact-version
+boundary with a downward version-ladder walk; the rest of this section
+describes the ADR 0015 increment.
 
 At the time of ADR 0015, retained-model reasoning stepped below known parent
 effort and standalone reasoning preferred medium/low/lowest supported non-off.
@@ -367,6 +378,17 @@ Verification for this follow-up:
   includes unknown-family retention, ignored legacy links, registry-missing
   parent capabilities, gapped effort ladders, and parents below the non-off floor.
 
+### Version-ladder routing fallback (ADR 0021)
+
+[ADR 0021](adr/0021-version-ladder-fallback.md) partially supersedes the
+exact-version boundary of ADR 0015: when the parent's version yields no
+runnable role target or cheaper rung, the router repeats the identical walk
+at every lower version in semver order — minors down to `.0`, then previous
+majors restarting the minor at the parent's own value, down to version 1 —
+before retaining the parent. Only downward versions are produced, family
+boundaries, role targets, provider rules, and explicit-pin precedence are
+unchanged, and routed outcomes report the version actually used.
+
 ### What the model selection does now
 
 | Area | Stories | State |
@@ -376,10 +398,10 @@ Verification for this follow-up:
 | Explicit choices are exact `provider/modelId` | 57, 58 | Done. No shorthand, no provider fallback, and an unavailable choice is an error rather than a silent fall back. |
 | An explicit choice works without a known family | 59 | Done. |
 | Routing follows a declared ladder, not a name fragment or a price | 60, 64 | Done. The ladders are profile data; the shipped profiles cover nine families. Gemini supports only its chemical line. |
-| Automatic routing stays in the exact parent family/version | 62; ADR 0015 | Version fallback links are removed from schema, data, and runtime; obsolete tier-level `fallbacks` is accepted and discarded. |
+| Automatic routing stays in the exact parent family, walking down versions only | 62; ADR 0015, ADR 0021 | Version fallback links are removed from schema, data, and runtime; obsolete tier-level `fallbacks` is accepted and discarded. When the parent version has no runnable rung, the walk repeats down the version ladder in semver order. |
 | The walk starts at the role target, past a tier the session cannot run | 63; #10 | Role-aware target first, then downward fallback; exhaustion retains the parent. |
 | Routing asks the session what it can run | 65 | Done. The router never invents a provider, a credential, or an id. |
-| An unknown parent family retains the parent | 66; ADR 0015 | No guessed family, price ranking, or cross-version fallback. |
+| An unknown parent family retains the parent | 66; ADR 0015 | No guessed family, price ranking, or upward version fallback. |
 | A family with nothing to offer keeps the parent's model | 67 | Done. |
 | The choice is reported | 74 (model half) | Done. The launch note says which model was chosen and why. |
 

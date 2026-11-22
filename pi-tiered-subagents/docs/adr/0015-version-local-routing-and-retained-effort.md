@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-10-27
-superseded_by: 0017 for automatic reasoning policy
+superseded_by: 0017 for automatic reasoning policy; 0021 for the exact-version boundary
 ---
 
 # 0015 — Keep automatic routing version-local and retained effort one rung down

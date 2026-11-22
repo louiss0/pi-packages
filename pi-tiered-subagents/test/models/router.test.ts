@@ -218,7 +218,7 @@ describe("routeModel", () => {
     });
   });
 
-  it("does not cross versions to find an XL parent's target", () => {
+  it("walks down versions when the parent's version has no target", () => {
     const parent = model("anthropic", "claude-fable-7");
     expect(
       routeModel(
@@ -226,7 +226,36 @@ describe("routeModel", () => {
         context([model("anthropic", "claude-opus-6")]),
         "worker",
       ),
+    ).toMatchObject({
+      kind: "routed",
+      modelId: "claude-opus-6",
+      tier: "claude 6 tier opus",
+    });
+  });
+
+  it("keeps walking majors until a runnable version is found", () => {
+    const parent = model("anthropic", "claude-fable-7");
+    expect(
+      routeModel(
+        parent,
+        context([model("anthropic", "claude-opus-5")]),
+        "worker",
+      ),
+    ).toMatchObject({
+      kind: "routed",
+      modelId: "claude-opus-5",
+      tier: "claude 5 tier opus",
+    });
+  });
+
+  it("restarts previous majors at the parent's own minor", () => {
+    const parent = model("openai", "gpt-6.0-sol");
+    expect(
+      routeModel(parent, context([model("openai", "gpt-5.9-terra")]), "worker"),
     ).toMatchObject({ kind: "retained", model: parent });
+    expect(
+      routeModel(parent, context([model("openai", "gpt-5.0-terra")]), "worker"),
+    ).toMatchObject({ kind: "routed", modelId: "gpt-5.0-terra" });
   });
 
   it("steps down one size in the parent's own version", () => {
@@ -270,7 +299,7 @@ describe("routeModel", () => {
     expect(outcome.modelId).toBe("gpt-5.6-luna");
   });
 
-  it("never crosses versions even when a legacy profile contains a link", () => {
+  it("never routes through obsolete tier-level fallbacks", () => {
     const parent = model("openai", "gpt-6.1-sol");
     const otherVersion = model("openai", "gpt-6-luna");
     const legacyLinks = { fallbacks: [{ version: "6", tier: "luna" }] };
@@ -293,7 +322,7 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("6.1");
   });
 
-  it("never invents a route to another version", () => {
+  it("never invents a route the version walk does not produce", () => {
     const profile: FamilyProfile = {
       family: "gpt",
       group: "size",
@@ -431,8 +460,6 @@ describe("routeModel", () => {
   it.each([
     ["minimax", "MiniMax-M3", "worker", "MiniMax-M3.1-flash", "worker"],
     ["minimax", "MiniMax-M2.7", "explore", "MiniMax-M3.1-flash", "worker"],
-    ["qwen-token-plan", "qwen3.7-max", "researcher", "qwen3.6-flash", "S"],
-    ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
   ])("%s/%s retains rather than crossing versions for %s", (provider, parentId, role, otherVersionId, target) => {
     const parent = model(provider, parentId);
     const outcome = routeModel(
@@ -444,6 +471,27 @@ describe("routeModel", () => {
     if (outcome.kind !== "retained") return;
     expect(outcome.model).toBe(parent);
     expect(outcome.reason).toContain(`${role} targets ${target}`);
+  });
+
+  it.each([
+    ["qwen-token-plan", "qwen3.7-max", "worker", "qwen3.6-plus", "M"],
+    ["qwen-token-plan", "qwen3.7-plus", "worker", "qwen3.6-flash", "S"],
+    ["openai", "gpt-6.1-sol", "worker", "gpt-6.0-terra", "M"],
+    ["openai", "gpt-6.1-sol", "worker", "gpt-5.1-terra", "M"],
+    ["openai", "gpt-6.1-astra", "debug", "gpt-6.0-terra", "M"],
+    ["openai", "gpt-6.1-astra", "debug", "gpt-5.1-terra", "M"],
+  ])("%s/%s walks down versions for %s to %s (%s)", (provider, parentId, role, expected, target) => {
+    const parent = model(provider, parentId);
+    const outcome = routeModel(
+      parent,
+      context([parent, model(provider, expected)]),
+      role,
+    );
+    expect(outcome.kind).toBe("routed");
+    if (outcome.kind !== "routed") return;
+    expect([outcome.provider, outcome.modelId]).toEqual([provider, expected]);
+    expect(outcome.reason).toContain(`${role} targets ${target}`);
+    expect(outcome.reason).toContain("below");
   });
 
   it("retains a bare Gemini parent whose tier is unknown", () => {
@@ -477,16 +525,18 @@ describe("routeModel", () => {
     expect(outcome.reason).toContain("worker targets S");
   });
 
-  it("does not borrow a chemical model from another version", () => {
+  it("borrows a chemical model from a lower version when it is reachable", () => {
     const parent = model("google", "gemini-3.7-krypton");
     const outcome = routeModel(
       parent,
       context([model("google", "gemini-2.5-carbon")]),
       "worker",
     );
-    expect(outcome.kind).toBe("retained");
-    if (outcome.kind !== "retained") return;
-    expect(outcome.model).toBe(parent);
+    expect(outcome).toMatchObject({
+      kind: "routed",
+      modelId: "gemini-2.5-carbon",
+    });
+    if (outcome.kind !== "routed") return;
     expect(outcome.reason).toContain("worker targets L");
   });
 
