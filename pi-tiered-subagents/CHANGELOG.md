@@ -1,3 +1,15 @@
+## 2.0.4 (2026-11-22)
+
+### 🚀 Features
+
+- **models:** walk down the version ladder when routing subagents ([#12](https://github.com/louiss0/pi-packages/pull/12))
+
+### ❤️ Thank You
+
+- Devin @devin-ai-integration[bot]
+- openhands
+- shelton louis @louiss0
+
 ## 2.0.3 (2026-11-19)
 
 This was a version bump only for pi-tiered-subagents to align it with other projects, there were no code changes.
